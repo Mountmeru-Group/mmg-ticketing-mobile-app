@@ -19,6 +19,7 @@
 > **Size of the work.**
 > - Blocking work: roughly **1.5 to 3 weeks of one backend developer**, plus about an hour of Microsoft Entra admin time.
 > - Nice-to-haves: roughly another 3 to 5 weeks.
+> - Features copied from the ServiceDesk Plus app that the system can't support yet (worklogs, a "my tasks" list, merging tickets, approval delegation and similar; asks **A19–A30**, added 14 October): roughly another 3 to 5 weeks. None of them blocks the first release; the app hides those features until they exist.
 
 Source of every item: `C:\Users\Ronit Chaudhari\mmg-ticketing-diagnostic.md` §10, re-checked against the web repo on 2026-10-09. The A7 "AI ticket summary" item comes from the 2026-10-14 drift check (`07-DRIFT-CHECK.md`), verified against web `master` @ `d7f3887`. File paths are relative to `backend/src/` unless stated otherwise.
 
@@ -57,10 +58,24 @@ Source of every item: `C:\Users\Ronit Chaudhari\mmg-ticketing-diagnostic.md` §1
 | A16 | Real baseline migration matching production; put raw-SQL columns into `schema.prisma` | A clean staging database for mobile testing can't be built from the repo | Nice-to-have | M |
 | A17 | Complete the OpenAPI spec | It covers about 95 of 300 paths, so a typed client can't be generated from it | Nice-to-have | M |
 | A18 | App links (`apple-app-site-association`, `assetlinks.json`), and fix the triage email link | Lets ticket links in emails open in the app. The triage email currently links to a wrong route | Nice-to-have (Phase 2) | S |
+| A19 | Worklogs and time tracking (model + CRUD under the ticket) | SDP parity: worklog section, worklog timer, task worklogs. No worklog/time model exists; the web "Worklog" tab is a placeholder | Nice-to-have (SDP parity) | M |
+| A20 | Cross-ticket "My tasks" list (+ optional task comments/attachments) | SDP standalone Tasks module. Tasks are only reachable under one ticket; the web "My Tasks" tab is a placeholder | Nice-to-have (SDP parity) | S (+M optional part) |
+| A21 | Ticket list: more `sortBy` values + `sortOrder` | SDP sort sheet (ID, status, subject, requester, asc/desc). Only priority / SLA / updated exist | Nice-to-have (SDP parity) | XS |
+| A22 | Ticket list: `searchField` selector | SDP search field picker. Today one `search` hits four fields | Nice-to-have (SDP parity) | XS |
+| A23 | Due-date filter on the ticket list + "due today" KPI | SDP "Requests due today". `fromDate`/`toDate` filter `createdAt`; `DUE_SOON` means ≤ 30 min | Nice-to-have (SDP parity) | S |
+| A24 | Bulk ticket actions endpoint | SDP multi-select. Today N calls share a 300/min IP bucket; mobile caps at 20 | Nice-to-have | M |
+| A25 | Merge tickets | SDP Merge. No route exists | Nice-to-have (SDP parity) | M |
+| A26 | Approval delegation and revoke | SDP Delegate / revoke delegation. No model or route | Nice-to-have (SDP parity) | M |
+| A27 | Approver read access to the parent record; ticket-scoped approvals; my approval history | Non-staff approvers get 403 on the ticket they must approve; the ticket's approvals list exists only as the unscoped `GET /approvals` | Nice-to-have (needed for non-staff approvers to see what they approve) | M |
+| A28 | Ticket templates readable by every role (active only, minimal fields) | SDP "pick a template" before the form. `GET /templates` is ADMIN/AGENT only and returns inactive rows and creator emails | Nice-to-have (SDP parity) | XS |
+| A29 | Exact asset lookup by tag | QR scan → one asset. Today only a contains-search exists | Nice-to-have (Phase 2) | XS |
+| A30 | Requester acknowledgement on closure | SDP close-flow field. No column exists | Nice-to-have (SDP parity) | S |
 
 **Totals**
 - **5 blocking asks:** A1, A2, A7, A13, A14.
-- **13 nice-to-have asks.**
+- **25 nice-to-have asks:**
+  - the original 13: A3–A6, A8–A12, A15–A18;
+  - 12 SDP-parity asks added 2026-10-14: A19–A30. Source: `08-SDP-PARITY.md` §7. Rough effort for these 12 is another 3 to 5 weeks of one backend developer.
 
 ---
 
@@ -280,6 +295,204 @@ Keep the same login rate limiter (20 per 15 min per IP).
 **Ask**
 - Host `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` on each environment's web domain. The mobile team will provide the bundle IDs and signing fingerprints.
 - Fix the triage email link (`modules/email/notification.service.ts`, around line 688) from `/tickets/<ticketNumber>` to `/ticket/<ticketNumber>`.
+
+---
+
+## SDP-parity asks (added 2026-10-14)
+
+**Why these exist**
+- The mobile app follows the ManageEngine ServiceDesk Plus Android app's structure.
+- These are the SDP features the backend cannot support today. Each was checked against web `master` @ `d7f3887`. Full analysis: `08-SDP-PARITY.md`.
+
+**Status**
+- All are **nice-to-have**: the Android MVP ships without them and hides the feature.
+- Asks that add a column or table (A19, A20 optional part, A26, A30) need a schema change in an environment managed by `prisma db push`; see A16.
+- **Android-first:** the iOS halves of A2, A5 and A18 can wait (`08` §8.3).
+
+### A19 — Worklogs and time tracking — Nice-to-have — M
+
+**Today**
+- No worklog, time-entry or time-spent model exists.
+- `schema.prisma` has 58 models; none records work time. The only time-like fields are:
+  - SLA settings;
+  - `Ticket.slaHoldMinutes` (SLA pause time, `schema.prisma:366`);
+  - `ServiceItem.estimatedTime` (a catalogue estimate, `:947`).
+- `TicketTask` (`:1664-1682`) has no duration or effort field.
+- There is no raw-SQL table either.
+- The web shows a placeholder "Worklog" tab with "No worklog entries" and an "Add Worklog" menu item that only switches tab (`frontend/src/pages/tickets/TicketDetailPage.tsx:688, 807, 1646-1655`). Neither calls an API.
+- Evidence in full: `08` §7.1.
+
+**Ask**
+1. New table `TicketWorklog`:
+   - `id`, `ticketId` (FK, cascade), `taskId?` (FK `TicketTask`, SetNull), `technicianId` (FK User);
+   - `startedAt`, `endedAt?`, `durationMinutes` (Int, required, > 0);
+   - `description?`, `createdAt`, `updatedAt`.
+2. Routes under `/api/v1/tickets/:ticketId/worklogs`:
+   - `GET` (list, `startedAt` desc, with `technician{id,displayName}`);
+   - `POST`;
+   - `PUT /:id`;
+   - `DELETE /:id`.
+   - Same ticket-scope check as the other ticket sub-resources (A7). Write: ADMIN, AGENT, L2 only. Edit/delete: author or ADMIN.
+3. Optionally `totalWorklogMinutes` on `GET /tickets/:id`.
+
+**Timer:** the mobile timer runs on the device and POSTs `{startedAt, endedAt, durationMinutes}` when stopped. No server-side timer state is needed.
+
+**Acceptance criteria**
+- A technician adds, edits and deletes a worklog on a ticket in scope; the list returns it.
+- An END_USER gets 403 on POST.
+- A caller outside the ticket's scope gets 403 or 404.
+
+### A20 — Cross-ticket "My tasks" — Nice-to-have — S (+M optional)
+
+**Today**
+- Tasks exist only as `/api/v1/tickets/:ticketId/tasks` (`modules/ticketTasks/ticketTasks.router.ts:7-10`). There is no `/tasks` mount (`app.ts:123-162`).
+- `Attachment` has only `ticketId`/`commentId` (`schema.prisma:439-454`). No task comment model exists.
+- The web dashboard "My Tasks" tab is a static placeholder (`frontend/src/pages/dashboard/DashboardPage.tsx:801-813`).
+
+**Ask**
+1. `GET /api/v1/tasks?assignedToId=me|<uuid>&status=&search=&page=&limit=`.
+   - Shape (a) pagination.
+   - Each row = task scalars + `assignedTo{id,displayName}` + `ticket{id,ticketNumber,title,status}`.
+   - Scoped like `GET /tickets`: a caller only sees tasks on tickets they may see.
+2. *(Optional)* Task comments and attachments: a nullable `taskId` on `Comment` and on `Attachment`, plus a `?taskId=` filter on the existing list routes.
+
+**Acceptance criteria**
+- An AGENT sees their open tasks across tickets, each with its parent ticket number.
+- An END_USER sees none that belong to tickets they don't own.
+
+### A21 — Ticket list sort allow-list and direction — Nice-to-have — XS
+
+**Today:** `GET /tickets` accepts `sortBy=priority` (desc) or `sla` (`slaResolveDue` asc); anything else gives `updatedAt` desc. There is no direction parameter (`modules/tickets/tickets.controller.ts:157-161`).
+
+**Ask**
+- Allow-list `sortBy` ∈ {`ticketNumber`, `status`, `title`, `requester` (requester `displayName`), `priority`, `updatedAt`, `createdAt`, `slaResolveDue`}.
+- Add `sortOrder=asc|desc`.
+- Reject other values with 400, not 500.
+
+**Acceptance criteria:** each allowed pair returns rows in that order across pages.
+
+### A22 — Ticket list search field selector — Nice-to-have — XS
+
+**Today:** `search` = exact `ticketNumber` if all digits; otherwise contains on title, requester name, requester email and assignee name (`tickets.controller.ts:133-150`).
+
+**Ask**
+- Optional `searchField=number|title|requester|assignee`; omitted = today's behaviour.
+- **Must keep the role scope** (wrap scope and search in `AND`, as A7 asks).
+
+**Acceptance criteria:** `searchField=title&search=printer` matches only titles, within the caller's scope.
+
+### A23 — Due-date filter and "due today" KPI — Nice-to-have — S
+
+**Today**
+- `fromDate`/`toDate` filter `createdAt` only (`tickets.controller.ts:125-130`).
+- `DUE_SOON` is set at ≤ 30 minutes remaining (`jobs/slaBreachChecker.job.ts:62-65`).
+- No KPI counts tickets due today.
+
+**Ask**
+- `dueFrom`/`dueTo` (ISO date-times, so the client can send its own local day bounds) on `GET /tickets`, filtering `slaResolveDue`.
+- A `dueToday` count in `GET /dashboard/all` `kpis`. It must be role-scoped, unlike the widgets flagged in `05` B.20. It needs a timezone parameter, or the client uses the list filter instead.
+
+**Acceptance criteria:** a ticket with `slaResolveDue` inside the given window appears; one outside does not.
+
+### A24 — Bulk ticket actions — Nice-to-have — M
+
+**Today**
+- No bulk route exists (`modules/tickets/tickets.router.ts:16-25`).
+- Mobile sends N sequential calls, capped at 20. All Bearer clients behind one NAT share the 300/min IP bucket until A14 ships (`app.ts:94-102`).
+
+**Ask:** `POST /api/v1/tickets/bulk { ids: uuid[] (max 50), action: 'assign'|'status', payload }`.
+- **Same per-ticket checks** as the single routes, plus A7's scope checks.
+- Returns `200 { results: [{ id, ok, error? }] }`. No all-or-nothing.
+- **One** notification digest per recipient instead of one email per ticket.
+
+**Acceptance criteria**
+- Mixed permitted and forbidden IDs give per-item results.
+- A requester affected by 10 closes gets one email, not 10–30.
+
+### A25 — Merge tickets — Nice-to-have — M
+
+**Today:** no merge route in any router.
+
+**Ask:** `POST /api/v1/tickets/:id/merge { sourceIds: uuid[] }`, ADMIN/AGENT.
+- Move comments and attachments from each source to the target.
+- Close each source with `closureCode: 'Closed – Duplicate'` and a public comment linking the target.
+- Write audit entries on both sides.
+
+**Acceptance criteria**
+- After a merge, the target's activity shows the moved comments.
+- Each source is CLOSED and links to the target.
+
+### A26 — Approval delegation — Nice-to-have — M
+
+**Today:** `Approval` has no delegation fields (`schema.prisma:763-783`). The approvals router has only create / list / pending / approve / reject (`modules/approvals/approvals.router.ts:8-12`). Neither the backend nor the frontend contains "delegat".
+
+**Ask**
+- Add `delegatedFromId?` and `delegatedAt?` to `Approval`.
+- `POST /approvals/:id/delegate { toUserId, comments? }`: the current approver only, PENDING only. Reassign `approverId`, keep the original in `delegatedFromId`, notify the new approver.
+- `POST /approvals/:id/revoke-delegation`: the original approver only, while still PENDING.
+
+**Acceptance criteria**
+- After delegating, the delegate sees it in `GET /approvals/pending` and the delegator does not.
+- After revoking, the reverse is true.
+
+### A27 — Approver read access, ticket-scoped approvals, approval history — Nice-to-have — M
+
+**Today**
+- Ticket approvals carry no ticket data.
+- An END_USER approver who is not the requester gets **403** from `GET /tickets/:id` (`tickets.controller.ts:476-498`) and from attachments. So do L2 approvers outside their scope.
+- The approval email links to the web ticket page (`modules/email/notification.service.ts`, `ticketUrl`, around line 513), which fails the same way.
+- AGENT approvers can open the ticket today only because AGENT reads are unscoped (`05` C.6), which A7 will close.
+- The web's ticket "Approvals" tab uses the **unscoped** `GET /approvals?entityType=ticket&entityId=` (`frontend/src/pages/tickets/TicketDetailPage.tsx:438`; `05` C.16).
+- No endpoint returns "approvals I have decided".
+
+**Ask**
+1. `GET /api/v1/approvals/:id`, readable by the approver (and the requester). Returns the approval plus a **parent summary**:
+   - ticket: `ticketNumber`, `title`, sanitised `description`, `requester{displayName}`, PUBLIC comments, attachment list;
+   - service request: the existing include;
+   - change: `changeNumber`, `title`, `description`, `status`.
+2. `GET /api/v1/tickets/:id/approvals`, with the same access rule as `GET /tickets/:id`. Replaces the web's unscoped call.
+3. `GET /api/v1/approvals/mine?status=APPROVED|REJECTED|CANCELLED&page=&limit=`: the caller's decided approvals.
+
+**Acceptance criteria**
+- An END_USER approver can read the parent summary of an approval assigned to them.
+- They still get 403 on `GET /tickets/:id` for that ticket (no widening of ticket access).
+
+### A28 — Ticket templates for every role — Nice-to-have — XS
+
+**Today**
+- `GET /templates` and `GET /templates/:id` are ADMIN/AGENT only (`modules/templates/templates.router.ts:7, 9`).
+- They return inactive templates and `createdBy.email` (`templates.controller.ts:20-38`).
+- The web create page uses no templates.
+
+**Ask:** let every role call `GET /templates?entityType=ticket`, returning only `isActive` rows with `{ id, name, description, title, body, categoryId, priority }` and no creator fields. ADMIN keeps the full view.
+
+**Acceptance criteria**
+- An END_USER gets active ticket templates only, without email addresses.
+- Inactive templates are absent.
+
+### A29 — Exact asset lookup by tag — Nice-to-have (Phase 2) — XS
+
+**Today**
+- `GET /assets?search=` contains-matches name, `assetTag` and `serialNumber` (`modules/assets/assets.controller.ts:79-98`), ADMIN/AGENT only.
+- `assetTag` is unique (`schema.prisma:809`).
+- Nothing in the web repo generates QR codes or barcodes.
+
+**Ask:** `GET /api/v1/assets/by-tag/:assetTag` → the asset (same include as `GET /assets/:id`) or 404, ADMIN/AGENT.
+
+**Acceptance criteria:** scanning a label with tag `MMG-0001` returns exactly that asset.
+
+**Note:** printing QR labels that encode the `assetTag` is an IT operations decision, not a backend change.
+
+### A30 — Requester acknowledgement on closure — Nice-to-have — S
+
+**Today:** `Ticket` has `resolution`, `closureCode`, `isFcr` and `closureComments` (`schema.prisma:373-377`), but no acknowledgement field.
+
+**Ask**
+- Add `requesterAcknowledged Boolean?` and `requesterAcknowledgedAt DateTime?` to `Ticket`.
+- Accept `requesterAcknowledged` in `POST /tickets/:id/status`, validated, unlike the raw fields today (A7).
+- Show it in the web closure modal.
+
+**Acceptance criteria:** closing with `requesterAcknowledged: true` persists it and returns it on `GET /tickets/:id`.
 
 ---
 
