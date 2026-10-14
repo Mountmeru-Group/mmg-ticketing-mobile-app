@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "MMG Service Desk",
+    "slug": "meru-servicedesk",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "mmgservicedesk",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.mountmeru.servicedesk",
+      "allowBackup": false
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}
