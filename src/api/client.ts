@@ -125,6 +125,12 @@ apiClient.interceptors.response.use(
     if (!isJsonResponse(response)) {
       throw new ApiClientError('not-json', response.status, { error: 'Unexpected non-JSON response from the server' });
     }
+    // A JSON content-type is not enough: axios silently hands back the raw text when the body does not
+    // parse (silentJSONParsing), so an HTML page labelled application/json would arrive as a string.
+    // Every documented /api/v1 success body is an object or an array (01), never a bare string or null.
+    if (typeof response.data !== 'object' || response.data === null) {
+      throw new ApiClientError('not-json', response.status, { error: 'Response body is not a JSON object or array' });
+    }
     return response;
   },
   (error: unknown) => {

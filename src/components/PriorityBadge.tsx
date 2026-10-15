@@ -12,15 +12,24 @@ const PRIORITY_STYLES: Record<TicketPriority, { container: string; text: string 
   URGENT: { container: 'bg-red-100', text: 'text-red-800' },
 };
 
+const FALLBACK = { container: 'bg-gray-100', text: 'text-gray-800' };
+
 interface PriorityBadgeProps {
-  priority: TicketPriority;
+  /** Unknown values render raw, in grey (logged as drift in __DEV__). */
+  priority: TicketPriority | (string & {});
+  /** "Auto" pill: priority computed by the server from impact × urgency (05 §A.3, staff only). */
+  auto?: boolean;
 }
 
-export function PriorityBadge({ priority }: PriorityBadgeProps) {
-  const style = PRIORITY_STYLES[priority];
+export function PriorityBadge({ priority, auto = false }: PriorityBadgeProps) {
+  const style = (PRIORITY_STYLES as Record<string, { container: string; text: string }>)[priority] ?? FALLBACK;
+  const label = (PRIORITY_LABELS as Record<string, string>)[priority] ?? priority;
   return (
-    <View className={`self-start rounded-full px-2.5 py-0.5 ${style.container}`}>
-      <Text className={`text-xs font-medium ${style.text}`}>{PRIORITY_LABELS[priority]}</Text>
+    <View className={`flex-row items-center self-start rounded-full px-2.5 py-0.5 ${style.container}`}>
+      <Text className={`text-xs font-medium ${style.text}`} numberOfLines={1}>
+        {label}
+      </Text>
+      {auto ? <Text className={`ml-1 text-[10px] font-semibold uppercase ${style.text}`}>Auto</Text> : null}
     </View>
   );
 }

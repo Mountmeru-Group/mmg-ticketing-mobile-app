@@ -4,11 +4,14 @@ import { ApiClientError } from './errors';
 
 const MAX_GET_RETRIES = 2;
 
+/** UAT shares its database server and Redis with PRODUCTION (00 §3): every query stays fresh for at least this long. */
+export const MIN_STALE_TIME_MS = 60_000;
+
 /**
  * Retry policy (02 §5.3; 05 B.32):
  * - Queries are GETs only in this app, so they may retry: at most twice, with exponential backoff,
  *   and only for 429, 5xx and transient network failures.
- * - Never retry 4xx, and never retry a 200 that turned out to be HTML (`not-json`).
+ * - Never retry 4xx, and never retry a 200 that turned out to be HTML (`not-json`) or the wrong shape.
  */
 function shouldRetryGet(failureCount: number, error: unknown): boolean {
   if (failureCount >= MAX_GET_RETRIES) return false;
@@ -17,12 +20,26 @@ function shouldRetryGet(failureCount: number, error: unknown): boolean {
   return error.status === 429 || (error.status !== null && error.status >= 500);
 }
 
+/**
+ * The one QueryClient. App.tsx provides it; it lives here (not in App.tsx) because the 401 handler in
+ * client.ts must clear this same instance, and App.tsx → client.ts → App.tsx would be an import cycle.
+ *
+ * Conservative defaults — UAT runs on production hardware (00 §3):
+ * - staleTime ≥ 60 s; hooks may raise it (lookups, /auth/me) but never lower it.
+ * - No refetchInterval anywhere, no refetch on focus, reconnect or remount: cached data only refreshes on
+ *   pull-to-refresh or an explicit Retry. A query with no cached data still loads on first use.
+ * - No prefetching and no cache warming anywhere in the app.
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: shouldRetryGet,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
-      staleTime: 30_000,
+      staleTime: MIN_STALE_TIME_MS,
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
     },
     mutations: {
       // Never auto-retry POST/PUT/DELETE: none of them is idempotent (duplicate tickets/comments, 02 §5.3).

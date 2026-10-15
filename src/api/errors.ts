@@ -8,8 +8,10 @@ import type { ApiError } from '@/types';
  * - `network`  — no response at all (offline, DNS, IIS restart at 03:00 — 05 B.32).
  * - `timeout`  — no response within the client timeout.
  * - `client`   — rejected on the device before sending (validation, expired session).
+ * - `shape`    — valid JSON, but not the documented envelope (e.g. an object where 01 promises an array).
+ *                Rejected so a screen never renders something it does not understand (src/api/drift.ts).
  */
-export type ApiErrorKind = 'http' | 'not-json' | 'network' | 'timeout' | 'client';
+export type ApiErrorKind = 'http' | 'not-json' | 'network' | 'timeout' | 'client' | 'shape';
 
 /**
  * Every rejection from src/api/ is an ApiClientError whose `body` is the documented error envelope
@@ -51,6 +53,17 @@ export function describeError(error: unknown): string {
   if (error.status === 403) return "You don't have permission to do that";
   if (error.status === 429) return 'Too many requests, try again shortly';
   if (error.status !== null && error.status >= 500) return 'Something went wrong';
-  if (error.kind === 'not-json') return 'Unexpected response from the server';
+  if (error.kind === 'not-json') {
+    // Most often the 200 text/html SPA fallback for an unknown GET (00 §2). Nothing from it was shown.
+    return 'The Service Desk sent a web page instead of data, so nothing was shown. Try again; if it keeps happening, report it.';
+  }
+  if (error.kind === 'shape') {
+    return "The Service Desk's reply was not in the expected format, so nothing was shown. Report it if it keeps happening.";
+  }
   return error.body.error;
+}
+
+/** No response at all: offline, DNS failure, or the server restarting. Screens show the offline banner for it. */
+export function isOfflineError(error: unknown): boolean {
+  return error instanceof ApiClientError && error.kind === 'network';
 }

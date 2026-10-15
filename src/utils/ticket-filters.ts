@@ -94,3 +94,44 @@ export function ticketSortQuery(sort: TicketSortOption): Pick<TicketListQuery, '
 export function roleDefaultTicketQuery(role: UserRole): Pick<TicketListQuery, 'countryId'> {
   return role === 'END_USER' ? { countryId: '' } : {};
 }
+
+/**
+ * The search box (08 §4.4, 05 §A.11): a leading `#` is stripped, so "#1234" and "1234" both hit the server's
+ * digits-only branch (exact ticketNumber). Anything else is sent as a keyword (subject, requester, technician).
+ * Returns undefined for a blank box, so the `search` key is not sent at all.
+ */
+export function normaliseTicketSearch(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const asNumber = trimmed.replace(/^#\s*/, '');
+  return /^\d+$/.test(asNumber) ? asNumber : trimmed;
+}
+
+// ── Country selector (05 §A.12) ──────────────────────────────
+
+/**
+ * - `switch`: ADMIN and triage AGENT (AGENT without a country) pick a country, default "All".
+ * - `locked`: country AGENT, forced to their own country.
+ * - `hidden`: L2_MANAGER (server ignores countryId for them) and END_USER (D8: always `countryId=`, so a
+ *   read-only country label would be misleading on mobile).
+ */
+export type CountrySelectorMode = 'switch' | 'locked' | 'hidden';
+
+export function countrySelectorMode(user: Pick<AuthUser, 'role' | 'countryId'>): CountrySelectorMode {
+  if (user.role === 'ADMIN') return 'switch';
+  if (user.role === 'AGENT') return user.countryId ? 'locked' : 'switch';
+  return 'hidden';
+}
+
+/**
+ * `countryId` for TKT-1, or undefined to omit the key (05 §A.12): the value is sent only as `countryId`.
+ * - locked AGENT → their own country;
+ * - triage AGENT → the selection, or `''` for "All";
+ * - ADMIN → the selection, or omitted for "All" (no filter either way for non-END_USER, 01 TKT-1);
+ * - END_USER → handled by roleDefaultTicketQuery (`''`); L2 → omitted (the server ignores it).
+ */
+export function listCountryParam(user: Pick<AuthUser, 'role' | 'countryId'>, selected: string | null): string | undefined {
+  if (user.role === 'AGENT') return user.countryId ? user.countryId : (selected ?? '');
+  if (user.role === 'ADMIN') return selected ?? undefined;
+  return undefined;
+}
