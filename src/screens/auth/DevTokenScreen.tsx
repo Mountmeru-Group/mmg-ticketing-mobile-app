@@ -151,7 +151,7 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
         <Text className="text-center font-semibold text-white">{checking ? 'Checking token…' : 'Use this token'}</Text>
       </Pressable>
       <Text className="mt-3 text-xs text-gray-500">
-        Signing out of the app does not revoke this token (it is your browser session). Sign out in the browser to end it.
+        Signing out of the app ends this session on the server, so the UAT browser you copied it from is signed out too.
       </Text>
     </PlaceholderScreen>
   );

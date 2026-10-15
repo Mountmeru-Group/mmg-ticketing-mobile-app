@@ -4,11 +4,13 @@
 // - TKT-3 loads the ticket first (05 §C hygiene), which also gives the current task when editing.
 // - Title required (1–255). Create sends { title, description?, assignedToId?, dueDate? } — the server defaults the
 //   status to OPEN. Edit sends only the fields that changed; clearing description, technician or due date sends null.
-// - Due date: a calendar day sent as UTC midnight, a full ISO string — never `YYYY-MM-DD` (05 B.25).
+// - Due date: picked with the system date picker (@react-native-community/datetimepicker, Android dialog) or a quick
+//   pick, never typed. The chosen calendar day is sent as UTC midnight, a full ISO string — never `YYYY-MM-DD` (05 B.25).
 // - Technician: ADMIN/AGENT pick through USR-3 (active users). L2_MANAGER can't search users (USR-3 is 403 for L2),
 //   so for L2 the technician is shown but not changeable.
 // - Save is the only write. Create/edit are reversible (edit or remove the task), so they are not confirmed; delete
 //   lives on task detail and is confirmed there.
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +27,9 @@ import { notify } from '@/utils/dialogs';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { canAssignToSelf } from '@/utils/session';
-import { dayFromToday, dayToDueDate, dueDateToDay, formatDueDay } from '@/utils/tasks';
+import {
+  DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate, dayFromToday, dayToDueDate, dueDateToDay, formatDueDay,
+} from '@/utils/tasks';
 
 const TECHNICIAN_ROLES: readonly UserRole[] = ['ADMIN', 'AGENT', 'L2_MANAGER'];
 const STATUS_OPTIONS: readonly SheetOption<TaskStatus>[] = TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABELS[s] }));
@@ -35,7 +39,7 @@ interface Draft {
   description: string;
   assignee: Person | null;
   status: TaskStatus;
-  /** The due-date field as typed: "YYYY-MM-DD", or "" for none. Validated on save. */
+  /** The chosen calendar day, "YYYY-MM-DD" (date picker or quick pick), or "" for none. */
   dueDay: string;
 }
 
@@ -88,13 +92,25 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
   const dueDay = draft.dueDay.trim();
   const dueValid = !dueDay || !!dayToDueDate(dueDay);
 
+  /** System date dialog (Android). Picking writes nothing: it only fills the field; Save sends it. */
+  const openDuePicker = () => {
+    DateTimePickerAndroid.open({
+      value: dateFromDay(dueDay) ?? new Date(),
+      mode: 'date',
+      minimumDate: DUE_DATE_MIN,
+      maximumDate: DUE_DATE_MAX,
+      onValueChange: (_event, date) => update({ dueDay: dayFromDate(date) }),
+      onError: () => setError("Couldn't open the date picker."),
+    });
+  };
+
   const submit = () =>
     void once(async () => {
       setError(null);
       const title = draft.title.trim();
       if (!title) return setError('Title is required');
       if (title.length > 255) return setError('Title must be 255 characters or fewer');
-      if (!dueValid) return setError('Due date must be a real date written as YYYY-MM-DD');
+      if (!dueValid) return setError('Pick a valid due date');
       try {
         await save.mutateAsync({ ticketId, taskId, body });
         notify(editing ? 'Task saved' : 'Task added');
@@ -194,30 +210,20 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             <SelectField label="Status" value={TASK_STATUS_LABELS[draft.status]} onPress={() => setSheet('status')} disabled={save.isPending} />
           ) : null}
 
-          <FieldLabel label="Due date" hint="YYYY-MM-DD, or pick one below" />
-          <TextInput
-            value={draft.dueDay}
-            onChangeText={(v) => update({ dueDay: v })}
-            editable={!save.isPending}
+          <SelectField
+            label="Due date"
+            hint="Tap to pick a date, or use a quick pick below"
+            value={dueDay && dueValid ? formatDueDay(dayToDueDate(dueDay)) : null}
             placeholder="No due date"
-            placeholderTextColor="#9ca3af"
-            keyboardType="numbers-and-punctuation"
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Due date"
-            className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
+            onPress={openDuePicker}
+            disabled={save.isPending}
           />
-          <View className="mb-1 mt-2 flex-row flex-wrap gap-2">
+          <View className="-mt-1 mb-1 flex-row flex-wrap gap-2">
             {quickDays.map((q) => (
               <Chip key={q.label} label={q.label} active={dueDay === q.day} onPress={() => update({ dueDay: q.day })} />
             ))}
             <Chip label="No due date" active={!dueDay} onPress={() => update({ dueDay: '' })} />
           </View>
-          {dueDay ? (
-            <Text className={`mb-1 text-xs ${dueValid ? 'text-gray-500' : 'text-red-700'}`}>
-              {dueValid ? `Due ${formatDueDay(dayToDueDate(dueDay))}` : 'Not a valid date — use YYYY-MM-DD'}
-            </Text>
-          ) : null}
         </FormCard>
 
         <InlineError message={error} />
@@ -264,7 +270,7 @@ function buildBody(draft: Draft, before: Draft | null): TaskBody {
   const title = draft.title.trim();
   const description = draft.description.trim();
   const day = draft.dueDay.trim();
-  const dueDate = day ? dayToDueDate(day) : null; // invalid text is refused before sending
+  const dueDate = day ? dayToDueDate(day) : null; // an invalid day is refused before sending
   if (!before) {
     const body: TaskBody = { title };
     if (description) body.description = description;
