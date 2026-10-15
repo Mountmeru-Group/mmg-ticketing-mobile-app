@@ -7,8 +7,8 @@ import { ActivityIndicator, AppState, View } from 'react-native';
 import { endSession } from '@/api/client';
 import { SESSION_ENDED_MESSAGE, isSessionExpired, useAuthStore } from '@/store/auth.store';
 import type { RootStackParamList } from '@/types';
+import { AppDrawer } from './AppDrawer';
 import { AuthStack } from './AuthStack';
-import { SessionGate } from './SessionGate';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -47,8 +47,7 @@ export function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          // SessionGate renders the App drawer once GET /auth/me has returned the real user.
-          <Stack.Screen name="App" component={SessionGate} />
+          <Stack.Screen name="App" component={AppDrawer} />
         ) : (
           <Stack.Screen name="Auth" component={AuthStack} />
         )}

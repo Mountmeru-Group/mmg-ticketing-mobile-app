@@ -44,8 +44,6 @@ interface AuthState {
   signOutMessage: string | null;
 
   setSession: (session: NewSession) => Promise<void>;
-  /** Replace the stored user with the server's copy from AUTH-2 GET /auth/me (02 §5.1). Token unchanged. */
-  updateUser: (user: AuthUser) => Promise<void>;
   clearSession: (message?: string | null) => Promise<void>;
   restoreSession: () => Promise<void>;
 }
@@ -78,7 +76,7 @@ function parseStoredUser(raw: string | null): AuthUser | null {
   }
 }
 
-export const useAuthStore = create<AuthState>()((set, get) => ({
+export const useAuthStore = create<AuthState>()((set) => ({
   ...LOGGED_OUT,
   isLoading: true,
   signOutMessage: null,
@@ -88,12 +86,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     await SecureStore.setItemAsync(KEYS.issuedAt, String(issuedAt));
     await SecureStore.setItemAsync(KEYS.user, JSON.stringify(user));
     set({ token, user, issuedAt, isAuthenticated: true, isLoading: false, signOutMessage: null });
-  },
-
-  updateUser: async (user) => {
-    if (!get().isAuthenticated) return; // signed out while /auth/me was in flight
-    set({ user });
-    await SecureStore.setItemAsync(KEYS.user, JSON.stringify(user));
   },
 
   clearSession: async (message = null) => {
