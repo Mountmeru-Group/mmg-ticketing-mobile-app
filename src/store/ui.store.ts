@@ -11,10 +11,14 @@ interface UiState {
   ticketSort: TicketSortOption;
   /** M3 country selector (05 §A.12): a country id, or null for "All countries". Only ADMIN and triage AGENT change it. */
   ticketCountryId: string | null;
+  /** Announcements hidden from the Home banner for this session only — no server state (ANN-1 is read-only). */
+  dismissedAnnouncementIds: readonly string[];
 
   setTicketFilter: (filter: TicketNamedFilter) => void;
   setTicketSort: (sort: TicketSortOption) => void;
   setTicketCountryId: (countryId: string | null) => void;
+  dismissAnnouncement: (id: string) => void;
+  restoreAnnouncement: (id: string) => void;
   reset: () => void;
 }
 
@@ -22,12 +26,16 @@ const INITIAL = {
   ticketFilter: 'ALL',
   ticketSort: 'UPDATED',
   ticketCountryId: null,
-} as const satisfies Pick<UiState, 'ticketFilter' | 'ticketSort' | 'ticketCountryId'>;
+  dismissedAnnouncementIds: [],
+} as const satisfies Pick<UiState, 'ticketFilter' | 'ticketSort' | 'ticketCountryId' | 'dismissedAnnouncementIds'>;
 
 export const useUiStore = create<UiState>()((set) => ({
   ...INITIAL,
   setTicketFilter: (ticketFilter) => set({ ticketFilter }),
   setTicketSort: (ticketSort) => set({ ticketSort }),
   setTicketCountryId: (ticketCountryId) => set({ ticketCountryId }),
+  dismissAnnouncement: (id) =>
+    set((s) => (s.dismissedAnnouncementIds.includes(id) ? s : { dismissedAnnouncementIds: [...s.dismissedAnnouncementIds, id] })),
+  restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),
   reset: () => set({ ...INITIAL }),
 }));

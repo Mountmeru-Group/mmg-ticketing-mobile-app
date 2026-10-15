@@ -1,4 +1,5 @@
-// Phase 1 scaffold layout shared by every placeholder screen. Delete once each screen is built for real.
+// Phase 1 scaffold layout. After Phase 4 it is used ONLY by the auth screens — M1 Login (blocked on ask A2) and the
+// __DEV__ token screen — which this phase was told not to touch. Replace it when M1 is built against A2.
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,10 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components';
 import { useAuthStore } from '@/store/auth.store';
 import { ROLE_LABELS } from '@/utils/roles';
-
-/** Fake ids used only to demonstrate navigation in Phase 1. Never sent to the API (no data fetching yet). */
-export const PLACEHOLDER_ID = '00000000-0000-4000-8000-000000000001';
-export const PLACEHOLDER_ID_2 = '00000000-0000-4000-8000-000000000002';
 
 export interface PlaceholderAction {
   label: string;

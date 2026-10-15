@@ -159,3 +159,143 @@ export const COUNTRY_SPEC: readonly FieldSpec[] = [
   { path: 'name', kinds: S },
   { path: 'displayName', kinds: S },
 ];
+
+// ── Phase 4 ──────────────────────────────────────────────────
+
+/** DSH-1 — only the keys Home reads (the safe KPIs, 05 B.20) and `recent`. */
+export const DASHBOARD_SPEC: readonly FieldSpec[] = [
+  { path: 'kpis', kinds: OBJ },
+  { path: 'kpis.open', kinds: N },
+  { path: 'kpis.inProgress', kinds: N },
+  { path: 'kpis.onHold', kinds: N },
+  { path: 'kpis.slaBreached', kinds: N },
+  { path: 'kpis.totalOpen', kinds: N },
+  { path: 'kpis.resolved', kinds: N },
+  { path: 'kpis.unassigned', kinds: N },
+  { path: 'recent', kinds: ARR },
+];
+
+/** `DashboardRecentTicket` (DSH-1 `recent[]`): Ticket scalars + `requester{displayName}` + `assignedTo{displayName}|null`. */
+export const DASHBOARD_RECENT_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'ticketNumber', kinds: N },
+  { path: 'title', kinds: S },
+  { path: 'status', kinds: S, oneOf: TICKET_STATUSES },
+  { path: 'priority', kinds: S, oneOf: TICKET_PRIORITIES },
+  { path: 'slaStatus', kinds: S, oneOf: SLA_STATUSES },
+  { path: 'createdAt', kinds: S },
+  { path: 'requester', kinds: OBJ },
+  { path: 'requester.displayName', kinds: S },
+  { path: 'assignedTo', kinds: OBJ_NULL },
+];
+
+const NOTIFICATION_TYPES = [
+  'TICKET_ASSIGNED', 'TICKET_UPDATED', 'TICKET_RESOLVED', 'SLA_WARNING', 'SLA_BREACHED', 'COMMENT_ADDED', 'MENTION',
+] as const;
+
+/** `Notification` from NTF-1 (with `ticket`). */
+export const NOTIFICATION_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'ticketId', kinds: S_NULL },
+  { path: 'type', kinds: S, oneOf: NOTIFICATION_TYPES },
+  { path: 'title', kinds: S },
+  { path: 'body', kinds: S },
+  { path: 'isRead', kinds: ['boolean'] },
+  { path: 'createdAt', kinds: S },
+  { path: 'ticket', kinds: ['object', 'null', 'undefined'] },
+];
+
+/** NTF-2 `{ count }`. */
+export const UNREAD_COUNT_SPEC: readonly FieldSpec[] = [{ path: 'count', kinds: N }];
+
+/** `Approval` from APR-1 / APR-2 / APR-3. */
+export const APPROVAL_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'entityType', kinds: S, oneOf: ['ticket', 'change', 'service_request'] },
+  { path: 'entityId', kinds: S },
+  { path: 'stage', kinds: N },
+  { path: 'status', kinds: S, oneOf: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] },
+  { path: 'comments', kinds: S_NULL },
+  { path: 'decidedAt', kinds: S_NULL },
+  { path: 'createdAt', kinds: S },
+  { path: 'change', kinds: OBJ_NULL },
+  { path: 'serviceRequest', kinds: OBJ_NULL },
+];
+
+/** `Announcement` from ANN-1. */
+export const ANNOUNCEMENT_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'body', kinds: S },
+  { path: 'type', kinds: S, oneOf: ['INFO', 'WARNING', 'CRITICAL', 'MAINTENANCE'] },
+  { path: 'isPinned', kinds: ['boolean'] },
+  { path: 'startsAt', kinds: S },
+  { path: 'expiresAt', kinds: S_NULL },
+  { path: 'author', kinds: OBJ },
+];
+
+/** `KBCategory` from KB-1. */
+export const KB_CATEGORY_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'isPublic', kinds: ['boolean'] },
+  { path: 'children', kinds: ['array', 'undefined'] },
+];
+
+/** `KBArticleListItem` from KB-2. */
+export const KB_ARTICLE_ITEM_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'slug', kinds: S },
+  { path: 'excerpt', kinds: S_NULL },
+  { path: 'tags', kinds: ARR },
+  { path: 'helpfulCount', kinds: N },
+  { path: 'isPublished', kinds: ['boolean'] },
+  { path: 'isPublic', kinds: ['boolean'] },
+  { path: 'publishedAt', kinds: S_NULL },
+  { path: 'category', kinds: OBJ_NULL },
+];
+
+/** `KBSearchResult` from KB-3. */
+export const KB_SEARCH_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'slug', kinds: S },
+  { path: 'excerpt', kinds: S_NULL },
+  { path: 'tags', kinds: ARR },
+];
+
+/** `KBArticle` from KB-4. */
+export const KB_ARTICLE_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'body', kinds: S },
+  { path: 'tags', kinds: ARR },
+  { path: 'isPublished', kinds: ['boolean'] },
+  { path: 'isPublic', kinds: ['boolean'] },
+  { path: 'helpfulCount', kinds: N },
+  { path: 'viewCount', kinds: N },
+  { path: 'publishedAt', kinds: S_NULL },
+  { path: 'author', kinds: OBJ },
+  { path: 'category', kinds: OBJ_NULL },
+];
+
+/** `UserProfile` from USR-1. */
+export const USER_PROFILE_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'email', kinds: S },
+  { path: 'displayName', kinds: S },
+  { path: 'role', kinds: S, oneOf: ['ADMIN', 'AGENT', 'END_USER', 'L2_MANAGER'] },
+  { path: 'department', kinds: S_NULL },
+  { path: 'phone', kinds: S_NULL },
+  { path: 'timezone', kinds: S },
+];
+
+/** `UserProfileUpdated` from USR-2 (same reads as USR-1). */
+export const USER_PROFILE_UPDATED_SPEC: readonly FieldSpec[] = USER_PROFILE_SPEC;
+
+/** `TicketTask` from TSK-2 / TSK-3 (assignedTo carries avatarUrl here, unlike inside a ticket). */
+export const TASK_RESPONSE_SPEC: readonly FieldSpec[] = [
+  ...TASK_SPEC,
+  { path: 'ticketId', kinds: S },
+];

@@ -12,7 +12,10 @@
 //   Closed      → status=CLOSED
 //   Sort        → sortBy=priority | sortBy=sla | omitted (= updatedAt desc). No direction param exists (08 §4.3).
 //   Search      → search=<digits> exact ticket # (a leading # is stripped) | search=<text> subject, requester,
-//                 technician (08 §4.4). Submitted on the keyboard's search key, not per keystroke.
+//                 technician (08 §4.4). Submitted on the keyboard's search key, not per keystroke. A pasted ticket
+//                 link (…/ticket/<n>, …/tickets/<id>) opens the in-app link resolver instead (05 §A.11).
+//   Home tiles  → tile-only filters with the KPI's exact status set (ticket-filters.ts HomeTileFilter); shown as an
+//                 extra chip until another filter is picked.
 //   Country     → countryId per 05 §A.12 (listCountryParam).
 // CLIENT-SIDE — display only, never used to hide or reorder rows:
 //   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the hold-adjusted SLA badge (05 §A.9), which can
@@ -46,13 +49,14 @@ import {
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import type { Ticket, TicketStackScreenProps, TicketStatus } from '@/types';
+import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { canAssignToSelf } from '@/utils/session';
 import {
-  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, countrySelectorMode, listCountryParam,
-  normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
+  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, countrySelectorMode, isHomeTileFilter,
+  listCountryParam, normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
 import {
   BULK_ACTION_LIMIT, canChangeStatus, getAvailableTransitions, isResolvedLocked, requiresClosureForm,
@@ -80,7 +84,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   }, [requestedFilter, setTicketFilter]);
 
   const filters = availableTicketFilters(role);
-  const activeFilter: TicketNamedFilter = filters.includes(ticketFilter) ? ticketFilter : 'ALL';
+  // Home tile filters are valid here too, except Unassigned for roles that can't use it (ADMIN/AGENT only).
+  const tileFilterAllowed = isHomeTileFilter(ticketFilter) && (ticketFilter !== 'UNASSIGNED_KPI' || isAgentOrAdmin(role));
+  const activeFilter: TicketNamedFilter = filters.includes(ticketFilter) || tileFilterAllowed ? ticketFilter : 'ALL';
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState<string | undefined>(undefined);
@@ -121,7 +127,14 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
-  const submitSearch = () => setSearch(normaliseTicketSearch(searchText));
+  const submitSearch = () => {
+    // A pasted email link opens that ticket (in-app resolver) instead of searching for the URL text.
+    if (looksLikeUrl(searchText)) {
+      navigation.navigate('TicketLink', { link: searchText.trim() });
+      return;
+    }
+    setSearch(normaliseTicketSearch(searchText));
+  };
   const clearSearch = () => {
     setSearchText('');
     setSearch(undefined);
@@ -352,6 +365,17 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
 
         {/* Named filters (08 §4.5) */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2" keyboardShouldPersistTaps="handled">
+          {isHomeTileFilter(activeFilter) ? (
+            <View
+              accessibilityRole="radio"
+              accessibilityState={{ selected: true }}
+              accessibilityLabel={`Filter from Home: ${TICKET_FILTER_LABELS[activeFilter]}`}
+              className="mr-2 flex-row items-center rounded-full border border-blue-600 bg-blue-600 px-3 py-1.5"
+            >
+              <Ionicons name="home-outline" size={12} color="#ffffff" />
+              <Text className="ml-1 text-sm font-medium text-white">{TICKET_FILTER_LABELS[activeFilter]}</Text>
+            </View>
+          ) : null}
           {filters.map((f) => {
             const active = f === activeFilter;
             return (

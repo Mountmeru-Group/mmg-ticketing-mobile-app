@@ -1,12 +1,15 @@
-// Tickets tab: list → detail → reply / status / assign / create / task (08 §3; 04 §2.1).
+// Tickets tab: list → detail → reply / status / assign / create / task (08 §3; 04 §2.1), plus the in-app ticket-link
+// resolver. TaskDetail and TaskEditor are also registered in the Tasks stack (ModuleStacks.tsx).
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { TaskDetailScreen } from '@/screens/tasks/TaskDetailScreen';
 import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { AssignPickerScreen } from '@/screens/tickets/AssignPickerScreen';
 import { CreateTicketScreen } from '@/screens/tickets/CreateTicketScreen';
 import { ReplyComposerScreen } from '@/screens/tickets/ReplyComposerScreen';
 import { StatusClosureScreen } from '@/screens/tickets/StatusClosureScreen';
 import { TicketDetailScreen } from '@/screens/tickets/TicketDetailScreen';
+import { TicketLinkScreen } from '@/screens/tickets/TicketLinkScreen';
 import { TicketListScreen } from '@/screens/tickets/TicketListScreen';
 import type { TicketStackParamList } from '@/types';
 
@@ -18,6 +21,8 @@ export function TicketStack() {
       <Stack.Screen name="TicketList" component={TicketListScreen} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
       <Stack.Screen name="CreateTicket" component={CreateTicketScreen} />
+      <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+      <Stack.Screen name="TicketLink" component={TicketLinkScreen} />
       {/* Sheets opened from M3/M4. Android back closes them first (08 §3.1). */}
       <Stack.Group screenOptions={{ presentation: 'modal' }}>
         <Stack.Screen name="ReplyComposer" component={ReplyComposerScreen} />

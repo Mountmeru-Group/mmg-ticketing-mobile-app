@@ -9,6 +9,7 @@ import { SESSION_ENDED_MESSAGE, isSessionExpired, useAuthStore } from '@/store/a
 import type { RootStackParamList } from '@/types';
 import { AppDrawer } from './AppDrawer';
 import { AuthStack } from './AuthStack';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,7 +45,7 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="App" component={AppDrawer} />

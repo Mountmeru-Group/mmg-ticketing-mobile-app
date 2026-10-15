@@ -1,7 +1,10 @@
 // Bottom tabs inside the drawer: Home · Tickets · Alerts, same order for every role (08 §3.1).
+// The Alerts badge is the NTF-2 unread count: loaded when the tabs mount, refreshed by pull-to-refresh (Home, Alerts)
+// and after a mark-read. No polling and no push (this phase's rule; 05 B.3/B.4), so it can lag until a refresh.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
+import { useUnreadCount } from '@/hooks';
 import { HomeScreen } from '@/screens/dashboard/HomeScreen';
 import { NotificationsScreen } from '@/screens/notifications/NotificationsScreen';
 import { useAuthStore } from '@/store/auth.store';
@@ -12,6 +15,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs() {
   const role = useAuthStore((s) => s.user?.role) ?? 'END_USER';
+  const unread = useUnreadCount({ enabled: true }).data ?? 0;
 
   return (
     <Tab.Navigator
@@ -41,7 +45,7 @@ export function MainTabs() {
         component={NotificationsScreen}
         options={{
           title: 'Alerts',
-          // TODO(Phase 4): tabBarBadge = NTF-2 unread count (poll ≥ 60 s, foreground only; 05 B.3).
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
           tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" color={color} size={size} />,
         }}
       />

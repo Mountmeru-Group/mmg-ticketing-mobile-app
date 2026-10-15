@@ -1,6 +1,8 @@
 // Typed param lists for every navigator. Structure follows 08-SDP-PARITY.md §3:
-// Root → (Auth stack | App drawer); drawer → (bottom tabs Home · Tickets · Alerts | Approvals | Knowledge |
+// Root → (Auth stack | App drawer); drawer → (bottom tabs Home · Tickets · Alerts | Approvals | Tasks | Knowledge |
 // Announcements | Profile); Tickets tab → TicketStack (list → detail → reply / status / assign / create / task).
+// Task detail and the task editor are registered in BOTH the Tickets stack (from a ticket's Tasks tab) and the Tasks
+// stack (from the standalone list), with the same params (TaskScreensParamList).
 // This file is client navigation, not an API shape, so it is the one file in src/types/ that does not come from 03.
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -34,7 +36,17 @@ export type TicketStackParamList = {
   CreateTicket: undefined;
   /** M11. No `taskId` = create. */
   TaskEditor: { ticketId: UUID; taskId?: UUID };
+  /** Task detail (Phase 4 tasks module). */
+  TaskDetail: { ticketId: UUID; taskId: UUID };
+  /**
+   * In-app deep-link resolver (05 §A.11): `link` is an email link (`…/ticket/<n>`, `…/tickets/<uuid or n>`) or "#1234".
+   * OS-level app links are not handled (they need ask A18).
+   */
+  TicketLink: { link: string };
 };
+
+/** Screens registered in both TicketStack and TasksStack. */
+export type TaskScreensParamList = Pick<TicketStackParamList, 'TaskDetail' | 'TaskEditor'>;
 
 // ── Bottom tabs (inside the drawer) ──────────────────────────
 export type MainTabParamList = {
@@ -51,6 +63,11 @@ export type ApprovalsStackParamList = {
   ApprovalDetail: { approvalId: UUID };
 };
 
+/** Standalone tasks module (drawer). Tasks are read from the tickets in TKT-1 pages — there is no task-list endpoint (A20). */
+export type TasksStackParamList = TaskScreensParamList & {
+  TaskList: undefined;
+};
+
 export type KnowledgeStackParamList = {
   /** M14 */
   KnowledgeBase: undefined;
@@ -61,6 +78,7 @@ export type KnowledgeStackParamList = {
 export type AppDrawerParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Approvals: NavigatorScreenParams<ApprovalsStackParamList>;
+  Tasks: NavigatorScreenParams<TasksStackParamList>;
   Knowledge: NavigatorScreenParams<KnowledgeStackParamList>;
   /** M16 */
   Announcements: undefined;
@@ -99,6 +117,20 @@ export type TicketStackScreenProps<T extends keyof TicketStackParamList> = Compo
 
 export type ApprovalsStackScreenProps<T extends keyof ApprovalsStackParamList> = CompositeScreenProps<
   NativeStackScreenProps<ApprovalsStackParamList, T>,
+  AppDrawerScreenProps<keyof AppDrawerParamList>
+>;
+
+/**
+ * Props of TaskDetail / TaskEditor, which are registered in BOTH TicketStack and TasksStack. Typed against the shared
+ * param list plus the drawer, so a screen can reach any module; at runtime `navigate` bubbles up from either stack.
+ */
+export type TaskScreenProps<T extends keyof TaskScreensParamList> = CompositeScreenProps<
+  NativeStackScreenProps<TaskScreensParamList, T>,
+  AppDrawerScreenProps<keyof AppDrawerParamList>
+>;
+
+export type TasksStackScreenProps<T extends keyof TasksStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<TasksStackParamList, T>,
   AppDrawerScreenProps<keyof AppDrawerParamList>
 >;
 

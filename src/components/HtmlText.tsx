@@ -1,8 +1,10 @@
 // Ticket descriptions and comment bodies (server HTML), rendered with react-native-render-html (05 §A.6).
 // - Input always passes sanitizeForRender() first: blocked elements removed, only inline base64 raster images
 //   kept, so no remote request is ever made by the renderer. Output is native views — no WebView, no script.
-// - Links open in the system browser, and only for http(s) and mailto.
+// - Links open in the system browser, and only for http(s) and mailto — except a ticket link to THIS environment
+//   (…/ticket/<n>, …/tickets/<uuid or n>), which opens the ticket in the app (deep-link resolver, 05 §A.11).
 // - If the renderer throws, the body falls back to plain text (htmlToDisplayText), never to a blank card.
+// One renderer for every server HTML body: ticket descriptions, comments, KB articles, announcements.
 import { Component, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import {
@@ -10,6 +12,8 @@ import {
   type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
 } from 'react-native-render-html';
 
+import { openTicketLinkInApp } from '@/navigation/navigationRef';
+import { parseTicketLink } from '@/utils/deep-links';
 import { BLOCKED_TAGS, htmlToDisplayText, looksLikeHtml, sanitizeForRender } from '@/utils/html';
 
 // ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
@@ -42,6 +46,7 @@ const ALLOWED_STYLES: NonNullable<ComponentProps<typeof TRenderEngineProvider>['
 function openLink(_event: GestureResponderEvent, href: string) {
   const url = href.trim();
   if (!/^(https?:|mailto:)/i.test(url)) return; // javascript:, data:, relative and app links are never opened
+  if (/^https?:/i.test(url) && parseTicketLink(url).ok && openTicketLinkInApp(url)) return;
   Linking.openURL(url).catch(() => undefined);
 }
 
