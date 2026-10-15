@@ -1,35 +1,196 @@
-// M5 Reply / Note composer (04 §2.1).
-// TODO(Phase 4) — frontend-only rules to reimplement (05 §A.5, §A.16):
-// - Quick actions: Reply (PUBLIC, To = [requester.email]); Reply All (PUBLIC, TKT-9: To = r.to || [requester.email],
-//   CC = r.cc; on error To = [requester.email]); Note (PRIVATE, no recipients, ADMIN/AGENT only).
-// - Type selector "Public Reply" / "Private Note" for non-END_USER; To/CC rows only for PUBLIC.
-// - Email chips: regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/; add on Enter/,/space; skip duplicates; backspace removes
-//   the last chip; leftover valid input is added on send.
-// - Recipient suggestions via USR-3 for ADMIN/AGENT only.
-// - Send disabled: (!body.trim() || body.replace(/<[^>]*>/g, '').trim() === '') && files.length === 0.
-// - Upload files FIRST (ATT-2), then CMT-2 with attachmentIds. Button "Send Reply" / "Save Note".
-// - Plain-text input wrapped as <p>…</p> with escaping; images go as attachments, never inline base64 (2 MB limit).
-// - Client file checks before upload (validateUploadFiles; 05 B.9).
-// - Warn staff that public replies email the whole original thread; removing a chip doesn't stop that (B.11).
-// - Persist the draft locally so a 401 on send doesn't lose it (02 §5.4).
+// M5 Reply / Note composer (04 M5, 05 §A.5, §A.16).
+// - Modes: Reply (everyone), Reply all (staff, TKT-9 pre-fill), Private note (ADMIN and AGENT ONLY — the option
+//   does not exist for END_USER or L2_MANAGER; usePostComment refuses it too).
+// - To / CC chips for staff on public replies; suggestions via USR-3 for ADMIN/AGENT.
+// - Plain-text body, sent as escaped <p> HTML. Files: camera / photos / documents, checked before staging.
+// - Send is the only write: files upload first (ATT-2), then CMT-2 with their ids. Disabled while in flight.
+//   On success the composer closes and the conversation refetches.
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { UploadFile } from '@/api/attachments.api';
+import { describeWriteError, isSessionEndedError } from '@/api/errors';
+import {
+  AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, ScreenHeader,
+  SubmitButton,
+} from '@/components';
+import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
+import { useAuthStore } from '@/store/auth.store';
 import type { TicketStackScreenProps } from '@/types';
-import { PlaceholderScreen } from '../PlaceholderScreen';
+import { canSeePrivateNotes } from '@/utils/activity';
+import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
+import { notify } from '@/utils/dialogs';
+import { isAgentOrAdmin, isStaff } from '@/utils/roles';
+import { isPlaceholderUser } from '@/utils/session';
 
-const TITLES = { reply: 'Reply', replyAll: 'Reply all', note: 'Add note' } as const;
+type Mode = 'reply' | 'replyAll' | 'note';
 
-export function ReplyComposerScreen({ route }: TicketStackScreenProps<'ReplyComposer'>) {
+const MODE_LABELS: Record<Mode, string> = { reply: 'Reply', replyAll: 'Reply all', note: 'Private note' };
+
+export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProps<'ReplyComposer'>) {
+  const { ticketId } = route.params;
+  const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role ?? 'END_USER';
+  const staff = isStaff(role);
+
+  // Private note is not an option at all for END_USER / L2_MANAGER (hidden, not disabled).
+  const modes: Mode[] = ['reply', ...(staff ? (['replyAll'] as const) : []), ...(canSeePrivateNotes(role) ? (['note'] as const) : [])];
+  const [mode, setMode] = useState<Mode>(modes.includes(route.params.mode) ? route.params.mode : 'reply');
+  const isPublic = mode !== 'note';
+  const showRecipients = staff && isPublic;
+
+  const ticketQuery = useTicket(ticketId);
+  const ticket = ticketQuery.data;
+  const requesterEmail = ticket?.requester?.email && isValidEmail(ticket.requester.email) ? ticket.requester.email : null;
+  const recipients = useEmailRecipients(ticketId, { enabled: mode === 'replyAll' && staff });
+
+  const [to, setTo] = useState<string[]>([]);
+  const [cc, setCc] = useState<string[]>([]);
+  const [toInput, setToInput] = useState('');
+  const [ccInput, setCcInput] = useState('');
+  const [text, setText] = useState('');
+  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const post = usePostComment();
+  const once = useSingleFlight();
+
+  // Quick-action pre-fill (05 §A.5): Reply → To = requester; Reply all → TKT-9, falling back to the requester.
+  useEffect(() => {
+    if (!showRecipients) return;
+    const fallback = requesterEmail ? [requesterEmail] : [];
+    if (mode === 'reply') {
+      setTo(fallback);
+      setCc([]);
+    } else if (recipients.data) {
+      const serverTo = (recipients.data.to ?? []).filter((e) => typeof e === 'string' && isValidEmail(e));
+      setTo(serverTo.length > 0 ? serverTo : fallback);
+      setCc((recipients.data.cc ?? []).filter((e) => typeof e === 'string' && isValidEmail(e)));
+    } else if (recipients.isError) {
+      setTo(fallback); // CC unchanged, as the web does
+    }
+  }, [mode, showRecipients, requesterEmail, recipients.data, recipients.isError]);
+
+  const empty = isBlankBody(text) && files.length === 0;
+  const { leave } = useDiscardGuard({ dirty: !isBlankBody(text) || files.length > 0, busy: post.isPending, what: isPublic ? 'reply' : 'note' });
+
+  async function send() {
+    setError(null);
+    try {
+      await post.mutateAsync({
+        ticketId,
+        type: isPublic ? 'PUBLIC' : 'PRIVATE',
+        text,
+        to: showRecipients ? finalRecipients(to, toInput) : [],
+        cc: showRecipients ? finalRecipients(cc, ccInput) : [],
+        files,
+      });
+      notify(isPublic ? 'Reply sent' : 'Note saved');
+      leave(() => navigation.goBack());
+    } catch (e) {
+      if (!isSessionEndedError(e)) setError(describeWriteError(e));
+    }
+  }
+
+  const title = ticket ? `${MODE_LABELS[mode]} · #${ticket.ticketNumber}` : MODE_LABELS[mode];
+
+  if (!ticket) {
+    return (
+      <View className="flex-1 bg-gray-50">
+        <ScreenHeader title={title} variant="close" />
+        {ticketQuery.isError ? (
+          <ErrorState error={ticketQuery.error} title="Couldn't load this ticket" onRetry={() => void ticketQuery.refetch()} />
+        ) : (
+          <LoadingSkeleton variant="detail" />
+        )}
+      </View>
+    );
+  }
+
   return (
-    <PlaceholderScreen
-      screenId="M5"
-      title={TITLES[route.params.mode]}
-      headerVariant="close"
-      visibility="All roles. Reply all: ADMIN, AGENT, L2. Private note: ADMIN, AGENT only."
-      endpoints={[
-        'CMT-2 · POST /tickets/:ticketId/comments',
-        'ATT-2 · POST /tickets/:ticketId/attachments (multipart)',
-        'TKT-9 · GET /tickets/:id/email-recipients (Reply all)',
-        'USR-3 · GET /users/search (recipient suggestions)',
-      ]}
-    />
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+      <ScreenHeader title={title} variant="close" />
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
+        <Text className="mx-4 mb-3 text-sm text-gray-600" numberOfLines={2}>
+          #{ticket.ticketNumber} · {ticket.title}
+        </Text>
+
+        {modes.length > 1 ? (
+          <View className="mx-4 mb-3 flex-row rounded-xl bg-gray-200 p-1" accessibilityRole="tablist">
+            {modes.map((m) => (
+              <Pressable
+                key={m}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: m === mode, disabled: post.isPending }}
+                disabled={post.isPending}
+                onPress={() => setMode(m)}
+                className={`flex-1 items-center rounded-lg py-2 ${m === mode ? (m === 'note' ? 'bg-amber-100' : 'bg-white') : ''}`}
+              >
+                <Text className={`text-sm ${m === mode ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{MODE_LABELS[m]}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <FormCard>
+          {showRecipients ? (
+            <>
+              {mode === 'replyAll' && recipients.isFetching ? <Text className="mb-1 text-xs text-gray-500">Loading thread recipients…</Text> : null}
+              <EmailChipsInput label="To" chips={to} onChangeChips={setTo} input={toInput} onChangeInput={setToInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
+              <EmailChipsInput label="Cc" chips={cc} onChangeChips={setCc} input={ccInput} onChangeInput={setCcInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
+            </>
+          ) : null}
+
+          <FieldLabel label={isPublic ? 'Message' : 'Note'} hint="Write a message, attach a file, or both." />
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            editable={!post.isPending}
+            multiline
+            textAlignVertical="top"
+            placeholder={isPublic ? 'Type your reply…' : 'Type an internal note…'}
+            placeholderTextColor="#9ca3af"
+            accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
+            className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
+          />
+
+          <FieldLabel label="Attachments" />
+          <AttachmentPicker files={files} onChange={setFiles} disabled={post.isPending} />
+        </FormCard>
+
+        <View className="mx-4">
+          {isPublic && staff ? (
+            <Notice tone="warning">
+              Public replies are emailed to the requester, everyone on the original email thread, and the assigned technician.
+              Removing an address here does not stop emails to people on the original thread.
+            </Notice>
+          ) : null}
+          {isPublic && !staff ? <Notice>Your reply is added to the ticket and emailed to the people working on it.</Notice> : null}
+          {!isPublic ? (
+            <Notice>Internal note: visible to Admins and Technicians only, and not emailed. Files are added to the ticket, not to this note.</Notice>
+          ) : null}
+          {!isPublic && isPlaceholderUser(user) ? (
+            <Notice tone="warning">
+              This session was saved before the developer token was checked with the server, so the app can't confirm your
+              role. If the account is not an Admin or Technician, the server will send this note as a PUBLIC email. Sign out
+              and paste the token again to fix this.
+            </Notice>
+          ) : null}
+        </View>
+
+        <InlineError message={error} />
+
+        <View className="mx-4">
+          <SubmitButton
+            label={isPublic ? 'Send Reply' : 'Save Note'}
+            onPress={() => void once(send)}
+            disabled={empty}
+            loading={post.isPending}
+            tone={isPublic ? 'primary' : 'muted'}
+          />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

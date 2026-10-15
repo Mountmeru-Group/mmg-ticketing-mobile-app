@@ -18,7 +18,11 @@ Phase 3a added a **`__DEV__`-only** checker (`src/api/drift.ts`, specs in `src/a
 
 Copy each line into the table below, adding where you saw it (screen, role, ticket number if needed).
 
-- **Endpoints checked:** TKT-1, TKT-3 (incl. `tasks[0]`), TKT-7, CMT-1, ATT-1, LKP-4/LKP-5.
+- **Endpoints checked (reads, Phase 3a):** TKT-1, TKT-3 (incl. `tasks[0]`), TKT-7, CMT-1, ATT-1, LKP-4/LKP-5.
+- **Endpoints checked (Phase 3b):**
+  - write responses: TKT-2, TKT-4, TKT-5, TKT-6 (the returned `Ticket`), CMT-2 (the created comment, without `attachments`, which 01 says are absent), ATT-2;
+  - picker reads: TKT-9, TKT-10, LKP-1, LKP-2, USR-3.
+- **A write is never failed because a field drifted.** The change has already happened on the server, so the app logs the drift line and refreshes the ticket. The exceptions are TKT-2 without an `id` and ATT-2 that is not an array: the app cannot continue without those, and the message says the change may have been saved.
 - **Checked per response:** the first array item only.
 - **Release builds:** the checker is compiled out.
 
@@ -28,7 +32,7 @@ A wrong **envelope**, such as an object where an array is promised, also logs a 
 
 | # | Date | Endpoint | Field | Expected (03 §C) | What arrived | Where seen (screen · role) | Decision (Ronit) |
 |---|---|---|---|---|---|---|---|
-| — | — | — | *None recorded yet. Phase 3a was written without UAT access (no token, by design); the first entries come from Ronit's test run.* | | | | |
+| — | — | — | *None recorded yet. Phases 3a and 3b were written without UAT access (no token, by design). Ronit's 3a test run found no read drift; write drift will come from the 3b test run.* | | | | |
 
 ## Watch list (flagged in the docs, not yet observed)
 

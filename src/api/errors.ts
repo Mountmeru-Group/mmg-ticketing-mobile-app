@@ -63,6 +63,45 @@ export function describeError(error: unknown): string {
   return error.body.error;
 }
 
+/**
+ * User-facing message for a failed WRITE (Phase 3b). Same rules as describeError(), plus the facts a person needs
+ * before trying again: some failures happen after the server has already saved (01 §0.2: a 500 can follow a
+ * created comment; a timeout means the request may have arrived), and mutations are never retried automatically.
+ */
+export function describeWriteError(error: unknown): string {
+  if (!(error instanceof ApiClientError)) return 'Something went wrong. Nothing was retried.';
+  const maybeSaved = 'It may have been saved — refresh before trying again.';
+  switch (error.kind) {
+    case 'client':
+      return error.body.error; // rejected on the device: nothing was sent
+    case 'network':
+      return `Couldn't reach the Service Desk. ${maybeSaved}`;
+    case 'timeout':
+      return `The Service Desk took too long to answer. ${maybeSaved}`;
+    case 'shape':
+      return `The Service Desk accepted the request but replied in an unexpected format. ${maybeSaved}`;
+    default:
+      break;
+  }
+  const status = error.status;
+  if (status === 403) return "Your role doesn't allow this action.";
+  if (status === 429) return 'Too many requests right now. Wait a minute, then try again.';
+  if (status !== null && status >= 500) return `The Service Desk reported an error. ${maybeSaved}`;
+  if (error.kind === 'not-json') return `Unexpected response from the Service Desk. ${maybeSaved}`;
+  if (status === 400 && error.body.details) {
+    const fields = Object.entries(error.body.details)
+      .map(([field, messages]) => `${field}: ${(messages ?? []).join(', ')}`)
+      .join('; ');
+    return fields ? `${error.body.error} — ${fields}` : error.body.error;
+  }
+  return error.body.error;
+}
+
+/** A 401: the API client has already ended the session and the app is returning to Login (02 §5.3). */
+export function isSessionEndedError(error: unknown): boolean {
+  return error instanceof ApiClientError && error.status === 401;
+}
+
 /** No response at all: offline, DNS failure, or the server restarting. Screens show the offline banner for it. */
 export function isOfflineError(error: unknown): boolean {
   return error instanceof ApiClientError && error.kind === 'network';
