@@ -1,12 +1,8 @@
-// HTML from the server (ticket description, comment body) → plain display text (05 §A.6).
-//
-// The backend stores HTML unsanitised (05 C.17). No HTML renderer or WebView is installed, so this phase
-// renders NO markup at all: the web's sanitiser runs first (the documented minimum), then every remaining tag
-// is dropped and entities are decoded. The result goes into a <Text>, which cannot execute or fetch anything —
-// no script, no remote image, no link navigation. Pure functions, no I/O.
-//
-// Richer rendering (bold, lists, tappable links, inline images) needs a renderer such as
-// react-native-render-html, pending Ronit's approval. It must still go through sanitizeHtml() first.
+// HTML from the server (ticket description, comment body). Pure functions, no I/O. The backend stores HTML
+// unsanitised (05 C.17), so nothing reaches the screen without passing through this file:
+// - sanitizeForRender(): input to react-native-render-html (HtmlText). Native views only — no WebView, no
+//   script execution. Only inline base64 raster images survive; remote images are never fetched (05 §A.6).
+// - htmlToDisplayText(): plain-text fallback, used when the renderer fails.
 
 /** Web sanitiser, verbatim minimum from FE:TicketDetailPage.tsx:2685-2718 (05 §A.6). */
 export function sanitizeHtml(html: string): string {
@@ -29,6 +25,38 @@ export function sanitizeHtml(html: string): string {
     return match;
   });
   return clean.trim();
+}
+
+/** Elements dropped with their content before rendering. Also passed to the renderer as `ignoredDomTags`. */
+export const BLOCKED_TAGS = [
+  'script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'svg', 'math', 'video', 'audio',
+  'source', 'track', 'canvas', 'picture', 'map', 'area', 'form', 'input', 'button', 'select', 'option', 'textarea',
+  'noscript', 'template', 'title', 'head', 'meta', 'link', 'base', 'dialog',
+] as const;
+
+/** Inline images the renderer may show: base64 raster data only. SVG (scriptable) and remote URLs are not. */
+const SAFE_IMAGE_SRC = /^\s*data:image\/(png|jpe?g|gif|webp|bmp);base64,/i;
+
+/**
+ * sanitizeHtml() (the web's minimum) plus mobile rules from 05 §A.6:
+ * - blocked elements are removed with their content;
+ * - an <img> stays only with a base64 raster `src` (data:image/png|jpeg|gif|webp|bmp); every other image —
+ *   remote URL, SVG, attachment URL needing the Bearer header — becomes "[image]", so nothing is fetched;
+ * - `srcset` and `style` attributes on images are dropped.
+ * Links stay as markup; HtmlText opens only http(s) and mailto links, in the system browser.
+ */
+export function sanitizeForRender(html: string): string {
+  let clean = sanitizeHtml(html);
+  for (const tag of BLOCKED_TAGS) {
+    clean = clean.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'), '');
+    clean = clean.replace(new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi'), '');
+  }
+  clean = clean.replace(/<img\b[^>]*>/gi, (img) => {
+    const src = /\ssrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(img)?.[2] ?? '';
+    if (!SAFE_IMAGE_SRC.test(src)) return '<span>[image]</span>';
+    return `<img src="${src.replace(/"/g, '')}" />`;
+  });
+  return clean;
 }
 
 /** HTML vs plain text, verbatim test from FE:TicketDetailPage.tsx:1157 (05 §A.6). */

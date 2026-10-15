@@ -18,7 +18,7 @@ Phase 3a added a **`__DEV__`-only** checker (`src/api/drift.ts`, specs in `src/a
 
 Copy each line into the table below, adding where you saw it (screen, role, ticket number if needed).
 
-- **Endpoints checked:** AUTH-2, TKT-1, TKT-3 (incl. `tasks[0]`), TKT-7, CMT-1, ATT-1, LKP-4/LKP-5.
+- **Endpoints checked:** TKT-1, TKT-3 (incl. `tasks[0]`), TKT-7, CMT-1, ATT-1, LKP-4/LKP-5.
 - **Checked per response:** the first array item only.
 - **Release builds:** the checker is compiled out.
 

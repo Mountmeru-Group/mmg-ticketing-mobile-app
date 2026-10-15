@@ -16,8 +16,10 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, HtmlText, LoadingSkeleton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge,
+  EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, PriorityBadge, QueryBanner,
+  ScreenHeader, SlaBadge, StatusBadge,
 } from '@/components';
 import { useTicket, useTicketAttachments, useTicketComments, useTicketHistory } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -57,8 +59,10 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
   const history = useTicketHistory(ticketId, { enabled: ready && visited.has('history') });
   const attachments = useTicketAttachments(ticketId, { enabled: ready && visited.has('attachments') });
 
+  const offline = useIsOffline();
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
+    if (offline) return; // a refetch would only pause until reconnect; the offline banner explains
     setRefreshing(true);
     try {
       await ticketQuery.refetch();
@@ -76,7 +80,9 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="back" />
-        {ticketQuery.isError ? (
+        {ticketQuery.fetchStatus === 'paused' ? (
+          <OfflineState what="This ticket" />
+        ) : ticketQuery.isError ? (
           <ErrorState error={ticketQuery.error} title="Couldn't load this ticket" onRetry={() => void ticketQuery.refetch()} />
         ) : (
           <LoadingSkeleton variant="detail" />
@@ -88,6 +94,7 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader title={title} variant="back" />
+      <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
@@ -118,6 +125,7 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
         {tab === 'conversation' ? (
           <TabBody
             query={comments}
+            what="The conversation"
             loadingRows={2}
             errorTitle="Couldn't load the conversation"
             isEmpty={(comments.data?.length ?? 0) === 0}
@@ -135,10 +143,11 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
             query={{
               data: history.data,
               error: history.isFetchNextPageError ? null : history.error,
-              isPending: history.isPending,
               isError: history.isError && !history.isFetchNextPageError,
+              fetchStatus: history.fetchStatus,
               refetch: history.refreshFirstPage,
             }}
+            what="The history"
             loadingRows={2}
             errorTitle="Couldn't load the history"
             isEmpty={history.audits.length === 0}
@@ -152,15 +161,19 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
             {history.hasNextPage ? (
               <Pressable
                 accessibilityRole="button"
-                disabled={history.isFetchingNextPage}
+                disabled={history.isFetchingNextPage || offline}
                 onPress={() => void history.fetchNextPage()}
-                className="mx-4 mt-3 items-center rounded-lg border border-gray-300 bg-white py-2.5"
+                className={`mx-4 mt-3 items-center rounded-lg border border-gray-300 bg-white py-2.5 ${offline ? 'opacity-50' : ''}`}
               >
                 {history.isFetchingNextPage ? (
                   <ActivityIndicator color="#2563eb" />
                 ) : (
                   <Text className="text-sm font-medium text-gray-800">
-                    {history.isFetchNextPageError ? "Couldn't load more — tap to retry" : 'Load older history'}
+                    {offline
+                      ? 'Older history loads when you reconnect'
+                      : history.isFetchNextPageError
+                        ? "Couldn't load more — tap to retry"
+                        : 'Load older history'}
                   </Text>
                 )}
               </Pressable>
@@ -171,6 +184,7 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
         {tab === 'attachments' ? (
           <TabBody
             query={attachments}
+            what="The attachment list"
             loadingRows={2}
             errorTitle="Couldn't load the attachments"
             isEmpty={(attachments.data?.length ?? 0) === 0}
@@ -376,7 +390,7 @@ function ResolutionCard({ ticket }: { ticket: TicketDetail }) {
   if (!done && !hasData) return null;
   return (
     <Card title="Resolution">
-      {ticket.resolution ? <HtmlText html={ticket.resolution} collapsedLines={6} /> : <Text className="text-sm text-gray-500">No resolution recorded</Text>}
+      {ticket.resolution ? <HtmlText html={ticket.resolution} collapsedHeight={140} /> : <Text className="text-sm text-gray-500">No resolution recorded</Text>}
       <View className="mt-2">
         <Row label="Closure code">{ticket.closureCode || 'Not set'}</Row>
         <Row label="First call fix">{ticket.isFcr ? 'Yes' : 'No'}</Row>
@@ -386,7 +400,7 @@ function ResolutionCard({ ticket }: { ticket: TicketDetail }) {
       {ticket.closureComments ? (
         <View className="mt-2">
           <Text className="mb-1 text-xs font-semibold text-gray-500">Closure comments</Text>
-          <HtmlText html={ticket.closureComments} collapsedLines={6} />
+          <HtmlText html={ticket.closureComments} collapsedHeight={140} />
         </View>
       ) : null}
     </Card>
@@ -441,16 +455,18 @@ function TabBar({
 interface TabQueryState {
   data: unknown;
   error: unknown;
-  isPending: boolean;
   isError: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
   refetch: () => Promise<unknown>;
 }
 
-/** Loading / error / empty / content for one tab, plus the offline-or-stale banner when data is on screen. */
+/** Loading / offline / error / empty / content for one tab, plus a stale-data banner when a refresh failed. */
 function TabBody({
-  query, loadingRows, errorTitle, isEmpty, empty, children,
+  query, what, loadingRows, errorTitle, isEmpty, empty, children,
 }: {
   query: TabQueryState;
+  /** For the offline message, e.g. "The conversation". */
+  what: string;
   loadingRows: number;
   errorTitle: string;
   isEmpty: boolean;
@@ -458,6 +474,7 @@ function TabBody({
   children: ReactNode;
 }) {
   const hasData = query.data !== undefined;
+  if (!hasData && query.fetchStatus === 'paused') return <OfflineState what={what} />;
   if (!hasData && query.isError) return <ErrorState error={query.error} title={errorTitle} onRetry={() => void query.refetch()} />;
   if (!hasData) return <LoadingSkeleton rows={loadingRows} />;
   return (

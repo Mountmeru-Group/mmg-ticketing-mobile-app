@@ -25,8 +25,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, LoadingSkeleton, OptionSheet, QueryBanner, ScreenHeader, TicketCard, type SheetOption,
+  EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, OptionSheet, QueryBanner, ScreenHeader,
+  TicketCard, type SheetOption,
 } from '@/components';
 import { countryName, useCountryOptions, useTickets } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -81,19 +83,23 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     [navigation],
   );
 
+  const offline = useIsOffline();
+
+  // Offline, a refetch would only pause until reconnect and leave the spinner turning; the banner explains.
   const onRefresh = useCallback(async () => {
+    if (offline) return;
     setRefreshing(true);
     try {
       await refreshFirstPage();
     } finally {
       setRefreshing(false);
     }
-  }, [refreshFirstPage]);
+  }, [offline, refreshFirstPage]);
 
   // Guarded: FlatList can fire onEndReached repeatedly, and a failed page must wait for an explicit retry.
   const loadMore = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, fetchNextPage]);
+    if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
   const submitSearch = () => setSearch(normaliseTicketSearch(searchText));
   const clearSearch = () => {
@@ -121,7 +127,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   );
 
   let content: ReactNode;
-  if (list.isPending && !hasData) {
+  if (!hasData && list.fetchStatus === 'paused') {
+    content = <OfflineState what="Tickets" />;
+  } else if (list.isPending && !hasData) {
     content = <LoadingSkeleton rows={5} />;
   } else if (list.isError && !hasData) {
     content = <ErrorState error={list.error} title="Couldn't load tickets" onRetry={() => void list.refetch()} />;
@@ -147,8 +155,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             count={list.tickets.length}
             total={list.total}
             loading={isFetchingNextPage}
-            failed={isFetchNextPageError}
+            failed={isFetchNextPageError && !offline}
             hasMore={!!hasNextPage}
+            offline={offline}
             onRetry={() => void fetchNextPage()}
           />
         }
@@ -242,6 +251,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         </View>
       </View>
 
+      <OfflineBanner />
       <QueryBanner
         error={isFetchNextPageError ? null : list.error}
         hasData={hasData}
@@ -277,7 +287,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         onSelect={(value) => setTicketCountryId(value === ALL_COUNTRIES ? null : value)}
         onClose={() => setSheet(null)}
       >
-        {countries.isPending ? (
+        {countries.fetchStatus === 'paused' && !countries.data ? (
+          <Text className="px-4 py-8 text-center text-sm text-gray-500">Countries load when you reconnect.</Text>
+        ) : countries.isPending ? (
           <View className="items-center py-8">
             <ActivityIndicator color="#2563eb" />
             <Text className="mt-2 text-sm text-gray-500">Loading countries…</Text>
@@ -325,15 +337,19 @@ function ListEmpty({
 }
 
 function ListFooter({
-  count, total, loading, failed, hasMore, onRetry,
+  count, total, loading, failed, hasMore, offline, onRetry,
 }: {
   count: number;
   total: number | undefined;
   loading: boolean;
   failed: boolean;
   hasMore: boolean;
+  offline: boolean;
   onRetry: () => void;
 }) {
+  if (hasMore && offline) {
+    return <Text className="py-4 text-center text-xs text-gray-500">More tickets load when you reconnect.</Text>;
+  }
   if (loading) {
     return (
       <View className="flex-row items-center justify-center py-4">

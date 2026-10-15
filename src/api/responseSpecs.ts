@@ -2,7 +2,7 @@
 // __DEV__ builds to log drift (src/api/drift.ts). Keep in step with 03 §C; never loosen a spec to silence a log.
 import {
   TASK_STATUSES, TICKET_IMPACTS, TICKET_PRIORITIES, TICKET_SOURCES, TICKET_STATUSES, TICKET_URGENCIES,
-  SLA_STATUSES, USER_ROLES,
+  SLA_STATUSES,
 } from '@/types';
 import type { FieldSpec } from './drift';
 
@@ -16,16 +16,6 @@ const ARR = ['array'] as const;
 const AUDIT_ACTIONS = [
   'CREATED', 'UPDATED', 'DELETED', 'STATUS_CHANGED', 'ASSIGNED', 'COMMENTED', 'ATTACHMENT_ADDED', 'SLA_BREACHED', 'ESCALATED',
 ] as const;
-
-/** AUTH-2 `{ user: AuthUser }`. */
-export const AUTH_ME_SPEC: readonly FieldSpec[] = [
-  { path: 'user', kinds: OBJ },
-  { path: 'user.id', kinds: S },
-  { path: 'user.email', kinds: S },
-  { path: 'user.displayName', kinds: S },
-  { path: 'user.role', kinds: S, oneOf: USER_ROLES },
-  { path: 'user.countryId', kinds: S_NULL },
-];
 
 /** `Ticket` (TKT-1 rows) / `TicketDetail` (TKT-3). */
 export const TICKET_SPEC: readonly FieldSpec[] = [

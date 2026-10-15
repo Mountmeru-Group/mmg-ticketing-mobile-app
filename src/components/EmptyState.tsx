@@ -9,6 +9,17 @@ interface EmptyStateProps {
   onAction?: () => void;
 }
 
+/** A first load that is waiting for the network (the query is paused while offline). */
+export function OfflineState({ what }: { what: string }) {
+  return (
+    <EmptyState
+      icon="cloud-offline-outline"
+      title="You're offline"
+      message={`${what} will load automatically when you reconnect.`}
+    />
+  );
+}
+
 export function EmptyState({ title, message, icon = 'file-tray-outline', actionLabel, onAction }: EmptyStateProps) {
   return (
     <View className="flex-1 items-center justify-center px-8 py-12">

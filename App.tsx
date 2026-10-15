@@ -5,8 +5,13 @@ import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { startConnectivityMonitoring } from '@/api/network';
 import { queryClient } from '@/api/queryClient';
+import { HtmlRenderProvider } from '@/components';
 import { RootNavigator } from '@/navigation/RootNavigator';
+
+// Offline → queries pause instead of failing (src/api/network.ts). Must run before the first query.
+startConnectivityMonitoring();
 
 export default function App() {
   return (
@@ -15,8 +20,10 @@ export default function App() {
         {/* Conservative defaults (staleTime ≥ 60 s, no polling, no focus/reconnect/remount refetch, ≤ 2 GET
             retries, never on 4xx) are set where the client is created: src/api/queryClient.ts. */}
         <QueryClientProvider client={queryClient}>
-          <StatusBar barStyle="dark-content" />
-          <RootNavigator />
+          <HtmlRenderProvider>
+            <StatusBar barStyle="dark-content" />
+            <RootNavigator />
+          </HtmlRenderProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

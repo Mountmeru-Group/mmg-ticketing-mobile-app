@@ -1,35 +1,157 @@
-// Ticket descriptions and comment bodies (server HTML) shown as plain text (05 §A.6).
-// htmlToDisplayText() sanitises with the web's rules and then drops every tag, so no markup, script, link or
-// remote image ever reaches the screen. There is no WebView in this app.
-import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+// Ticket descriptions and comment bodies (server HTML), rendered with react-native-render-html (05 §A.6).
+// - Input always passes sanitizeForRender() first: blocked elements removed, only inline base64 raster images
+//   kept, so no remote request is ever made by the renderer. Output is native views — no WebView, no script.
+// - Links open in the system browser, and only for http(s) and mailto.
+// - If the renderer throws, the body falls back to plain text (htmlToDisplayText), never to a blank card.
+import { Component, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import {
+  RenderHTMLConfigProvider, RenderHTMLSource, TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts,
+  type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
+} from 'react-native-render-html';
 
-import { htmlToDisplayText } from '@/utils/html';
+import { BLOCKED_TAGS, htmlToDisplayText, looksLikeHtml, sanitizeForRender } from '@/utils/html';
+
+// ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
+
+const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: '#1f2937' };
+
+const TAGS_STYLES: MixedStyleRecord = {
+  body: { margin: 0, padding: 0 },
+  p: { marginTop: 0, marginBottom: 8 },
+  a: { color: '#1d4ed8', textDecorationLine: 'underline' },
+  h1: { fontSize: 18, marginTop: 4, marginBottom: 8 },
+  h2: { fontSize: 17, marginTop: 4, marginBottom: 8 },
+  h3: { fontSize: 16, marginTop: 4, marginBottom: 6 },
+  h4: { fontSize: 15, marginTop: 4, marginBottom: 6 },
+  blockquote: { marginLeft: 0, marginRight: 0, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: '#d1d5db', color: '#4b5563' },
+  pre: { fontSize: 12 },
+  code: { fontSize: 12 },
+  ul: { marginTop: 0, marginBottom: 8 },
+  ol: { marginTop: 0, marginBottom: 8 },
+};
+
+/**
+ * Inline CSS kept from server HTML. Everything else (colours, fonts, sizes, widths) is dropped: email HTML often
+ * sets white text, fixed widths or tiny fonts that would make a card unreadable or overflow it.
+ */
+const ALLOWED_STYLES: NonNullable<ComponentProps<typeof TRenderEngineProvider>['allowedStyles']> = [
+  'fontWeight', 'fontStyle', 'textDecorationLine', 'textAlign',
+];
+
+function openLink(_event: GestureResponderEvent, href: string) {
+  const url = href.trim();
+  if (!/^(https?:|mailto:)/i.test(url)) return; // javascript:, data:, relative and app links are never opened
+  Linking.openURL(url).catch(() => undefined);
+}
+
+const RENDERERS_PROPS: Partial<RenderersProps> = { a: { onPress: openLink } };
+
+/**
+ * Wrap the app once (App.tsx). Every TRenderEngineProvider option is passed explicitly: react-native-render-html
+ * 6.3.4 declares these defaults through `defaultProps` on a function component, which React 19 ignores.
+ * Values not customised here are the library's own defaults (TRenderEngineProvider.tsx).
+ */
+export function HtmlRenderProvider({ children }: { children: ReactNode }) {
+  return (
+    <TRenderEngineProvider
+      htmlParserOptions={{ decodeEntities: true }}
+      emSize={14}
+      ignoredDomTags={[...BLOCKED_TAGS]}
+      ignoredStyles={[]}
+      allowedStyles={ALLOWED_STYLES}
+      baseStyle={BASE_STYLE}
+      tagsStyles={TAGS_STYLES}
+      classesStyles={{}}
+      enableUserAgentStyles
+      enableCSSInlineProcessing
+      customHTMLElementModels={{}}
+      fallbackFonts={defaultFallbackFonts}
+      systemFonts={defaultSystemFonts}
+    >
+      <RenderHTMLConfigProvider
+        defaultTextProps={{ selectable: true }}
+        renderersProps={RENDERERS_PROPS}
+        enableExperimentalBRCollapsing
+        enableExperimentalGhostLinesPrevention
+      >
+        {children}
+      </RenderHTMLConfigProvider>
+    </TRenderEngineProvider>
+  );
+}
+
+class RendererBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // Error name only: messages can quote the HTML, i.e. ticket content.
+    if (__DEV__) console.warn(`[HtmlText] renderer failed (${error.name}); showing plain text instead`);
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+// ── One snippet ──────────────────────────────────────────────
+
+type Prepared =
+  | { kind: 'empty' }
+  | { kind: 'text'; text: string }
+  | { kind: 'html'; html: string; fallbackText: string };
+
+function prepare(input: string | null | undefined): Prepared {
+  if (!input || !input.trim()) return { kind: 'empty' };
+  if (!looksLikeHtml(input)) return { kind: 'text', text: input.replace(/\r\n?/g, '\n').trim() };
+  const html = sanitizeForRender(input);
+  const fallbackText = htmlToDisplayText(input);
+  if (!fallbackText && !/<img\b/i.test(html)) return { kind: 'empty' };
+  return { kind: 'html', html, fallbackText };
+}
 
 interface HtmlTextProps {
   html: string | null | undefined;
-  /** Collapse long bodies to this many lines with a "Show more" toggle. */
-  collapsedLines?: number;
+  /** Bodies taller than this collapse behind "Show more". */
+  collapsedHeight?: number;
+  /** Horizontal space around the text on screen (card margins + padding), for image sizing. */
+  horizontalInset?: number;
   emptyText?: string;
 }
 
-const LONG_TEXT_CHARS = 600;
-
-export function HtmlText({ html, collapsedLines = 12, emptyText = 'No text' }: HtmlTextProps) {
-  const text = useMemo(() => htmlToDisplayText(html), [html]);
+export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 64, emptyText = 'No text' }: HtmlTextProps) {
+  const prepared = useMemo(() => prepare(html), [html]);
+  const { width } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
 
-  if (!text) return <Text className="text-sm italic text-gray-400">{emptyText}</Text>;
+  if (prepared.kind === 'empty') return <Text className="text-sm italic text-gray-400">{emptyText}</Text>;
 
-  const lineCount = text.split('\n').length;
-  const long = text.length > LONG_TEXT_CHARS || lineCount > collapsedLines;
+  const plain = (text: string) => (
+    <Text selectable className="text-sm leading-5 text-gray-800">
+      {text}
+    </Text>
+  );
+  const body =
+    prepared.kind === 'text' ? (
+      plain(prepared.text)
+    ) : (
+      <RendererBoundary fallback={plain(prepared.fallbackText)}>
+        <RenderHTMLSource source={{ html: prepared.html }} contentWidth={Math.max(width - horizontalInset, 120)} />
+      </RendererBoundary>
+    );
+  const collapsible = contentHeight > collapsedHeight + 40;
 
   return (
     <View>
-      <Text selectable className="text-sm leading-5 text-gray-800" numberOfLines={long && !expanded ? collapsedLines : undefined}>
-        {text}
-      </Text>
-      {long ? (
+      <View style={collapsible && !expanded ? { maxHeight: collapsedHeight, overflow: 'hidden' } : undefined}>
+        <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>{body}</View>
+      </View>
+      {collapsible ? (
         <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} hitSlop={6} className="mt-1 self-start">
           <Text className="text-sm font-medium text-blue-700">{expanded ? 'Show less' : 'Show more'}</Text>
         </Pressable>
