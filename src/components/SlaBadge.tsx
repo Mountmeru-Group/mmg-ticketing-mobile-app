@@ -11,6 +11,8 @@ const SLA_STYLES: Record<SLAStatus, { container: string; text: string }> = {
   BREACHED: { container: 'bg-red-100', text: 'text-red-800' },
 };
 
+const FALLBACK = { container: 'bg-gray-100', text: 'text-gray-800' };
+
 interface SlaBadgeProps {
   ticket: SlaFields;
   /** Injectable clock for tests. */
@@ -19,7 +21,7 @@ interface SlaBadgeProps {
 
 export function SlaBadge({ ticket, now }: SlaBadgeProps) {
   const display = getDisplaySlaStatus(ticket, now);
-  const style = SLA_STYLES[display.status];
+  const style = (SLA_STYLES as Record<string, { container: string; text: string }>)[display.status] ?? FALLBACK;
   return (
     <View className={`self-start rounded-full px-2.5 py-0.5 ${style.container}`}>
       <Text className={`text-xs font-medium ${style.text}`} numberOfLines={1}>

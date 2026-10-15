@@ -2,7 +2,8 @@
 // Dates render in the DEVICE timezone, like the web (01 §0.1). The web uses date-fns; it is not installed,
 // so the formats below are reproduced by hand.
 import type {
-  ISODateString, SLAStatus, Ticket, TicketImpact, TicketPriority, TicketStatus, TicketUrgency,
+  ISODateString, SLAStatus, TaskStatus, Ticket, TicketCategoryRef, TicketImpact, TicketPriority, TicketStatus,
+  TicketUrgency,
 } from '@/types';
 import { HOLD_STATUSES } from '@/types';
 
@@ -118,7 +119,9 @@ export function slaLabel(display: DisplaySlaStatus): string {
         return 'Breached';
     }
   }
-  return display.status === 'DUE_SOON' ? 'Due Soon' : 'Within SLA';
+  if (display.status === 'DUE_SOON') return 'Due Soon';
+  if (display.status === 'WITHIN_SLA') return 'Within SLA';
+  return String(display.status); // a value outside 03 §A (logged as drift): show it raw, never "Within SLA"
 }
 
 // ── Labels (05 §A.3, §A.10) ──────────────────────────────────
@@ -162,6 +165,46 @@ export const URGENCY_LABELS: Record<TicketUrgency, string> = {
 /** Unknown values fall back to the raw value (05 §A.10). */
 export function statusLabel(status: string): string {
   return (STATUS_LABELS as Record<string, string>)[status] ?? status;
+}
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  OPEN: 'Open',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+/** Header source chip (05 §A.10): `source === 'EMAIL' ? 'Email Request' : 'Incident Request'`. */
+export function sourceLabel(source: string): string {
+  return source === 'EMAIL' ? 'Email Request' : 'Incident Request';
+}
+
+/** "512 B", "14.2 KB", "3.1 MB". */
+export function formatBytes(bytes: number | null | undefined): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Category / Subcategory / Item names from the ticket's category chain, derived from `level` as the web does
+ * (05 §A.3, FE:TicketDetailPage.tsx:1934-2008). Missing levels are null.
+ */
+export function categoryCascade(category: TicketCategoryRef | null | undefined): {
+  category: string | null;
+  subcategory: string | null;
+  item: string | null;
+} {
+  if (!category) return { category: null, subcategory: null, item: null };
+  switch (category.level) {
+    case 'ITEM':
+      return { category: category.parent?.parent?.name ?? null, subcategory: category.parent?.name ?? null, item: category.name };
+    case 'SUBCATEGORY':
+      return { category: category.parent?.name ?? null, subcategory: category.name, item: null };
+    default:
+      return { category: category.name, subcategory: null, item: null };
+  }
 }
 
 /**

@@ -75,7 +75,7 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
       title="Developer session token"
       headerVariant="back"
       visibility="__DEV__ builds only. Not present in release builds. REMOVE BEFORE RELEASE (Phase 5)."
-      endpoints={['None in Phase 1. From Phase 3: AUTH-2 · GET /auth/me to load the real user.']}
+      endpoints={['AUTH-2 · GET /auth/me — run by the app shell (SessionGate) right after this screen, to load the real user.']}
     >
       <Section heading="sd_session from a UAT browser session">
         <Text className="mb-2 text-sm text-gray-700">
@@ -97,9 +97,10 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
         {error ? <Text className="mt-2 text-sm text-red-700">{error}</Text> : null}
       </Section>
 
-      <Section heading="Fixture role (Phase 1 only)">
+      <Section heading="Placeholder role (replaced on sign-in)">
         <Text className="mb-2 text-xs text-gray-500">
-          No API is called in Phase 1, so pick the role to preview. Phase 3 replaces this with GET /auth/me.
+          From Phase 3 the app loads your real name, role and country from GET /auth/me before any screen opens, so
+          this choice no longer changes what you see. The role is the one the token belongs to.
         </Text>
         <View className="flex-row flex-wrap">
           {USER_ROLES.map((r) => (
