@@ -6,9 +6,11 @@
 //   the server's answer), and lists are marked stale WITHOUT refetching; pull-to-refresh brings the order and
 //   filter membership up to date;
 // - creating a ticket refreshes only the FIRST page of the list on screen (one request).
+// - Home's one-page lists and DSH-1 counts are marked stale (no request); pull-to-refresh on Home reloads them.
+// - a task write replaces that one task in the ticket's cached detail and list rows with the server's returned task.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 
-import type { ActivityPage, Paginated, Ticket } from '@/types';
+import type { ActivityPage, Paginated, Ticket, TicketTaskEmbedded } from '@/types';
 import { queryKeys } from './queryKeys';
 
 type ListData = InfiniteData<Paginated<Ticket>, number>;
@@ -37,6 +39,13 @@ export function patchTicketInLists(queryClient: QueryClient, ticket: unknown): v
     });
   }
   void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.lists(), refetchType: 'none' });
+  markHomeStale(queryClient);
+}
+
+/** Home's recent list and DSH-1 counts: marked stale, never refetched here (pull-to-refresh on Home does that). */
+export function markHomeStale(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.recents(), refetchType: 'none' });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(), refetchType: 'none' });
 }
 
 /** Refetch one ticket and its open tabs (history trimmed to its newest page first). */
@@ -59,6 +68,49 @@ export async function refreshListsFirstPage(queryClient: QueryClient): Promise<v
     data ? { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) } : data,
   );
   await queryClient.invalidateQueries({ queryKey: queryKeys.tickets.lists(), refetchType: 'active' });
+  markHomeStale(queryClient);
+}
+
+/** A task the server returned (TSK-2/TSK-3), `{ deletedId }` after TSK-4. */
+export type TaskChange = { task: TicketTaskEmbedded } | { deletedId: string };
+
+function applyTaskChange(tasks: unknown, change: TaskChange): TicketTaskEmbedded[] | unknown {
+  if (!Array.isArray(tasks)) return tasks;
+  const list = tasks as TicketTaskEmbedded[];
+  if ('deletedId' in change) return list.filter((t) => t?.id !== change.deletedId);
+  const { task } = change;
+  const exists = list.some((t) => t?.id === task.id);
+  // The embedded shape has assignedTo without avatarUrl (03 B.5); keep only the embedded fields.
+  const embedded: TicketTaskEmbedded = {
+    ...task,
+    assignedTo: task.assignedTo ? { id: task.assignedTo.id, displayName: task.assignedTo.displayName, email: task.assignedTo.email } : null,
+  };
+  const next = exists ? list.map((t) => (t?.id === task.id ? embedded : t)) : [...list, embedded];
+  return next.sort((a, b) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0));
+}
+
+/**
+ * Put the server's answer to a task write into the ticket's cached copies: the detail (TKT-3) and every loaded list
+ * row (TKT-1 embeds tasks, and the standalone task list reads them from there). Not optimistic — called on success.
+ * The detail is then refetched by refreshTicket(); lists are only marked stale.
+ */
+export function patchTaskInCaches(queryClient: QueryClient, ticketId: string, change: TaskChange): void {
+  queryClient.setQueryData<Ticket>(queryKeys.tickets.detail(ticketId), (ticket) =>
+    ticket ? { ...ticket, tasks: applyTaskChange(ticket.tasks, change) as TicketTaskEmbedded[] } : ticket,
+  );
+  queryClient.setQueriesData<ListData>({ queryKey: queryKeys.tickets.lists() }, (data) => {
+    if (!data) return data;
+    return {
+      ...data,
+      pages: data.pages.map((page) => ({
+        ...page,
+        data: page.data.map((row) =>
+          row?.id === ticketId ? { ...row, tasks: applyTaskChange(row.tasks, change) as TicketTaskEmbedded[] } : row,
+        ),
+      })),
+    };
+  });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.lists(), refetchType: 'none' });
 }
 
 /** A ticket already in the cache (detail first, then any loaded list page), without a network call. */

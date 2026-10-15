@@ -15,7 +15,9 @@
 //   More options: Pick up (ADMIN/AGENT, not locked, not the dev placeholder user), Assign → M7, Close → M6.
 //   Conversation: Reply / Reply all (staff) / Note (ADMIN/AGENT) → M5.
 //   Attachments: images open inline via ATT-3 with the Bearer header; staged files upload via ATT-2 (unless locked).
-//   Tasks stay read-only.
+//   Tasks (Phase 4): every role taps a task to open task detail. Staff (ADMIN, AGENT, L2) also tick it done / not done
+//     (TSK-3, reversible) and add tasks (→ M11, TSK-2); edit and remove live on task detail. END_USER: read-only (D4).
+//     The rows are the shared TaskRow, also used by the standalone task list.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -27,11 +29,11 @@ import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   AttachmentPicker, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, OfflineBanner, OfflineState,
-  OptionSheet, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, type SheetOption,
+  OptionSheet, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow, type SheetOption,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useSingleFlight, useTicket, useTicketAttachments, useTicketComments, useTicketHistory,
-  useUploadAttachment,
+  useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import type {
@@ -41,8 +43,8 @@ import type {
 import { canSeePrivateNotes, describeAudit } from '@/utils/activity';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import {
-  IMPACT_LABELS, TASK_STATUS_LABELS, URGENCY_LABELS, categoryCascade, effectiveResolveDue, formatBytes, formatDate,
-  formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
+  IMPACT_LABELS, URGENCY_LABELS, categoryCascade, effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName,
+  formatRelative, initials, sourceLabel,
 } from '@/utils/format';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { canAssignToSelf } from '@/utils/session';
@@ -102,6 +104,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const changeStatus = useChangeStatus();
   const assign = useAssignTicket();
   const upload = useUploadAttachment();
+  const toggleTask = useToggleTask();
   const once = useSingleFlight();
   const [moreOpen, setMoreOpen] = useState(false);
   const [viewing, setViewing] = useState<Attachment | null>(null);
@@ -161,6 +164,14 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       notify('Assigned to you');
     } catch (e) {
       reportWriteError('Failed to pick up', e);
+    }
+  }
+
+  async function onToggleTask(task: TicketTaskEmbedded) {
+    try {
+      await toggleTask.mutateAsync({ ticketId, taskId: task.id, status: task.status });
+    } catch (e) {
+      reportWriteError("Couldn't update the task", e);
     }
   }
 
@@ -364,7 +375,16 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
           </TabBody>
         ) : null}
 
-        {tab === 'tasks' ? <TasksTab tasks={Array.isArray(ticket.tasks) ? ticket.tasks : []} /> : null}
+        {tab === 'tasks' ? (
+          <TasksTab
+            tasks={Array.isArray(ticket.tasks) ? ticket.tasks : []}
+            canEdit={isStaff(role)}
+            togglingId={toggleTask.isPending ? (toggleTask.variables?.taskId ?? null) : null}
+            onOpen={(task) => navigation.navigate('TaskDetail', { ticketId, taskId: task.id })}
+            onToggle={(task) => void once(() => onToggleTask(task))}
+            onAdd={() => navigation.navigate('TaskEditor', { ticketId })}
+          />
+        ) : null}
       </ScrollView>
 
       <OptionSheet visible={moreOpen} title="More options" options={moreActions} selected={null} onSelect={onMore} onClose={() => setMoreOpen(false)} />
@@ -814,41 +834,43 @@ function AttachmentRow({
   );
 }
 
-const TASK_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  OPEN: { name: 'ellipse-outline', color: '#6b7280' },
-  IN_PROGRESS: { name: 'time-outline', color: '#ca8a04' },
-  COMPLETED: { name: 'checkmark-circle', color: '#16a34a' },
-  CANCELLED: { name: 'close-circle-outline', color: '#9ca3af' },
-};
-
-/** Read-only for every role in Phase 3a (no toggling). Tasks come embedded in TKT-3, ordered by sortOrder. */
-function TasksTab({ tasks }: { tasks: readonly TicketTaskEmbedded[] }) {
-  if (tasks.length === 0) {
-    return <EmptyState icon="checkbox-outline" title="No tasks" message="Tasks added to this ticket will appear here." />;
-  }
+/**
+ * Tasks embedded in TKT-3, in sortOrder. Tap → task detail (every role). Staff: checkbox (TSK-3) and "Add task" (M11).
+ * END_USER sees the same rows without the checkbox or the add button (D4).
+ */
+function TasksTab({
+  tasks, canEdit, togglingId, onOpen, onToggle, onAdd,
+}: {
+  tasks: readonly TicketTaskEmbedded[];
+  canEdit: boolean;
+  togglingId: string | null;
+  onOpen: (task: TicketTaskEmbedded) => void;
+  onToggle: (task: TicketTaskEmbedded) => void;
+  onAdd: () => void;
+}) {
   return (
-    <View className="mx-4 rounded-xl bg-white px-4 py-1">
-      {tasks.map((task) => {
-        const icon = TASK_ICONS[task.status] ?? TASK_ICONS.OPEN!;
-        const label = (TASK_STATUS_LABELS as Record<string, string>)[task.status] ?? task.status;
-        const assignee = formatDisplayName(task.assignedTo?.displayName);
-        return (
-          <View key={task.id} className="flex-row border-b border-gray-100 py-3">
-            <Ionicons name={icon.name} size={20} color={icon.color} />
-            <View className="ml-3 flex-1">
-              <Text className={`text-sm font-medium ${task.status === 'COMPLETED' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                {task.title}
-              </Text>
-              {task.description ? <Text className="mt-0.5 text-xs text-gray-600">{task.description}</Text> : null}
-              <Text className="mt-1 text-xs text-gray-500">
-                {label}
-                {assignee ? ` · ${assignee}` : ' · Unassigned'}
-                {task.dueDate ? ` · Due ${formatDate(task.dueDate)}` : ''}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
+    <View>
+      {canEdit ? (
+        <View className="mx-4 mb-3 flex-row">
+          <ActionChip icon="add-circle-outline" label="Add task" onPress={onAdd} />
+        </View>
+      ) : null}
+      {tasks.length === 0 ? (
+        <EmptyState icon="checkbox-outline" title="No tasks" message="Tasks added to this ticket will appear here." />
+      ) : (
+        <View className="mx-4 rounded-xl bg-white px-4 py-1">
+          {tasks.map((task, i) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              onPress={() => onOpen(task)}
+              onToggle={canEdit ? () => onToggle(task) : undefined}
+              toggling={togglingId === task.id}
+              last={i === tasks.length - 1}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }

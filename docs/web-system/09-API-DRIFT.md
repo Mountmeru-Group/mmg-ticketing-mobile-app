@@ -22,6 +22,10 @@ Copy each line into the table below, adding where you saw it (screen, role, tick
 - **Endpoints checked (Phase 3b):**
   - write responses: TKT-2, TKT-4, TKT-5, TKT-6 (the returned `Ticket`), CMT-2 (the created comment, without `attachments`, which 01 says are absent), ATT-2;
   - picker reads: TKT-9, TKT-10, LKP-1, LKP-2, USR-3.
+- **Endpoints checked (Phase 4):**
+  - reads: DSH-1 (`kpis` keys Home uses + `recent[0]`), NTF-1, NTF-2, APR-1, ANN-1, KB-1, KB-2, KB-3, KB-4, USR-1, and TKT-1 for Home's recent list and the ticket-link lookup;
+  - write responses: APR-2/APR-3 (the returned `Approval`), USR-2, TSK-2/TSK-3 (the returned `TicketTask`). NTF-3, NTF-4, KB-5, TSK-4 and AUTH-3 return `{ message }` only and are not checked.
+  - Phase 4 also re-read the backend source (read-only, web `master` @ `d7f3887`) for NTF-1/2/3/4, KB-1..KB-4, APR-2/APR-3 and DSH-1. Every field the app reads matches 03 §C. Nothing is recorded below from that read: this table is for **live** responses.
 - **A write is never failed because a field drifted.** The change has already happened on the server, so the app logs the drift line and refreshes the ticket. The exceptions are TKT-2 without an `id` and ATT-2 that is not an array: the app cannot continue without those, and the message says the change may have been saved.
 - **Checked per response:** the first array item only.
 - **Release builds:** the checker is compiled out.
@@ -32,7 +36,7 @@ A wrong **envelope**, such as an object where an array is promised, also logs a 
 
 | # | Date | Endpoint | Field | Expected (03 §C) | What arrived | Where seen (screen · role) | Decision (Ronit) |
 |---|---|---|---|---|---|---|---|
-| — | — | — | *None recorded yet. Phases 3a and 3b were written without UAT access (no token, by design). Ronit's 3a test run found no read drift; write drift will come from the 3b test run.* | | | | |
+| — | — | — | *None recorded yet. Phases 3a, 3b and 4 were written without UAT access (no token, by design). Ronit's 3a test run found no read drift; write drift will come from the 3b test run, and Phase 4 drift from its test run.* | | | | |
 
 ## Watch list (flagged in the docs, not yet observed)
 
@@ -45,3 +49,6 @@ These are the likeliest drift points. Each one is already read with a fallback i
 | `Ticket.isFcr` | Nullable in the schema despite its `false` default | 03 §B.1 |
 | `TicketDetail.slaPolicy` | Full row on TKT-3, `{id,name}` elsewhere | 01 TKT-3 |
 | Enum values (`status`, `priority`, `slaStatus`, audit `action`) | The database is managed by `prisma db push`, so a deployed enum can run ahead of the schema read on 2026-10-09 | 00 B2, 03 "Read this first" |
+| `Notification.type`, `Announcement.type`, `Approval.entityType` / `status` (Phase 4) | Same `db push` risk. Unknown values render raw (announcement chip) or with a generic icon (alerts); the drift checker logs them | 03 §A |
+| `DashboardAll.kpis.*` (Phase 4) | Computed by hand-written queries; a key renamed server-side would read as 0 on Home. The checker logs a missing key | 01 DSH-1 |
+| `KBCategory.children` (Phase 4) | KB-1 includes one level of children (`include: { children: true }`); deeper levels are not returned | 01 KB-1 |

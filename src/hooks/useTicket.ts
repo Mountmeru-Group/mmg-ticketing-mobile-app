@@ -9,20 +9,23 @@ import { getTicket } from '@/api/tickets.api';
 import type { TicketDetail } from '@/types';
 import { queryKeys } from './queryKeys';
 
+/** TKT-3 with the envelope check. Shared by useTicket and the approval cards (same cache key). */
+export async function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
+  const res = await getTicket(ticketId);
+  assertObject<TicketDetail>('TKT-3', res);
+  // The id is what every sub-resource call uses; without it nothing else on the screen is trustworthy.
+  if (typeof res.id !== 'string') {
+    throw new ApiClientError('shape', 200, { error: 'Unexpected response shape from TKT-3' });
+  }
+  checkFields('TKT-3', res, TICKET_SPEC);
+  if (Array.isArray(res.tasks)) checkFields('TKT-3', res.tasks[0], TASK_SPEC, 'tasks[0].');
+  return res;
+}
+
 export function useTicket(ticketId: string) {
   return useQuery({
     queryKey: queryKeys.tickets.detail(ticketId),
-    queryFn: async (): Promise<TicketDetail> => {
-      const res = await getTicket(ticketId);
-      assertObject<TicketDetail>('TKT-3', res);
-      // The id is what every sub-resource call uses; without it nothing else on the screen is trustworthy.
-      if (typeof res.id !== 'string') {
-        throw new ApiClientError('shape', 200, { error: 'Unexpected response shape from TKT-3' });
-      }
-      checkFields('TKT-3', res, TICKET_SPEC);
-      if (Array.isArray(res.tasks)) checkFields('TKT-3', res.tasks[0], TASK_SPEC, 'tasks[0].');
-      return res;
-    },
+    queryFn: () => fetchTicketDetail(ticketId),
     enabled: !!ticketId,
   });
 }

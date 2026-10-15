@@ -1,0 +1,58 @@
+// Compact ticket row for Home's recent list. Takes either a TKT-1 row or a DSH-1 `recent` item (scalars plus
+// requester/assignee names only), so it reads nothing beyond what both shapes carry.
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, Text, View } from 'react-native';
+
+import type { DashboardRecentTicket, Ticket } from '@/types';
+import { formatDisplayName, formatRelative } from '@/utils/format';
+import { PriorityBadge } from './PriorityBadge';
+import { SlaBadge } from './SlaBadge';
+import { StatusBadge } from './StatusBadge';
+
+interface RecentTicketRowProps {
+  ticket: Ticket | DashboardRecentTicket;
+  /** Staff see the requester; END_USER sees the technician. */
+  showRequester: boolean;
+  onPress: (ticketId: string) => void;
+  last?: boolean;
+}
+
+export function RecentTicketRow({ ticket, showRequester, onPress, last = false }: RecentTicketRowProps) {
+  const technician = formatDisplayName(ticket.assignedTo?.displayName);
+  const requester = formatDisplayName(ticket.requester?.displayName);
+  const who = showRequester
+    ? `${requester || 'Unknown requester'} · ${technician ? technician : 'Unassigned'}`
+    : technician
+      ? `Technician: ${technician}`
+      : 'Not yet assigned';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Ticket ${ticket.ticketNumber}: ${ticket.title}`}
+      onPress={() => onPress(ticket.id)}
+      className={`flex-row items-center py-3 active:opacity-70 ${last ? '' : 'border-b border-gray-100'}`}
+    >
+      <View className="flex-1">
+        <View className="flex-row items-center">
+          <Text className="text-xs font-semibold text-gray-500">#{ticket.ticketNumber ?? '—'}</Text>
+          <Text className="ml-2 flex-1 text-xs text-gray-400" numberOfLines={1}>
+            Updated {formatRelative(ticket.updatedAt)}
+          </Text>
+        </View>
+        <Text className="mt-0.5 text-sm font-semibold text-gray-900" numberOfLines={2}>
+          {ticket.title || '(no subject)'}
+        </Text>
+        <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+          <StatusBadge status={ticket.status} />
+          <PriorityBadge priority={ticket.priority} />
+          <SlaBadge ticket={ticket} />
+        </View>
+        <Text className="mt-1 text-xs text-gray-600" numberOfLines={1}>
+          {who}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+    </Pressable>
+  );
+}
