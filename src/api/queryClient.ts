@@ -44,6 +44,9 @@ export const queryClient = new QueryClient({
     mutations: {
       // Never auto-retry POST/PUT/DELETE: none of them is idempotent (duplicate tickets/comments, 02 §5.3).
       retry: false,
+      // 'always': a write runs (or is refused) the moment it is tapped. The default would PAUSE it while offline and
+      // send it on its own at reconnect; instead every write hook refuses up front when offline (requireOnline()).
+      networkMode: 'always',
     },
   },
 });

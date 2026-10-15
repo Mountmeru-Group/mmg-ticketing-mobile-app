@@ -1,4 +1,4 @@
-// M4 Ticket detail (04 §2.1 M4). Phase 3a: READ-ONLY, live data.
+// M4 Ticket detail (04 §2.1 M4). Live data (Phase 3a reads) plus the ticket write actions (Phase 3b).
 //
 // Calls: TKT-3 first. Only after it succeeds (05 §C hygiene) are the tab queries allowed, and each one loads the
 // first time its tab is opened — nothing is prefetched:
@@ -9,37 +9,61 @@
 // Role rules (05 §A.3): impact/urgency hidden for END_USER; PRIVATE notes shown to ADMIN/AGENT only, checked here
 // even though the server already withholds them (visibleComments); status bar hidden for END_USER (05 §A.1).
 //
-// NOT IN PHASE 3a (Phase 3b): status changes (the bar below is a disabled preview), reply/note, assign, pick up,
-// field edits, task edits, and opening or downloading attachments. PUT /tickets/:id is never used for status.
+// WRITES (Phase 3b) — each an explicit action, confirmed where it emails people or can't be undone:
+//   Status bar: transitions from ticket-rules.ts only; RESOLVED/CLOSED/CANCELED open M6 for the closure fields.
+//     TKT-6 POST /tickets/:id/status — PUT /tickets/:id is never used for status (05 B.1).
+//   More options: Pick up (ADMIN/AGENT, not locked, not the dev placeholder user), Assign → M7, Close → M6.
+//   Conversation: Reply / Reply all (staff) / Note (ADMIN/AGENT) → M5.
+//   Attachments: images open inline via ATT-3 with the Bearer header; staged files upload via ATT-2 (unless locked).
+//   Tasks stay read-only.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { openAttachmentExternally } from '@/api/attachmentDownload';
+import { getAttachmentViewRequest, type UploadFile } from '@/api/attachments.api';
+import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, PriorityBadge, QueryBanner,
-  ScreenHeader, SlaBadge, StatusBadge,
+  AttachmentPicker, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, OfflineBanner, OfflineState,
+  OptionSheet, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, type SheetOption,
 } from '@/components';
-import { useTicket, useTicketAttachments, useTicketComments, useTicketHistory } from '@/hooks';
+import {
+  useAssignTicket, useChangeStatus, useSingleFlight, useTicket, useTicketAttachments, useTicketComments, useTicketHistory,
+  useUploadAttachment,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import type {
   ActivityAuditItem, Attachment, Comment, TicketDetail, TicketImpact, TicketStackScreenProps, TicketTaskEmbedded,
   TicketUrgency, UserRole,
 } from '@/types';
 import { canSeePrivateNotes, describeAudit } from '@/utils/activity';
+import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import {
   IMPACT_LABELS, TASK_STATUS_LABELS, URGENCY_LABELS, categoryCascade, effectiveResolveDue, formatBytes, formatDate,
   formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
-import { isStaff } from '@/utils/roles';
-import { canChangeStatus, getAvailableTransitions, isResolvedLocked, transitionTone } from '@/utils/ticket-rules';
+import { isAgentOrAdmin, isStaff } from '@/utils/roles';
+import { canAssignToSelf } from '@/utils/session';
+import {
+  canChangeStatus, getAvailableTransitions, isResolvedLocked, requiresClosureForm, transitionTone, type StatusTransition,
+} from '@/utils/ticket-rules';
+import { statusChangeMessage } from '@/utils/writeCopy';
 
 type DetailTab = 'conversation' | 'history' | 'attachments' | 'tasks';
+type MoreAction = 'pickup' | 'assign' | 'close';
 
-export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDetail'>) {
+/** Images (not SVG) open in the in-app viewer; PDFs and other types show their details only. */
+function isViewableImage(mimeType: string): boolean {
+  const type = (mimeType || '').toLowerCase();
+  return type.startsWith('image/') && !type.startsWith('image/svg');
+}
+
+export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps<'TicketDetail'>) {
   const { ticketId } = route.params;
-  const role = useAuthStore((s) => s.user?.role) ?? 'END_USER';
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role ?? 'END_USER';
   const insets = useSafeAreaInsets();
 
   const ticketQuery = useTicket(ticketId);
@@ -74,6 +98,83 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
     }
   };
 
+  // ── Writes ─────────────────────────────────────────────────
+  const changeStatus = useChangeStatus();
+  const assign = useAssignTicket();
+  const upload = useUploadAttachment();
+  const once = useSingleFlight();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [viewing, setViewing] = useState<Attachment | null>(null);
+  // ATT-3 with the Bearer header, built once per opened image so a background refetch doesn't reload it. The token
+  // is read from the auth store at this moment and never logged.
+  const viewRequest = useMemo(() => (viewing ? getAttachmentViewRequest(ticketId, viewing.id) : null), [ticketId, viewing]);
+  // ATT-4 download-then-share for PDFs and other files (and "Share" on an open image). A read, not a write.
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  async function openExternally(attachment: Attachment) {
+    if (offline) {
+      Alert.alert("You're offline", 'Files can be opened once you reconnect.');
+      return;
+    }
+    setOpeningId(attachment.id);
+    try {
+      await openAttachmentExternally(ticketId, attachment);
+    } catch (e) {
+      if (!isSessionEndedError(e)) Alert.alert("Couldn't open the file", describeError(e));
+    } finally {
+      setOpeningId(null);
+    }
+  }
+  const [newFiles, setNewFiles] = useState<UploadFile[]>([]);
+  const writing = changeStatus.isPending || assign.isPending;
+
+  async function onTransition(t: StatusTransition) {
+    if (!ticket) return;
+    if (requiresClosureForm(t.target)) {
+      navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: t.target });
+      return;
+    }
+    const ok = await confirmAction({
+      title: `${t.label}?`,
+      message: statusChangeMessage(ticket.ticketNumber, ticket.status, t.target),
+      confirmLabel: t.label,
+    });
+    if (!ok) return;
+    try {
+      await changeStatus.mutateAsync({ ticketId, from: ticket.status, body: { status: t.target } });
+      notify('Status updated');
+    } catch (e) {
+      reportWriteError('Failed to update status', e);
+    }
+  }
+
+  async function pickUp() {
+    if (!ticket || !user) return;
+    const ok = await confirmAction({
+      title: 'Pick up this ticket?',
+      message: `#${ticket.ticketNumber} will be assigned to you${ticket.team ? ` in ${ticket.team.name}` : ''}.`,
+      confirmLabel: 'Pick up',
+    });
+    if (!ok) return;
+    try {
+      // 08 S5 / 05 B.14: send the current team so the server doesn't pick an arbitrary one.
+      await assign.mutateAsync({ ticketId, status: ticket.status, assignedToId: user.id, teamId: ticket.teamId ?? undefined });
+      notify('Assigned to you');
+    } catch (e) {
+      reportWriteError('Failed to pick up', e);
+    }
+  }
+
+  async function uploadStaged() {
+    if (!ticket || newFiles.length === 0) return;
+    try {
+      await upload.mutateAsync({ ticketId, status: ticket.status, files: newFiles });
+      notify(`${newFiles.length} ${newFiles.length === 1 ? 'file' : 'files'} uploaded`);
+      setNewFiles([]);
+    } catch (e) {
+      reportWriteError('Upload failed', e);
+    }
+  }
+
   const title = ticket ? `Ticket #${ticket.ticketNumber}` : 'Ticket';
 
   if (!ticket) {
@@ -91,9 +192,41 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
     );
   }
 
+  const locked = isResolvedLocked(role, ticket.status);
+  const moreActions: SheetOption<MoreAction>[] = [];
+  if (isAgentOrAdmin(role) && !locked && canAssignToSelf(user) && ticket.assignedToId !== user?.id) {
+    moreActions.push({ value: 'pickup', label: 'Pick up', description: 'Assign this ticket to yourself' });
+  }
+  if (isAgentOrAdmin(role) && !locked) moreActions.push({ value: 'assign', label: 'Assign…', description: 'Choose a group and technician' });
+  if (getAvailableTransitions(role, ticket.status).some((t) => t.target === 'CLOSED')) {
+    moreActions.push({ value: 'close', label: 'Close…', description: 'Opens the closure form' });
+  }
+  const onMore = (action: MoreAction) => {
+    if (action === 'pickup') void once(pickUp);
+    else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
+    else navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
+  };
+
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title={title} variant="back" />
+      <ScreenHeader
+        title={title}
+        variant="back"
+        right={
+          moreActions.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+              disabled={writing}
+              onPress={() => setMoreOpen(true)}
+              hitSlop={8}
+              className="h-10 w-10 items-center justify-center rounded-full"
+            >
+              {assign.isPending ? <ActivityIndicator color="#2563eb" /> : <Ionicons name="ellipsis-vertical" size={22} color="#111827" />}
+            </Pressable>
+          ) : undefined
+        }
+      />
       <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
       <ScrollView
@@ -101,7 +234,7 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
       >
         <HeaderCard ticket={ticket} role={role} />
-        <StatusActionBar ticket={ticket} role={role} />
+        <StatusActionBar ticket={ticket} role={role} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
 
         <Card title="Description">
           <HtmlText html={ticket.description} emptyText="No description" />
@@ -122,6 +255,18 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
           }}
         />
 
+        {tab === 'conversation' ? (
+          <View className="mx-4 mb-3 flex-row gap-2">
+            <ActionChip icon="arrow-undo-outline" label="Reply" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'reply' })} />
+            {isStaff(role) ? (
+              <ActionChip icon="arrow-undo-circle-outline" label="Reply all" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'replyAll' })} />
+            ) : null}
+            {/* Private note: ADMIN and AGENT only — not offered at all to END_USER or L2_MANAGER. */}
+            {canSeePrivateNotes(role) ? (
+              <ActionChip icon="lock-closed-outline" label="Note" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'note' })} />
+            ) : null}
+          </View>
+        ) : null}
         {tab === 'conversation' ? (
           <TabBody
             query={comments}
@@ -181,6 +326,20 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
           </TabBody>
         ) : null}
 
+        {tab === 'attachments' && !locked ? (
+          <Card title="Add files">
+            <AttachmentPicker files={newFiles} onChange={setNewFiles} disabled={upload.isPending} />
+            {newFiles.length > 0 ? (
+              <View className="mt-3">
+                <SubmitButton
+                  label={`Upload ${newFiles.length} ${newFiles.length === 1 ? 'file' : 'files'}`}
+                  onPress={() => void once(uploadStaged)}
+                  loading={upload.isPending}
+                />
+              </View>
+            ) : null}
+          </Card>
+        ) : null}
         {tab === 'attachments' ? (
           <TabBody
             query={attachments}
@@ -190,16 +349,46 @@ export function TicketDetailScreen({ route }: TicketStackScreenProps<'TicketDeta
             isEmpty={(attachments.data?.length ?? 0) === 0}
             empty={<EmptyState icon="attach-outline" title="No attachments" message="Files added to this ticket will appear here." />}
           >
-            <Text className="mx-4 mb-2 text-xs text-gray-500">Tap a file for its details. Opening and downloading files arrive in Phase 3b.</Text>
+            <Text className="mx-4 mb-2 text-xs text-gray-500">
+              Tap an image to view it, or any other file to open or share it. Long-press for details.
+            </Text>
             {(attachments.data ?? []).map((a) => (
-              <AttachmentRow key={a.id} attachment={a} />
+              <AttachmentRow
+                key={a.id}
+                attachment={a}
+                onView={isViewableImage(a.mimeType) ? () => setViewing(a) : undefined}
+                onOpen={() => void once(() => openExternally(a))}
+                opening={openingId === a.id}
+              />
             ))}
           </TabBody>
         ) : null}
 
         {tab === 'tasks' ? <TasksTab tasks={Array.isArray(ticket.tasks) ? ticket.tasks : []} /> : null}
       </ScrollView>
+
+      <OptionSheet visible={moreOpen} title="More options" options={moreActions} selected={null} onSelect={onMore} onClose={() => setMoreOpen(false)} />
+      <ImageViewerModal
+        request={viewRequest}
+        title={viewing?.fileName ?? ''}
+        onShare={viewing ? () => void once(() => openExternally(viewing)) : undefined}
+        sharing={!!viewing && openingId === viewing.id}
+        onClose={() => setViewing(null)}
+      />
     </View>
+  );
+}
+
+function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white py-2.5 active:bg-gray-50"
+    >
+      <Ionicons name={icon} size={16} color="#1f2937" />
+      <Text className="ml-1.5 text-sm font-medium text-gray-900">{label}</Text>
+    </Pressable>
   );
 }
 
@@ -275,14 +464,22 @@ function HeaderCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) 
 }
 
 /**
- * Status bar (05 §A.1) as a DISABLED preview: the transition map for this role and status, nothing pressable.
- * Hidden for END_USER; empty for AGENT on CLOSED/CANCELED. Status changes are Phase 3b (TKT-6 only, never PUT).
+ * Status bar (05 §A.1): only the transition map for this role and status. Hidden for END_USER; empty for AGENT on
+ * CLOSED/CANCELED. All buttons disabled while a write is in flight. Closure targets open M6; others confirm, then
+ * post TKT-6 (never PUT).
  */
-function StatusActionBar({ ticket, role }: { ticket: TicketDetail; role: UserRole }) {
+function StatusActionBar({
+  ticket, role, busy, onTransition,
+}: {
+  ticket: TicketDetail;
+  role: UserRole;
+  busy: boolean;
+  onTransition: (t: StatusTransition) => void;
+}) {
   if (!canChangeStatus(role)) return null;
   const locked = isResolvedLocked(role, ticket.status);
   const transitions = getAvailableTransitions(role, ticket.status);
-  const toneClass = { success: 'border-green-300 bg-green-50', muted: 'border-gray-300 bg-gray-100', neutral: 'border-gray-300 bg-white' } as const;
+  const toneClass = { success: 'border-green-300 bg-green-50', muted: 'border-gray-400 bg-gray-100', neutral: 'border-gray-300 bg-white' } as const;
 
   return (
     <Card title="Change status">
@@ -291,11 +488,12 @@ function StatusActionBar({ ticket, role }: { ticket: TicketDetail; role: UserRol
           {transitions.map((t) => (
             <Pressable
               key={t.target}
-              disabled
+              disabled={busy}
               accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
-              accessibilityHint="Available in Phase 3b"
-              className={`rounded-lg border px-3 py-2 opacity-50 ${toneClass[transitionTone(t.target)]}`}
+              accessibilityState={{ disabled: busy }}
+              accessibilityHint={requiresClosureForm(t.target) ? 'Opens the closure form' : 'Asks you to confirm'}
+              onPress={() => onTransition(t)}
+              className={`rounded-lg border px-3 py-2 ${toneClass[transitionTone(t.target)]} ${busy ? 'opacity-50' : 'active:opacity-70'}`}
             >
               <Text className="text-sm text-gray-800">{t.label}</Text>
             </Pressable>
@@ -306,10 +504,7 @@ function StatusActionBar({ ticket, role }: { ticket: TicketDetail; role: UserRol
           {locked ? 'Closed and canceled tickets are locked for technicians.' : 'No status changes are available from this status.'}
         </Text>
       )}
-      <View className="mt-3 flex-row items-center rounded-md bg-blue-50 px-2 py-1.5">
-        <Ionicons name="information-circle-outline" size={14} color="#1d4ed8" />
-        <Text className="ml-1 flex-1 text-xs text-blue-800">Read-only preview. Changing status arrives in Phase 3b.</Text>
-      </View>
+      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color="#2563eb" /> : null}
     </Card>
   );
 }
@@ -566,14 +761,27 @@ function attachmentIcon(mimeType: string): keyof typeof Ionicons.glyphMap {
   return 'document-outline';
 }
 
-/** Metadata only. `storagePath` (a server disk path) is never displayed (03 B.4). */
-function AttachmentRow({ attachment }: { attachment: Attachment }) {
+/**
+ * Tap: images open in the in-app viewer (ATT-3); every other type — PDFs included — downloads (ATT-4) and opens the
+ * system share sheet. Long-press: details. `storagePath` (a server disk path) is never displayed (03 B.4).
+ */
+function AttachmentRow({
+  attachment, onView, onOpen, opening,
+}: {
+  attachment: Attachment;
+  onView?: () => void;
+  onOpen: () => void;
+  opening: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ expanded: open }}
-      onPress={() => setOpen((v) => !v)}
+      accessibilityState={{ busy: opening, expanded: open }}
+      accessibilityHint={onView ? 'Opens the image. Long-press for details' : 'Downloads the file and opens the share sheet. Long-press for details'}
+      disabled={opening}
+      onPress={onView ?? onOpen}
+      onLongPress={() => setOpen((v) => !v)}
       className="mx-4 mb-2 rounded-xl bg-white p-3 active:bg-gray-50"
     >
       <View className="flex-row items-center">
@@ -584,7 +792,11 @@ function AttachmentRow({ attachment }: { attachment: Attachment }) {
             {formatBytes(attachment.sizeBytes)} · {attachment.mimeType || 'unknown type'}
           </Text>
         </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#9ca3af" />
+        {opening ? (
+          <ActivityIndicator color="#2563eb" />
+        ) : (
+          <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color="#6b7280" />
+        )}
       </View>
       {open ? (
         <View className="mt-2 border-t border-gray-100 pt-1">
@@ -593,6 +805,9 @@ function AttachmentRow({ attachment }: { attachment: Attachment }) {
           <Row label="Type">{attachment.mimeType || 'Unknown'}</Row>
           <Row label="Size">{formatBytes(attachment.sizeBytes)}</Row>
           <Row label="Added with">{attachment.commentId ? 'A reply' : 'The ticket'}</Row>
+          <Pressable accessibilityRole="button" disabled={opening} onPress={onOpen} className="mt-2 self-start py-1">
+            <Text className="text-sm font-medium text-blue-700">Download and share</Text>
+          </Pressable>
         </View>
       ) : null}
     </Pressable>

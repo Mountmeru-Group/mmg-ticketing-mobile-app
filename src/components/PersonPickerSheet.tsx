@@ -1,0 +1,100 @@
+// Searchable people picker: a local list (group members), plus USR-3 search when `searchRoles` is given.
+// USR-3 is ADMIN/AGENT only (useUserSearch enforces it). Picking a person writes nothing — the caller confirms.
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useDebouncedValue, useUserSearch } from '@/hooks';
+import type { UserRole } from '@/types';
+import { formatDisplayName } from '@/utils/format';
+
+export interface Person {
+  id: string;
+  displayName: string;
+  email: string;
+  /** Short grey note, e.g. "Not in any active group". */
+  note?: string;
+}
+
+interface PersonPickerSheetProps {
+  visible: boolean;
+  title: string;
+  /** Shown first and filtered as you type. */
+  people?: readonly Person[];
+  /** When set, typing ≥ 2 characters also searches USR-3 for these roles ([] = all roles). */
+  searchRoles?: readonly UserRole[];
+  /** Extra rows above the list, e.g. "Unassigned" or "Me". */
+  extraOptions?: readonly { key: string; label: string; onPress: () => void }[];
+  onPick: (person: Person) => void;
+  onClose: () => void;
+}
+
+export function PersonPickerSheet({ visible, title, people = [], searchRoles, extraOptions = [], onPick, onClose }: PersonPickerSheetProps) {
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+  const term = useDebouncedValue(query, 350);
+  const remote = useUserSearch(term, { roles: searchRoles ?? [], enabled: visible && searchRoles !== undefined });
+
+  const q = query.trim().toLowerCase();
+  const local = useMemo(
+    () => (q ? people.filter((p) => p.displayName.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)) : [...people]),
+    [people, q],
+  );
+  const remoteOnly = (remote.data ?? []).filter((r) => !local.some((p) => p.id === r.id));
+
+  const close = () => {
+    setQuery('');
+    onClose();
+  };
+  const pick = (p: Person) => {
+    setQuery('');
+    onPick(p);
+  };
+
+  const row = (p: Person) => (
+    <Pressable key={p.id} accessibilityRole="button" onPress={() => pick(p)} className="border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+      <Text className="text-base text-gray-900">{formatDisplayName(p.displayName) || p.email}</Text>
+      <Text className="text-xs text-gray-500">
+        {p.email}
+        {p.note ? ` · ${p.note}` : ''}
+      </Text>
+    </Pressable>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+      <Pressable accessibilityLabel="Close" onPress={close} className="flex-1 bg-black/40" />
+      <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-3">
+        <Text className="px-4 pb-2 text-base font-semibold text-gray-900" accessibilityRole="header">{title}</Text>
+        <View className="mx-4 mb-2 h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
+          <Ionicons name="search" size={16} color="#6b7280" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={searchRoles !== undefined ? 'Name or email (2+ letters)' : 'Filter by name or email'}
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="ml-2 flex-1 text-base text-gray-900"
+          />
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {extraOptions.map((o) => (
+            <Pressable key={o.key} accessibilityRole="button" onPress={o.onPress} className="border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+              <Text className="text-base font-medium text-blue-700">{o.label}</Text>
+            </Pressable>
+          ))}
+          {local.map(row)}
+          {remoteOnly.map((r) => row({ id: r.id, displayName: r.displayName, email: r.email }))}
+          {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color="#2563eb" /> : null}
+          {!remote.isFetching && local.length === 0 && remoteOnly.length === 0 ? (
+            <Text className="px-4 py-6 text-center text-sm text-gray-500">
+              {searchRoles !== undefined && q.length < 2 ? 'Type at least 2 letters to search.' : 'No one matches.'}
+            </Text>
+          ) : null}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}

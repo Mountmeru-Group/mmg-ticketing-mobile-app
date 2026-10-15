@@ -117,6 +117,42 @@ export const AUDIT_ITEM_SPEC: readonly FieldSpec[] = [
   { path: 'actor', kinds: OBJ_NULL },
 ];
 
+/** CMT-2 201: the created comment. 01 CMT-2: `attachments` are NOT included (so not checked). */
+export const COMMENT_CREATED_SPEC: readonly FieldSpec[] = COMMENT_SPEC.filter((s) => s.path !== 'attachments');
+
+/** TKT-9 `{ to, cc, from }`. */
+export const EMAIL_RECIPIENTS_SPEC: readonly FieldSpec[] = [
+  { path: 'to', kinds: ARR },
+  { path: 'cc', kinds: ARR },
+  { path: 'from', kinds: S },
+];
+
+/** TKT-10 item / USR-3 item (shared fields). */
+export const USER_REF_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'displayName', kinds: S },
+  { path: 'email', kinds: S },
+];
+
+/** LKP-1 `?flat=true` row. */
+export const CATEGORY_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'parentId', kinds: S_NULL },
+  { path: 'level', kinds: S, oneOf: ['CATEGORY', 'SUBCATEGORY', 'ITEM'] },
+  { path: 'defaultTeamId', kinds: S_NULL },
+  { path: 'defaultAssigneeId', kinds: S_NULL },
+];
+
+/** LKP-2 team. */
+export const TEAM_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'isActive', kinds: ['boolean'] },
+  { path: 'members', kinds: ARR },
+  { path: 'members.0.user', kinds: ['object', 'undefined'] },
+];
+
 /** `Country` from LKP-4 / LKP-5. */
 export const COUNTRY_SPEC: readonly FieldSpec[] = [
   { path: 'id', kinds: S },
