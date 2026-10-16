@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import {
@@ -87,8 +88,13 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   };
 
   const onPressRow = (n: Notification) => {
-    // Marking read is part of opening it; a failure (e.g. offline) never blocks opening the ticket.
-    if (!n.isRead) markRead.mutate(n.id);
+    // Marking read is part of opening it; a failure (e.g. offline) never blocks opening the ticket, but it is always
+    // reported (the row stays unread). The per-call promise reports every tap, even when several overlap.
+    if (!n.isRead) {
+      markRead.mutateAsync(n.id).catch((e: unknown) => {
+        if (!isSessionEndedError(e)) notify(`Couldn't mark it read: ${describeWriteError(e)}`);
+      });
+    }
     openRelated(n);
   };
 

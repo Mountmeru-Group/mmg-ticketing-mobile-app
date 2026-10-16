@@ -10,10 +10,10 @@ import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { UploadFile } from '@/api/attachments.api';
-import { describeWriteError, isSessionEndedError } from '@/api/errors';
+import { describeError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, ScreenHeader,
-  SubmitButton,
+  AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner,
+  OfflineState, ScreenHeader, SubmitButton,
 } from '@/components';
 import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -99,10 +99,13 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="close" />
-        {ticketQuery.isError ? (
+        <OfflineBanner />
+        {ticketQuery.fetchStatus === 'paused' ? (
+          <OfflineState what="This ticket" />
+        ) : ticketQuery.isError ? (
           <ErrorState error={ticketQuery.error} title="Couldn't load this ticket" onRetry={() => void ticketQuery.refetch()} />
         ) : (
-          <LoadingSkeleton variant="detail" />
+          <LoadingSkeleton variant="formPage" rows={2} />
         )}
       </View>
     );
@@ -111,6 +114,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <ScreenHeader title={title} variant="close" />
+      <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
         <Text className="mx-4 mb-3 text-sm text-gray-600" numberOfLines={2}>
           #{ticket.ticketNumber} · {ticket.title}
@@ -137,6 +141,14 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
           {showRecipients ? (
             <>
               {mode === 'replyAll' && recipients.isFetching ? <Text className="mb-1 text-xs text-gray-500">Loading thread recipients…</Text> : null}
+              {mode === 'replyAll' && recipients.isError && !recipients.isFetching ? (
+                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-2 rounded-lg bg-amber-50 p-2">
+                  <Text className="text-xs text-amber-900">
+                    Couldn't load the thread's recipients ({describeError(recipients.error)}). To is set to the requester only.{' '}
+                    <Text className="font-semibold">Tap to retry.</Text>
+                  </Text>
+                </Pressable>
+              ) : null}
               <EmailChipsInput label="To" chips={to} onChangeChips={setTo} input={toInput} onChangeInput={setToInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
               <EmailChipsInput label="Cc" chips={cc} onChangeChips={setCc} input={ccInput} onChangeInput={setCcInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
             </>

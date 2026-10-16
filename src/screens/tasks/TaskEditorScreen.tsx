@@ -17,8 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, OfflineState, OptionSheet, PersonPickerSheet,
-  ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
+  EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, OfflineBanner, OfflineState, OptionSheet,
+  PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
 } from '@/components';
 import { useDiscardGuard, useSaveTask, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -134,12 +134,13 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="close" />
+        <OfflineBanner />
         {ticketQuery.fetchStatus === 'paused' ? (
           <OfflineState what="The ticket" />
         ) : ticketQuery.isError ? (
           <ErrorState error={ticketQuery.error} title="Couldn't load the ticket" onRetry={() => void ticketQuery.refetch()} />
         ) : (
-          <LoadingSkeleton variant="detail" />
+          <LoadingSkeleton variant="formPage" rows={4} />
         )}
       </View>
     );
@@ -162,6 +163,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
   return (
     <KeyboardAvoidingView behavior="height" className="flex-1 bg-gray-50">
       <ScreenHeader title={title} variant="close" />
+      <OfflineBanner />
       <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         <Text className="mx-4 mb-2 text-xs text-gray-500" numberOfLines={1}>
           On ticket #{ticket.ticketNumber} · {ticket.title}

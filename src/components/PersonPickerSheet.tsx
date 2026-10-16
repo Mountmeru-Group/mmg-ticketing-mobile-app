@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDebouncedValue, useUserSearch } from '@/hooks';
 import type { UserRole } from '@/types';
 import { formatDisplayName } from '@/utils/format';
+import { LookupError } from './Form';
 
 export interface Person {
   id: string;
@@ -88,7 +89,11 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
           {local.map(row)}
           {remoteOnly.map((r) => row({ id: r.id, displayName: r.displayName, email: r.email }))}
           {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color="#2563eb" /> : null}
-          {!remote.isFetching && local.length === 0 && remoteOnly.length === 0 ? (
+          {/* A failed search is said as such, never shown as "No one matches". */}
+          <View className="mx-4 mt-2">
+            <LookupError query={remote} what="people" />
+          </View>
+          {!remote.isFetching && !(remote.isError && !remote.data) && local.length === 0 && remoteOnly.length === 0 ? (
             <Text className="px-4 py-6 text-center text-sm text-gray-500">
               {searchRoles !== undefined && q.length < 2 ? 'Type at least 2 letters to search.' : 'No one matches.'}
             </Text>

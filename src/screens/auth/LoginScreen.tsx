@@ -8,13 +8,16 @@
 // - Never: password form (production is SSO only), /auth/test-login, WebView cookie lifting (02 §6).
 import { Pressable, Text, View } from 'react-native';
 
-import { APP_ENV } from '@/config/env';
+import { useIsOffline } from '@/api/network';
+import { OfflineBanner } from '@/components';
+import { ENVIRONMENT_LABEL } from '@/config/env';
 import { useAuthStore } from '@/store/auth.store';
 import type { AuthStackScreenProps } from '@/types';
 import { PlaceholderScreen, Section } from '../PlaceholderScreen';
 
 export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
   const signOutMessage = useAuthStore((s) => s.signOutMessage);
+  const offline = useIsOffline();
 
   return (
     <PlaceholderScreen
@@ -30,8 +33,17 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
       ]}
     >
       <Section heading="MMG Service Desk">
-        <View className="mb-3 self-start rounded-full bg-amber-100 px-2.5 py-0.5">
-          <Text className="text-xs font-semibold text-amber-800">{APP_ENV}</Text>
+        {offline ? (
+          <View className="mb-3 overflow-hidden rounded-lg">
+            <OfflineBanner />
+          </View>
+        ) : null}
+        {/* Which backend this build talks to, always visible to testers (04 M1). */}
+        <View
+          accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`}
+          className="mb-3 self-start rounded-lg bg-amber-100 px-2.5 py-1"
+        >
+          <Text className="text-xs font-semibold text-amber-800">{ENVIRONMENT_LABEL}</Text>
         </View>
 
         {signOutMessage ? (

@@ -16,7 +16,7 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { changeTicketStatus } from '@/api/tickets.api';
 import {
   AttachmentPicker, BulkProgressModal, EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice,
-  OptionSheet, ScreenHeader, SelectField, StatusBadge, SubmitButton, type SheetOption,
+  OfflineBanner, OfflineState, OptionSheet, ScreenHeader, SelectField, StatusBadge, SubmitButton, type SheetOption,
 } from '@/components';
 import {
   assertStatusChange, assertStatusUnchanged, findCachedTicket, useBulkRunner, useChangeStatus, useDiscardGuard, useSingleFlight, useTicket,
@@ -180,10 +180,13 @@ function SingleStatus({ navigation, route }: Props) {
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="close" />
-        {ticketQuery.isError ? (
+        <OfflineBanner />
+        {ticketQuery.fetchStatus === 'paused' ? (
+          <OfflineState what="This ticket" />
+        ) : ticketQuery.isError ? (
           <ErrorState error={ticketQuery.error} title="Couldn't load this ticket" onRetry={() => void ticketQuery.refetch()} />
         ) : (
-          <LoadingSkeleton variant="detail" />
+          <LoadingSkeleton variant="formPage" rows={3} />
         )}
       </View>
     );
@@ -201,6 +204,7 @@ function SingleStatus({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <ScreenHeader title={title} variant="close" />
+      <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
         <FormCard>
           <Text className="text-sm text-gray-600" numberOfLines={2}>
@@ -321,6 +325,7 @@ function BulkClose({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <ScreenHeader title={`Close ${route.params.ticketIds.length} tickets`} variant="close" />
+      <OfflineBanner />
       {invalidRequest ? (
         <EmptyState icon="alert-circle-outline" title="Not available" message={`Bulk changes are limited to closing up to ${BULK_ACTION_LIMIT} tickets, by staff.`} />
       ) : (

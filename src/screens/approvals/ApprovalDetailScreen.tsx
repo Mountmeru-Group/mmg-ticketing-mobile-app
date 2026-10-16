@@ -13,7 +13,7 @@
 // - No delegation (A26).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiClientError } from '@/api/errors';
@@ -223,7 +223,7 @@ function TicketContext({
         {query.fetchStatus === 'paused' ? (
           <Text className="text-sm text-gray-500">The ticket loads when you reconnect.</Text>
         ) : (
-          <ActivityIndicator color="#2563eb" />
+          <LoadingSkeleton variant="lines" rows={3} />
         )}
       </Card>
     );

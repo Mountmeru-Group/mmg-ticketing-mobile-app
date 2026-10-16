@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { startConnectivityMonitoring } from '@/api/network';
 import { queryClient } from '@/api/queryClient';
-import { HtmlRenderProvider } from '@/components';
+import { ErrorBoundary, HtmlRenderProvider } from '@/components';
 import { RootNavigator } from '@/navigation/RootNavigator';
 
 // Offline → queries pause instead of failing (src/api/network.ts). Must run before the first query.
@@ -22,7 +22,10 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <HtmlRenderProvider>
             <StatusBar barStyle="dark-content" />
-            <RootNavigator />
+            {/* A render crash below shows a recoverable screen, not a white screen or a redbox. */}
+            <ErrorBoundary>
+              <RootNavigator />
+            </ErrorBoundary>
           </HtmlRenderProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

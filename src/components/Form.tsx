@@ -3,6 +3,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { describeError } from '@/api/errors';
+
 /** Label with a visible, announced "required" marker. */
 export function FieldLabel({ label, required = false, hint }: { label: string; required?: boolean; hint?: string }) {
   return (
@@ -63,6 +65,33 @@ export function InlineError({ message }: { message: string | null }) {
     <View accessibilityRole="alert" className="mx-4 mb-3 flex-row items-start rounded-lg bg-red-50 p-3">
       <Ionicons name="alert-circle" size={18} color="#b91c1c" />
       <Text className="ml-2 flex-1 text-sm text-red-800">{message}</Text>
+    </View>
+  );
+}
+
+interface LookupQuery {
+  data: unknown;
+  error: unknown;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => Promise<unknown>;
+}
+
+/**
+ * A picker's lookup (groups, people, recommendations) failed and nothing is loaded: the reason and a Retry, inline in
+ * the form, so a pick list never just comes up empty.
+ */
+export function LookupError({ query, what }: { query: LookupQuery; what: string }) {
+  if (!query.isError || query.isFetching || query.data !== undefined) return null;
+  return (
+    <View accessibilityRole="alert" className="mb-2 flex-row items-start rounded-lg bg-red-50 p-2">
+      <Ionicons name="alert-circle" size={16} color="#b91c1c" />
+      <Text className="ml-2 flex-1 text-xs text-red-800">
+        Couldn't load {what}. {describeError(query.error)}
+      </Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Retry loading ${what}`} onPress={() => void query.refetch()} hitSlop={8} className="ml-2 px-1">
+        <Text className="text-xs font-semibold text-red-800">Retry</Text>
+      </Pressable>
     </View>
   );
 }

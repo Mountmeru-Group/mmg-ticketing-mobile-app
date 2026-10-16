@@ -16,10 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
-import { APP_ENV, APP_VERSION } from '@/config/env';
+import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
 import {
-  ErrorState, FieldLabel, InlineError, Notice, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader, SubmitButton,
-  type SheetOption,
+  ErrorState, FieldLabel, InlineError, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
+  SubmitButton, type SheetOption,
 } from '@/components';
 import {
   countryName, profileChanges, useCountryOptions, useProfile, useSignOut, useSingleFlight, useUpdateProfile, validateProfile,
@@ -164,11 +164,11 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
             <ErrorState error={profile.error} title="Couldn't load your profile" onRetry={() => void profile.refetch()} />
           </Card>
         ) : !profile.data ? (
-          <Card>
+          <Card title="Your details">
             {profile.fetchStatus === 'paused' ? (
               <Text className="text-sm text-gray-500">Your profile loads when you reconnect.</Text>
             ) : (
-              <ActivityIndicator color="#2563eb" />
+              <LoadingSkeleton variant="form" rows={5} />
             )}
           </Card>
         ) : (
@@ -239,7 +239,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
 
         <Card title="App">
           <ReadOnly label="Version" value={APP_VERSION} />
-          <ReadOnly label="Environment" value={`${APP_ENV}${__DEV__ ? ' · development build' : ''}`} />
+          <ReadOnly label="Environment" value={ENVIRONMENT_LABEL} />
         </Card>
 
         <View className="mx-4">
@@ -260,6 +260,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
         ) : countries.isPending ? (
           <View className="items-center py-8">
             <ActivityIndicator color="#2563eb" />
+            <Text className="mt-2 text-sm text-gray-500">Loading countries…</Text>
           </View>
         ) : countries.isError && !countries.data ? (
           <ErrorState error={countries.error} title="Couldn't load countries" onRetry={() => void countries.refetch()} />

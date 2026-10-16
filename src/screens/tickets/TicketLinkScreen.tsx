@@ -13,7 +13,7 @@ import { ActivityIndicator, Linking, Text, View } from 'react-native';
 
 import { assertPaginated } from '@/api/drift';
 import { listTickets } from '@/api/tickets.api';
-import { EmptyState, ErrorState, OfflineState, ScreenHeader } from '@/components';
+import { EmptyState, ErrorState, OfflineBanner, OfflineState, ScreenHeader } from '@/components';
 import { queryKeys, type TicketListKeyParams } from '@/hooks/queryKeys';
 import { useAuthStore } from '@/store/auth.store';
 import type { Ticket, TicketStackScreenProps } from '@/types';
@@ -100,6 +100,7 @@ export function TicketLinkScreen({ navigation, route }: TicketStackScreenProps<'
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader title="Ticket link" variant="back" />
+      <OfflineBanner />
       {body}
     </View>
   );
