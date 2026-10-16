@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "mmgservicedesk",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "com.mountmeru.servicedesk",
       "versionCode": 1,
@@ -18,12 +20,25 @@
         "monochromeImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1D4ED8"
       },
-      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"]
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       "expo-secure-store",
-      ["expo-image-picker", { "microphonePermission": false }],
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "86788b11-328a-4ad7-a3dc-275b6f31325e"
+      }
+    },
+    "owner": "ronitpc"
   }
 }
