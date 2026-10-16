@@ -34,4 +34,13 @@ export const API_BASE_URL: string = API_BASE_URLS[APP_ENV];
 /** SYS-1 lives OUTSIDE `/api/v1`: `https://<host>/health` (01 §1; `/api/health` is not a route). */
 export const HEALTH_URL: string = `${API_BASE_URL.replace(/\/api\/v1$/, '')}/health`;
 
+/** The backend's host name, e.g. `uat-servicedesk.mountmerugroup.com`. */
+export const API_HOST: string = API_BASE_URL.replace(/^https?:\/\//, '').split('/')[0] ?? '';
+
+/**
+ * Which backend this build talks to, shown on Login and Profile so a tester can always tell (04 M1, M10):
+ * e.g. "UAT · uat-servicedesk.mountmerugroup.com", plus "development build" when __DEV__.
+ */
+export const ENVIRONMENT_LABEL: string = `${APP_ENV} · ${API_HOST}${__DEV__ ? ' · development build' : ''}`;
+
 export const APP_VERSION: string = appJson.expo.version;

@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { assignTicket } from '@/api/tickets.api';
 import {
-  BulkProgressModal, EmptyState, ErrorState, FormCard, LoadingSkeleton, Notice, OptionSheet, PersonPickerSheet,
-  ScreenHeader, SelectField, type Person, type SheetOption,
+  BulkProgressModal, EmptyState, ErrorState, FormCard, LoadingSkeleton, LookupError, Notice, OfflineBanner, OfflineState,
+  OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, type Person, type SheetOption,
 } from '@/components';
 import {
   assertAssignment, fetchCurrentStatus, findCachedTicket, useAssignTicket, useBulkRunner, useDiscardGuard, useSingleFlight, useSuggestedAssignees, useTeams,
@@ -131,10 +131,13 @@ function SingleAssign({ navigation, route }: Props) {
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title="Assign" variant="close" />
-        {ticketQuery.isError ? (
+        <OfflineBanner />
+        {ticketQuery.fetchStatus === 'paused' ? (
+          <OfflineState what="This ticket" />
+        ) : ticketQuery.isError ? (
           <ErrorState error={ticketQuery.error} title="Couldn't load this ticket" onRetry={() => void ticketQuery.refetch()} />
         ) : (
-          <LoadingSkeleton variant="detail" />
+          <LoadingSkeleton variant="formPage" rows={3} />
         )}
       </View>
     );
@@ -148,6 +151,7 @@ function SingleAssign({ navigation, route }: Props) {
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader title={`Assign · #${ticket.ticketNumber}`} variant="close" />
+      <OfflineBanner />
       {locked ? (
         <EmptyState icon="lock-closed-outline" title="Locked" message="Closed and canceled tickets are locked for technicians." />
       ) : (
@@ -203,7 +207,7 @@ function SingleAssign({ navigation, route }: Props) {
               onPress={() => setSheet('group')}
               disabled={busy || !group.teams.data}
             />
-            {group.teams.isError ? <Text className="mb-2 text-sm text-red-700">Couldn't load groups.</Text> : null}
+            <LookupError query={group.teams} what="groups" />
             {groupChanged ? (
               <ActionRow
                 label={`Move to ${group.team?.name ?? 'this group'}${current ? ` (keep ${current})` : ''}`}
@@ -230,8 +234,8 @@ function SingleAssign({ navigation, route }: Props) {
           </FormCard>
 
           <FormCard title={`Recommended${ticket.country ? ` for ${ticket.country.displayName || ticket.country.name}` : ''}`}>
-            {suggested.isLoading ? <Text className="text-sm text-gray-500">Loading…</Text> : null}
-            {suggested.isError ? <Text className="text-sm text-gray-500">Recommendations aren't available right now.</Text> : null}
+            {suggested.isLoading ? <LoadingSkeleton variant="lines" rows={2} /> : null}
+            <LookupError query={suggested} what="recommendations" />
             {!suggested.isLoading && recommended.length === 0 && !suggested.isError ? (
               <Text className="text-sm text-gray-500">No recommendations for this category and country.</Text>
             ) : null}
@@ -343,6 +347,7 @@ function BulkAssign({ navigation, route }: Props) {
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader title={`Assign ${route.params.ticketIds.length} tickets`} variant="close" />
+      <OfflineBanner />
       {tooMany ? (
         <EmptyState icon="alert-circle-outline" title="Too many tickets" message={`You can act on up to ${BULK_ACTION_LIMIT} tickets at a time.`} />
       ) : (
@@ -363,6 +368,7 @@ function BulkAssign({ navigation, route }: Props) {
               onPress={() => setSheet('group')}
               disabled={running || !group.teams.data || bulk.progress !== null}
             />
+            <LookupError query={group.teams} what="groups" />
             <ActionRow
               label={group.team ? (members.length > 0 ? `Choose from ${members.length} members` : 'Search technicians') : 'Search technicians'}
               disabled={running || eligible.length === 0 || bulk.progress !== null}

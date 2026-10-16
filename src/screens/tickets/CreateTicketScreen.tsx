@@ -12,8 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { UploadFile } from '@/api/attachments.api';
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OptionSheet, PersonPickerSheet,
-  ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
+  AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, LookupError, Notice, OfflineBanner,
+  OfflineState, OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
 } from '@/components';
 import { useCategories, useCreateTicket, useDiscardGuard, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -148,19 +148,19 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
   const urgencyOptions: SheetOption<string>[] = [{ value: NOT_SET, label: 'Not set' }, ...TICKET_URGENCIES.map((v) => ({ value: v, label: URGENCY_LABELS[v] }))];
   const teamOptions: SheetOption<string>[] = [{ value: AUTO, label: 'Auto (from category)' }, ...teams.map((t) => ({ value: t.id, label: t.name }))];
 
-  if (categoriesQuery.isPending && !categoriesQuery.data) {
+  if (!categoriesQuery.data) {
+    // Categories are required to raise a ticket (05 §A.8), so the form waits for them.
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title="New ticket" variant="back" />
-        <LoadingSkeleton variant="detail" />
-      </View>
-    );
-  }
-  if (categoriesQuery.isError && !categoriesQuery.data) {
-    return (
-      <View className="flex-1 bg-gray-50">
-        <ScreenHeader title="New ticket" variant="back" />
-        <ErrorState error={categoriesQuery.error} title="Couldn't load categories" onRetry={() => void categoriesQuery.refetch()} />
+        <OfflineBanner />
+        {categoriesQuery.fetchStatus === 'paused' ? (
+          <OfflineState what="The ticket form" />
+        ) : categoriesQuery.isError ? (
+          <ErrorState error={categoriesQuery.error} title="Couldn't load categories" onRetry={() => void categoriesQuery.refetch()} />
+        ) : (
+          <LoadingSkeleton variant="formPage" rows={4} />
+        )}
       </View>
     );
   }
@@ -168,6 +168,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <ScreenHeader title="New ticket" variant="back" />
+      <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
         <FormCard>
           <FieldLabel label="Title" required hint="3 to 255 characters" />
@@ -225,6 +226,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
               onPress={() => setSheet('team')}
               disabled={busy || teamsQuery.isLoading}
             />
+            <LookupError query={teamsQuery} what="groups" />
             <SelectField
               label="Assign to"
               value={assignee ? formatDisplayName(assignee.displayName) || assignee.email : null}

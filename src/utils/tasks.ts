@@ -70,12 +70,27 @@ export function dueDateToDay(dueDate: string | null | undefined): string {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
+/** A Date's calendar day on the device, as "YYYY-MM-DD" (what the date picker's choice means to the person). */
+export function dayFromDate(date: Date): string {
+  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** Today + `offsetDays` on the device's calendar, as "YYYY-MM-DD". */
 export function dayFromToday(offsetDays: number, now: Date = new Date()): string {
-  const local = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays);
-  const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
-  return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}`;
+  return dayFromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays));
 }
+
+/** "YYYY-MM-DD" → a local Date at noon of that day (the date picker's starting value), or null if not a real date. */
+export function dateFromDay(day: string): Date | null {
+  if (!dayToDueDate(day)) return null;
+  const m = DAY_RE.exec(day.trim());
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : null;
+}
+
+/** The range dayToDueDate accepts, for the picker's minimumDate / maximumDate. */
+export const DUE_DATE_MIN = new Date(2000, 0, 1);
+export const DUE_DATE_MAX = new Date(2100, 11, 31);
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 

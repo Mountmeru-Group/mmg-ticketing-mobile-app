@@ -8,6 +8,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
@@ -148,7 +149,18 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
                 onPress={() => setCategoryId(c.id)}
               />
             ))}
-            {categories.isPending && categories.fetchStatus !== 'idle' ? <ActivityIndicator style={{ marginLeft: 8 }} color="#2563eb" /> : null}
+            {categories.isPending && categories.fetchStatus === 'fetching' ? <LoadingSkeleton variant="chips" rows={3} /> : null}
+            {categories.isError && !categories.data ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Categories didn't load. ${describeError(categories.error)} Tap to retry.`}
+                onPress={() => void categories.refetch()}
+                className="mr-2 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5"
+              >
+                <Ionicons name="refresh" size={14} color="#b91c1c" />
+                <Text className="ml-1 text-sm text-red-800">Categories didn't load · Retry</Text>
+              </Pressable>
+            ) : null}
           </ScrollView>
         ) : null}
       </View>

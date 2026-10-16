@@ -11,12 +11,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementBanner, EmptyState, ErrorState, Notice, OfflineBanner, QueryBanner, RecentTicketRow, ScreenHeader,
+  AnnouncementBanner, EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, QueryBanner, RecentTicketRow,
+  ScreenHeader, Skeleton,
 } from '@/components';
 import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, type SafeDashboard } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -309,7 +310,9 @@ function TileGrid({
               {t.value !== undefined ? (
                 <Text className="mt-1 text-2xl font-bold text-gray-900">{t.value}</Text>
               ) : loading ? (
-                <ActivityIndicator style={{ marginTop: 8, alignSelf: 'flex-start' }} color={tone.fg} />
+                <View className="mt-2">
+                  <Skeleton className="h-6 w-12" />
+                </View>
               ) : (
                 <Text className="mt-1 text-xs text-gray-500">View tickets</Text>
               )}
@@ -358,7 +361,7 @@ function RecentList({
   } else if (!rows && query.isError) {
     body = <ErrorState error={query.error} title="Couldn't load recent tickets" onRetry={() => void query.refetch()} />;
   } else if (!rows) {
-    body = <ActivityIndicator style={{ marginVertical: 16 }} color="#2563eb" />;
+    body = <LoadingSkeleton variant="rows" rows={3} />;
   } else if (rows.length === 0) {
     body = <EmptyState icon="ticket-outline" title={emptyText} />;
   } else {
