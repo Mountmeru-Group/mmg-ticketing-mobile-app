@@ -1,6 +1,7 @@
 export * from './api';
 export * from './enums';
 export * from './user';
+export * from './mobile-sso-contract';
 export * from './lookups';
 export * from './ticket';
 export * from './comment';

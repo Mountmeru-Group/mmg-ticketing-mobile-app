@@ -1,9 +1,11 @@
 # 02 — Authentication
 
-> ## ⛔ PENDING DECISION — the mobile app CANNOT authenticate today
-> - The backend never hands a session token to a non-browser client.
-> - Production allows only Microsoft SSO, and that flow is web-only.
-> - **Until Ronit chooses option (a) or (b) in §4 and the backend team ships it (`06-BACKEND-ASKS.md` A1/A2), no mobile build can log in to any real environment.**
+> ## ✅ DECIDED: option (b), ask A2, native Microsoft SSO. App side built 2026-10-19 (Phase 2). ⛔ Backend endpoint NOT deployed yet
+> - **Decision:** Ronit chose (b) (§4). The Entra ID public-client app registration **exists**.
+> - **App:** the native flow is implemented (§7). It signs in with Microsoft, then posts the ID token to `POST /api/v1/auth/microsoft/mobile` (AUTH-P2).
+> - **Backend:** AUTH-P2 did **not exist on any web branch** on 2026-10-19 (`10-A2-STATUS.md`). Until it ships, sign-in stops at the exchange step with "App sign-in isn't available yet" (reason `endpoint-missing`). That is expected.
+> - **The request/response shape is an ASSUMPTION** (§7.5). The backend team must confirm or correct it.
+> - `__DEV__` builds keep the developer-token screen as the fallback until SSO works end to end. It is removed in Phase 8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
@@ -172,7 +174,9 @@ and **no cookies** (§5.2).
 
 ---
 
-## 4. Candidate solutions (PENDING DECISION — Ronit chooses)
+## 4. Candidate solutions (DECIDED: (b), ask A2)
+
+> **Decision (Ronit, by 2026-10-19):** option **(b)**. IT has created the Entra app registration. The implemented flow is in §7. Option (a) / A1 is not being built: production is SSO only. The text below is kept as the record of the choice.
 
 ### (a) New backend endpoint that returns the session token in the JSON body (ask **A1**)
 `POST /api/v1/auth/mobile/login` `{ username, password }` → `{ token, expiresAt, user }`, no cookie. Or the same added to `/auth/login` behind an `X-Client: mobile` header.
@@ -266,7 +270,7 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
   - Until A1 or A2 returns it, the fallback is login time + 8 h. `SESSION_TTL_HOURS` is configurable per environment, so treat the fallback as a hint and let 401 be the truth.
 - **On app foreground and before opening any long-form screen** (reply, create ticket, close ticket): if `now > expiresAt − 10 min`, ask the user to sign in again **before** they type.
 - **Drafts:** persist reply and create-ticket drafts locally (non-secret AsyncStorage), so a 401 on submit does not lose work. After re-login, offer to resubmit.
-- With option (b), re-login can usually be silent (auth library refresh token, then token exchange). Still handle a 401 exactly as above.
+- With option (b), re-login *could* be silent (auth library refresh token, then token exchange). **Not implemented in Phase 2:** Microsoft's refresh token is discarded (§7.3), so re-login is interactive. Still handle a 401 exactly as above.
 
 ### 5.5 Logout
 1. `POST /api/v1/auth/logout` with the Bearer header. It always returns 200; ignore network failures.
@@ -293,3 +297,122 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 - Parsing `Set-Cookie` from `/auth/login`.
 - Shipping the existing web app registration's client secret, or any secret.
 - Asking users to paste a token.
+  - One documented exception: the `__DEV__`-only developer-token screen (`src/screens/auth/DevTokenScreen.tsx`). It is absent from release bundles (`docs/RELEASE.md` §6) and is deleted in Phase 8, once SSO works end to end.
+
+---
+
+## 7. Implemented flow: native Microsoft SSO (A2, Phase 2, 2026-10-19)
+
+### 7.1 Entra ID app registration (exists)
+- **Type:** public client, platform "Mobile and desktop applications". PKCE. **No client secret.** The app contains no secret, and none is needed.
+- **Redirect URI:** `com.mountmeru.servicedesk://auth`. **Android package:** `com.mountmeru.servicedesk`.
+- **Client ID and tenant ID** are not secrets. Ronit fills them into `src/config/auth.config.ts`, which **replaces the `<CLIENT_ID>` / `<TENANT_ID>` defaults**. For local runs they can also be set as `EXPO_PUBLIC_AZURE_CLIENT_ID` / `EXPO_PUBLIC_AZURE_TENANT_ID` in `.env`.
+  - EAS builds do not upload `.env`, so an APK uses the defaults in the file.
+  - While either ID is not a GUID, the app does not open Microsoft at all. It shows "Microsoft sign-in is not configured." (reason `not-configured`).
+- **Authority:** `https://login.microsoftonline.com/<TENANT_ID>`. The v2.0 `authorize` and `token` endpoints are fixed in the config, so there is no discovery request.
+- **Scopes:** `openid profile email offline_access`. Nothing else, and no Graph scope.
+
+### 7.2 Redirect URI per runtime
+The URI is built by `expo-auth-session`'s `makeRedirectUri({ scheme: 'com.mountmeru.servicedesk', path: 'auth' })`.
+
+| Runtime | URI the app sends | Registered? |
+|---|---|---|
+| EAS build (`preview` APK), any standalone or dev-client build | `com.mountmeru.servicedesk://auth` | **Yes** |
+| Expo Go (`npx expo start`, scan the QR code) | `exp://<LAN-IP>:8081/--/auth`. It changes with the machine and network | **No.** Microsoft shows AADSTS50011 (redirect URI mismatch) on its own page, unless that exact URI is also added under "Mobile and desktop applications". `__DEV__` builds show the URI on the Login screen |
+
+- `app.json` `scheme` is now `["mmgservicedesk", "com.mountmeru.servicedesk"]`. The first entry keeps the existing in-app scheme; the second lets the redirect return to a standalone build.
+- **New native modules** (`expo-crypto`, plus `expo-web-browser` and `expo-application` through `expo-auth-session`): an APK built before this change cannot run the flow. Build a new one.
+
+### 7.3 Sequence (`src/api/auth.api.ts`)
+1. **Login:** the user taps "Sign in with Microsoft". The button is disabled and shows a spinner until the flow ends.
+2. **Microsoft:** `AuthRequest` with `response_type=code`, PKCE `S256` and `prompt=select_account` (as the web flow does) opens in the system browser (Custom Tab).
+   - Closing the page, pressing Back, or pressing Cancel on Microsoft's page (`access_denied` + `error_subcode=cancel`) returns to Login with **no error**.
+3. **Code redemption:** the code goes to Microsoft's token endpoint (`exchangeCodeAsync`) with the PKCE verifier and no secret.
+   - Only `id_token` is kept, in memory, for one request.
+   - Microsoft's access token and refresh token are dropped unused. There is no silent re-login (§5.4).
+4. **Exchange:** `POST /api/v1/auth/microsoft/mobile` with body `{ idToken }`.
+   - Sent **without** an `Authorization` header (`skipAuth`), and without cookies (`withCredentials: false`).
+5. **Validation:** the 200 body is checked field by field against the assumed contract (§7.5). If anything is off, nothing is stored and the reason is `unexpected-response`.
+6. **Store:** `setSession({ token, user })` is **unchanged**.
+   - Token, user and `issuedAt = now` go to SecureStore.
+   - The 8-hour rule runs from `issuedAt`. `expiresAt` from the response is checked but **not used** yet.
+   - A 401 still means "sign in again". There is no refresh.
+7. **Done:** RootNavigator switches to the app.
+
+**Nothing is logged:** no token, ID token, authorization code or redirect URL. Error details carry only HTTP statuses, server `error` strings, AADSTS codes and field names.
+
+### 7.4 Failure reasons, as shown on Login
+Each reason has its own title, message and reference line (`Ref: <reason> · HTTP <status>`). `__DEV__` builds also print a developer detail line.
+
+| Reason | Trigger | User sees | Retry |
+|---|---|---|---|
+| `endpoint-missing` | AUTH-P2 → **404 or 405 with a non-JSON (HTML) body**: Express's "Cannot POST", i.e. the route is not deployed. Also a JSON 404 whose `error` is exactly `"Not found"` (the A11 catch-all) | "App sign-in isn't available yet". Microsoft accepted the sign-in; the server can't sign in the app yet | No |
+| `token-rejected` | AUTH-P2 → 401 or 403, `error` not mentioning "deactivated" | "Sign-in was refused". Use the work account, then contact IT | Yes |
+| `no-account` | AUTH-P2 → **404 with a JSON `{ error }` body** (assumed signal, §7.5) | "No Service Desk account". Contact IT, or use a different account | Yes ("Use a different account") |
+| `network` | No answer from the Service Desk (network or timeout) or from `login.microsoftonline.com` | "Can't connect" | Yes |
+| `account-disabled` | AUTH-P2 → 401 or 403 whose `error` matches `/deactivated/i` | 05 §A.13: "Your account has been deactivated. Contact IT support." | No |
+| `not-configured` | Client or tenant ID still a placeholder | 05 §A.13: "Microsoft sign-in is not configured." | No |
+| `microsoft` | Microsoft returned an error (AADSTS code shown in the detail), no code, or no ID token | 05 §A.13: "Microsoft sign-in failed. Please try again." | Yes |
+| `rate-limited` | AUTH-P2 → 429 | "Too many attempts" | No |
+| `unexpected-response` | AUTH-P2 → 2xx, but the body is not JSON or does not match §7.5 | "Sign-in couldn't be completed". Report to IT | No |
+| `server` | AUTH-P2 → 5xx, 400, 501 or any other status | "The Service Desk had a problem" | Yes |
+| `storage` | SecureStore refused to save the session | "Couldn't save your sign-in" | Yes |
+
+**How to tell "backend not ready" from "app bug":**
+- `endpoint-missing`, `server` with HTTP 501, and `unexpected-response` point at the **backend**. In each case Microsoft sign-in already succeeded.
+- `microsoft` and `not-configured` point at **Entra registration or app config**. The Service Desk was never called.
+- A crash, a spinner that never stops, or an error after a 200 that does match §7.5 is an **app bug**.
+
+### 7.5 The contract the app assumes (for the backend team to confirm or correct)
+Single source in code: `src/types/mobile-sso-contract.ts`. Each wire name or status is one line there.
+
+**Request**
+```
+POST /api/v1/auth/microsoft/mobile
+Content-Type: application/json
+Accept: application/json
+(no Authorization header, no cookie)
+
+{ "idToken": "<Microsoft v2.0 ID token: JWT, aud = mobile client ID, tid = MMG tenant>" }
+```
+
+**Success: 200, with NO `Set-Cookie`.** A cookie would override the Bearer header (§2 #5). `__DEV__` builds warn if one is seen.
+```json
+{
+  "token": "<opaque session UUID, as sd_session>",
+  "expiresAt": "2026-10-19T18:30:00.000Z",
+  "user": { "id": "uuid", "email": "string", "displayName": "string",
+            "role": "ADMIN|AGENT|END_USER|L2_MANAGER",
+            "ldapSamAccount": "string|null", "countryId": "string|null" }
+}
+```
+- All three top-level fields are **required**.
+- `user` must carry **all six** `AuthUser` fields (03 §C, the same as AUTH-2). `null` is fine where marked; a missing key is not.
+- Anything less gives `unexpected-response`, and the developer detail names each field that is off.
+
+**Errors the app distinguishes**
+
+| Case | Status + body the app expects |
+|---|---|
+| Microsoft token invalid (signature, `iss`, `aud`, `tid`, expiry) | 401 or 403, JSON `{ "error": "…" }` |
+| Account deactivated | 401 or 403, `error` containing "deactivated" |
+| Valid Microsoft identity, no Service Desk account | 404, JSON `{ "error": "User not found" }` (any text except exactly `"Not found"`) |
+| Too many attempts | 429 |
+| Server not configured for mobile | 501, JSON `{ "error": "…" }` |
+| Anything else | JSON `{ "error": "…" }` with the real status. Never a raw stack or exception text |
+
+### 7.6 Still unconfirmed / open
+1. **AUTH-P2 does not exist yet** on any web branch (`10-A2-STATUS.md`, checked 2026-10-19). The proposed backend change is in `10-A2-STATUS.md` §4.3.
+2. **Field names** `idToken`, `token`, `expiresAt`, `user` are assumed.
+3. **`user` shape:** if the backend reuses `loginWithAzureAd()` as is, `user` has 4 fields and no `expiresAt` is returned (`10-A2-STATUS.md` §5). The app would then report `unexpected-response`. Backend change #3 in `10-A2-STATUS.md` §4.3 fixes that.
+4. **"No account" signal:** the web flow **auto-creates** unknown users as END_USER, so today no such error exists. A business decision is needed: auto-create on mobile too, or refuse. If refused, confirm the status. The app assumes a JSON 404.
+5. **Deactivated wording:** "Account is deactivated" (service) vs "Account deactivated" (middleware). The app matches both.
+6. **Rate limit** on the new route: today every `/auth/*` route except `/login` has none (`10-A2-STATUS.md` §4.1).
+7. **Country and office for users created through mobile:** an ID token alone does not carry Graph `country`/`officeLocation`. If the backend wants parity, the request gains `accessToken` and the app needs the `User.Read` scope. That is a scope change, so it needs Ronit's approval.
+8. **Bearer through IIS/ARR on UAT** is still unverified (`00-OVERVIEW.md` BLOCKER B4).
+9. **Expo Go redirect** is not registered (§7.2). Test with an EAS build, or register the `exp://` URI the Login screen shows.
+10. **`npm run verify:release-bundle` now FAILS.** It needs Ronit's decision; the script was not changed.
+    - `client_secret` / `clientSecret` appear in `expo-auth-session`'s own option names (`AuthRequest.js`, `TokenRequest.js`, `AuthRequestHooks.js`). They are option names only; the app passes no secret.
+    - One UUID-v4 literal: the EAS `extra.eas.projectId` in `app.json`. It is bundled because `src/config/env.ts` imports `app.json`. **This predates Phase 2.**
+    - Once the real Entra IDs are filled in, those two GUIDs will be flagged the same way.
+    - Suggested fix (not applied): match secret **values** instead of the property names, and allow-list the projectId and the two Entra IDs.
