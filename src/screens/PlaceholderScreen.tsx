@@ -1,5 +1,5 @@
-// Phase 1 scaffold layout. After Phase 4 it is used ONLY by the auth screens — M1 Login (blocked on ask A2) and the
-// __DEV__ token screen — which this phase was told not to touch. Replace it when M1 is built against A2.
+// Phase 1 scaffold layout. Since M1 Login was built against A2 it is used ONLY by the __DEV__ token screen, which is
+// deleted in Phase 8 together with this file.
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

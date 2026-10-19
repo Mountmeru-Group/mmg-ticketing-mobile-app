@@ -28,7 +28,10 @@ export function isSessionExpired(issuedAt: number, now: number = Date.now()): bo
 export interface NewSession {
   token: string;
   user: AuthUser;
-  /** Epoch ms. Defaults to now. Replace with the server's `expiresAt` once A2 returns it (02 §4). */
+  /**
+   * Epoch ms. Defaults to now. AUTH-P2 also returns `expiresAt`, but it is not used yet: the 8-hour rule from
+   * `issuedAt` stays until the backend confirms the contract (02 §7), and a 401 is still the final word.
+   */
   issuedAt?: number;
 }
 
