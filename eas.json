@@ -12,7 +12,6 @@
     // Dev client for day-to-day development against UAT. Needs expo-dev-client, which is NOT installed yet (it is on
     // the approval list in docs/RELEASE.md); until then use `npx expo start` for development.
     "development": {
-      "developmentClient": true,
       "distribution": "internal",
       "android": { "buildType": "apk" },
       "env": { "EXPO_PUBLIC_APP_ENV": "UAT" }
