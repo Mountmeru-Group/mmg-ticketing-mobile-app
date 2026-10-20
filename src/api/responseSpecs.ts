@@ -299,3 +299,18 @@ export const TASK_RESPONSE_SPEC: readonly FieldSpec[] = [
   ...TASK_SPEC,
   { path: 'ticketId', kinds: S },
 ];
+
+// ── Auth ─────────────────────────────────────────────────────
+
+/**
+ * AUTH-P2 200 body: the OPTIONAL fields only. Their types come from src/types/mobile-sso-contract.ts, not 03 §C.
+ * A mismatch here is only logged. The REQUIRED fields (token, expiresAt, user.id, user.email, user.role) are checked by
+ * readSession() in auth.api.ts, and a bad one fails sign-in.
+ */
+export const MOBILE_SSO_OPTIONAL_SPEC: readonly FieldSpec[] = [
+  { path: 'user.name', kinds: S },
+  { path: 'user.countryId', kinds: S_NULL },
+  { path: 'user.ldapSamAccount', kinds: S_NULL },
+  { path: 'user.department', kinds: S_NULL },
+  { path: 'user.phone', kinds: S_NULL },
+];

@@ -7,7 +7,8 @@
 //    for one request. Microsoft's access and refresh tokens are dropped unused: there is no refresh in this app (02 §1.1).
 // 3. exchangeMicrosoftIdToken() posts the ID token to AUTH-P2 and reads the MMG session `{ token, expiresAt, user }`
 //    from the JSON body (no cookie). The caller stores it with the auth store's setSession().
-// AUTH-P2's request and response shapes are an ASSUMPTION, kept in one file: src/types/mobile-sso-contract.ts.
+// AUTH-P2's request and response shapes were CONFIRMED by the backend team on 2026-10-19. They live in one file:
+// src/types/mobile-sso-contract.ts. Only five response fields can fail sign-in (readSession()).
 // Every failure is a MicrosoftSignInError with its own `reason`, so the Login screen can tell them apart.
 // Never: scrape Set-Cookie, call /auth/test-login, lift the session out of a WebView, ship a secret (02 §6), or call
 // the cookie-setting web endpoints /auth/login and /auth/microsoft* (02 §5.2). No token, ID token or authorization
@@ -23,21 +24,21 @@ import {
 } from '@/config/auth.config';
 import { API_HOST, HEALTH_URL } from '@/config/env';
 import {
-  MOBILE_SSO_DEACTIVATED_ERROR,
-  MOBILE_SSO_NO_ACCOUNT_STATUS,
   MOBILE_SSO_PATH,
-  MOBILE_SSO_ROUTE_NOT_FOUND_ERROR,
-  MOBILE_SSO_WIRE,
   USER_ROLES,
   type AuthConfigResponse,
   type AuthMeResponse,
   type AuthUser,
   type MobileLoginResponse,
   type MobileSsoRequest,
+  type MobileSsoResponse,
+  type MobileSsoUser,
   type UserRole,
 } from '@/types';
 import { apiClient, type MessageResponse } from './client';
+import { checkFields } from './drift';
 import { ApiClientError } from './errors';
+import { MOBILE_SSO_OPTIONAL_SPEC } from './responseSpecs';
 
 /** SYS-1 response (01 §1). */
 export interface HealthResponse {
@@ -89,14 +90,15 @@ export async function logout(): Promise<MessageResponse> {
  * Before the Service Desk is called:
  * - `not-configured`      — this build still has the placeholder client/tenant IDs (src/config/auth.config.ts).
  * - `microsoft`           — Microsoft returned an error, or no ID token. The Service Desk was never called.
- * From AUTH-P2:
- * - `endpoint-missing`    — a 404 from the routing layer, not from the endpoint: AUTH-P2 is not deployed there yet.
- * - `token-rejected`      — 401/403: the endpoint ran and refused the Microsoft token.
- * - `account-disabled`    — 401/403 "…deactivated": the Service Desk account exists but is switched off.
- * - `no-account`          — the Microsoft sign-in is valid, but no Service Desk account matches it (assumed signal).
- * - `rate-limited`        — 429.
- * - `unexpected-response` — the endpoint answered 2xx, but not in the assumed contract shape.
- * - `server`              — 5xx, 400, 501 or any other status.
+ * From AUTH-P2. Its confirmed statuses are 400, 401, 403 and 500, each with a JSON `{ error }` (02-AUTH.md §7.5):
+ * - `bad-request`         — 400: the server could not read the request. An app-side problem; a retry won't help.
+ * - `token-rejected`      — 401: the endpoint ran and refused the Microsoft token.
+ * - `account-disabled`    — 403: the Service Desk account exists but is deactivated.
+ * - `server`              — 500, any other 5xx, or any status not listed here.
+ * - `endpoint-missing`    — any 404 or 405, HTML or JSON. AUTH-P2 itself never answers 404 (there is no "no account"
+ *                           case), so it means the route is not deployed on this server.
+ * - `rate-limited`        — 429. Not a confirmed status; kept in case a limiter is put on the route.
+ * - `unexpected-response` — 2xx, but a REQUIRED field is missing or the wrong type, or the body is not JSON.
  * Either side:
  * - `network`             — no answer at all: offline, DNS failure, timeout.
  * Closing Microsoft's page is not a failure: signInWithMicrosoft() resolves `{ type: 'cancelled' }`.
@@ -104,10 +106,10 @@ export async function logout(): Promise<MessageResponse> {
 export type MicrosoftSignInFailure =
   | 'not-configured'
   | 'microsoft'
-  | 'endpoint-missing'
+  | 'bad-request'
   | 'token-rejected'
   | 'account-disabled'
-  | 'no-account'
+  | 'endpoint-missing'
   | 'rate-limited'
   | 'unexpected-response'
   | 'server'
@@ -232,12 +234,11 @@ async function getMicrosoftIdToken(): Promise<string | null> {
 const AUTH_P2 = `POST /api/v1${MOBILE_SSO_PATH}`;
 
 /**
- * AUTH-P2 — POST /api/v1/auth/microsoft/mobile `{ idToken }` → `{ token, expiresAt, user }`, no cookie.
- * ⚠ The endpoint was not deployed on 2026-10-19 and its shape is ASSUMED (src/types/mobile-sso-contract.ts).
- * A failure says which it is: `endpoint-missing` = not deployed; `unexpected-response` = deployed, different shape.
+ * AUTH-P2 — POST /api/v1/auth/microsoft/mobile `{ idToken }` → `{ token, user, expiresAt }`, no cookie.
+ * Contract confirmed 2026-10-19 and deployed to UAT (src/types/mobile-sso-contract.ts).
  */
 export async function exchangeMicrosoftIdToken(idToken: string): Promise<MobileLoginResponse> {
-  const body: MobileSsoRequest = { [MOBILE_SSO_WIRE.idToken]: idToken };
+  const body: MobileSsoRequest = { idToken };
   let data: unknown;
   try {
     // skipAuth: there is no session yet, and a stale token must not ride along.
@@ -264,48 +265,31 @@ function classifyExchangeFailure(error: unknown): MicrosoftSignInError {
   if (kind === 'network' || kind === 'timeout') {
     return new MicrosoftSignInError('network', `${AUTH_P2}: ${kind === 'timeout' ? 'timed out' : 'no answer'} (${API_HOST})`);
   }
+  // For a non-JSON body `said` is only the client's fallback text, so it is not quoted as the server's.
+  const answer = kind === 'not-json' ? ' with a non-JSON body' : ` "${said}"`;
+
+  // AUTH-P2 never answers 404 itself: it auto-creates unknown users, so there is no "no account" case. Any 404/405,
+  // Express's HTML "Cannot POST" (01 §0.5) or a JSON catch-all, means the route is not deployed on this server.
+  if (status === 404 || status === 405) {
+    return new MicrosoftSignInError('endpoint-missing', `${http}${answer}: the route is not deployed on ${API_HOST}`, status);
+  }
+  if (status === 429) return new MicrosoftSignInError('rate-limited', `${http}${answer}`, status);
   if (kind === 'not-json') {
-    // Express answers an unknown POST with an HTML 404 (01 §0.5): the route does not exist on this server.
-    if (status === 404 || status === 405) {
-      return new MicrosoftSignInError(
-        'endpoint-missing',
-        `${http} with an HTML body: the route is not deployed on ${API_HOST}`,
-        status,
-      );
-    }
-    if (status === 429) return new MicrosoftSignInError('rate-limited', http, status);
     if (status !== null && status >= 200 && status < 300) {
       return new MicrosoftSignInError('unexpected-response', `${http}, but the body is not a JSON object`, status);
     }
-    return new MicrosoftSignInError('server', `${http} with a non-JSON body`, status);
+    // e.g. an IIS error page: not the endpoint's answer, so not read as 401/403.
+    return new MicrosoftSignInError('server', `${http}${answer}`, status);
   }
   if (kind === 'shape') {
     return new MicrosoftSignInError('unexpected-response', `${http}: ${said}`, status);
   }
 
-  // A JSON `{ error }` body: the endpoint itself answered.
-  if (status === MOBILE_SSO_NO_ACCOUNT_STATUS) {
-    if (said === MOBILE_SSO_ROUTE_NOT_FOUND_ERROR) {
-      return new MicrosoftSignInError(
-        'endpoint-missing',
-        `${http} "${said}" (catch-all 404): the route is not deployed on ${API_HOST}`,
-        status,
-      );
-    }
-    return new MicrosoftSignInError(
-      'no-account',
-      `${http} "${said}": deployed; read as "no Service Desk account" (assumed, mobile-sso-contract.ts)`,
-      status,
-    );
-  }
-  if (status === 401 || status === 403) {
-    if (MOBILE_SSO_DEACTIVATED_ERROR.test(said)) {
-      return new MicrosoftSignInError('account-disabled', `${http} "${said}"`, status);
-    }
-    return new MicrosoftSignInError('token-rejected', `${http} "${said}": deployed; the Microsoft token was refused`, status);
-  }
-  if (status === 429) return new MicrosoftSignInError('rate-limited', `${http} "${said}"`, status);
-  return new MicrosoftSignInError('server', `${http} "${said}"`, status);
+  // A JSON `{ error }` body: the endpoint itself answered. Mapped by the confirmed status, not by the message text.
+  if (status === 400) return new MicrosoftSignInError('bad-request', `${http}${answer}: the request body was refused`, status);
+  if (status === 401) return new MicrosoftSignInError('token-rejected', `${http}${answer}: the Microsoft token was refused`, status);
+  if (status === 403) return new MicrosoftSignInError('account-disabled', `${http}${answer}: the account is deactivated`, status);
+  return new MicrosoftSignInError('server', `${http}${answer}`, status);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -318,61 +302,89 @@ function kindOf(value: unknown): string {
   return Array.isArray(value) ? 'array' : typeof value;
 }
 
-/** The AuthUser in the response, or null after adding a problem per wrong field (03 §C). */
-function readUser(value: unknown, problems: string[]): AuthUser | null {
-  const at = MOBILE_SSO_WIRE.user;
-  if (!isRecord(value)) {
-    problems.push(`${at}: expected object, got ${kindOf(value)}`);
-    return null;
-  }
-  const before = problems.length;
-  const text = (key: keyof AuthUser): string => {
-    const v = value[key];
-    if (typeof v === 'string') return v;
-    problems.push(`${at}.${key}: expected string, got ${kindOf(v)}`);
-    return '';
-  };
-  const textOrNull = (key: keyof AuthUser): string | null => {
-    const v = value[key];
-    if (typeof v === 'string' || v === null) return v;
-    problems.push(`${at}.${key}: expected string | null, got ${kindOf(v)}`);
-    return null;
-  };
-  const user = {
-    id: text('id'),
-    email: text('email'),
-    displayName: text('displayName'),
-    role: text('role') as UserRole,
-    ldapSamAccount: textOrNull('ldapSamAccount'),
-    countryId: textOrNull('countryId'),
-  };
-  if (problems.length === before && !USER_ROLES.includes(user.role)) {
-    problems.push(`${at}.role: unknown value "${user.role}" (expected one of ${USER_ROLES.join(', ')})`);
-  }
-  return problems.length === before ? user : null;
+/**
+ * A body seen through the contract's key names, with every value still unchecked. Reading a key the contract does not
+ * name is a compile error; keys the contract does not name are never looked at.
+ */
+type Unchecked<T> = { [K in keyof T]?: unknown };
+
+/** A REQUIRED string field: the value, or null after adding a problem. Blank counts as missing. */
+function requiredText(value: unknown, at: string, problems: string[]): string | null {
+  if (typeof value === 'string' && value.trim() !== '') return value;
+  problems.push(`${at}: expected non-empty string, got ${typeof value === 'string' ? 'blank string' : kindOf(value)}`);
+  return null;
 }
 
-/** The 200 body as the app's session. Anything else is `unexpected-response`, naming each field that is off. */
+/** An OPTIONAL string field: the value, or null when missing, null or not a string. checkFields() logs the drift. */
+function optionalText(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function isUserRole(value: unknown): value is UserRole {
+  return typeof value === 'string' && USER_ROLES.includes(value as UserRole);
+}
+
+/**
+ * AUTH-P2 `user` as the app's AuthUser, or null after adding a problem per bad REQUIRED field.
+ * The two shapes differ (mobile-sso-contract.ts). This is the one place that maps one onto the other.
+ */
+function readUser(value: unknown, problems: string[]): AuthUser | null {
+  if (!isRecord(value)) {
+    problems.push(`user: expected object, got ${kindOf(value)}`);
+    return null;
+  }
+  const user: Unchecked<MobileSsoUser> = value;
+  const id = requiredText(user.id, 'user.id', problems);
+  const email = requiredText(user.email, 'user.email', problems);
+  // An unknown role is refused: every gate in the app is keyed on it, and the stored session would not load (auth.store).
+  const role = isUserRole(user.role) ? user.role : null;
+  if (role === null) {
+    problems.push(
+      typeof user.role === 'string'
+        ? `user.role: unknown value "${user.role}" (expected one of ${USER_ROLES.join(', ')})`
+        : `user.role: expected string, got ${kindOf(user.role)}`,
+    );
+  }
+  if (id === null || email === null || role === null) return null;
+
+  const name = optionalText(user.name);
+  return {
+    id,
+    email,
+    role,
+    // `name` on the wire. Without one, the email: formatDisplayName() turns "first.last@…" into "First Last".
+    displayName: name !== null && name.trim() !== '' ? name : email,
+    ldapSamAccount: optionalText(user.ldapSamAccount),
+    // Without one, an AGENT reads as a triage agent in the UI (05 §A.12). The server still scopes the data.
+    countryId: optionalText(user.countryId),
+    // `department` and `phone` are not kept: AuthUser (03 §C) has neither. Profile reads them from USR-1.
+  };
+}
+
+/**
+ * The 200 body as the app's session.
+ * - REQUIRED: token, expiresAt, user.id, user.email, user.role. If one is missing, blank or the wrong type, the result is
+ *   `unexpected-response`, naming each bad field. Nothing else can fail sign-in.
+ * - OPTIONAL: every other field the contract names. checkFields() logs a missing or wrong one once as `[API drift]` in
+ *   __DEV__, and readUser() falls back.
+ * - Anything else: never read. The body is accessed only by the key names above. Nothing walks its keys or compares its
+ *   key set, so an unknown extra field cannot fail sign-in.
+ */
 function readSession(data: unknown): MobileLoginResponse {
   const problems: string[] = [];
   if (!isRecord(data)) problems.push(`body: expected object, got ${kindOf(data)}`);
-  const body = isRecord(data) ? data : {};
+  const body: Unchecked<MobileSsoResponse> = isRecord(data) ? data : {};
+  if (isRecord(data)) checkFields('AUTH-P2', data, MOBILE_SSO_OPTIONAL_SPEC);
 
-  const token = body[MOBILE_SSO_WIRE.token];
-  if (typeof token !== 'string' || token.trim() === '') {
-    problems.push(`${MOBILE_SSO_WIRE.token}: expected non-empty string, got ${kindOf(token)}`);
-  }
-  const expiresAt = body[MOBILE_SSO_WIRE.expiresAt];
-  if (typeof expiresAt !== 'string') {
-    problems.push(`${MOBILE_SSO_WIRE.expiresAt}: expected ISO-8601 string, got ${kindOf(expiresAt)}`);
-  }
-  const user = readUser(body[MOBILE_SSO_WIRE.user], problems);
+  const token = requiredText(body.token, 'token', problems);
+  const expiresAt = requiredText(body.expiresAt, 'expiresAt', problems);
+  const user = readUser(body.user, problems);
 
-  if (problems.length > 0 || typeof token !== 'string' || typeof expiresAt !== 'string' || user === null) {
+  if (token === null || expiresAt === null || user === null) {
     if (__DEV__) for (const problem of problems) console.warn(`[API drift] AUTH-P2 ${problem}`);
     throw new MicrosoftSignInError(
       'unexpected-response',
-      `${AUTH_P2} → 200, but not the assumed contract: ${problems.join('; ')}`,
+      `${AUTH_P2} → 200, but a required field is missing or wrong: ${problems.join('; ')}`,
       200,
     );
   }

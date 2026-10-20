@@ -1,13 +1,65 @@
 # 10 — A2 status: does the native Microsoft SSO endpoint exist yet?
 
-> ## Answer: **NO.** The endpoint does not exist on any branch.
-> - Checked on **2026-10-19**, after `git fetch --all` (15:20 local time).
-> - Searched the working tree (`master` @ `d7f3887`) and **all 9 remote branches**. None has a mobile or token-exchange route, any ID-token validation, or a TODO or stub for one.
-> - **Remote `master` has had no new commits since 2026-10-09.** The clone is not stale: the remote has simply not moved.
-> - **A2 is still needed exactly as written in `06-BACKEND-ASKS.md`.** §4.3 below is the concrete change request, written against the code as it is today.
-> - `src/api/auth.api.ts` `exchangeMicrosoftIdToken()` must keep throwing.
+> ## Answer (updated 2026-10-20): **YES. RESOLVED.** AUTH-P2 is deployed to UAT
+> - `POST https://uat-servicedesk.mountmerugroup.com/api/v1/auth/microsoft/mobile` is live. It answered the app on UAT with **HTTP 200**.
+> - The backend team **confirmed the contract on 2026-10-19** (§0.2). The full shape is in `02-AUTH.md` §7.5; the code copy is `src/types/mobile-sso-contract.ts`.
+> - The app was changed on 2026-10-20 to accept that contract (§0.3).
+> - **Production is not confirmed.**
+> - §1–§7 below are the 2026-10-19 investigation, whose answer then was **NO**. They are kept as the record.
 
-All backend paths are relative to `backend/src/` in the web repo. Line numbers are as of commit `d7f3887`.
+---
+
+## 0. Resolution (2026-10-20)
+
+### 0.1 Evidence
+- **Backend team's written answer, 2026-10-19**, relayed by Ronit: the request, response and error codes in §0.2.
+- **Live:** on UAT the endpoint returned HTTP 200. The app at `7018f85` then showed `unexpected-response · HTTP 200` (reported by Ronit, 2026-10-20).
+- **Not re-verified from source.** The local web clone is still at `d7f3887` (2026-10-09) and does not contain the endpoint. It was not fetched, because R1 keeps the web repo strictly read-only. So there are no file or line references for the new handler yet.
+
+### 0.2 Confirmed contract vs the §4.3 proposal
+
+| Item | Proposed (§4.3) | Confirmed (2026-10-19) | Effect on the app |
+|---|---|---|---|
+| Request | `{ idToken }` | `{ idToken }` | None |
+| `token` | UUID string | UUID string | None |
+| `expiresAt` | ISO-8601 string | ISO-8601 string | None. Still read but not used (02 §5.4) |
+| `user` name field | `displayName` | **`name`** | **This caused the failure.** The app required `user.displayName`. It now maps `name` → `displayName` |
+| Other `user` fields | `id, email, role, ldapSamAccount, countryId` | The same, **plus `department` (a string, not `departmentId`) and `phone`** | Accepted, not stored (`AuthUser` has neither) |
+| Malformed body | 400 | 400 | `bad-request` (new reason) |
+| Bad Microsoft token | 401 | 401 | `token-rejected` |
+| Deactivated | 403 | 403 | `account-disabled`, mapped by status |
+| No MMG user | Auto-create, no error | Auto-create as END_USER; **no 404** | `no-account` reason and message removed |
+| Server error | 500 | 500 | `server` |
+| Not configured | 501 | Not listed | Would show `server` |
+| Too many attempts | 429, if change #6 is made | Not listed | `rate-limited` kept, in case |
+
+- The failure was first attributed to `department` vs `departmentId`. **The app never read either field.**
+  - The pre-fix code, given the confirmed body, fails with `user.displayName: expected string, got undefined`.
+  - That was reproduced on 2026-10-20 by running the `7018f85` version of `auth.api.ts` against the confirmed shape.
+- **The AUTH-P2 `user` is not the AUTH-2 (`GET /auth/me`) `user`**: it has `name` vs `displayName`, and adds `department` and `phone`. The app keeps the two as separate types (`02-AUTH.md` §7.5).
+
+### 0.3 What changed in the mobile app (2026-10-20; uncommitted, for Ronit's review)
+- `src/types/mobile-sso-contract.ts`: the confirmed contract. `MobileSsoUser` is kept separate from `AuthUser`. The assumed-only constants are gone (the 404 "no account" status, the "Not found" catch-all text, the "deactivated" regex).
+- `src/api/auth.api.ts` `readSession()`:
+  - Only `token`, `expiresAt`, `user.id`, `user.email` and `user.role` can fail sign-in.
+  - Every other named field is optional, and drift-logged through `checkFields()` + `MOBILE_SSO_OPTIONAL_SPEC`.
+  - Unknown extras are never read.
+- `src/api/auth.api.ts` `classifyExchangeFailure()`:
+  - 400 → `bad-request`, 401 → `token-rejected`, 403 → `account-disabled`, 500 → `server`.
+  - Any 404 or 405 → `endpoint-missing`.
+- `src/screens/auth/LoginScreen.tsx`: the `no-account` message is gone, and there is a new `bad-request` message.
+- Not touched: the auth flow, PKCE, `auth.config.ts`, Entra settings, the redirect URI, the dev-token screen and its `__DEV__` gate.
+
+### 0.4 Still open
+- Production deployment of AUTH-P2.
+- Whether `name` vs `displayName` is intentional (`02-AUTH.md` §7.6 #2).
+- No `Set-Cookie` on the response: not stated by the backend team.
+- Whether the route is rate-limited (§4.1, change #6).
+- `06-BACKEND-ASKS.md` still lists A2 as **BLOCKING**. `00-OVERVIEW.md` was not updated either. Both are outside this change; Ronit to decide.
+
+---
+
+All backend paths in §1–§7 are relative to `backend/src/` in the web repo. Line numbers are as of commit `d7f3887`.
 
 ---
 

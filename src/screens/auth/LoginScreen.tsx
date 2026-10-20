@@ -38,13 +38,7 @@ interface Failure {
 }
 
 const FAILURE_COPY: Record<FailureReason, { title: string; message: string; retryLabel?: string }> = {
-  // ── the four cases that must be told apart ──
-  'endpoint-missing': {
-    title: "App sign-in isn't available yet",
-    message:
-      "Microsoft accepted your sign-in, but this Service Desk server can't sign in the mobile app yet. Your account " +
-      'is fine. Try again after the Service Desk has been updated.',
-  },
+  // ── AUTH-P2's own answers: 401, 403, 400 (500 is `server`, below) ──
   'token-rejected': {
     title: 'Sign-in was refused',
     message:
@@ -52,19 +46,28 @@ const FAILURE_COPY: Record<FailureReason, { title: string; message: string; retr
       'try again. If it keeps happening, contact IT support.',
     retryLabel: 'Try again',
   },
-  'no-account': {
-    title: 'No Service Desk account',
+  'account-disabled': {
+    title: 'Account deactivated',
+    message: 'Your account has been deactivated. Contact IT support.', // 05 §A.13 account_deactivated
+  },
+  'bad-request': {
+    title: "Sign-in request wasn't accepted",
     message:
-      'You signed in to Microsoft, but there is no Service Desk account for that Microsoft account. Contact IT ' +
-      'support to get access, or sign in with a different account.',
-    retryLabel: 'Use a different account',
+      "The Service Desk couldn't read this app's sign-in request, so you were not signed in. Please report this to IT " +
+      'support.',
+  },
+  // ── the rest ──
+  'endpoint-missing': {
+    title: "App sign-in isn't available yet",
+    message:
+      "Microsoft accepted your sign-in, but this Service Desk server can't sign in the mobile app yet. Your account " +
+      'is fine. Try again after the Service Desk has been updated.',
   },
   network: {
     title: "Can't connect",
     message: "Couldn't reach Microsoft or the Service Desk. Check your connection and try again.",
     retryLabel: 'Try again',
   },
-  // ── the rest ──
   'not-configured': {
     title: 'Microsoft sign-in is not configured.', // 05 §A.13 oauth_not_configured
     message: 'This build of the app is missing its Microsoft sign-in settings. Contact IT support.',
@@ -73,10 +76,6 @@ const FAILURE_COPY: Record<FailureReason, { title: string; message: string; retr
     title: 'Microsoft sign-in failed',
     message: 'Microsoft sign-in failed. Please try again.', // 05 §A.13 oauth_failed
     retryLabel: 'Try again',
-  },
-  'account-disabled': {
-    title: 'Account deactivated',
-    message: 'Your account has been deactivated. Contact IT support.', // 05 §A.13 account_deactivated
   },
   'rate-limited': {
     title: 'Too many attempts',
