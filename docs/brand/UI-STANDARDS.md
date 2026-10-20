@@ -1,8 +1,9 @@
-# UI standards — MMG Service Desk mobile (Phase C, 2026-10-20)
+# UI standards — MMG Service Desk mobile (Phase C, 2026-10-20; Phase C2 fixes the same day)
 
 Phase C polished the 16 MVP screens (M1–M16, `docs/RELEASE.md` §9) plus the task list and task detail on the Phase B
 token foundation (`docs/brand/WEB-TOKENS.md`, `src/theme/`). This file has the consistency audit that came first (§1),
-the one standard chosen for each finding (§2), the contrast report (§3) and the layout checks (§4).
+the one standard chosen for each finding (§2), the contrast report (§3) and the layout checks (§4). Phase C2 fixed two
+defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -49,6 +50,10 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
 - `flush` gives a card of rows (`px-4` only).
 - Tinted variants (private note, unread notification, selected ticket, announcement banner) change colour only.
 - KPI tiles are this card with a coloured 32 dp square from `colors.kpi`, the label in `text-sm gray-500` and the count in `text-2xl font-bold`, like the web's KPICard.
+  - Arrangement: the square top-left, the label under it at the tile's full width, the count at the tile's foot. The web puts the label beside the square, but a phone tile leaves only about 80 dp for that.
+  - Grid: two per row, 12 dp apart both ways, built as explicit rows with tile widths in dp from the grid's measured width. An odd last tile spans its row. Tiles in a row stretch to the taller one, so the counts line up. Minimum height 128 dp (`min-h-32`).
+  - Labels are never truncated and never break inside a word. Each word may take a line (two lines at most). A word that is still too wide shrinks to fit (`adjustsFontSizeToFit`, no `minimumFontScale`).
+  - **No percentage widths in a wrapping row** (`w-[48%]` + `flex-wrap`) for a grid, anywhere. On a device the tiles came out as wide as their content (§5).
 
 **S3 Typography and avatars.**
 - Screen title: `text-lg font-semibold`. Home greeting: `text-xl font-bold`.
@@ -117,9 +122,14 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 
 **S12 Chrome.**
 - Tab bar: white with a `border-border` top line. Active red, idle gray-500, 24 dp icons (filled when active), and a red unread badge.
-- Drawer:
-  - Header band: white, 72 dp tall, the logo left at 44 dp, "Mount Meru / Service Desk" beside it.
-  - Rows: 48 dp, active `bg-primary` with white text, idle gray-600, Sign out red-600 (all three as on the web).
+- Drawer, top to bottom, as in the web sidebar:
+  - Header band: white, 72 dp tall, the logo left at 44 dp, "Mount Meru / Service Desk" beside it. Fixed; it does not scroll.
+  - Nav rows (Approvals when shown, Tasks, Knowledge base, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls.
+  - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
+    - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
+    - a gray-100 line;
+    - **Sign out**, 48 dp, red-600 icon and label (the web's `text-red-600`), `red-50` when pressed. While signing out, the icon becomes a brand-red spinner and the label reads "Signing out…".
+  - The version line under the card. The drawer pads by the top and bottom safe-area insets, so the line stays clear of the gesture bar.
 - Status bar: dark on white and grey screens; light on the red selection bar and the black image viewer.
 
 ## 3. Contrast (WCAG AA: 4.5:1 for text, 3:1 for UI graphics)
@@ -172,11 +182,76 @@ All are now at least 44 dp.
 
 This was checked by layout arithmetic on every row that holds more than one control. It was not run on a device: no build in this phase.
 
-- **Text that wraps instead of truncating:** key/value labels; KPI tile labels (2 lines); ticket-detail tab labels (shrink to 85 %, then 2 lines); the reply-mode tabs.
+- **Text that wraps instead of truncating:** key/value labels; KPI tile labels (a line per word, two at most; a single word shrinks rather than splits, §5); ticket-detail tab labels (shrink to 85 %, then 2 lines); the reply-mode tabs.
 - **Equal-width button rows** (Reply/Reply all/Note, Pick up/Assign/Close, Camera/Photos/Files) have about 92–104 dp per button at 360 dp. Their labels shrink to as little as 75 % on one line instead of wrapping (`OutlineButton compact`).
 - **Rows with long values:** the country pill and its label shrink with an ellipsis; "Current status" and its badge wrap onto two lines.
-- **Fixed-size boxes:** the drawer header (72 dp) and the 44 dp drawer logo leave 180 dp for the app name on a 296 dp drawer.
+- **Fixed-size boxes:** the drawer header (72 dp) and the 44 dp drawer logo leave 188 dp for the app name on the 304 dp drawer. React Navigation's default width at 360 dp is the window minus 56 dp (`react-native-drawer-layout` `getDrawerWidthNative`); this line said 296 dp until Phase C2.
 - **To check on the next build:**
   - the Ticket list filter bar with a long country name at 130 % text;
   - the ticket-detail tab labels at 130 %;
-  - the splash on Android 12+ (icon circle) and Android 11 or older.
+  - the splash on Android 12+ (icon circle) and Android 11 or older;
+  - the Home KPI tiles and the drawer at 360 dp, at 130 % and at 200 % (§5);
+  - two pre-existing drawer items at 200 % text, unchanged in Phase C2:
+    - the header band is a fixed 72 dp, but its two 20 dp-leading lines become 80 dp and may clip;
+    - "Announcements" (about 233 dp) is wider than the 224 dp row label and may split mid-word.
+
+## 5. Phase C2 — device fixes (2026-10-20)
+
+Found on a phone while testing Phase C. Layout only: no API call, query, KPI or data source changed. Checked by layout
+arithmetic, with Roboto advance widths and the dp values NativeWind compiles (`inlineRem: 16`). **Not run on a device:**
+no build in this phase.
+
+### 5.1 Home KPI tiles
+
+**Before.** The tiles were six squeezed into one row, with the sixth wrapping alone. Labels showed as "I", "A" and
+"right now".
+- The tiles were `w-[48%]` in a `flex-row flex-wrap` row. NativeWind compiles that class correctly (`width: '48%'`), so the percentage was lost at layout time on the device.
+- Each tile then took its content width, about 70 dp, so five fit in a row.
+- The label beside the icon was `flex-1` with nothing to grow into, so it collapsed to one letter.
+
+**Now (S2).**
+- Explicit rows of two, with tile widths in dp. An odd last tile spans its row: Active, for the 5-tile AGENT and L2 sets.
+- The label sits under the icon square.
+- Rows stretch to their taller tile, and each count sits at its tile's foot.
+- The grid sits 16 dp below the greeting block (S1). Every size in it is explicit, so nothing can overlap the "Hello" header.
+
+**At 360 dp.**
+- Grid 328 dp, each tile 158 dp, label width 124 dp (after the 1 dp borders and 16 dp padding).
+- 6 tiles (ADMIN, triage AGENT): 3 rows. 5 tiles: 2 rows plus a full-width Active tile. END_USER: 1 row.
+
+| Label (`text-sm`) | 100 % (14 dp) | 130 % (18.2 dp, Android ≤ 13 max) | 200 % (28 dp, Android 14+ max) |
+|---|---|---|---|
+| Open | 1 line | 1 line | 1 line |
+| In progress | 69 dp, 1 line | 89 dp, 1 line | 137 dp → 2 lines ("progress" 108) |
+| On hold | 47 dp, 1 line | 61 dp, 1 line | 94 dp, 1 line |
+| SLA breached | 85 dp, 1 line | 110 dp, 1 line | 170 dp → 2 lines ("breached" 113) |
+| Active + "right now" (`text-xs`) | 38 + 49 dp | 49 + 63 dp | 76 + 97 dp |
+| Unassigned | 71 dp, 1 line | 93 dp, 1 line | 143 dp, one word → shrinks to about 87 %, 1 line |
+| Resolved (END_USER) | 56 dp, 1 line | 72 dp, 1 line | 111 dp, 1 line |
+
+- **Counts** (`text-2xl` bold): "375" is 41, 53 and 82 dp at the three sizes. Four digits fit at 200 % (109 dp). Five digits shrink.
+- **Tile heights**, for a one-line label and then with Active's hint:
+  - 100 %: 130 dp, and 146 dp with the hint.
+  - 130 %: 146 dp, and 166 dp with the hint.
+  - 200 %: 182 dp; 222 dp with a two-line label; 214 dp with the hint.
+- **6-tile rows at 200 %:** 222, 222 and 214 dp. Rows can differ in height; the two tiles within a row never do.
+- **Worst case:** "Unassigned" at 200 % on a 320 dp phone needs about 71 %. With no `minimumFontScale` it still fits in full.
+- **Font scaling:** this assumes RN scales linearly. If Android 14's non-linear scaling applies, every 200 % figure is smaller.
+
+### 5.2 Drawer
+
+- **Before.** Logo header, account card, nav rows, Settings, Sign out, then the version line, all in one scroll view.
+- **Now (S12).**
+  - The header band is fixed. The nav rows and Settings scroll.
+  - A separator, then the account card pinned to the bottom, with Sign out inside it.
+  - Then the version line.
+  - The bottom inset is padded as before.
+- **Navigation is unchanged.** Every row calls the same `go()` target: Approvals (same visibility rule, 08 S1), Tasks, Knowledge base, Announcements, and Settings → Profile. The card opens Profile, and Sign out calls the same `useSignOut` (confirmation, AUTH-3, local wipe).
+
+At 360 dp the drawer is 304 dp wide. The account card's name column is 192 dp, and the nav labels get 224 dp.
+
+| | 100 % | 130 % | 200 % |
+|---|---|---|---|
+| Pinned block (separator + card + version line) | 168 dp | 186 dp | 276 dp (the name wraps to 2 lines) |
+| Nav list, ADMIN (5 rows) | 256 dp | 256 dp | about 300 dp |
+| Room for the nav list on a 360 × 640 phone (568 dp drawer − 72 header − pinned block) | 328 dp: no scroll | 310 dp: no scroll | 220 dp: the list scrolls, the card stays pinned |

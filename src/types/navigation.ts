@@ -82,7 +82,7 @@ export type AppDrawerParamList = {
   Knowledge: NavigatorScreenParams<KnowledgeStackParamList>;
   /** M16 */
   Announcements: undefined;
-  /** M10 — opened from the drawer header and the "Settings" item. */
+  /** M10 — opened from the drawer's account card and the "Settings" item. */
   Profile: undefined;
 };
 
