@@ -1,4 +1,5 @@
-// Side drawer ("Menu", as in SDP), role-aware per 08 §3.2.
+// Side drawer ("Menu", as in SDP), role-aware per 08 §3.2. Which rows show is decided by drawerItems()
+// (utils/permissions.ts, pinned per role by tests/rbac); this file only lays them out.
 // The drawer never lists the three tab destinations, so no screen has two routes.
 // - Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns at least one (08 S1), so no one
 //   sees an empty module they can't use. Badge = APR-1 count (one cached query, shared with Home and the inbox; it
@@ -24,7 +25,9 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { AppDrawerParamList } from '@/types';
 import { formatDisplayName, initials } from '@/utils/format';
-import { ROLE_LABELS, isAgentOrAdmin, isCountryLockedAgent } from '@/utils/roles';
+import { drawerItems, type DrawerItem } from '@/utils/permissions';
+import { ROLE_LABELS } from '@/utils/roles';
+import { countrySelectorMode } from '@/utils/ticket-filters';
 
 interface DrawerRow {
   key: string;
@@ -35,6 +38,15 @@ interface DrawerRow {
   onPress: () => void;
 }
 
+/** Label, icon and destination of each drawer row; which rows show is decided by drawerItems() alone. */
+const DRAWER_ROWS: Record<DrawerItem, { label: string; icon: keyof typeof Ionicons.glyphMap; route: keyof AppDrawerParamList }> = {
+  approvals: { label: 'Approvals', icon: 'checkmark-done-outline', route: 'Approvals' },
+  tasks: { label: 'Tasks', icon: 'checkbox-outline', route: 'Tasks' },
+  knowledge: { label: 'Knowledge base', icon: 'book-outline', route: 'Knowledge' },
+  announcements: { label: 'Announcements', icon: 'megaphone-outline', route: 'Announcements' },
+  settings: { label: 'Settings', icon: 'settings-outline', route: 'Profile' },
+};
+
 export function DrawerContent({ navigation, state }: DrawerContentComponentProps) {
   const user = useAuthStore((s) => s.user);
   const insets = useSafeAreaInsets();
@@ -43,10 +55,8 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
 
   const approvals = usePendingApprovals();
   const pendingApprovals = approvals.data?.length ?? 0;
-  // 08 S1: ADMIN/AGENT always; END_USER and L2_MANAGER only while they have ≥ 1 pending approval.
-  const showApprovals = isAgentOrAdmin(role) || pendingApprovals >= 1;
   const { signOut, signingOut } = useSignOut();
-  const locked = !!user && isCountryLockedAgent(user);
+  const locked = !!user && countrySelectorMode(user) === 'locked';
   const countries = useCountryOptions({ enabled: locked });
   const lockedCountry = locked ? countryName(countries.data?.find((c) => c.id === user?.countryId)) : null;
 
@@ -70,23 +80,12 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
     }
   };
 
-  const rows: DrawerRow[] = [];
-  if (showApprovals) {
-    rows.push({
-      key: 'approvals',
-      label: 'Approvals',
-      icon: 'checkmark-done-outline',
-      route: 'Approvals',
-      badge: pendingApprovals,
-      onPress: go('Approvals'),
-    });
-  }
-  rows.push(
-    { key: 'tasks', label: 'Tasks', icon: 'checkbox-outline', route: 'Tasks', onPress: go('Tasks') },
-    { key: 'kb', label: 'Knowledge base', icon: 'book-outline', route: 'Knowledge', onPress: go('Knowledge') },
-    { key: 'ann', label: 'Announcements', icon: 'megaphone-outline', route: 'Announcements', onPress: go('Announcements') },
-    { key: 'settings', label: 'Settings', icon: 'settings-outline', route: 'Profile', onPress: go('Profile') },
-  );
+  const rows: DrawerRow[] = drawerItems(role, pendingApprovals).map((item) => ({
+    key: item,
+    ...DRAWER_ROWS[item],
+    badge: item === 'approvals' ? pendingApprovals : undefined,
+    onPress: go(DRAWER_ROWS[item].route),
+  }));
   // Hidden until their asks ship: Service catalog (P2), Assets (P18). No approval delegation (A26).
 
   return (

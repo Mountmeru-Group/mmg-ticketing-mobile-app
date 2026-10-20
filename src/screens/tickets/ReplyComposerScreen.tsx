@@ -19,13 +19,12 @@ import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, u
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps } from '@/types';
-import { canSeePrivateNotes } from '@/utils/activity';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { notify } from '@/utils/dialogs';
-import { isAgentOrAdmin, isStaff } from '@/utils/roles';
+import { composerPermissions, type ComposerMode } from '@/utils/permissions';
 import { isPlaceholderUser } from '@/utils/session';
 
-type Mode = 'reply' | 'replyAll' | 'note';
+type Mode = ComposerMode;
 
 const MODE_LABELS: Record<Mode, string> = { reply: 'Reply', replyAll: 'Reply all', note: 'Private note' };
 
@@ -34,13 +33,15 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? 'END_USER';
-  const staff = isStaff(role);
-
-  // Private note is not an option at all for END_USER / L2_MANAGER (hidden, not disabled).
-  const modes: Mode[] = ['reply', ...(staff ? (['replyAll'] as const) : []), ...(canSeePrivateNotes(role) ? (['note'] as const) : [])];
+  // Modes and recipient fields come from composerPermissions() (utils/permissions.ts, pinned per role by tests/rbac).
+  // Private note is not an option at all for END_USER / L2_MANAGER (hidden, not disabled); a route asking for a mode
+  // the role doesn't have opens as a plain reply.
+  const can = composerPermissions(role);
+  const modes = can.modes;
+  const staff = can.recipients;
   const [mode, setMode] = useState<Mode>(modes.includes(route.params.mode) ? route.params.mode : 'reply');
   const isPublic = mode !== 'note';
-  const showRecipients = staff && isPublic;
+  const showRecipients = can.recipients && isPublic;
 
   const ticketQuery = useTicket(ticketId);
   const ticket = ticketQuery.data;
@@ -150,8 +151,8 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
                   </Text>
                 </Pressable>
               ) : null}
-              <EmailChipsInput label="To" chips={to} onChangeChips={setTo} input={toInput} onChangeInput={setToInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
-              <EmailChipsInput label="Cc" chips={cc} onChangeChips={setCc} input={ccInput} onChangeInput={setCcInput} suggest={isAgentOrAdmin(role)} disabled={post.isPending} />
+              <EmailChipsInput label="To" chips={to} onChangeChips={setTo} input={toInput} onChangeInput={setToInput} suggest={can.suggestRecipients} disabled={post.isPending} />
+              <EmailChipsInput label="Cc" chips={cc} onChangeChips={setCc} input={ccInput} onChangeInput={setCcInput} suggest={can.suggestRecipients} disabled={post.isPending} />
             </>
           ) : null}
 

@@ -8,6 +8,7 @@
 //
 // Role rules (05 §A.3): impact/urgency hidden for END_USER; PRIVATE notes shown to ADMIN/AGENT only, checked here
 // even though the server already withholds them (visibleComments); status bar hidden for END_USER (05 §A.1).
+// Every role-gated element reads ticketDetailPermissions() (utils/permissions.ts), pinned per role by tests/rbac.
 //
 // WRITES (Phase 3b) — each an explicit action, confirmed where it emails people or can't be undone:
 //   Status bar: transitions from ticket-rules.ts only; RESOLVED/CLOSED/CANCELED open M6 for the closure fields.
@@ -28,8 +29,8 @@ import { getAttachmentViewRequest, type UploadFile } from '@/api/attachments.api
 import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, OfflineBanner, OfflineState,
-  OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow,
+  AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, Notice, OfflineBanner,
+  OfflineState, OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow,
   type SheetOption,
 } from '@/components';
 import {
@@ -40,23 +41,33 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type {
   ActivityAuditItem, Attachment, Comment, TicketDetail, TicketImpact, TicketStackScreenProps, TicketTaskEmbedded,
-  TicketUrgency, UserRole,
+  TicketUrgency,
 } from '@/types';
-import { canSeePrivateNotes, describeAudit } from '@/utils/activity';
+import { describeAudit } from '@/utils/activity';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import {
   IMPACT_LABELS, URGENCY_LABELS, categoryCascade, effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName,
   formatRelative, initials, sourceLabel,
 } from '@/utils/format';
-import { isAgentOrAdmin, isStaff } from '@/utils/roles';
-import { canAssignToSelf } from '@/utils/session';
 import {
-  canChangeStatus, getAvailableTransitions, isResolvedLocked, requiresClosureForm, transitionTone, type StatusTransition,
-} from '@/utils/ticket-rules';
+  isCommentVisible, ticketDetailPermissions, type ComposerMode, type MoreAction, type TicketDetailPermissions,
+} from '@/utils/permissions';
+import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
 import { statusChangeMessage } from '@/utils/writeCopy';
 
 type DetailTab = 'conversation' | 'history' | 'attachments' | 'tasks';
-type MoreAction = 'pickup' | 'assign' | 'close';
+
+/** Labels for the role-gated buttons; WHICH ones show is decided by ticketDetailPermissions() alone. */
+const MORE_ACTION_LABELS: Record<MoreAction, { label: string; description: string }> = {
+  pickup: { label: 'Pick up', description: 'Assign this ticket to yourself' },
+  assign: { label: 'Assign…', description: 'Choose a group and technician' },
+  close: { label: 'Close…', description: 'Opens the closure form' },
+};
+const CONVERSATION_ACTIONS: Record<ComposerMode, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  reply: { label: 'Reply', icon: 'arrow-undo-outline' },
+  replyAll: { label: 'Reply all', icon: 'arrow-undo-circle-outline' },
+  note: { label: 'Note', icon: 'lock-closed-outline' },
+};
 
 /** Images (not SVG) open in the in-app viewer; PDFs and other types show their details only. */
 function isViewableImage(mimeType: string): boolean {
@@ -67,7 +78,6 @@ function isViewableImage(mimeType: string): boolean {
 export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps<'TicketDetail'>) {
   const { ticketId } = route.params;
   const user = useAuthStore((s) => s.user);
-  const role = user?.role ?? 'END_USER';
   const insets = useSafeAreaInsets();
 
   const ticketQuery = useTicket(ticketId);
@@ -206,15 +216,9 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     );
   }
 
-  const locked = isResolvedLocked(role, ticket.status);
-  const moreActions: SheetOption<MoreAction>[] = [];
-  if (isAgentOrAdmin(role) && !locked && canAssignToSelf(user) && ticket.assignedToId !== user?.id) {
-    moreActions.push({ value: 'pickup', label: 'Pick up', description: 'Assign this ticket to yourself' });
-  }
-  if (isAgentOrAdmin(role) && !locked) moreActions.push({ value: 'assign', label: 'Assign…', description: 'Choose a group and technician' });
-  if (getAvailableTransitions(role, ticket.status).some((t) => t.target === 'CLOSED')) {
-    moreActions.push({ value: 'close', label: 'Close…', description: 'Opens the closure form' });
-  }
+  // Every role-gated element below reads this one object (utils/permissions.ts, pinned per role by tests/rbac).
+  const can = ticketDetailPermissions(user, ticket);
+  const moreActions: SheetOption<MoreAction>[] = can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] }));
   const onMore = (action: MoreAction) => {
     if (action === 'pickup') void once(pickUp);
     else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
@@ -246,14 +250,14 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
-        <HeaderCard ticket={ticket} role={role} />
-        <StatusActionBar ticket={ticket} role={role} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
+        <HeaderCard ticket={ticket} can={can} />
+        <StatusActionBar can={can} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
 
         <Card title="Description">
           <HtmlText html={ticket.description} emptyText="No description" />
         </Card>
 
-        <PropertiesCard ticket={ticket} role={role} />
+        <PropertiesCard ticket={ticket} can={can} />
         <RequesterCard ticket={ticket} />
         <ResolutionCard ticket={ticket} />
 
@@ -269,15 +273,16 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
         />
 
         {tab === 'conversation' ? (
+          // Reply: everyone. Reply all: staff. Note: ADMIN and AGENT only — not offered at all to END_USER or L2_MANAGER.
           <View className="mx-4 mb-3 flex-row gap-2">
-            <ActionChip icon="arrow-undo-outline" label="Reply" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'reply' })} />
-            {isStaff(role) ? (
-              <ActionChip icon="arrow-undo-circle-outline" label="Reply all" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'replyAll' })} />
-            ) : null}
-            {/* Private note: ADMIN and AGENT only — not offered at all to END_USER or L2_MANAGER. */}
-            {canSeePrivateNotes(role) ? (
-              <ActionChip icon="lock-closed-outline" label="Note" onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode: 'note' })} />
-            ) : null}
+            {can.conversationActions.map((mode) => (
+              <ActionChip
+                key={mode}
+                icon={CONVERSATION_ACTIONS[mode].icon}
+                label={CONVERSATION_ACTIONS[mode].label}
+                onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode })}
+              />
+            ))}
           </View>
         ) : null}
         {tab === 'conversation' ? (
@@ -291,7 +296,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
             empty={<EmptyState icon="chatbubbles-outline" title="No replies yet" message="Replies on this ticket will appear here." />}
           >
             {(comments.data ?? []).map((c) => (
-              <CommentItem key={c.id} comment={c} role={role} />
+              <CommentItem key={c.id} comment={c} can={can} />
             ))}
           </TabBody>
         ) : null}
@@ -337,7 +342,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
           </TabBody>
         ) : null}
 
-        {tab === 'attachments' && !locked ? (
+        {tab === 'attachments' && can.addAttachments ? (
           <Card title="Add files">
             <AttachmentPicker files={newFiles} onChange={setNewFiles} disabled={upload.isPending} />
             {newFiles.length > 0 ? (
@@ -350,6 +355,12 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
               </View>
             ) : null}
           </Card>
+        ) : null}
+        {tab === 'attachments' && !can.addAttachments ? (
+          // A state, not a role limit (ROLE-MATRIX.md §3): say why "Add files" is missing instead of dropping it silently.
+          <View className="mx-4 mb-3">
+            <Notice>Closed and canceled tickets are locked for technicians, so files can't be added here.</Notice>
+          </View>
         ) : null}
         {tab === 'attachments' ? (
           <TabBody
@@ -379,7 +390,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
         {tab === 'tasks' ? (
           <TasksTab
             tasks={Array.isArray(ticket.tasks) ? ticket.tasks : []}
-            canEdit={isStaff(role)}
+            canEdit={can.editTasks}
             togglingId={toggleTask.isPending ? (toggleTask.variables?.taskId ?? null) : null}
             onOpen={(task) => navigation.navigate('TaskDetail', { ticketId, taskId: task.id })}
             onToggle={(task) => void once(() => onToggleTask(task))}
@@ -438,9 +449,9 @@ function Chip({ label, tone }: { label: string; tone: keyof typeof CHIP_STYLES }
 
 // ── Header ───────────────────────────────────────────────────
 
-function HeaderCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) {
+function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
   // "Auto" pill when the server computed priority from impact × urgency (05 §A.3, staff).
-  const autoPriority = isStaff(role) && !!ticket.impact && !!ticket.urgency;
+  const autoPriority = can.classification && !!ticket.impact && !!ticket.urgency;
   const attachmentCount = ticket._count?.attachments ?? 0;
   return (
     <Card>
@@ -477,16 +488,14 @@ function HeaderCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) 
  * post TKT-6 (never PUT).
  */
 function StatusActionBar({
-  ticket, role, busy, onTransition,
+  can, busy, onTransition,
 }: {
-  ticket: TicketDetail;
-  role: UserRole;
+  can: TicketDetailPermissions;
   busy: boolean;
   onTransition: (t: StatusTransition) => void;
 }) {
-  if (!canChangeStatus(role)) return null;
-  const locked = isResolvedLocked(role, ticket.status);
-  const transitions = getAvailableTransitions(role, ticket.status);
+  if (!can.statusBar) return null;
+  const { locked, transitions } = can;
   const toneClass = { success: 'border-green-300 bg-green-50', muted: 'border-gray-400 bg-gray-100', neutral: 'border-gray-300 bg-white' } as const;
 
   return (
@@ -534,14 +543,14 @@ function urgencyTone(urgency: TicketUrgency): 'red' | 'orange' | 'yellow' | 'gre
   return 'green';
 }
 
-function PropertiesCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) {
+function PropertiesCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
   const cascade = categoryCascade(ticket.category);
   const resolveBy = effectiveResolveDue(ticket);
   const technician = formatDisplayName(ticket.assignedTo?.displayName);
   return (
     <Card title="Properties">
       {/* Impact / urgency are hidden for END_USER (05 §A.3). */}
-      {isStaff(role) ? (
+      {can.classification ? (
         <>
           <Row label="Impact">
             {ticket.impact ? <Chip label={IMPACT_LABELS[ticket.impact] ?? ticket.impact} tone={impactTone(ticket.impact)} /> : 'Not set'}
@@ -559,7 +568,7 @@ function PropertiesCard({ ticket, role }: { ticket: TicketDetail; role: UserRole
       <Row label="Country">{ticket.country?.displayName || ticket.country?.name || 'Not set'}</Row>
       <Row label="Resolve by">{resolveBy ? formatDateTime(resolveBy) : 'No SLA'}</Row>
       {ticket.slaHoldStartedAt ? <Row label="SLA paused">{`Since ${formatDateTime(ticket.slaHoldStartedAt)}`}</Row> : null}
-      {isStaff(role) ? (
+      {can.classification ? (
         <Row label="First response">{ticket.firstResponseAt ? formatDateTime(ticket.firstResponseAt) : 'Not yet'}</Row>
       ) : null}
     </Card>
@@ -696,10 +705,10 @@ function TabBody({
   );
 }
 
-function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
+function CommentItem({ comment, can }: { comment: Comment; can: TicketDetailPermissions }) {
   const isPrivate = comment.type === 'PRIVATE';
   // visibleComments() already dropped notes for END_USER/L2; this is a second guard at the point of display.
-  if (isPrivate && !canSeePrivateNotes(role)) return null;
+  if (!isCommentVisible(comment, can)) return null;
   const author = formatDisplayName(comment.author?.displayName) || 'Unknown';
   const to = Array.isArray(comment.toRecipients) ? comment.toRecipients : [];
   const cc = Array.isArray(comment.ccRecipients) ? comment.ccRecipients : [];
@@ -728,7 +737,7 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
       </View>
 
       {/* Recipient addresses: staff only, public replies only (05 §A.5). */}
-      {isStaff(role) && !isPrivate && (to.length > 0 || cc.length > 0) ? (
+      {can.recipients && !isPrivate && (to.length > 0 || cc.length > 0) ? (
         <Text className="mb-2 text-xs text-gray-500" numberOfLines={2}>
           {to.length > 0 ? `To: ${to.join(', ')}` : ''}
           {to.length > 0 && cc.length > 0 ? '  ·  ' : ''}

@@ -25,7 +25,8 @@ import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
 import { formatDisplayName } from '@/utils/format';
-import { ROLE_LABELS, isAgentOrAdmin, isTriageAgent } from '@/utils/roles';
+import { homeTiles, homeVariant, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
+import { ROLE_LABELS } from '@/utils/roles';
 import type { TicketNamedFilter } from '@/utils/ticket-filters';
 
 interface Tile {
@@ -50,14 +51,16 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const dismissed = useUiStore((s) => s.dismissedAnnouncementIds);
   const dismissAnnouncement = useUiStore((s) => s.dismissAnnouncement);
 
-  const isEndUser = role === 'END_USER';
-  const isL2 = role === 'L2_MANAGER';
+  // Variant, tiles and the approvals shortcut come from utils/permissions.ts (pinned per role by tests/rbac).
+  const variant = homeVariant(role);
+  const isEndUser = variant === 'endUser';
+  const isL2 = variant === 'l2';
   const dashboard = useDashboard(); // disabled for L2_MANAGER inside the hook
   const recent = useRecentTickets({ enabled: isEndUser || isL2 });
   const announcements = useAnnouncements();
   const approvals = usePendingApprovals();
   const pendingCount = approvals.data?.length ?? 0;
-  const showApprovalsTile = isAgentOrAdmin(role) || pendingCount > 0; // 08 S1
+  const showApprovalsTile = showApprovalsShortcut(role, pendingCount); // 08 S1
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
@@ -96,7 +99,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
 
   // ── Tiles ──────────────────────────────────────────────────
   const kpis = dashboard.data?.kpis;
-  const tiles: Tile[] = isEndUser ? endUserTiles(kpis, openList) : staffTiles(role, user, isL2 ? undefined : kpis, openList);
+  const tiles: Tile[] = user ? buildTiles(homeTiles(user), isL2 ? undefined : kpis, openList) : [];
   const showTileCounts = !isL2;
 
   const primaryError = isL2 ? recent.error : isEndUser ? (dashboard.error ?? recent.error) : dashboard.error;
@@ -203,32 +206,25 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
 
 // ── Tiles per role ───────────────────────────────────────────
 
-function endUserTiles(kpis: SafeDashboard['kpis'] | undefined, openList: (f: TicketNamedFilter) => void): Tile[] {
-  return [
-    { key: 'open', label: 'Open', value: kpis?.open, icon: 'folder-open-outline', color: colors.kpi.open, onPress: () => openList('OPEN') },
-    { key: 'resolved', label: 'Resolved', value: kpis?.resolved, icon: 'checkmark-circle-outline', color: colors.kpi.resolved, onPress: () => openList('RESOLVED') },
-  ];
-}
+// Which tiles show, per role, is homeTiles() (END_USER: Open, Resolved; staff: five counts, plus Unassigned for ADMIN
+// and the UI's triage AGENT only, 04 M2). This table only says how each one looks and which list filter it opens.
+// Colours: the web KPI card for the same count (colors.kpi); On hold uses the web's On Hold mini-tile grey.
+const TILES: Record<HomeTile, Omit<Tile, 'key' | 'value' | 'onPress'> & { filter: TicketNamedFilter }> = {
+  open: { label: 'Open', icon: 'folder-open-outline', color: colors.kpi.open, filter: 'OPEN' },
+  resolved: { label: 'Resolved', icon: 'checkmark-circle-outline', color: colors.kpi.resolved, filter: 'RESOLVED' },
+  inProgress: { label: 'In progress', icon: 'play-circle-outline', color: colors.kpi.inProgress, filter: 'IN_PROGRESS_KPI' },
+  onHold: { label: 'On hold', icon: 'pause-circle-outline', color: colors.kpiPending.ON_HOLD, filter: 'ON_HOLD_KPI' },
+  slaBreached: { label: 'SLA breached', icon: 'warning-outline', color: colors.kpi.slaBreached, filter: 'BREACHED_KPI' },
+  totalOpen: { label: 'Active', hint: 'right now', icon: 'pulse-outline', color: colors.kpi.total, filter: 'ACTIVE_KPI' },
+  unassigned: { label: 'Unassigned', icon: 'help-circle-outline', color: colors.kpi.unassigned, filter: 'UNASSIGNED_KPI' },
+};
 
-function staffTiles(
-  role: string,
-  user: { role: 'ADMIN' | 'AGENT' | 'END_USER' | 'L2_MANAGER'; countryId: string | null } | null,
-  kpis: SafeDashboard['kpis'] | undefined,
-  openList: (f: TicketNamedFilter) => void,
-): Tile[] {
-  // Colours: the web KPI card for the same count (colors.kpi); On hold uses the web's On Hold mini-tile grey.
-  const tiles: Tile[] = [
-    { key: 'open', label: 'Open', value: kpis?.open, icon: 'folder-open-outline', color: colors.kpi.open, onPress: () => openList('OPEN') },
-    { key: 'inProgress', label: 'In progress', value: kpis?.inProgress, icon: 'play-circle-outline', color: colors.kpi.inProgress, onPress: () => openList('IN_PROGRESS_KPI') },
-    { key: 'onHold', label: 'On hold', value: kpis?.onHold, icon: 'pause-circle-outline', color: colors.kpiPending.ON_HOLD, onPress: () => openList('ON_HOLD_KPI') },
-    { key: 'slaBreached', label: 'SLA breached', value: kpis?.slaBreached, icon: 'warning-outline', color: colors.kpi.slaBreached, onPress: () => openList('BREACHED_KPI') },
-    { key: 'totalOpen', label: 'Active', hint: 'right now', value: kpis?.totalOpen, icon: 'pulse-outline', color: colors.kpi.total, onPress: () => openList('ACTIVE_KPI') },
-  ];
-  // Unassigned: ADMIN and the UI's triage AGENT only (brief; 04 M2; 05 §A.12) — never L2 (server 403 on assign anyway).
-  if (role === 'ADMIN' || (user && isTriageAgent(user))) {
-    tiles.push({ key: 'unassigned', label: 'Unassigned', value: kpis?.unassigned, icon: 'help-circle-outline', color: colors.kpi.unassigned, onPress: () => openList('UNASSIGNED_KPI') });
-  }
-  return tiles;
+/** `kpis` undefined = no counts (L2_MANAGER, or still loading). */
+function buildTiles(keys: readonly HomeTile[], kpis: SafeDashboard['kpis'] | undefined, openList: (f: TicketNamedFilter) => void): Tile[] {
+  return keys.map((key) => {
+    const { filter, ...look } = TILES[key];
+    return { key, ...look, value: kpis?.[key], onPress: () => openList(filter) };
+  });
 }
 
 // ── Pieces ───────────────────────────────────────────────────
