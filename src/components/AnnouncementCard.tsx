@@ -42,8 +42,9 @@ export function AnnouncementBanner({
 }) {
   const s = styleFor(announcement.type);
   const preview = htmlToDisplayText(announcement.body).replace(/\s+/g, ' ').trim();
+  // The standard card's shape (Card.tsx), tinted by announcement type.
   return (
-    <View accessibilityRole="summary" className={`mx-4 mb-3 rounded-xl border p-3 ${s.banner}`}>
+    <View accessibilityRole="summary" className={`mx-4 mb-3 rounded-xl border p-4 ${s.banner}`}>
       <View className="flex-row items-start">
         <Ionicons name={s.icon} size={20} color={s.color} />
         <Pressable accessibilityRole="button" accessibilityHint="Opens announcements" onPress={onOpen} className="ml-2 flex-1">
@@ -51,11 +52,11 @@ export function AnnouncementBanner({
             {announcement.title || 'Announcement'}
           </Text>
           {preview ? (
-            <Text className="mt-0.5 text-xs text-gray-700" numberOfLines={2}>
+            <Text className="mt-0.5 text-sm text-gray-700" numberOfLines={2}>
               {preview}
             </Text>
           ) : null}
-          <Text className="mt-1 text-xs font-medium text-blue-700">
+          <Text className="mt-2 text-sm font-medium text-blue-700">
             {moreCount > 0 ? `See all announcements (${moreCount} more)` : 'Read more'}
           </Text>
         </Pressable>
@@ -63,8 +64,8 @@ export function AnnouncementBanner({
           accessibilityRole="button"
           accessibilityLabel="Dismiss announcement for this session"
           onPress={onDismiss}
-          hitSlop={10}
-          className="ml-2 h-6 w-6 items-center justify-center"
+          hitSlop={6}
+          className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center rounded-full active:bg-black/5"
         >
           <Ionicons name="close" size={18} color={palette.gray[600]} />
         </Pressable>
@@ -83,12 +84,12 @@ export function AnnouncementCard({
 }) {
   const author = formatDisplayName(announcement.author?.displayName);
   return (
-    <View className="mx-4 mb-3 rounded-xl bg-white p-4">
+    <View className="mx-4 mb-3 rounded-xl border border-border bg-white p-4">
       <View className="mb-2 flex-row items-center">
         <AnnouncementTypeChip type={announcement.type} />
         {announcement.isPinned ? (
           <View className="ml-2 flex-row items-center">
-            <Ionicons name="pin" size={12} color={colors.text.secondary} />
+            <Ionicons name="pin" size={14} color={colors.text.secondary} />
             <Text className="ml-0.5 text-xs text-gray-500">Pinned</Text>
           </View>
         ) : null}
@@ -103,8 +104,8 @@ export function AnnouncementCard({
       </Text>
       <HtmlText html={announcement.body} collapsedHeight={160} emptyText="No details" />
       {hiddenOnHome ? (
-        <Pressable accessibilityRole="button" onPress={onShowOnHome} className="mt-2 self-start py-1">
-          <Text className="text-xs font-medium text-blue-700">Hidden from Home for this session · Show it again</Text>
+        <Pressable accessibilityRole="button" onPress={onShowOnHome} className="mt-1 min-h-11 justify-center self-start">
+          <Text className="text-sm font-medium text-blue-700">Hidden from Home for this session · Show it again</Text>
         </Pressable>
       ) : null}
     </View>

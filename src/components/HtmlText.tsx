@@ -13,13 +13,14 @@ import {
 } from 'react-native-render-html';
 
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import { parseTicketLink } from '@/utils/deep-links';
 import { BLOCKED_TAGS, htmlToDisplayText, looksLikeHtml, sanitizeForRender } from '@/utils/html';
 
 // ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
 
-const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: palette.gray[800] };
+// `text-sm` body text (14/20 dp, colors.text.body), the same as every other paragraph in the app.
+const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: colors.text.body };
 
 const TAGS_STYLES: MixedStyleRecord = {
   body: { margin: 0, padding: 0 },
@@ -124,21 +125,22 @@ interface HtmlTextProps {
   html: string | null | undefined;
   /** Bodies taller than this collapse behind "Show more". */
   collapsedHeight?: number;
-  /** Horizontal space around the text on screen (card margins + padding), for image sizing. */
+  /** Horizontal space around the text on screen (card margins, borders and padding), for image sizing. */
   horizontalInset?: number;
   emptyText?: string;
 }
 
-export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 64, emptyText = 'No text' }: HtmlTextProps) {
+// Default inset: the standard card (Card.tsx) — 16 dp margin, 1 dp border and 16 dp padding on each side.
+export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 66, emptyText = 'No text' }: HtmlTextProps) {
   const prepared = useMemo(() => prepare(html), [html]);
   const { width } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const [contentHeight, setContentHeight] = useState(0);
 
-  if (prepared.kind === 'empty') return <Text className="text-sm italic text-gray-400">{emptyText}</Text>;
+  if (prepared.kind === 'empty') return <Text className="text-sm italic text-gray-500">{emptyText}</Text>;
 
   const plain = (text: string) => (
-    <Text selectable className="text-sm leading-5 text-gray-800">
+    <Text selectable className="text-sm leading-5 text-gray-700">
       {text}
     </Text>
   );
@@ -158,7 +160,7 @@ export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 64, em
         <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>{body}</View>
       </View>
       {collapsible ? (
-        <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} hitSlop={6} className="mt-1 self-start">
+        <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} className="min-h-11 justify-center self-start">
           <Text className="text-sm font-medium text-blue-700">{expanded ? 'Show less' : 'Show more'}</Text>
         </Pressable>
       ) : null}

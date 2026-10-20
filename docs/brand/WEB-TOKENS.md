@@ -237,6 +237,8 @@ explained below the table.
   - Matching the web pixel-for-pixel means setting `inlineRem: 16` in `metro.config.js` (or `:root { font-size: 16px }`
     in `global.css`).
   - That would enlarge every screen by 14%, so it is a **Phase C decision**, not done here.
+  - **Phase C (2026-10-20): done.** `metro.config.js` sets `inlineRem: 16`, so the app now matches the web's
+    "Web px" column. See `docs/brand/UI-STANDARDS.md` S0.
 - **Weights:** `font-medium` 500 (473 uses), `font-semibold` 600 (116), `font-bold` 700 (94), `font-normal` 400 (5).
 - **Roles:**
   - KPI value: `text-2xl font-bold`.
@@ -367,3 +369,16 @@ There is no visual change in these:
 - Icons replaced (see `docs/RELEASE.md` §7):
   - adaptive-icon `backgroundColor`: `#1D4ED8` → `#FFFFFF`.
 - Unchanged: `slug`, `android.package`, `version`, `versionCode` and `scheme`.
+
+## 8. Phase C: where the app now differs from the web, and why
+
+Each value below fails WCAG AA where it was used before. The details are in `docs/brand/UI-STANDARDS.md` §3.
+
+| Token / use | Before | App now | Contrast, before → now |
+|---|---|---|---|
+| `colors.status.CANCELED` text | red-600 (web) | red-700 | 3.95 → 5.30 |
+| `colors.nav.tabIdle` (bottom bar idle label) | gray-400 (web) | gray-500 | 2.54 → 4.83 |
+| Hints, captions, placeholders (`text.muted` in Phase B) | gray-400 (web) | gray-500 (`text.secondary`); gray-400 stays for icons only | 2.54 → 4.83 |
+| SubmitButton `success` (Approve) | green-600 (a Phase B mobile choice; the web Button has no success style) | green-700 | 3.30 → 5.02 |
+
+The drawer logo is now 44 dp tall and 72 dp wide, with "Mount Meru / Service Desk" beside it; the Phase B drawer header is in §7.4.

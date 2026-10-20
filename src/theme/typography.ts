@@ -2,9 +2,8 @@
 // `text-*` and `font-*` classes resolve from here.
 // - Font: the web sets no font of its own, so it renders Tailwind's default system stack (`font-sans`), which is
 //   Roboto on Android. Roboto is also React Native's default on Android, so no font is loaded or named here.
-// - Sizes are the web's scale (Tailwind's default) in rem. The web resolves 1rem to 16px; NativeWind resolves it to
-//   14px (`inlineRem`, default 14, in metro.config.js's withNativeWind), so `text-sm` is 14px on the web and 12.25px
-//   here. Changing that is an app-wide size change for Phase C, not a token change.
+// - Sizes are the web's scale (Tailwind's default) in rem. Since Phase C, NativeWind resolves 1rem to 16 dp as the web
+//   does (`inlineRem: 16` in metro.config.js; its default is 14), so `text-sm` is 14 on both.
 // This file must stay free of runtime imports, because tailwind.config.js loads it outside Metro.
 
 /** `text-*` sizes: [font size, { lineHeight }]. */

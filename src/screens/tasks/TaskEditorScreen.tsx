@@ -12,17 +12,17 @@
 //   lives on task detail and is confirmed there.
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, OfflineBanner, OfflineState, OptionSheet,
-  PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
+  EmptyState, ErrorState, FieldLabel, FilterChip, FormCard, InlineError, LoadingSkeleton, OfflineBanner, OfflineState,
+  OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
 } from '@/components';
 import { useDiscardGuard, useSaveTask, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors } from '@/theme';
 import { TASK_STATUSES, type TaskBody, type TaskScreenProps, type TaskStatus, type UserRole } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
@@ -165,7 +165,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
     <KeyboardAvoidingView behavior="height" className="flex-1 bg-gray-50">
       <ScreenHeader title={title} variant="close" />
       <OfflineBanner />
-      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
         <Text className="mx-4 mb-2 text-xs text-gray-500" numberOfLines={1}>
           On ticket #{ticket.ticketNumber} · {ticket.title}
         </Text>
@@ -177,7 +177,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             editable={!save.isPending}
             maxLength={255}
             placeholder="What needs doing"
-            placeholderTextColor={palette.gray[400]}
+            placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Title"
             className="mb-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
@@ -189,7 +189,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             multiline
             textAlignVertical="top"
             placeholder="Optional details"
-            placeholderTextColor={palette.gray[400]}
+            placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Description"
             className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
@@ -221,11 +221,11 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             onPress={openDuePicker}
             disabled={save.isPending}
           />
-          <View className="-mt-1 mb-1 flex-row flex-wrap gap-2">
+          <View className="mb-1 flex-row flex-wrap gap-2">
             {quickDays.map((q) => (
-              <Chip key={q.label} label={q.label} active={dueDay === q.day} onPress={() => update({ dueDay: q.day })} />
+              <FilterChip key={q.label} role="button" label={q.label} active={dueDay === q.day} onPress={() => update({ dueDay: q.day })} />
             ))}
-            <Chip label="No due date" active={!dueDay} onPress={() => update({ dueDay: '' })} />
+            <FilterChip role="button" label="No due date" active={!dueDay} onPress={() => update({ dueDay: '' })} />
           </View>
         </FormCard>
 
@@ -288,17 +288,4 @@ function buildBody(draft: Draft, before: Draft | null): TaskBody {
   if (draft.status !== before.status) body.status = draft.status;
   if (day !== before.dueDay) body.dueDate = dueDate;
   return body;
-}
-
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      className={`rounded-full border px-3 py-1.5 ${active ? 'border-blue-600 bg-blue-50' : 'border-gray-300 bg-white'}`}
-    >
-      <Text className={`text-sm ${active ? 'font-medium text-blue-700' : 'text-gray-800'}`}>{label}</Text>
-    </Pressable>
-  );
 }

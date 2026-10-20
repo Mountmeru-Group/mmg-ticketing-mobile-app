@@ -2,7 +2,7 @@
 // reads both, so `p-*`, `m-*`, `gap-*` and `rounded-*` resolve from here.
 // - Spacing: the web defines no scale of its own; it uses Tailwind's default (step n = n × 0.25rem), written out here.
 // - Radius: the web sets `--radius: 0.5rem` and derives lg / md / sm from it; the other steps are Tailwind's.
-// Like typography, rem is 16px on the web and 14px under NativeWind (see typography.ts).
+// Like typography, rem is 16 on the web and in the app (`inlineRem: 16`, see typography.ts).
 // This file must stay free of runtime imports, because tailwind.config.js loads it outside Metro.
 
 export const spacing = {

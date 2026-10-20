@@ -23,7 +23,7 @@ import {
   type BulkTarget,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
 import { notify, confirmAction, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
@@ -59,7 +59,7 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         multiline
         textAlignVertical="top"
         placeholder="What was done to resolve the issue"
-        placeholderTextColor={palette.gray[400]}
+        placeholderTextColor={colors.text.secondary}
         accessibilityLabel="Resolution, required"
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
@@ -70,9 +70,16 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         onPress={() => setCodeSheet(true)}
         disabled={disabled}
       />
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="flex-1 text-sm font-medium text-gray-800">Is FCR (First Call Resolution)</Text>
-        <Switch value={form.isFcr} onValueChange={(isFcr) => onChange({ ...form, isFcr })} disabled={disabled} accessibilityLabel="First call resolution" />
+      <View className="mb-3 min-h-11 flex-row items-center justify-between">
+        <Text className="flex-1 text-sm font-medium text-gray-700">Is FCR (First Call Resolution)</Text>
+        <Switch
+          value={form.isFcr}
+          onValueChange={(isFcr) => onChange({ ...form, isFcr })}
+          disabled={disabled}
+          trackColor={{ false: palette.gray[300], true: colors.primary }}
+          thumbColor={palette.white}
+          accessibilityLabel="First call resolution"
+        />
       </View>
       <FieldLabel label="Closure comments" required hint="Posted as a PUBLIC reply the requester sees, and included in the closed email." />
       <TextInput
@@ -82,7 +89,7 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         multiline
         textAlignVertical="top"
         placeholder="Message to the requester"
-        placeholderTextColor={palette.gray[400]}
+        placeholderTextColor={colors.text.secondary}
         accessibilityLabel="Closure comments, required"
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
@@ -208,11 +215,11 @@ function SingleStatus({ navigation, route }: Props) {
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
         <FormCard>
-          <Text className="text-sm text-gray-600" numberOfLines={2}>
+          <Text className="text-sm text-gray-500" numberOfLines={2}>
             #{ticket.ticketNumber} · {ticket.title}
           </Text>
-          <View className="mt-2 flex-row items-center">
-            <Text className="mr-2 text-sm text-gray-500">Current status</Text>
+          <View className="mt-2 flex-row flex-wrap items-center gap-2">
+            <Text className="text-sm text-gray-700">Current status</Text>
             <StatusBadge status={ticket.status} />
           </View>
         </FormCard>
@@ -220,7 +227,7 @@ function SingleStatus({ navigation, route }: Props) {
         {closure === null ? (
           <FormCard title="Move to">
             {transitions.length === 0 ? (
-              <Text className="text-sm text-gray-600">
+              <Text className="text-sm text-gray-700">
                 {isResolvedLocked(role, ticket.status)
                   ? 'Closed and canceled tickets are locked for technicians.'
                   : 'No status changes are available from this status.'}
@@ -233,10 +240,10 @@ function SingleStatus({ navigation, route }: Props) {
                   accessibilityState={{ disabled: change.isPending }}
                   disabled={change.isPending}
                   onPress={() => void once(() => quickChange(t))}
-                  className={`mb-2 flex-row items-center justify-between rounded-lg border px-3 py-3 ${TONE_CLASS[transitionTone(t.target)]} ${change.isPending ? 'opacity-50' : ''}`}
+                  className={`mb-2 min-h-12 flex-row items-center justify-between rounded-lg border px-4 py-3 ${TONE_CLASS[transitionTone(t.target)]} ${change.isPending ? 'opacity-50' : 'active:opacity-70'}`}
                 >
-                  <Text className="flex-1 text-base text-gray-900">{t.label}</Text>
-                  {requiresClosureForm(t.target) ? <Text className="text-xs text-gray-500">Needs closure details</Text> : null}
+                  <Text className="flex-1 text-base font-medium text-gray-900">{t.label}</Text>
+                  {requiresClosureForm(t.target) ? <Text className="ml-2 text-xs text-gray-500">Needs closure details</Text> : null}
                 </Pressable>
               ))
             )}
@@ -258,7 +265,7 @@ function SingleStatus({ navigation, route }: Props) {
                 tone={saveTone(closure.target)}
               />
               {!change.isPending ? (
-                <Pressable accessibilityRole="button" onPress={() => setClosure(null)} className="mt-3 items-center py-2">
+                <Pressable accessibilityRole="button" onPress={() => setClosure(null)} className="mt-2 min-h-11 items-center justify-center">
                   <Text className="text-sm font-medium text-blue-700">Choose a different status</Text>
                 </Pressable>
               ) : null}
@@ -335,9 +342,9 @@ function BulkClose({ navigation, route }: Props) {
             <Text className="text-sm text-gray-700">{eligible.map((t) => t.label).join(', ') || 'None of the selected tickets can be closed.'}</Text>
             {skipped.length > 0 ? (
               <View className="mt-3">
-                <Text className="text-xs font-semibold uppercase text-gray-500">Skipped</Text>
+                <Text className="text-xs font-semibold text-gray-500">Skipped</Text>
                 {skipped.map((t) => (
-                  <Text key={t.id} className="mt-1 text-sm text-gray-600">
+                  <Text key={t.id} className="mt-1 text-sm text-gray-500">
                     {t.label}: {t.skipReason}
                   </Text>
                 ))}

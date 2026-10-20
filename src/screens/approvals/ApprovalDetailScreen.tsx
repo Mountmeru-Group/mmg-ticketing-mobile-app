@@ -13,16 +13,16 @@
 // - No delegation (A26).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiClientError } from '@/api/errors';
 import {
-  EmptyState, ErrorState, FieldLabel, HtmlText, LoadingSkeleton, Notice, OfflineBanner, OfflineState, PriorityBadge,
-  ScreenHeader, StatusBadge, SubmitButton,
+  Card, EmptyState, ErrorState, FieldLabel, HtmlText, LoadingSkeleton, Notice, OfflineBanner, OfflineState, OutlineButton,
+  PriorityBadge, ScreenHeader, StatusBadge, SubmitButton,
 } from '@/components';
 import { useDecideApproval, useDiscardGuard, usePendingApprovals, useSingleFlight, useTicket, type ApprovalDecision } from '@/hooks';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { Approval, ApprovalsStackScreenProps, TicketDetail } from '@/types';
 import { decisionMessage, decisionOutcome, entityLabel, shortApprovalId } from '@/utils/approvals';
 import { confirmAction, reportWriteError } from '@/utils/dialogs';
@@ -74,6 +74,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title="Approval" variant="back" />
+        <OfflineBanner />
         {approvals.fetchStatus === 'paused' && !approvals.data ? (
           <OfflineState what="This approval" />
         ) : approvals.isError && !approvals.data ? (
@@ -100,9 +101,9 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
     <KeyboardAvoidingView behavior="height" className="flex-1 bg-gray-50">
       <ScreenHeader title={`${entityLabel(shown.entityType)} approval`} variant="back" />
       <OfflineBanner />
-      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
         <Card>
-          <View className="mb-1 flex-row items-center">
+          <View className="mb-2 flex-row items-center">
             <View className="rounded-full bg-yellow-100 px-2.5 py-0.5">
               <Text className="text-xs font-medium text-yellow-800">{entityLabel(shown.entityType)}</Text>
             </View>
@@ -128,7 +129,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
             {decisionOutcome(result, ticketQuery.data?.status ?? null).map((line) => (
               <View key={line} className="mb-1.5 flex-row items-start">
                 <Ionicons name="checkmark-circle-outline" size={16} color={palette.green[700]} style={{ marginTop: 2 }} />
-                <Text className="ml-2 flex-1 text-sm text-gray-800">{line}</Text>
+                <Text className="ml-2 flex-1 text-sm text-gray-700">{line}</Text>
               </View>
             ))}
             <View className="mt-2">
@@ -149,7 +150,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
               multiline
               textAlignVertical="top"
               placeholder="Add a comment"
-              placeholderTextColor={palette.gray[400]}
+              placeholderTextColor={colors.text.secondary}
               className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
             />
             <View className="flex-row gap-2">
@@ -233,10 +234,10 @@ function TicketContext({
   return (
     <Card title="Ticket">
       <Text className="text-xs font-semibold text-gray-500">#{t.ticketNumber}</Text>
-      <Text selectable className="text-base font-bold text-gray-900">
+      <Text selectable className="text-base font-semibold text-gray-900">
         {t.title || '(no subject)'}
       </Text>
-      <View className="mt-2 flex-row flex-wrap gap-1.5">
+      <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
         <StatusBadge status={t.status} />
         <PriorityBadge priority={t.priority} />
       </View>
@@ -247,14 +248,9 @@ function TicketContext({
       </View>
       <Text className="mb-1 mt-3 text-xs font-semibold text-gray-500">Description</Text>
       <HtmlText html={t.description} collapsedHeight={200} emptyText="No description" />
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onOpen(t.id)}
-        className="mt-3 flex-row items-center justify-center rounded-lg border border-gray-300 py-2.5 active:bg-gray-50"
-      >
-        <Ionicons name="open-outline" size={16} color={palette.gray[800]} />
-        <Text className="ml-1.5 text-sm font-medium text-gray-900">Open the ticket (conversation, files)</Text>
-      </Pressable>
+      <View className="mt-3">
+        <OutlineButton icon="open-outline" label="Open the ticket (conversation, files)" onPress={() => onOpen(t.id)} />
+      </View>
     </Card>
   );
 }
@@ -266,7 +262,7 @@ function ChangeContext({ approval }: { approval: Approval }) {
       {c ? (
         <>
           <Text className="text-xs font-semibold text-gray-500">Change #{c.changeNumber}</Text>
-          <Text selectable className="text-base font-bold text-gray-900">
+          <Text selectable className="text-base font-semibold text-gray-900">
             {c.title || '(no title)'}
           </Text>
           <Row label="Status">{c.status ? c.status.replace(/_/g, ' ') : '—'}</Row>
@@ -298,7 +294,7 @@ function ServiceRequestContext({ approval }: { approval: Approval }) {
   return (
     <Card title="Service request">
       <Text className="text-xs font-semibold text-gray-500">Request #{sr.requestNumber}</Text>
-      <Text className="text-base font-bold text-gray-900">{sr.serviceItem?.name ?? 'Service request'}</Text>
+      <Text className="text-base font-semibold text-gray-900">{sr.serviceItem?.name ?? 'Service request'}</Text>
       <Row label="Status">{statusLabel(sr.status)}</Row>
       <Row label="Priority">
         <PriorityBadge priority={sr.priority} />
@@ -312,7 +308,7 @@ function ServiceRequestContext({ approval }: { approval: Approval }) {
       {notes ? (
         <>
           <Text className="mb-1 mt-3 text-xs font-semibold text-gray-500">Notes</Text>
-          <Text selectable className="text-sm text-gray-800">
+          <Text selectable className="text-sm text-gray-700">
             {notes}
           </Text>
         </>
@@ -323,19 +319,11 @@ function ServiceRequestContext({ approval }: { approval: Approval }) {
 
 // ── Layout pieces ────────────────────────────────────────────
 
-function Card({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <View className="mx-4 mb-3 rounded-xl bg-white p-4">
-      {title ? <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</Text> : null}
-      {children}
-    </View>
-  );
-}
-
+/** A label / value line in a card (UI-STANDARDS S6). */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="flex-row border-b border-gray-100 py-2">
-      <Text className="w-28 text-sm text-gray-500" numberOfLines={2}>
+      <Text className="w-28 pr-2 text-sm text-gray-500" numberOfLines={2}>
         {label}
       </Text>
       <View className="flex-1">{typeof children === 'string' ? <Text selectable className="text-sm text-gray-900">{children}</Text> : children}</View>

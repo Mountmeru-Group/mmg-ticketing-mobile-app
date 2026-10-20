@@ -1,3 +1,5 @@
+// Empty and offline states (docs/brand/UI-STANDARDS.md, S11): a 40 dp icon, a title that says what is missing, a
+// message that says what would appear here, and an action where one makes sense.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, Text, View } from 'react-native';
 
@@ -26,11 +28,15 @@ export function EmptyState({ title, message, icon = 'file-tray-outline', actionL
   return (
     <View className="flex-1 items-center justify-center px-8 py-12">
       <Ionicons name={icon} size={40} color={colors.text.muted} />
-      <Text className="mt-3 text-center text-base font-semibold text-gray-800">{title}</Text>
+      <Text className="mt-3 text-center text-base font-semibold text-gray-900">{title}</Text>
       {message ? <Text className="mt-1 text-center text-sm text-gray-500">{message}</Text> : null}
       {actionLabel && onAction ? (
-        <Pressable accessibilityRole="button" onPress={onAction} className="mt-4 rounded-lg bg-primary px-4 py-2">
-          <Text className="font-medium text-primary-foreground">{actionLabel}</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAction}
+          className="mt-4 min-h-11 justify-center rounded-lg bg-primary px-5 active:opacity-80"
+        >
+          <Text className="text-sm font-semibold text-primary-foreground">{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>

@@ -47,7 +47,7 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
                     <Text className="text-sm text-gray-900">
                       {o.label} · {style.label}
                     </Text>
-                    {o.message ? <Text className="text-xs text-gray-600">{o.message}</Text> : null}
+                    {o.message ? <Text className="text-xs text-gray-500">{o.message}</Text> : null}
                   </View>
                 </View>
               );

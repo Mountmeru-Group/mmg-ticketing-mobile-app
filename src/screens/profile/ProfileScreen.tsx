@@ -10,7 +10,7 @@
 // - Theme (System/Light/Dark, 04 M10) is not in this phase's brief and is not built.
 // - Sign out: confirmation → AUTH-3 (result ignored) → SecureStore, cache and stores wiped → Login (02 §5.5).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,7 +18,7 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
 import {
-  ErrorState, FieldLabel, InlineError, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
+  Card, ErrorState, FieldLabel, InlineError, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
@@ -27,7 +27,7 @@ import {
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
-import { palette } from '@/theme';
+import { colors } from '@/theme';
 import type { AppDrawerScreenProps, UserProfile } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
@@ -128,23 +128,24 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
       <OfflineBanner />
       <QueryBanner error={profile.error} hasData={!!profile.data} onRetry={() => void onRefresh()} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <Card>
           <View className="flex-row items-center">
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-blue-600">
-              <Text className="text-lg font-bold text-white">{initials(profile.data?.displayName ?? user?.displayName)}</Text>
+            {/* The web's avatar (AppLayout.tsx): brand red at 10 % with red initials, as in the drawer. */}
+            <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+              <Text className="text-lg font-bold text-primary">{initials(profile.data?.displayName ?? user?.displayName)}</Text>
             </View>
             <View className="ml-3 flex-1">
-              <Text className="text-lg font-semibold text-gray-900" numberOfLines={1}>
+              <Text className="text-lg font-bold text-gray-900" numberOfLines={1}>
                 {displayName || 'Signed in'}
               </Text>
-              <Text selectable className="text-sm text-gray-600" numberOfLines={1}>
+              <Text selectable className="text-sm text-gray-500" numberOfLines={1}>
                 {user?.email ?? ''}
               </Text>
-              <View className="mt-1 self-start rounded-full bg-gray-100 px-2 py-0.5">
+              <View className="mt-1 self-start rounded-full bg-gray-100 px-2.5 py-0.5">
                 <Text className="text-xs font-medium text-gray-700">{user ? ROLE_LABELS[user.role] : ''}</Text>
               </View>
             </View>
@@ -188,7 +189,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
               editable={!update.isPending}
             />
             {tz && tz !== form.timezone ? (
-              <Pressable accessibilityRole="button" onPress={() => set('timezone')(tz)} className="-mt-2 mb-3 self-start py-1">
+              <Pressable accessibilityRole="button" onPress={() => set('timezone')(tz)} className="-mt-3 mb-2 min-h-11 justify-center self-start">
                 <Text className="text-sm font-medium text-blue-700">Use this device's timezone ({tz})</Text>
               </Pressable>
             ) : null}
@@ -204,9 +205,9 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                   setError(null);
                   if (profile.data) setForm(formFrom(profile.data));
                 }}
-                className="mt-2 items-center py-2"
+                className="mt-2 min-h-11 items-center justify-center"
               >
-                <Text className="text-sm font-medium text-gray-700">Discard changes</Text>
+                <Text className="text-sm font-medium text-blue-700">Discard changes</Text>
               </Pressable>
             ) : null}
           </Card>
@@ -222,15 +223,15 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                   onPress={() => setCountrySheet(true)}
                   className="min-h-11 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2"
                 >
-                  <Ionicons name="globe-outline" size={16} color={palette.gray[700]} />
+                  <Ionicons name="globe-outline" size={18} color={colors.text.body} />
                   <Text className="ml-2 flex-1 text-base text-gray-900">{countryLabel}</Text>
-                  <Ionicons name="chevron-down" size={16} color={palette.gray[500]} />
+                  <Ionicons name="chevron-down" size={18} color={colors.text.secondary} />
                 </Pressable>
                 <Text className="mt-2 text-xs text-gray-500">Filters the Tickets list and Home counts on this device. Not saved to your account.</Text>
               </>
             ) : (
-              <View accessibilityLabel={`Locked to ${countryLabel}`} className="flex-row items-center">
-                <Ionicons name="lock-closed" size={14} color={palette.gray[500]} />
+              <View accessibilityLabel={`Locked to ${countryLabel}`} className="flex-row flex-wrap items-center">
+                <Ionicons name="lock-closed" size={14} color={colors.text.secondary} />
                 <Text className="ml-2 text-base text-gray-900">{countryLabel}</Text>
                 <Text className="ml-2 text-xs text-gray-500">Locked to your country</Text>
               </View>
@@ -260,7 +261,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
           <Text className="px-4 py-8 text-center text-sm text-gray-500">Countries load when you reconnect.</Text>
         ) : countries.isPending ? (
           <View className="items-center py-8">
-            <ActivityIndicator color={palette.blue[600]} />
+            <ActivityIndicator color={colors.primary} />
             <Text className="mt-2 text-sm text-gray-500">Loading countries…</Text>
           </View>
         ) : countries.isError && !countries.data ? (
@@ -268,15 +269,6 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
         ) : undefined}
       </OptionSheet>
     </KeyboardAvoidingView>
-  );
-}
-
-function Card({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <View className="mx-4 mb-3 rounded-xl bg-white p-4">
-      {title ? <Text className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</Text> : null}
-      {children}
-    </View>
   );
 }
 

@@ -7,12 +7,14 @@
 // - Errors thrown outside rendering (event handlers, promises) are not caught here; every write handler already
 //   reports its own failure (utils/dialogs.ts).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useSignOut } from '@/hooks/useProfile';
+import { hideSplash } from '@/navigation/splash';
 import { useAuthStore } from '@/store/auth.store';
 import { palette } from '@/theme';
+import { OutlineButton, SubmitButton } from './Form';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -48,14 +50,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 function CrashScreen({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const signedIn = useAuthStore((s) => s.isAuthenticated);
   const { signOut, signingOut } = useSignOut();
+  // A crash before the first screen drew would otherwise sit behind the native splash.
+  useEffect(hideSplash, []);
 
   return (
     <ScrollView contentContainerClassName="flex-grow items-center justify-center bg-gray-50 px-8 py-16">
-      <Ionicons name="warning-outline" size={44} color={palette.amber[600]} />
+      <Ionicons name="warning-outline" size={40} color={palette.amber[600]} />
       <Text accessibilityRole="header" className="mt-3 text-center text-lg font-semibold text-gray-900">
         Something went wrong
       </Text>
-      <Text className="mt-2 text-center text-sm text-gray-600">
+      <Text className="mt-2 text-center text-sm text-gray-700">
         The app hit an unexpected problem while showing this screen. Anything you already sent is not affected, and
         nothing is re-sent when you try again.
       </Text>
@@ -67,23 +71,13 @@ function CrashScreen({ error, onRetry }: { error: Error; onRetry: () => void }) 
           </Text>
         </View>
       ) : null}
-      <Pressable
-        accessibilityRole="button"
-        onPress={onRetry}
-        className="mt-6 h-12 self-stretch flex-row items-center justify-center rounded-lg bg-primary px-4 active:opacity-80"
-      >
-        <Text className="text-base font-semibold text-primary-foreground">Try again</Text>
-      </Pressable>
+      <View className="mt-6 self-stretch">
+        <SubmitButton label="Try again" onPress={onRetry} />
+      </View>
       {signedIn ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: signingOut, busy: signingOut }}
-          disabled={signingOut}
-          onPress={() => void signOut()}
-          className="mt-3 h-12 self-stretch items-center justify-center rounded-lg border border-gray-300 bg-white px-4"
-        >
-          <Text className="text-base font-medium text-gray-800">{signingOut ? 'Signing out…' : 'Sign out'}</Text>
-        </Pressable>
+        <View className="mt-3 self-stretch">
+          <OutlineButton label={signingOut ? 'Signing out…' : 'Sign out'} onPress={() => void signOut()} disabled={signingOut} />
+        </View>
       ) : null}
       <Text className="mt-6 text-center text-xs text-gray-500">If this keeps happening, tell the Service Desk team what you were doing.</Text>
     </ScrollView>

@@ -19,7 +19,7 @@
 //     (TSK-3, reversible) and add tasks (→ M11, TSK-2); edit and remove live on task detail. END_USER: read-only (D4).
 //     The rows are the shared TaskRow, also used by the standalone task list.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,15 +28,16 @@ import { getAttachmentViewRequest, type UploadFile } from '@/api/attachments.api
 import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  AttachmentPicker, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, OfflineBanner, OfflineState,
-  OptionSheet, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow, type SheetOption,
+  AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, OfflineBanner, OfflineState,
+  OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow,
+  type SheetOption,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useSingleFlight, useTicket, useTicketAttachments, useTicketComments, useTicketHistory,
   useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type {
   ActivityAuditItem, Attachment, Comment, TicketDetail, TicketImpact, TicketStackScreenProps, TicketTaskEmbedded,
   TicketUrgency, UserRole,
@@ -193,6 +194,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="back" />
+        <OfflineBanner />
         {ticketQuery.fetchStatus === 'paused' ? (
           <OfflineState what="This ticket" />
         ) : ticketQuery.isError ? (
@@ -231,10 +233,9 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
               accessibilityLabel="More options"
               disabled={writing}
               onPress={() => setMoreOpen(true)}
-              hitSlop={8}
-              className="h-10 w-10 items-center justify-center rounded-full"
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-gray-100"
             >
-              {assign.isPending ? <ActivityIndicator color={palette.blue[600]} /> : <Ionicons name="ellipsis-vertical" size={22} color={palette.gray[900]} />}
+              {assign.isPending ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="ellipsis-vertical" size={24} color={colors.text.primary} />}
             </Pressable>
           ) : undefined
         }
@@ -242,8 +243,8 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
       <ScrollView
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <HeaderCard ticket={ticket} role={role} />
         <StatusActionBar ticket={ticket} role={role} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
@@ -283,6 +284,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
           <TabBody
             query={comments}
             what="The conversation"
+            loading="comments"
             loadingRows={2}
             errorTitle="Couldn't load the conversation"
             isEmpty={(comments.data?.length ?? 0) === 0}
@@ -305,35 +307,32 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
               refetch: history.refreshFirstPage,
             }}
             what="The history"
-            loadingRows={2}
+            loading="history"
+            loadingRows={4}
             errorTitle="Couldn't load the history"
             isEmpty={history.audits.length === 0}
             empty={<EmptyState icon="time-outline" title="No history yet" message="Changes to this ticket will appear here." />}
           >
-            <View className="mx-4 rounded-xl bg-white px-4 py-2">
-              {history.audits.map((a) => (
-                <AuditRow key={a.id} audit={a} />
+            <Card flush>
+              {history.audits.map((a, i) => (
+                <AuditRow key={a.id} audit={a} last={i === history.audits.length - 1} />
               ))}
-            </View>
+            </Card>
             {history.hasNextPage ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={history.isFetchingNextPage || offline}
-                onPress={() => void history.fetchNextPage()}
-                className={`mx-4 mt-3 items-center rounded-lg border border-gray-300 bg-white py-2.5 ${offline ? 'opacity-50' : ''}`}
-              >
-                {history.isFetchingNextPage ? (
-                  <ActivityIndicator color={palette.blue[600]} />
-                ) : (
-                  <Text className="text-sm font-medium text-gray-800">
-                    {offline
+              <View className="mx-4">
+                <OutlineButton
+                  label={
+                    offline
                       ? 'Older history loads when you reconnect'
                       : history.isFetchNextPageError
                         ? "Couldn't load more — tap to retry"
-                        : 'Load older history'}
-                  </Text>
-                )}
-              </Pressable>
+                        : 'Load older history'
+                  }
+                  onPress={() => void history.fetchNextPage()}
+                  loading={history.isFetchingNextPage}
+                  disabled={offline}
+                />
+              </View>
             ) : null}
           </TabBody>
         ) : null}
@@ -356,6 +355,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
           <TabBody
             query={attachments}
             what="The attachment list"
+            loading="attachments"
             loadingRows={2}
             errorTitle="Couldn't load the attachments"
             isEmpty={(attachments.data?.length ?? 0) === 0}
@@ -402,32 +402,19 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
 
 function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      className="flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white py-2.5 active:bg-gray-50"
-    >
-      <Ionicons name={icon} size={16} color={palette.gray[800]} />
-      <Text className="ml-1.5 text-sm font-medium text-gray-900">{label}</Text>
-    </Pressable>
+    <View className="flex-1">
+      <OutlineButton icon={icon} label={label} onPress={onPress} compact />
+    </View>
   );
 }
 
 // ── Layout pieces ────────────────────────────────────────────
 
-function Card({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <View className="mx-4 mb-3 rounded-xl bg-white p-4">
-      {title ? <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</Text> : null}
-      {children}
-    </View>
-  );
-}
-
+/** A label / value line in a card (UI-STANDARDS S6): 112 dp label column, separators between rows. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="flex-row border-b border-gray-100 py-2">
-      <Text className="w-32 text-sm text-gray-500">{label}</Text>
+      <Text className="w-28 pr-2 text-sm text-gray-500">{label}</Text>
       <View className="flex-1">{typeof children === 'string' ? <Text className="text-sm text-gray-900">{children}</Text> : children}</View>
     </View>
   );
@@ -459,14 +446,14 @@ function HeaderCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) 
     <Card>
       <View className="mb-1 flex-row items-center">
         <Text className="text-xs font-semibold text-gray-500">#{ticket.ticketNumber}</Text>
-        <View className="ml-2 rounded bg-gray-100 px-1.5 py-0.5">
-          <Text className="text-[10px] font-medium uppercase text-gray-600">{sourceLabel(ticket.source)}</Text>
+        <View className="ml-2 rounded-full px-2.5 py-0.5" style={{ backgroundColor: colors.badgeFallback.bg }}>
+          <Text className="text-xs font-medium" style={{ color: colors.badgeFallback.fg }}>{sourceLabel(ticket.source)}</Text>
         </View>
       </View>
       <Text selectable className="text-lg font-bold text-gray-900">
         {ticket.title || '(no subject)'}
       </Text>
-      <View className="mt-2 flex-row flex-wrap gap-1.5">
+      <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
         <StatusBadge status={ticket.status} />
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
@@ -514,18 +501,18 @@ function StatusActionBar({
               accessibilityState={{ disabled: busy }}
               accessibilityHint={requiresClosureForm(t.target) ? 'Opens the closure form' : 'Asks you to confirm'}
               onPress={() => onTransition(t)}
-              className={`rounded-lg border px-3 py-2 ${toneClass[transitionTone(t.target)]} ${busy ? 'opacity-50' : 'active:opacity-70'}`}
+              className={`min-h-11 justify-center rounded-lg border px-4 ${toneClass[transitionTone(t.target)]} ${busy ? 'opacity-50' : 'active:opacity-70'}`}
             >
-              <Text className="text-sm text-gray-800">{t.label}</Text>
+              <Text className="text-sm font-medium text-gray-900">{t.label}</Text>
             </Pressable>
           ))}
         </View>
       ) : (
-        <Text className="text-sm text-gray-600">
+        <Text className="text-sm text-gray-700">
           {locked ? 'Closed and canceled tickets are locked for technicians.' : 'No status changes are available from this status.'}
         </Text>
       )}
-      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={palette.blue[600]} /> : null}
+      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} /> : null}
     </Card>
   );
 }
@@ -585,13 +572,13 @@ function RequesterCard({ ticket }: { ticket: TicketDetail }) {
   return (
     <Card title="Requester">
       <View className="flex-row items-center">
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-          <Text className="font-semibold text-blue-700">{initials(r?.displayName)}</Text>
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+          <Text className="text-sm font-semibold text-primary">{initials(r?.displayName)}</Text>
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-sm font-semibold text-gray-900">{name}</Text>
-          {r?.email ? <Text selectable className="text-xs text-gray-600">{r.email}</Text> : null}
-          {r?.phone ? <Text selectable className="text-xs text-gray-600">{r.phone}</Text> : null}
+          {r?.email ? <Text selectable className="text-xs text-gray-500">{r.email}</Text> : null}
+          {r?.phone ? <Text selectable className="text-xs text-gray-500">{r.phone}</Text> : null}
           {r?.department ? <Text className="text-xs text-gray-500">{r.department}</Text> : null}
         </View>
       </View>
@@ -639,6 +626,8 @@ function TabBar({
   onSelect: (tab: DetailTab) => void;
   counts: Partial<Record<DetailTab, number | undefined>>;
 }) {
+  // Segmented control (UI-STANDARDS S5): 44 dp tabs on a grey track; the active tab is white. Labels shrink a little,
+  // then wrap to a second line, so nothing is cut off at 360 dp or with large text.
   return (
     <View className="mx-4 mb-3 flex-row rounded-xl bg-gray-200 p-1" accessibilityRole="tablist">
       {(Object.keys(TAB_LABELS) as DetailTab[]).map((t) => {
@@ -650,13 +639,13 @@ function TabBar({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => onSelect(t)}
-            className={`flex-1 items-center rounded-lg py-2 ${active ? 'bg-white' : ''}`}
+            className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${active ? 'bg-white' : ''}`}
           >
             <Text
-              className={`text-xs ${active ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
-              numberOfLines={1}
+              className={`text-center text-xs ${active ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}
+              numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.85}
             >
               {TAB_LABELS[t]}
               {count !== undefined ? ` (${count})` : ''}
@@ -678,11 +667,13 @@ interface TabQueryState {
 
 /** Loading / offline / error / empty / content for one tab, plus a stale-data banner when a refresh failed. */
 function TabBody({
-  query, what, loadingRows, errorTitle, isEmpty, empty, children,
+  query, what, loading, loadingRows, errorTitle, isEmpty, empty, children,
 }: {
   query: TabQueryState;
   /** For the offline message, e.g. "The conversation". */
   what: string;
+  /** The skeleton that mirrors this tab's rows. */
+  loading: ComponentProps<typeof LoadingSkeleton>['variant'];
   loadingRows: number;
   errorTitle: string;
   isEmpty: boolean;
@@ -692,7 +683,7 @@ function TabBody({
   const hasData = query.data !== undefined;
   if (!hasData && query.fetchStatus === 'paused') return <OfflineState what={what} />;
   if (!hasData && query.isError) return <ErrorState error={query.error} title={errorTitle} onRetry={() => void query.refetch()} />;
-  if (!hasData) return <LoadingSkeleton rows={loadingRows} />;
+  if (!hasData) return <LoadingSkeleton variant={loading} rows={loadingRows} topGap={false} />;
   return (
     <View>
       {query.isError ? (
@@ -714,11 +705,12 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
   const cc = Array.isArray(comment.ccRecipients) ? comment.ccRecipients : [];
   const files = Array.isArray(comment.attachments) ? comment.attachments : [];
 
+  // The standard card; a private note is the same card tinted amber.
   return (
-    <View className={`mx-4 mb-3 rounded-xl border p-4 ${isPrivate ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'}`}>
+    <View className={`mx-4 mb-3 rounded-xl border p-4 ${isPrivate ? 'border-amber-200 bg-amber-50' : 'border-border bg-white'}`}>
       <View className="mb-2 flex-row items-center">
-        <View className={`h-8 w-8 items-center justify-center rounded-full ${isPrivate ? 'bg-amber-200' : 'bg-blue-100'}`}>
-          <Text className={`text-xs font-semibold ${isPrivate ? 'text-amber-900' : 'text-blue-700'}`}>{initials(comment.author?.displayName)}</Text>
+        <View className={`h-8 w-8 items-center justify-center rounded-full ${isPrivate ? 'bg-amber-200' : 'bg-primary/10'}`}>
+          <Text className={`text-xs font-semibold ${isPrivate ? 'text-amber-900' : 'text-primary'}`}>{initials(comment.author?.displayName)}</Text>
         </View>
         <View className="ml-2 flex-1">
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{author}</Text>
@@ -728,9 +720,9 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
           </Text>
         </View>
         {isPrivate ? (
-          <View className="flex-row items-center rounded-full bg-amber-200 px-2 py-0.5">
-            <Ionicons name="lock-closed" size={10} color={palette.amber[900]} />
-            <Text className="ml-1 text-[10px] font-semibold uppercase text-amber-900">Private note</Text>
+          <View className="ml-2 flex-row items-center rounded-full bg-amber-200 px-2.5 py-0.5">
+            <Ionicons name="lock-closed" size={12} color={palette.amber[900]} />
+            <Text className="ml-1 text-xs font-semibold text-amber-900">Private note</Text>
           </View>
         ) : null}
       </View>
@@ -760,13 +752,13 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
   );
 }
 
-function AuditRow({ audit }: { audit: ActivityAuditItem }) {
+function AuditRow({ audit, last }: { audit: ActivityAuditItem; last: boolean }) {
   const { actor, action } = describeAudit(audit);
   return (
-    <View className="flex-row border-b border-gray-100 py-2.5">
+    <View className={`flex-row py-3 ${last ? '' : 'border-b border-gray-100'}`}>
       <View className="mr-3 mt-1.5 h-2 w-2 rounded-full bg-gray-300" />
       <View className="flex-1">
-        <Text className="text-sm text-gray-800">
+        <Text className="text-sm text-gray-700">
           <Text className="font-semibold">{actor}</Text> {action}
         </Text>
         <Text className="mt-0.5 text-xs text-gray-500">{formatDateTime(audit.createdAt)}</Text>
@@ -803,20 +795,20 @@ function AttachmentRow({
       disabled={opening}
       onPress={onView ?? onOpen}
       onLongPress={() => setOpen((v) => !v)}
-      className="mx-4 mb-2 rounded-xl bg-white p-3 active:bg-gray-50"
+      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
     >
       <View className="flex-row items-center">
-        <Ionicons name={attachmentIcon(attachment.mimeType)} size={22} color={palette.gray[600]} />
+        <Ionicons name={attachmentIcon(attachment.mimeType)} size={20} color={palette.gray[600]} />
         <View className="ml-3 flex-1">
-          <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>{attachment.fileName || 'Unnamed file'}</Text>
+          <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{attachment.fileName || 'Unnamed file'}</Text>
           <Text className="text-xs text-gray-500" numberOfLines={1}>
             {formatBytes(attachment.sizeBytes)} · {attachment.mimeType || 'unknown type'}
           </Text>
         </View>
         {opening ? (
-          <ActivityIndicator color={palette.blue[600]} />
+          <ActivityIndicator color={colors.primary} />
         ) : (
-          <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color={palette.gray[500]} />
+          <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color={colors.text.secondary} />
         )}
       </View>
       {open ? (
@@ -826,7 +818,7 @@ function AttachmentRow({
           <Row label="Type">{attachment.mimeType || 'Unknown'}</Row>
           <Row label="Size">{formatBytes(attachment.sizeBytes)}</Row>
           <Row label="Added with">{attachment.commentId ? 'A reply' : 'The ticket'}</Row>
-          <Pressable accessibilityRole="button" disabled={opening} onPress={onOpen} className="mt-2 self-start py-1">
+          <Pressable accessibilityRole="button" disabled={opening} onPress={onOpen} className="mt-1 min-h-11 justify-center self-start">
             <Text className="text-sm font-medium text-blue-700">Download and share</Text>
           </Pressable>
         </View>
@@ -859,7 +851,7 @@ function TasksTab({
       {tasks.length === 0 ? (
         <EmptyState icon="checkbox-outline" title="No tasks" message="Tasks added to this ticket will appear here." />
       ) : (
-        <View className="mx-4 rounded-xl bg-white px-4 py-1">
+        <Card flush>
           {tasks.map((task, i) => (
             <TaskRow
               key={task.id}
@@ -870,7 +862,7 @@ function TasksTab({
               last={i === tasks.length - 1}
             />
           ))}
-        </View>
+        </Card>
       )}
     </View>
   );

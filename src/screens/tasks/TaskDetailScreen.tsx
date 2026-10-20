@@ -5,19 +5,19 @@
 // - Shows title, description, status, owner, due date and the parent ticket; "View parent ticket" opens M4.
 // - Staff (ADMIN, AGENT, L2_MANAGER): mark done / not done (TSK-3, reversible: no confirmation), Edit (M11),
 //   Delete (TSK-4, "Remove this task?" first, 05 §A.15). END_USER: read-only (D4).
-import Ionicons from '@expo/vector-icons/Ionicons';
+import type Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader, StatusBadge,
-  taskStatusLabel,
+  Card, EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, OfflineState, OutlineButton, QueryBanner,
+  ScreenHeader, StatusBadge, taskStatusLabel,
 } from '@/components';
 import { useDeleteTask, useSingleFlight, useTicket, useToggleTask } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors } from '@/theme';
 import type { TaskScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName } from '@/utils/format';
@@ -112,8 +112,8 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
     const busy = toggle.isPending || remove.isPending;
     content = (
       <ScrollView
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <Card>
           <View className="mb-2 self-start rounded-full bg-gray-100 px-2.5 py-0.5">
@@ -123,11 +123,11 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
             {task.title || '(untitled task)'}
           </Text>
           {task.description ? (
-            <Text selectable className="mt-2 text-sm leading-5 text-gray-800">
+            <Text selectable className="mt-2 text-sm leading-5 text-gray-700">
               {task.description}
             </Text>
           ) : (
-            <Text className="mt-2 text-sm italic text-gray-400">No description</Text>
+            <Text className="mt-2 text-sm italic text-gray-500">No description</Text>
           )}
           <View className="mt-3">
             <Row label="Owner">{formatDisplayName(task.assignedTo?.displayName) || 'Unassigned'}</Row>
@@ -155,14 +155,9 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
           <View className="mt-2">
             <StatusBadge status={ticket.status} />
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={viewParent}
-            className="mt-3 flex-row items-center justify-center rounded-lg border border-gray-300 py-2.5 active:bg-gray-50"
-          >
-            <Ionicons name="ticket-outline" size={16} color={palette.gray[800]} />
-            <Text className="ml-1.5 text-sm font-medium text-gray-900">View parent ticket</Text>
-          </Pressable>
+          <View className="mt-3">
+            <OutlineButton icon="ticket-outline" label="View parent ticket" onPress={viewParent} />
+          </View>
         </Card>
 
         {canEdit ? (
@@ -201,24 +196,17 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
   );
 }
 
-function Card({ title, children }: { title?: string; children: ReactNode }) {
-  return (
-    <View className="mx-4 mb-3 rounded-xl bg-white p-4">
-      {title ? <Text className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</Text> : null}
-      {children}
-    </View>
-  );
-}
-
+/** A label / value line in a card (UI-STANDARDS S6). */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View className="flex-row border-b border-gray-100 py-2">
-      <Text className="w-28 text-sm text-gray-500">{label}</Text>
+      <Text className="w-28 pr-2 text-sm text-gray-500">{label}</Text>
       <View className="flex-1">{typeof children === 'string' ? <Text className="text-sm text-gray-900">{children}</Text> : children}</View>
     </View>
   );
 }
 
+/** One action in the card's stack: the standard outline button, left-aligned. */
 function ActionButton({
   icon, label, onPress, disabled = false, loading = false, tone = 'neutral',
 }: {
@@ -229,17 +217,9 @@ function ActionButton({
   loading?: boolean;
   tone?: 'neutral' | 'danger';
 }) {
-  const color = tone === 'danger' ? palette.red[700] : palette.gray[800];
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled, busy: loading }}
-      disabled={disabled}
-      onPress={onPress}
-      className={`mb-2 flex-row items-center rounded-lg border px-3 py-3 ${tone === 'danger' ? 'border-red-200' : 'border-gray-300'} ${disabled ? 'opacity-50' : 'active:bg-gray-50'}`}
-    >
-      {loading ? <ActivityIndicator color={color} /> : <Ionicons name={icon} size={18} color={color} />}
-      <Text className={`ml-2 text-sm font-medium ${tone === 'danger' ? 'text-red-700' : 'text-gray-900'}`}>{label}</Text>
-    </Pressable>
+    <View className="mb-2">
+      <OutlineButton icon={icon} label={label} onPress={onPress} disabled={disabled} loading={loading} tone={tone} align="start" />
+    </View>
   );
 }

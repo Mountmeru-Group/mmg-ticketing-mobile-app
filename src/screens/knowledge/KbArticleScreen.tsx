@@ -5,14 +5,17 @@
 // - One helpful vote per article per device (no server de-duplication, 01 KB-5), confirmed first: it can't be undone.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiClientError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
-import { EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
+import {
+  Card, EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, OutlineButton, QueryBanner,
+  ScreenHeader,
+} from '@/components';
 import { useKbArticle, useKbHelpfulVote, useKbVoted, useSingleFlight } from '@/hooks';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { KnowledgeStackScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDate, formatDisplayName } from '@/utils/format';
@@ -75,16 +78,16 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
   } else if (!article && query.isError) {
     content = <ErrorState error={query.error} title="Couldn't load this article" onRetry={() => void query.refetch()} />;
   } else if (!article) {
-    content = <LoadingSkeleton variant="detail" />;
+    content = <LoadingSkeleton variant="article" />;
   } else {
     const author = formatDisplayName(article.author?.displayName);
     const tags = Array.isArray(article.tags) ? article.tags.filter((t) => typeof t === 'string' && t.trim()) : [];
     content = (
       <ScrollView
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
-        <View className="mx-4 mb-3 rounded-xl bg-white p-4">
+        <Card>
           {article.category?.name ? <Text className="mb-1 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
           <Text selectable className="text-lg font-bold text-gray-900">
             {article.title || 'Untitled article'}
@@ -95,21 +98,21 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
             {typeof article.viewCount === 'number' ? ` · ${article.viewCount} views` : ''}
           </Text>
           {tags.length > 0 ? (
-            <View className="mt-2 flex-row flex-wrap gap-1">
+            <View className="mt-2 flex-row flex-wrap gap-1.5">
               {tags.map((t) => (
-                <View key={t} className="rounded bg-gray-100 px-1.5 py-0.5">
-                  <Text className="text-[11px] text-gray-600">{t}</Text>
+                <View key={t} className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: colors.badgeFallback.bg }}>
+                  <Text className="text-xs" style={{ color: colors.badgeFallback.fg }}>{t}</Text>
                 </View>
               ))}
             </View>
           ) : null}
-        </View>
+        </Card>
 
-        <View className="mx-4 mb-3 rounded-xl bg-white p-4">
-          <HtmlText html={article.body} collapsedHeight={100_000} horizontalInset={64} emptyText="This article has no text." />
-        </View>
+        <Card>
+          <HtmlText html={article.body} collapsedHeight={100_000} horizontalInset={66} emptyText="This article has no text." />
+        </Card>
 
-        <View className="mx-4 rounded-xl bg-white p-4">
+        <Card>
           <Text className="text-sm font-semibold text-gray-900">Was this helpful?</Text>
           <Text className="mt-0.5 text-xs text-gray-500">
             {typeof article.helpfulCount === 'number' ? `${article.helpfulCount} ${article.helpfulCount === 1 ? 'person' : 'people'} found this helpful.` : ''}
@@ -117,21 +120,20 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
           {voted ? (
             <View className="mt-3 flex-row items-center">
               <Ionicons name="checkmark-circle" size={18} color={palette.green[600]} />
-              <Text className="ml-1.5 text-sm text-gray-800">You marked this as helpful on this device.</Text>
+              <Text className="ml-1.5 text-sm text-gray-700">You marked this as helpful on this device.</Text>
             </View>
           ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: voted === null || vote.isPending, busy: vote.isPending }}
-              disabled={voted === null || vote.isPending}
-              onPress={onVote}
-              className="mt-3 flex-row items-center self-start rounded-lg border border-gray-300 px-4 py-2 active:bg-gray-50"
-            >
-              {vote.isPending ? <ActivityIndicator color={palette.blue[600]} /> : <Ionicons name="thumbs-up-outline" size={18} color={palette.gray[800]} />}
-              <Text className="ml-2 text-sm font-medium text-gray-900">Yes, this helped</Text>
-            </Pressable>
+            <View className="mt-3 self-start">
+              <OutlineButton
+                icon="thumbs-up-outline"
+                label="Yes, this helped"
+                onPress={onVote}
+                disabled={voted === null}
+                loading={vote.isPending}
+              />
+            </View>
           )}
-        </View>
+        </Card>
       </ScrollView>
     );
   }

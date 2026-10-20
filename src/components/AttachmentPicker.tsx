@@ -131,15 +131,18 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             accessibilityLabel={`Attach from ${s.label}`}
             disabled={disabled || busy}
             onPress={() => void run(s.key)}
-            className={`flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 py-2 ${disabled || busy ? 'opacity-50' : 'bg-white'}`}
+            className={`min-h-11 flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white px-2 ${disabled || busy ? 'opacity-50' : 'active:bg-gray-50'}`}
           >
-            <Ionicons name={s.icon} size={16} color={colors.text.body} />
-            <Text className="ml-1 text-sm text-gray-800">{s.label}</Text>
+            <Ionicons name={s.icon} size={18} color={colors.text.body} />
+            {/* Three across a form card: shrink a little rather than wrap at 360 dp or with large text. */}
+            <Text className="ml-1.5 shrink text-sm font-medium text-gray-700" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {s.label}
+            </Text>
           </Pressable>
         ))}
       </View>
       {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} /> : null}
-      <Text className="mt-1 text-xs text-gray-500">
+      <Text className="mt-2 text-xs text-gray-500">
         Up to {MAX_FILES_PER_UPLOAD} files, {formatBytes(MAX_UPLOAD_BYTES)} each. Not allowed: {BLOCKED_EXTENSIONS.join(' ')}
       </Text>
       {files.map((f) => (
@@ -154,7 +157,7 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             accessibilityLabel={`Remove ${f.name}`}
             disabled={disabled}
             onPress={() => onChange(files.filter((x) => x.uri !== f.uri))}
-            hitSlop={8}
+            hitSlop={12}
           >
             <Ionicons name="close-circle" size={20} color={colors.text.muted} />
           </Pressable>

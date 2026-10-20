@@ -13,9 +13,11 @@ import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
-import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
+import {
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
+} from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
-import { palette } from '@/theme';
+import { colors } from '@/theme';
 import type { Approval, ApprovalsStackScreenProps, TicketDetail } from '@/types';
 import {
   APPROVAL_FILTERS, approvalRequester, approvalSubject, entityLabel, shortApprovalId, type ApprovalFilter,
@@ -62,7 +64,7 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
   } else if (!hasData && query.isError) {
     content = <ErrorState error={query.error} title="Couldn't load approvals" onRetry={() => void query.refetch()} />;
   } else if (!hasData) {
-    content = <LoadingSkeleton rows={3} />;
+    content = <LoadingSkeleton variant="approvals" rows={3} />;
   } else {
     content = (
       <FlatList
@@ -91,10 +93,12 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
             icon="checkmark-done-outline"
             title={filter === 'ALL' ? 'Nothing waiting for you' : 'Nothing of this type'}
             message="Approvals assigned to you appear here. Pull down to refresh."
+            actionLabel={filter === 'ALL' ? undefined : 'Show all approvals'}
+            onAction={() => setFilter('ALL')}
           />
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       />
     );
   }
@@ -102,28 +106,19 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader title="Approvals" variant="drawer" />
-      <View className="border-b border-gray-200 bg-white px-4 py-2">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {APPROVAL_FILTERS.map((f) => {
-            const active = f.value === filter;
-            return (
-              <Pressable
-                key={f.value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                onPress={() => setFilter(f.value)}
-                className={`mr-2 rounded-full border px-3 py-1.5 ${active ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'}`}
-              >
-                <Text className={active ? 'text-sm font-medium text-white' : 'text-sm text-gray-800'}>
-                  {f.label}
-                  {hasData ? ` (${counts[f.value]})` : ''}
-                </Text>
-              </Pressable>
-            );
-          })}
+      <OfflineBanner />
+      <View className="border-b border-border bg-white px-4 py-2">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 py-1">
+          {APPROVAL_FILTERS.map((f) => (
+            <FilterChip
+              key={f.value}
+              label={`${f.label}${hasData ? ` (${counts[f.value]})` : ''}`}
+              active={f.value === filter}
+              onPress={() => setFilter(f.value)}
+            />
+          ))}
         </ScrollView>
       </View>
-      <OfflineBanner />
       <QueryBanner error={query.error} hasData={hasData} onRetry={() => void onRefresh()} />
       {content}
     </View>
@@ -146,24 +141,24 @@ function ApprovalCard({
       accessibilityRole="button"
       accessibilityLabel={`${entityLabel(approval.entityType)} approval: ${subject}`}
       onPress={onPress}
-      className="mx-4 mb-3 rounded-xl border border-gray-100 bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80"
     >
-      <View className="mb-1 flex-row items-center">
+      <View className="mb-2 flex-row items-center">
         <View className="rounded-full bg-yellow-100 px-2.5 py-0.5">
           <Text className="text-xs font-medium text-yellow-800">{entityLabel(approval.entityType)}</Text>
         </View>
         <Text className="ml-2 text-xs font-semibold text-gray-500">#{shortApprovalId(approval.id)}</Text>
-        <Text className="ml-auto text-xs text-gray-400">Stage {approval.stage ?? '—'}</Text>
+        <Text className="ml-auto text-xs text-gray-500">Stage {approval.stage ?? '—'}</Text>
       </View>
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {subject}
       </Text>
-      <Text className="mt-1 text-xs text-gray-600" numberOfLines={1}>
+      <Text className="mt-1 text-xs text-gray-500" numberOfLines={1}>
         {requester ? `Requester: ${requester}` : genericTicket ? (ticketLoading ? 'Loading ticket…' : 'Details on open') : 'Requester not shown'}
       </Text>
       <View className="mt-1 flex-row items-center">
-        <Ionicons name="time-outline" size={12} color={palette.gray[400]} />
-        <Text className="ml-1 text-xs text-gray-400" accessibilityLabel={`Requested ${formatDateTime(approval.createdAt)}`}>
+        <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+        <Text className="ml-1 shrink text-xs text-gray-500" accessibilityLabel={`Requested ${formatDateTime(approval.createdAt)}`}>
           Requested {formatRelative(approval.createdAt)} · {formatDateTime(approval.createdAt)}
         </Text>
       </View>

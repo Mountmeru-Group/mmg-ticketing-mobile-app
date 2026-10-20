@@ -22,7 +22,7 @@ export function PriorityBadge({ priority, auto = false }: PriorityBadgeProps) {
       <Text className="text-xs font-medium" style={{ color: tone.fg }} numberOfLines={1}>
         {label}
       </Text>
-      {auto ? <Text className="ml-1 text-[10px] font-semibold uppercase" style={{ color: tone.fg }}>Auto</Text> : null}
+      {auto ? <Text className="ml-1 text-xs font-semibold uppercase" style={{ color: tone.fg }}>Auto</Text> : null}
     </View>
   );
 }

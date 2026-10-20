@@ -12,7 +12,7 @@ import {
 } from '@/components';
 import { useAnnouncements } from '@/hooks';
 import { useUiStore } from '@/store/ui.store';
-import { palette } from '@/theme';
+import { colors } from '@/theme';
 import type { AppDrawerScreenProps } from '@/types';
 
 export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'>) {
@@ -40,7 +40,7 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
   } else if (!hasData && query.isError) {
     content = <ErrorState error={query.error} title="Couldn't load announcements" onRetry={() => void query.refetch()} />;
   } else if (!hasData) {
-    content = <LoadingSkeleton rows={3} />;
+    content = <LoadingSkeleton variant="announcements" rows={3} />;
   } else {
     content = (
       <FlatList
@@ -53,7 +53,7 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
           <EmptyState icon="megaphone-outline" title="No announcements" message="Service Desk announcements for your role will appear here." />
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       />
     );
   }

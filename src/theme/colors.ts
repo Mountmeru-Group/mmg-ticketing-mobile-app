@@ -59,7 +59,8 @@ const status: Record<TicketStatus, BadgeTone> = {
   PENDING_USER_CONFIRM: tone(palette.cyan[100], palette.cyan[700]),
   PENDING_USER_INFO: tone(palette.teal[100], palette.teal[700]),
   RESOLVED: tone(palette.green[100], palette.green[700]),
-  CANCELED: tone(palette.red[100], palette.red[600]),
+  // Web: `text-red-600` (3.95:1 on red-100, below WCAG AA for 12 dp text). One shade darker: 5.3:1.
+  CANCELED: tone(palette.red[100], palette.red[700]),
   CLOSED: tone(palette.zinc[700], palette.white),
 };
 
@@ -108,9 +109,12 @@ export const colors = {
     primary: palette.gray[900],
     /** Form labels and table cells (`text-gray-700`). */
     body: palette.gray[700],
-    /** Labels and captions (`text-gray-500`). */
+    /** Labels, captions, hints and placeholders (`text-gray-500`, 4.8:1 on white). */
     secondary: palette.gray[500],
-    /** Hints, placeholders, chevrons (`text-gray-400`). */
+    /**
+     * Icons, chevrons and disabled marks only (`text-gray-400`). Never text: 2.5:1 on white fails WCAG AA, so the
+     * web's gray-400 hints and placeholders are `secondary` in the app.
+     */
     muted: palette.gray[400],
     inverse: palette.white,
   },
@@ -121,7 +125,8 @@ export const colors = {
     activeFg: palette.white,
     idleFg: palette.gray[600],
     tabActive: BRAND_RED,
-    tabIdle: palette.gray[400],
+    /** Web: `text-gray-400`, 2.5:1 for the tab label (fails WCAG AA). gray-500 is 4.8:1. */
+    tabIdle: palette.gray[500],
   },
 
   status,
