@@ -85,6 +85,15 @@ export function availableTicketFilters(role: UserRole): TicketNamedFilter[] {
   return isAgentOrAdmin(role) ? all : all.filter((f) => f !== 'UNASSIGNED');
 }
 
+/**
+ * Whether the list may apply this filter for this role: the drop-down filters above, plus the Home-tile filters
+ * (which never appear in the drop-down). Unassigned, in either form, stays ADMIN/AGENT only.
+ */
+export function isTicketFilterAllowed(role: UserRole, filter: TicketNamedFilter): boolean {
+  if (isHomeTileFilter(filter)) return filter !== 'UNASSIGNED_KPI' || isAgentOrAdmin(role);
+  return availableTicketFilters(role).includes(filter);
+}
+
 export function ticketFilterQuery(
   filter: TicketNamedFilter,
   me: Pick<AuthUser, 'id' | 'role'>,

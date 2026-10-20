@@ -49,19 +49,17 @@ import {
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
-import type { Ticket, TicketStackScreenProps, TicketStatus } from '@/types';
+import type { Ticket, TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
 import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
-import { isAgentOrAdmin, isStaff } from '@/utils/roles';
-import { canAssignToSelf } from '@/utils/session';
+import { bulkActions, inlineStatusTransitions, ticketsTitle, type BulkAction } from '@/utils/permissions';
+import { isStaff } from '@/utils/roles';
 import {
   TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, countrySelectorMode, isHomeTileFilter,
-  listCountryParam, normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
+  isTicketFilterAllowed, listCountryParam, normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
-import {
-  BULK_ACTION_LIMIT, canChangeStatus, getAvailableTransitions, isResolvedLocked, requiresClosureForm,
-} from '@/utils/ticket-rules';
+import { BULK_ACTION_LIMIT, isResolvedLocked, requiresClosureForm } from '@/utils/ticket-rules';
 import { bulkPickUpMessage, statusChangeMessage } from '@/utils/writeCopy';
 
 const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
@@ -86,8 +84,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
 
   const filters = availableTicketFilters(role);
   // Home tile filters are valid here too, except Unassigned for roles that can't use it (ADMIN/AGENT only).
-  const tileFilterAllowed = isHomeTileFilter(ticketFilter) && (ticketFilter !== 'UNASSIGNED_KPI' || isAgentOrAdmin(role));
-  const activeFilter: TicketNamedFilter = filters.includes(ticketFilter) || tileFilterAllowed ? ticketFilter : 'ALL';
+  const activeFilter: TicketNamedFilter = isTicketFilterAllowed(role, ticketFilter) ? ticketFilter : 'ALL';
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState<string | undefined>(undefined);
@@ -156,8 +153,10 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         : (countryName(countries.data?.find((c) => c.id === ticketCountryId)) ?? 'Selected country');
 
   // ── Multi-select (08 §4.2) ─────────────────────────────────
-  const staff = isStaff(role);
-  const agentOrAdmin = isAgentOrAdmin(role);
+  // The bar's buttons, and whether a long-press selects at all, come from bulkActions() (utils/permissions.ts, pinned
+  // per role by tests/rbac): staff only; Pick up / Assign for ADMIN and AGENT; Close for every role that changes status.
+  const bulk = bulkActions(user);
+  const canSelect = bulk.length > 0;
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const selectionMode = selected.size > 0;
   const clearSelection = useCallback(() => setSelected(new Set()), []);
@@ -199,7 +198,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   const onStatusPress = useCallback((t: Ticket) => setStatusFor(t), []);
 
   async function applyTransition(t: Ticket, target: TicketStatus) {
-    const transition = getAvailableTransitions(role, t.status).find((x) => x.target === target);
+    const transition = inlineStatusTransitions(role, t.status).find((x) => x.target === target);
     if (!transition) return;
     if (requiresClosureForm(target)) {
       navigation.navigate('StatusClosure', { ticketIds: [t.id], target }); // closure fields are required (05 §A.2)
@@ -220,7 +219,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   }
 
   // ── Bulk pick up (runs here; Assign and Close open M7 / M6) ─
-  const bulk = useBulkRunner();
+  const runner = useBulkRunner();
   async function bulkPickUp() {
     if (!user) return;
     const me = user;
@@ -246,7 +245,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     });
     if (!ok) return;
     const byId = new Map(selectedTickets.map((t) => [t.id, t]));
-    await bulk.run('Picking up tickets', targets, async (id) => {
+    await runner.run('Picking up tickets', targets, async (id) => {
       const t = byId.get(id);
       if (!t) throw new Error('Ticket not loaded');
       assertAssignment(role, t.status, me.id); // same guards as a single assignment,
@@ -263,16 +262,21 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     else navigation.navigate('StatusClosure', { ticketIds, target: 'CLOSED' });
     clearSelection();
   }
+  const onBulk: Record<BulkAction, () => void> = {
+    pickup: () => void once(bulkPickUp),
+    assign: () => openBulk('AssignPicker'),
+    close: () => openBulk('StatusClosure'),
+  };
 
   const renderItem = useCallback(
     ({ item }: { item: Ticket }) => {
-      const interactive = canChangeStatus(role) && getAvailableTransitions(role, item.status).length > 0;
+      const interactive = inlineStatusTransitions(role, item.status).length > 0;
       return (
         <TicketCard
           ticket={item}
           role={role}
           onPress={onCardPress}
-          onLongPress={staff ? toggle : undefined}
+          onLongPress={canSelect ? toggle : undefined}
           selectionMode={selectionMode}
           selected={selected.has(item.id)}
           onStatusPress={interactive ? onStatusPress : undefined}
@@ -280,7 +284,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         />
       );
     },
-    [role, onCardPress, staff, toggle, selectionMode, selected, onStatusPress, statusBusyId],
+    [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
   );
 
   let content: ReactNode;
@@ -347,7 +351,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
           </View>
         </View>
       ) : (
-        <ScreenHeader title={role === 'END_USER' ? 'My Tickets' : 'Tickets'} variant="drawer" />
+        <ScreenHeader title={ticketsTitle(role)} variant="drawer" />
       )}
       <OfflineBanner />
 
@@ -439,11 +443,11 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
       {content}
 
       {selectionMode ? (
-        // Selection action bar (08 §4.2). Pick up / Assign: ADMIN and AGENT. Close: staff.
+        // Selection action bar (08 §4.2): exactly the buttons bulkActions() returns.
         <View style={{ paddingBottom: insets.bottom + 8 }} className="absolute bottom-0 left-0 right-0 flex-row gap-2 border-t border-border bg-white px-4 pt-3">
-          {agentOrAdmin && canAssignToSelf(user) ? <BarButton icon="hand-left-outline" label="Pick up" onPress={() => void once(bulkPickUp)} /> : null}
-          {agentOrAdmin ? <BarButton icon="person-add-outline" label="Assign" onPress={() => openBulk('AssignPicker')} /> : null}
-          {canChangeStatus(role) ? <BarButton icon="checkmark-done-outline" label="Close" onPress={() => openBulk('StatusClosure')} /> : null}
+          {bulk.map((action) => (
+            <BarButton key={action} icon={BULK_BUTTONS[action].icon} label={BULK_BUTTONS[action].label} onPress={onBulk[action]} />
+          ))}
         </View>
       ) : (
         // "+" FAB → M8 Create ticket (04 §2.1).
@@ -461,7 +465,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
       <OptionSheet
         visible={statusFor !== null}
         title={statusFor ? `Change status · #${statusFor.ticketNumber}` : 'Change status'}
-        options={(statusFor ? getAvailableTransitions(role, statusFor.status) : []).map((t) => ({
+        options={(statusFor ? inlineStatusTransitions(role, statusFor.status) : []).map((t) => ({
           value: t.target,
           label: t.label,
           description: requiresClosureForm(t.target) ? 'Opens the closure form' : undefined,
@@ -474,10 +478,10 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         onClose={() => setStatusFor(null)}
       />
       <BulkProgressModal
-        progress={bulk.progress}
-        onStop={bulk.stop}
+        progress={runner.progress}
+        onStop={runner.stop}
         onClose={() => {
-          bulk.reset();
+          runner.reset();
           clearSelection();
         }}
       />
@@ -516,7 +520,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
 function ListEmpty({
   role, filter, search, onClearSearch, onShowAll, onCreate,
 }: {
-  role: string;
+  role: UserRole;
   filter: TicketNamedFilter;
   search: string | undefined;
   onClearSearch: () => void;
@@ -545,7 +549,7 @@ function ListEmpty({
       />
     );
   }
-  return role === 'END_USER' ? (
+  return !isStaff(role) ? (
     <EmptyState
       icon="ticket-outline"
       title="You haven't raised any tickets yet"
@@ -601,6 +605,12 @@ function ListFooter({
   }
   return null;
 }
+
+const BULK_BUTTONS: Record<BulkAction, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  pickup: { label: 'Pick up', icon: 'hand-left-outline' },
+  assign: { label: 'Assign', icon: 'person-add-outline' },
+  close: { label: 'Close', icon: 'checkmark-done-outline' },
+};
 
 function BarButton({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
