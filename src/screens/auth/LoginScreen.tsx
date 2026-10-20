@@ -3,22 +3,17 @@
 //   browser, then AUTH-P2. The session goes to setSession(); RootNavigator then switches to the app.
 // - Every failure reason has its own message (05 §A.13 wording where one applies) and a Retry only where trying
 //   again can help. Closing Microsoft's page just returns here: no error, no spinner.
+// - The attempt itself, the messages and the stale-banner rule are in ./signInAttempt.ts; this file only renders.
 // - The environment badge stays visible (04 M1).
 // TODO(later phase):
 // - AUTH-1 decides which buttons show; `microsoftEnabled` describes the WEB SSO only (01 AUTH-1).
 // - SYS-1 health check on start / after a network error.
 // - Never: password form (production is SSO only), /auth/test-login, WebView cookie lifting (02 §6).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  MicrosoftSignInError,
-  signInWithMicrosoft,
-  type MicrosoftSignInFailure,
-  type MicrosoftSignInResult,
-} from '@/api/auth.api';
 import { useIsOffline } from '@/api/network';
 import { OfflineBanner } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
@@ -26,78 +21,7 @@ import { ENVIRONMENT_LABEL } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import type { AuthStackScreenProps } from '@/types';
-
-/** `storage`: signed in, but SecureStore refused the session. */
-type FailureReason = MicrosoftSignInFailure | 'storage';
-
-interface Failure {
-  reason: FailureReason;
-  status: number | null;
-  /** Developer detail from MicrosoftSignInError. Never holds a token. Shown in __DEV__ builds only. */
-  detail: string;
-}
-
-const FAILURE_COPY: Record<FailureReason, { title: string; message: string; retryLabel?: string }> = {
-  // ── AUTH-P2's own answers: 401, 403, 400 (500 is `server`, below) ──
-  'token-rejected': {
-    title: 'Sign-in was refused',
-    message:
-      'The Service Desk did not accept your Microsoft sign-in. Make sure you chose your Mount Meru work account, then ' +
-      'try again. If it keeps happening, contact IT support.',
-    retryLabel: 'Try again',
-  },
-  'account-disabled': {
-    title: 'Account deactivated',
-    message: 'Your account has been deactivated. Contact IT support.', // 05 §A.13 account_deactivated
-  },
-  'bad-request': {
-    title: "Sign-in request wasn't accepted",
-    message:
-      "The Service Desk couldn't read this app's sign-in request, so you were not signed in. Please report this to IT " +
-      'support.',
-  },
-  // ── the rest ──
-  'endpoint-missing': {
-    title: "App sign-in isn't available yet",
-    message:
-      "Microsoft accepted your sign-in, but this Service Desk server can't sign in the mobile app yet. Your account " +
-      'is fine. Try again after the Service Desk has been updated.',
-  },
-  network: {
-    title: "Can't connect",
-    message: "Couldn't reach Microsoft or the Service Desk. Check your connection and try again.",
-    retryLabel: 'Try again',
-  },
-  'not-configured': {
-    title: 'Microsoft sign-in is not configured.', // 05 §A.13 oauth_not_configured
-    message: 'This build of the app is missing its Microsoft sign-in settings. Contact IT support.',
-  },
-  microsoft: {
-    title: 'Microsoft sign-in failed',
-    message: 'Microsoft sign-in failed. Please try again.', // 05 §A.13 oauth_failed
-    retryLabel: 'Try again',
-  },
-  'rate-limited': {
-    title: 'Too many attempts',
-    message: 'There have been too many sign-in attempts from this network. Wait a few minutes, then try again.',
-  },
-  'unexpected-response': {
-    title: "Sign-in couldn't be completed",
-    message:
-      "The Service Desk replied in a way this version of the app doesn't understand, so you were not signed in. " +
-      'Please report this to IT support.',
-  },
-  server: {
-    title: 'The Service Desk had a problem',
-    message: "The Service Desk couldn't complete your sign-in. Try again in a few minutes.",
-    retryLabel: 'Try again',
-  },
-  storage: {
-    title: "Couldn't save your sign-in",
-    message: "You signed in, but this phone couldn't store the session securely. Try again.",
-    retryLabel: 'Try again',
-  },
-};
+import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
 /** The redirect URI this build sends to Microsoft (src/config/auth.config.ts), for the __DEV__ hint. */
 function describeRedirectUri(): string {
@@ -110,43 +34,38 @@ function describeRedirectUri(): string {
 
 export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
   const signOutMessage = useAuthStore((s) => s.signOutMessage);
-  const setSession = useAuthStore((s) => s.setSession);
   const offline = useIsOffline();
   const insets = useSafeAreaInsets();
   const [signingIn, setSigningIn] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   // `disabled` applies only after a re-render: a fast double-tap must not open Microsoft's page twice.
   const once = useSingleFlight();
+  // Read by the AppState listener, which must not re-subscribe on every render.
+  const inFlight = useRef(false);
+
+  // An old failure banner must not greet someone reopening the app as if it had just failed (signInAttempt.ts).
+  useEffect(() => {
+    const isStale = createStaleFailureGuard(() => inFlight.current);
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (isStale(next)) setFailure(null);
+    });
+    return () => subscription.remove();
+  }, []);
 
   async function signIn() {
     setFailure(null);
     setSigningIn(true);
-
-    let result: MicrosoftSignInResult;
+    inFlight.current = true;
+    let outcome: SignInOutcome;
     try {
-      result = await signInWithMicrosoft();
-    } catch (e) {
-      setFailure(
-        e instanceof MicrosoftSignInError
-          ? { reason: e.reason, status: e.status, detail: e.detail }
-          : { reason: 'microsoft', status: null, detail: 'Unexpected error outside the sign-in flow' },
-      );
-      setSigningIn(false);
-      return;
+      outcome = await attemptSignIn();
+    } finally {
+      inFlight.current = false;
     }
-    if (result.type === 'cancelled') {
-      setSigningIn(false); // closed Microsoft's page: back to the button, nothing to report
-      return;
-    }
-
-    try {
-      // The 8-hour rule runs from now (issuedAt), as before; AUTH-P2's expiresAt is not used yet (02 §5.4).
-      await setSession({ token: result.session.token, user: result.session.user });
-      // RootNavigator switches to the app; this screen unmounts.
-    } catch {
-      setFailure({ reason: 'storage', status: null, detail: 'SecureStore refused to save the session' });
-      setSigningIn(false);
-    }
+    // signed-in: RootNavigator switches to the app and this screen unmounts, so the spinner stays until then.
+    if (outcome.type === 'signed-in') return;
+    if (outcome.type === 'failed') setFailure(outcome.failure);
+    setSigningIn(false); // cancelled: closed Microsoft's page, back to the button with nothing to report
   }
 
   const startSignIn = () => void once(signIn);
