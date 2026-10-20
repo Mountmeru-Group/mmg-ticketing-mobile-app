@@ -1,4 +1,4 @@
-// Signed-in shell: a side drawer wrapping the bottom tabs (08 §3). Profile lives in the drawer header.
+// Signed-in shell: a side drawer wrapping the bottom tabs (08 §3). Profile opens from the drawer's account card.
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
 import { AnnouncementsScreen } from '@/screens/dashboard/AnnouncementsScreen';

@@ -11,7 +11,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
@@ -261,6 +261,9 @@ function Section({
   );
 }
 
+/** Space between KPI tiles, both ways (S1: cards 12 dp apart). */
+const TILE_GAP = 12;
+
 function TileGrid({
   tiles, loading, error, paused, onRetry,
 }: {
@@ -270,8 +273,21 @@ function TileGrid({
   paused: boolean;
   onRetry: () => void;
 }) {
-  // The web's KPI card (DashboardPage.tsx KPICard): white card, a coloured square with a white icon, the label in
-  // `text-sm text-gray-500`, the count in `text-2xl font-bold`. Two columns, 12 dp apart both ways.
+  // Two tiles per row, as explicit rows with widths in dp. The tiles used to size themselves with `w-[48%]` in a
+  // wrapping row. That class compiles to `width: '48%'`, yet on a device the tiles came out as wide as their content
+  // (five to a row) and the label beside the icon collapsed to one letter. Nothing here depends on a percentage or on
+  // wrapping now.
+  // - Width: the grid's measured width (until the first layout, the window minus the `mx-4` gutters), minus one gap.
+  // - An odd last tile (5 tiles: AGENT outside triage, L2_MANAGER) spans the row, so no tile is left alone half-width.
+  // - A row is as tall as its taller tile (the tiles stretch) and each count sits at the tile's foot, so the two
+  //   counts line up when one label wraps.
+  const { width: windowWidth } = useWindowDimensions();
+  const [gridWidth, setGridWidth] = useState<number>();
+  const width = gridWidth ?? windowWidth - 32;
+  const half = (width - TILE_GAP) / 2;
+  const rows: Tile[][] = [];
+  for (let i = 0; i < tiles.length; i += 2) rows.push(tiles.slice(i, i + 2));
+
   return (
     <View>
       {error ? (
@@ -280,37 +296,59 @@ function TileGrid({
         </View>
       ) : null}
       {paused ? <Text className="mx-4 mb-2 text-xs text-gray-500">Counts load when you reconnect.</Text> : null}
-      <View className="mx-4 flex-row flex-wrap gap-3">
-        {tiles.map((t) => (
-          <Pressable
-            key={t.key}
-            accessibilityRole="button"
-            accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}` : ''}. Opens the list`}
-            onPress={t.onPress}
-            className="w-[48%] rounded-xl border border-border bg-white p-4 active:opacity-80"
-          >
-            <View className="flex-row items-center">
-              <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: t.color }}>
-                <Ionicons name={t.icon} size={18} color={colors.text.inverse} />
-              </View>
-              <Text className="ml-2 flex-1 text-sm text-gray-500" numberOfLines={2}>
-                {t.label}
-              </Text>
-            </View>
-            {t.value !== undefined ? (
-              <Text className="mt-2 text-2xl font-bold text-gray-900">{t.value}</Text>
-            ) : loading ? (
-              <View className="mt-2 py-1">
-                <Skeleton className="h-6 w-12" />
-              </View>
-            ) : (
-              <Text className="mt-2 text-sm font-medium text-blue-700">View tickets</Text>
-            )}
-            {t.hint && t.value !== undefined ? <Text className="text-xs text-gray-500">{t.hint}</Text> : null}
-          </Pressable>
+      <View className="mx-4" style={{ rowGap: TILE_GAP }} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
+        {rows.map((row) => (
+          <View key={row.map((t) => t.key).join('+')} className="flex-row" style={{ columnGap: TILE_GAP }}>
+            {row.map((t) => (
+              <KpiTile key={t.key} tile={t} width={row.length === 2 ? half : width} loading={loading} />
+            ))}
+          </View>
         ))}
       </View>
     </View>
+  );
+}
+
+function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loading: boolean }) {
+  // The web's KPI card (DashboardPage.tsx KPICard): white card, a coloured square with a white icon, the label in
+  // `text-sm text-gray-500`, the count in `text-2xl font-bold`. The web puts the label beside the square; a phone tile
+  // is too narrow for that (about 80 dp at 360 dp), so the label goes under the square and gets the full width.
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}` : ''}. Opens the list`}
+      onPress={t.onPress}
+      style={{ width }}
+      className="min-h-32 justify-between rounded-xl border border-border bg-white p-4 active:opacity-80"
+    >
+      <View>
+        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: t.color }}>
+          <Ionicons name={t.icon} size={18} color={colors.text.inverse} />
+        </View>
+        {/* Never truncated, and a word never breaks: each word may take a line (two at most), and a word still too wide
+            shrinks to fit instead ("Unassigned" at 200 % text on a 360 dp phone: about 87 %). No minimumFontScale, so the
+            shrink can always finish and nothing is cut. */}
+        <Text
+          className="mt-2 text-sm text-gray-500"
+          numberOfLines={Math.min(t.label.split(' ').length, 2)}
+          adjustsFontSizeToFit
+        >
+          {t.label}
+        </Text>
+        {t.hint && t.value !== undefined ? <Text className="text-xs text-gray-500">{t.hint}</Text> : null}
+      </View>
+      {t.value !== undefined ? (
+        <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>
+          {t.value}
+        </Text>
+      ) : loading ? (
+        <View className="mt-1 h-8 justify-center">
+          <Skeleton className="h-6 w-12" />
+        </View>
+      ) : (
+        <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>
+      )}
+    </Pressable>
   );
 }
 

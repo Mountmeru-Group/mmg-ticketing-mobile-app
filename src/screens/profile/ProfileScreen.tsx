@@ -1,4 +1,4 @@
-// M10 Profile & settings — opened from the drawer header and "Settings" (04 §2.1 M10, 08 §3.2).
+// M10 Profile & settings — opened from the drawer's account card and "Settings" (04 §2.1 M10, 08 §3.2).
 // - Read: email, role, country from the signed-in user (the AUTH-2 /auth/me answer stored at sign-in); name, phone,
 //   department, timezone from USR-1 (AUTH-2 doesn't carry them, 01 AUTH-2).
 // - Edit: name, phone, department, timezone only (USR-2 allow-list in users.api). Never countryId (05 C.10), role or
