@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { colors } from '@/theme';
+
 export interface SheetOption<T extends string> {
   value: T;
   label: string;
@@ -49,10 +51,10 @@ export function OptionSheet<T extends string>({
                   className="flex-row items-center px-4 py-3 active:bg-gray-50"
                 >
                   <View className="flex-1">
-                    <Text className={`text-base ${active ? 'font-semibold text-blue-700' : 'text-gray-900'}`}>{option.label}</Text>
+                    <Text className={`text-base ${active ? 'font-semibold text-primary' : 'text-gray-900'}`}>{option.label}</Text>
                     {option.description ? <Text className="text-xs text-gray-500">{option.description}</Text> : null}
                   </View>
-                  {active ? <Ionicons name="checkmark" size={20} color="#1d4ed8" /> : null}
+                  {active ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
                 </Pressable>
               );
             })}

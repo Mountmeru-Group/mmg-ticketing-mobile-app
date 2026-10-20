@@ -6,6 +6,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDebouncedValue, useUserSearch } from '@/hooks';
+import { colors } from '@/theme';
 import type { UserRole } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { LookupError } from './Form';
@@ -69,12 +70,12 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
       <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-3">
         <Text className="px-4 pb-2 text-base font-semibold text-gray-900" accessibilityRole="header">{title}</Text>
         <View className="mx-4 mb-2 h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
-          <Ionicons name="search" size={16} color="#6b7280" />
+          <Ionicons name="search" size={16} color={colors.text.secondary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder={searchRoles !== undefined ? 'Name or email (2+ letters)' : 'Filter by name or email'}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.text.muted}
             autoCapitalize="none"
             autoCorrect={false}
             className="ml-2 flex-1 text-base text-gray-900"
@@ -88,7 +89,7 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
           ))}
           {local.map(row)}
           {remoteOnly.map((r) => row({ id: r.id, displayName: r.displayName, email: r.email }))}
-          {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color="#2563eb" /> : null}
+          {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.primary} /> : null}
           {/* A failed search is said as such, never shown as "No one matches". */}
           <View className="mx-4 mt-2">
             <LookupError query={remote} what="people" />

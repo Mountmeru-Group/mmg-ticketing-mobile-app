@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { colors, palette } from '@/theme';
 import type { Ticket, UserRole } from '@/types';
 import { formatDisplayName, formatRelative, statusLabel } from '@/utils/format';
 import { isStaff } from '@/utils/roles';
@@ -55,7 +56,7 @@ function TicketCardImpl({
     >
       <View className="mb-1 flex-row items-center">
         {selectionMode ? (
-          <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? '#2563eb' : '#9ca3af'} style={{ marginRight: 6 }} />
+          <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? palette.blue[600] : colors.text.muted} style={{ marginRight: 6 }} />
         ) : null}
         <Text className="text-xs font-semibold text-gray-500">#{ticket.ticketNumber ?? '—'}</Text>
         <Text className="ml-2 flex-1 text-xs text-gray-400" numberOfLines={1}>
@@ -85,9 +86,9 @@ function TicketCardImpl({
           >
             <StatusBadge status={ticket.status} />
             {statusBusy ? (
-              <ActivityIndicator size="small" color="#2563eb" style={{ marginLeft: 4 }} />
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
             ) : (
-              <Ionicons name="chevron-down" size={14} color="#4b5563" style={{ marginLeft: 2 }} />
+              <Ionicons name="chevron-down" size={14} color={palette.gray[600]} style={{ marginLeft: 2 }} />
             )}
           </Pressable>
         ) : (

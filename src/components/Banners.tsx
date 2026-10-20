@@ -8,6 +8,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { describeError, isOfflineError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
+import { palette } from '@/theme';
 
 function Banner({
   tone, title, detail, onRetry,
@@ -21,7 +22,7 @@ function Banner({
   const textClass = amber ? 'text-amber-900' : 'text-red-800';
   return (
     <View accessibilityRole="alert" className={`flex-row items-center px-4 py-2 ${amber ? 'bg-amber-100' : 'bg-red-50'}`}>
-      <Ionicons name={amber ? 'cloud-offline-outline' : 'alert-circle-outline'} size={18} color={amber ? '#92400e' : '#b91c1c'} />
+      <Ionicons name={amber ? 'cloud-offline-outline' : 'alert-circle-outline'} size={18} color={amber ? palette.amber[800] : palette.red[700]} />
       <View className="ml-2 flex-1">
         <Text className={`text-sm font-semibold ${textClass}`}>{title}</Text>
         <Text className={`text-xs ${textClass}`}>{detail}</Text>

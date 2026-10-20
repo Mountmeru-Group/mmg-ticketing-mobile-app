@@ -16,6 +16,7 @@ import { listTickets } from '@/api/tickets.api';
 import { EmptyState, ErrorState, OfflineBanner, OfflineState, ScreenHeader } from '@/components';
 import { queryKeys, type TicketListKeyParams } from '@/hooks/queryKeys';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type { Ticket, TicketStackScreenProps } from '@/types';
 import { APP_ORIGIN, parseTicketLink } from '@/utils/deep-links';
 import { roleDefaultTicketQuery } from '@/utils/ticket-filters';
@@ -109,9 +110,9 @@ export function TicketLinkScreen({ navigation, route }: TicketStackScreenProps<'
 function Resolving({ text }: { text: string }) {
   return (
     <View className="flex-1 items-center justify-center px-8">
-      <ActivityIndicator size="large" color="#2563eb" />
+      <ActivityIndicator size="large" color={palette.blue[600]} />
       <View className="mt-3 flex-row items-center">
-        <Ionicons name="link-outline" size={16} color="#6b7280" />
+        <Ionicons name="link-outline" size={16} color={palette.gray[500]} />
         <Text className="ml-1.5 text-sm text-gray-600">{text}</Text>
       </View>
     </View>

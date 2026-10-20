@@ -6,15 +6,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { colors, palette } from '@/theme';
 import type { TicketTaskEmbedded } from '@/types';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
 import { formatDueDay, isTaskOverdue } from '@/utils/tasks';
 
 export const TASK_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  OPEN: { name: 'ellipse-outline', color: '#6b7280' },
-  IN_PROGRESS: { name: 'time-outline', color: '#ca8a04' },
-  COMPLETED: { name: 'checkmark-circle', color: '#16a34a' },
-  CANCELLED: { name: 'close-circle-outline', color: '#9ca3af' },
+  OPEN: { name: 'ellipse-outline', color: palette.gray[500] },
+  IN_PROGRESS: { name: 'time-outline', color: palette.yellow[600] },
+  COMPLETED: { name: 'checkmark-circle', color: palette.green[600] },
+  CANCELLED: { name: 'close-circle-outline', color: palette.gray[400] },
 };
 
 export function taskStatusLabel(status: string): string {
@@ -49,9 +50,9 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
       className="mr-3 h-6 w-6 items-center justify-center"
     >
       {toggling ? (
-        <ActivityIndicator size="small" color="#2563eb" />
+        <ActivityIndicator size="small" color={colors.primary} />
       ) : (
-        <Ionicons name={done ? 'checkbox' : 'square-outline'} size={22} color={done ? '#16a34a' : '#4b5563'} />
+        <Ionicons name={done ? 'checkbox' : 'square-outline'} size={22} color={done ? palette.green[600] : palette.gray[600]} />
       )}
     </Pressable>
   ) : (
@@ -100,7 +101,7 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
           className="flex-1 flex-row items-center active:opacity-70"
         >
           {body}
-          <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+          <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
         </Pressable>
       ) : (
         body

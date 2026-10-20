@@ -3,6 +3,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, Text, View } from 'react-native';
 
+import { colors } from '@/theme';
 import type { DashboardRecentTicket, Ticket } from '@/types';
 import { formatDisplayName, formatRelative } from '@/utils/format';
 import { PriorityBadge } from './PriorityBadge';
@@ -52,7 +53,7 @@ export function RecentTicketRow({ ticket, showRequester, onPress, last = false }
           {who}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+      <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
     </Pressable>
   );
 }

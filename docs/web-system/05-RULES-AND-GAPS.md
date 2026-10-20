@@ -416,6 +416,9 @@ WITHIN_SLA 'Within SLA' green · DUE_SOON 'Due Soon' yellow · BREACHED 'Breache
 
 **Approval chip:** APPROVED green, REJECTED red, CANCELLED gray, else yellow.
 
+**Exact shades and brand colours** (Phase B, 2026-10-20): `docs/brand/WEB-TOKENS.md` lists every badge pair (`<hue>-100` background, `<hue>-700` text, except CANCELED `red-600` and CLOSED `zinc-700`/white), the KPI tile colours and the brand red `#D21121` / yellow `#FFCC00`, each with its web source line. The mobile copies live in `src/theme/colors.ts`.
+- Web brand inconsistencies (report only, R3): `index.html:7` and `public/manifest.webmanifest:5` still set `theme-color` to blue `#2563eb`; `components/ui/Button.tsx:12` gives the red primary button `hover:bg-blue-600`.
+
 **Name formatting** (`TicketsListPage.tsx:21-26`): if a display name contains `@`, take the part before `@`, turn `[._-]+` into spaces, and title-case it.
 
 **Dates** (`FE:utils/formatDate.ts`)

@@ -6,6 +6,7 @@ import { ActivityIndicator, AppState, View } from 'react-native';
 
 import { endSession } from '@/api/client';
 import { SESSION_ENDED_MESSAGE, isSessionExpired, useAuthStore } from '@/store/auth.store';
+import { colors } from '@/theme';
 import type { RootStackParamList } from '@/types';
 import { AppDrawer } from './AppDrawer';
 import { AuthStack } from './AuthStack';
@@ -39,7 +40,7 @@ export function RootNavigator() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
+import { palette } from '@/theme';
 import type { Approval, ApprovalsStackScreenProps, TicketDetail } from '@/types';
 import {
   APPROVAL_FILTERS, approvalRequester, approvalSubject, entityLabel, shortApprovalId, type ApprovalFilter,
@@ -93,7 +94,7 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
           />
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       />
     );
   }
@@ -161,7 +162,7 @@ function ApprovalCard({
         {requester ? `Requester: ${requester}` : genericTicket ? (ticketLoading ? 'Loading ticket…' : 'Details on open') : 'Requester not shown'}
       </Text>
       <View className="mt-1 flex-row items-center">
-        <Ionicons name="time-outline" size={12} color="#9ca3af" />
+        <Ionicons name="time-outline" size={12} color={palette.gray[400]} />
         <Text className="ml-1 text-xs text-gray-400" accessibilityLabel={`Requested ${formatDateTime(approval.createdAt)}`}>
           Requested {formatRelative(approval.createdAt)} · {formatDateTime(approval.createdAt)}
         </Text>

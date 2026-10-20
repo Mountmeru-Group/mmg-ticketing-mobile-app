@@ -22,6 +22,7 @@ import {
 } from '@/components';
 import { useDiscardGuard, useSaveTask, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import { TASK_STATUSES, type TaskBody, type TaskScreenProps, type TaskStatus, type UserRole } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
@@ -176,7 +177,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             editable={!save.isPending}
             maxLength={255}
             placeholder="What needs doing"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             accessibilityLabel="Title"
             className="mb-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
@@ -188,7 +189,7 @@ export function TaskEditorScreen({ navigation, route }: TaskScreenProps<'TaskEdi
             multiline
             textAlignVertical="top"
             placeholder="Optional details"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             accessibilityLabel="Description"
             className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />

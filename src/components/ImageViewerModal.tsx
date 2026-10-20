@@ -7,6 +7,7 @@ import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AuthenticatedRequest } from '@/api/attachments.api';
+import { colors } from '@/theme';
 
 export function ImageViewerModal({
   request, title, onClose, onShare, sharing = false,
@@ -26,7 +27,7 @@ export function ImageViewerModal({
       <View className="flex-1 bg-black" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <View className="h-14 flex-row items-center px-2">
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} className="h-10 w-10 items-center justify-center">
-            <Ionicons name="close" size={26} color="#ffffff" />
+            <Ionicons name="close" size={26} color={colors.text.inverse} />
           </Pressable>
           <Text className="ml-2 flex-1 text-base text-white" numberOfLines={1}>{title}</Text>
           {onShare ? (
@@ -39,7 +40,7 @@ export function ImageViewerModal({
               hitSlop={8}
               className="h-10 w-10 items-center justify-center"
             >
-              {sharing ? <ActivityIndicator color="#ffffff" /> : <Ionicons name="share-social-outline" size={22} color="#ffffff" />}
+              {sharing ? <ActivityIndicator color={colors.text.inverse} /> : <Ionicons name="share-social-outline" size={22} color={colors.text.inverse} />}
             </Pressable>
           ) : null}
         </View>
@@ -54,7 +55,7 @@ export function ImageViewerModal({
               accessibilityLabel={title}
             />
           ) : null}
-          {state === 'loading' ? <ActivityIndicator style={{ position: 'absolute' }} color="#ffffff" size="large" /> : null}
+          {state === 'loading' ? <ActivityIndicator style={{ position: 'absolute' }} color={colors.text.inverse} size="large" /> : null}
           {state === 'error' ? (
             <Text style={{ position: 'absolute' }} className="px-8 text-center text-sm text-white">
               Couldn't load this image. Close and try again; if it keeps failing, your session may have ended.

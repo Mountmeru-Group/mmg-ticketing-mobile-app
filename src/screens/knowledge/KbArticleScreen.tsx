@@ -12,6 +12,7 @@ import { ApiClientError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import { useKbArticle, useKbHelpfulVote, useKbVoted, useSingleFlight } from '@/hooks';
+import { palette } from '@/theme';
 import type { KnowledgeStackScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDate, formatDisplayName } from '@/utils/format';
@@ -81,7 +82,7 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
     content = (
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       >
         <View className="mx-4 mb-3 rounded-xl bg-white p-4">
           {article.category?.name ? <Text className="mb-1 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
@@ -115,7 +116,7 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
           </Text>
           {voted ? (
             <View className="mt-3 flex-row items-center">
-              <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+              <Ionicons name="checkmark-circle" size={18} color={palette.green[600]} />
               <Text className="ml-1.5 text-sm text-gray-800">You marked this as helpful on this device.</Text>
             </View>
           ) : (
@@ -126,7 +127,7 @@ export function KbArticleScreen({ route }: KnowledgeStackScreenProps<'KbArticle'
               onPress={onVote}
               className="mt-3 flex-row items-center self-start rounded-lg border border-gray-300 px-4 py-2 active:bg-gray-50"
             >
-              {vote.isPending ? <ActivityIndicator color="#2563eb" /> : <Ionicons name="thumbs-up-outline" size={18} color="#1f2937" />}
+              {vote.isPending ? <ActivityIndicator color={palette.blue[600]} /> : <Ionicons name="thumbs-up-outline" size={18} color={palette.gray[800]} />}
               <Text className="ml-2 text-sm font-medium text-gray-900">Yes, this helped</Text>
             </Pressable>
           )}

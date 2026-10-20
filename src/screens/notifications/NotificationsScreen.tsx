@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, Q
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useUnreadCount,
 } from '@/hooks';
+import { palette } from '@/theme';
 import type { MainTabScreenProps, Notification } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatRelative } from '@/utils/format';
@@ -134,7 +135,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
       className="px-2 py-1"
     >
       {markAll.isPending ? (
-        <ActivityIndicator color="#2563eb" />
+        <ActivityIndicator color={palette.blue[600]} />
       ) : (
         <Text className={`text-sm font-medium ${unreadCount === 0 ? 'text-gray-400' : 'text-blue-700'}`}>Mark all read</Text>
       )}
@@ -169,7 +170,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         )}
         ListHeaderComponent={
           <View className="mx-4 mb-3 flex-row items-start rounded-lg bg-blue-50 p-3">
-            <Ionicons name="information-circle-outline" size={16} color="#1d4ed8" />
+            <Ionicons name="information-circle-outline" size={16} color={palette.blue[700]} />
             <Text className="ml-2 flex-1 text-xs leading-4 text-blue-900">
               Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
             </Text>
@@ -190,7 +191,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       />
     );
   }
@@ -226,7 +227,7 @@ function NotificationRow({
         className="flex-1 flex-row active:opacity-70"
       >
         <View className="mr-3 mt-0.5">
-          <Ionicons name={icon} size={20} color={n.isRead ? '#6b7280' : '#1d4ed8'} />
+          <Ionicons name={icon} size={20} color={n.isRead ? palette.gray[500] : palette.blue[700]} />
         </View>
         <View className="flex-1">
           <View className="flex-row items-center">
@@ -259,7 +260,7 @@ function NotificationRow({
           hitSlop={8}
           className="ml-2 h-8 w-8 items-center justify-center self-start"
         >
-          {marking ? <ActivityIndicator size="small" color="#2563eb" /> : <Ionicons name="checkmark-done-outline" size={20} color="#1d4ed8" />}
+          {marking ? <ActivityIndicator size="small" color={palette.blue[600]} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
         </Pressable>
       ) : null}
     </View>
@@ -276,7 +277,7 @@ function Footer({
   onRetry: () => void;
 }) {
   if (hasMore && offline) return <Text className="py-4 text-center text-xs text-gray-500">More load when you reconnect.</Text>;
-  if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color="#2563eb" />;
+  if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color={palette.blue[600]} />;
   if (failed) {
     return (
       <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4">

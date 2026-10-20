@@ -27,6 +27,7 @@ import {
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
+import { palette } from '@/theme';
 import type { AppDrawerScreenProps, UserProfile } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
@@ -129,7 +130,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       >
         <Card>
           <View className="flex-row items-center">
@@ -221,15 +222,15 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                   onPress={() => setCountrySheet(true)}
                   className="min-h-11 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2"
                 >
-                  <Ionicons name="globe-outline" size={16} color="#374151" />
+                  <Ionicons name="globe-outline" size={16} color={palette.gray[700]} />
                   <Text className="ml-2 flex-1 text-base text-gray-900">{countryLabel}</Text>
-                  <Ionicons name="chevron-down" size={16} color="#6b7280" />
+                  <Ionicons name="chevron-down" size={16} color={palette.gray[500]} />
                 </Pressable>
                 <Text className="mt-2 text-xs text-gray-500">Filters the Tickets list and Home counts on this device. Not saved to your account.</Text>
               </>
             ) : (
               <View accessibilityLabel={`Locked to ${countryLabel}`} className="flex-row items-center">
-                <Ionicons name="lock-closed" size={14} color="#6b7280" />
+                <Ionicons name="lock-closed" size={14} color={palette.gray[500]} />
                 <Text className="ml-2 text-base text-gray-900">{countryLabel}</Text>
                 <Text className="ml-2 text-xs text-gray-500">Locked to your country</Text>
               </View>
@@ -259,7 +260,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
           <Text className="px-4 py-8 text-center text-sm text-gray-500">Countries load when you reconnect.</Text>
         ) : countries.isPending ? (
           <View className="items-center py-8">
-            <ActivityIndicator color="#2563eb" />
+            <ActivityIndicator color={palette.blue[600]} />
             <Text className="mt-2 text-sm text-gray-500">Loading countries…</Text>
           </View>
         ) : countries.isError && !countries.data ? (

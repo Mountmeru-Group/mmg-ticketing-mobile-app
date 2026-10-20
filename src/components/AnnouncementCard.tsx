@@ -3,16 +3,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, Text, View } from 'react-native';
 
+import { colors, palette } from '@/theme';
 import type { Announcement, AnnouncementType } from '@/types';
 import { formatDate, formatDisplayName } from '@/utils/format';
 import { htmlToDisplayText } from '@/utils/html';
 import { HtmlText } from './HtmlText';
 
 const TYPE_STYLES: Record<AnnouncementType, { label: string; chip: string; text: string; banner: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-  INFO: { label: 'Info', chip: 'bg-blue-100', text: 'text-blue-800', banner: 'border-blue-200 bg-blue-50', icon: 'information-circle', color: '#1d4ed8' },
-  WARNING: { label: 'Warning', chip: 'bg-amber-100', text: 'text-amber-800', banner: 'border-amber-200 bg-amber-50', icon: 'warning', color: '#b45309' },
-  CRITICAL: { label: 'Critical', chip: 'bg-red-100', text: 'text-red-800', banner: 'border-red-200 bg-red-50', icon: 'alert-circle', color: '#b91c1c' },
-  MAINTENANCE: { label: 'Maintenance', chip: 'bg-purple-100', text: 'text-purple-800', banner: 'border-purple-200 bg-purple-50', icon: 'construct', color: '#6d28d9' },
+  INFO: { label: 'Info', chip: 'bg-blue-100', text: 'text-blue-800', banner: 'border-blue-200 bg-blue-50', icon: 'information-circle', color: palette.blue[700] },
+  WARNING: { label: 'Warning', chip: 'bg-amber-100', text: 'text-amber-800', banner: 'border-amber-200 bg-amber-50', icon: 'warning', color: palette.amber[700] },
+  CRITICAL: { label: 'Critical', chip: 'bg-red-100', text: 'text-red-800', banner: 'border-red-200 bg-red-50', icon: 'alert-circle', color: palette.red[700] },
+  MAINTENANCE: { label: 'Maintenance', chip: 'bg-purple-100', text: 'text-purple-800', banner: 'border-purple-200 bg-purple-50', icon: 'construct', color: palette.violet[700] },
 };
 
 /** Unknown types (enum drift) fall back to the INFO look with the raw value as the label. */
@@ -65,7 +66,7 @@ export function AnnouncementBanner({
           hitSlop={10}
           className="ml-2 h-6 w-6 items-center justify-center"
         >
-          <Ionicons name="close" size={18} color="#4b5563" />
+          <Ionicons name="close" size={18} color={palette.gray[600]} />
         </Pressable>
       </View>
     </View>
@@ -87,7 +88,7 @@ export function AnnouncementCard({
         <AnnouncementTypeChip type={announcement.type} />
         {announcement.isPinned ? (
           <View className="ml-2 flex-row items-center">
-            <Ionicons name="pin" size={12} color="#6b7280" />
+            <Ionicons name="pin" size={12} color={colors.text.secondary} />
             <Text className="ml-0.5 text-xs text-gray-500">Pinned</Text>
           </View>
         ) : null}

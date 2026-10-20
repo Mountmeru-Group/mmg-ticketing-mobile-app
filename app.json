@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MMG Service Desk",
+    "name": "Mount Meru Service Desk",
     "slug": "meru-servicedesk",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/adaptive-icon-background.png",
         "monochromeImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1D4ED8"
+        "backgroundColor": "#FFFFFF"
       },
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW"

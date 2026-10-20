@@ -1,6 +1,7 @@
 export { AnnouncementBanner, AnnouncementCard, AnnouncementTypeChip } from './AnnouncementCard';
 export { AttachmentPicker } from './AttachmentPicker';
 export { OfflineBanner, QueryBanner } from './Banners';
+export { BrandLogo } from './BrandLogo';
 export { BulkProgressModal } from './BulkProgressModal';
 export { EmailChipsInput } from './EmailChipsInput';
 export { EmptyState, OfflineState } from './EmptyState';

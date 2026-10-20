@@ -22,6 +22,7 @@ import {
   ScreenHeader, StatusBadge, SubmitButton,
 } from '@/components';
 import { useDecideApproval, useDiscardGuard, usePendingApprovals, useSingleFlight, useTicket, type ApprovalDecision } from '@/hooks';
+import { palette } from '@/theme';
 import type { Approval, ApprovalsStackScreenProps, TicketDetail } from '@/types';
 import { decisionMessage, decisionOutcome, entityLabel, shortApprovalId } from '@/utils/approvals';
 import { confirmAction, reportWriteError } from '@/utils/dialogs';
@@ -126,7 +127,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
           <Card title="What happened">
             {decisionOutcome(result, ticketQuery.data?.status ?? null).map((line) => (
               <View key={line} className="mb-1.5 flex-row items-start">
-                <Ionicons name="checkmark-circle-outline" size={16} color="#15803d" style={{ marginTop: 2 }} />
+                <Ionicons name="checkmark-circle-outline" size={16} color={palette.green[700]} style={{ marginTop: 2 }} />
                 <Text className="ml-2 flex-1 text-sm text-gray-800">{line}</Text>
               </View>
             ))}
@@ -148,7 +149,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
               multiline
               textAlignVertical="top"
               placeholder="Add a comment"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={palette.gray[400]}
               className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
             />
             <View className="flex-row gap-2">
@@ -251,7 +252,7 @@ function TicketContext({
         onPress={() => onOpen(t.id)}
         className="mt-3 flex-row items-center justify-center rounded-lg border border-gray-300 py-2.5 active:bg-gray-50"
       >
-        <Ionicons name="open-outline" size={16} color="#1f2937" />
+        <Ionicons name="open-outline" size={16} color={palette.gray[800]} />
         <Text className="ml-1.5 text-sm font-medium text-gray-900">Open the ticket (conversation, files)</Text>
       </Pressable>
     </Card>

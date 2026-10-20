@@ -23,6 +23,7 @@ import {
   type BulkTarget,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type { TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
 import { notify, confirmAction, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
@@ -58,7 +59,7 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         multiline
         textAlignVertical="top"
         placeholder="What was done to resolve the issue"
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor={palette.gray[400]}
         accessibilityLabel="Resolution, required"
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
@@ -81,7 +82,7 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         multiline
         textAlignVertical="top"
         placeholder="Message to the requester"
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor={palette.gray[400]}
         accessibilityLabel="Closure comments, required"
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
@@ -202,7 +203,7 @@ function SingleStatus({ navigation, route }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: palette.gray[50] }}>
       <ScreenHeader title={title} variant="close" />
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
@@ -323,7 +324,7 @@ function BulkClose({ navigation, route }: Props) {
   const invalidRequest = route.params.target !== 'CLOSED' || !canChangeStatus(role) || route.params.ticketIds.length > BULK_ACTION_LIMIT;
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: palette.gray[50] }}>
       <ScreenHeader title={`Close ${route.params.ticketIds.length} tickets`} variant="close" />
       <OfflineBanner />
       {invalidRequest ? (

@@ -11,6 +11,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import {
   BLOCKED_EXTENSIONS, MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES, validateUploadFiles, type UploadFile,
 } from '@/api/attachments.api';
+import { colors, palette } from '@/theme';
 import { formatBytes } from '@/utils/format';
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -132,18 +133,18 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             onPress={() => void run(s.key)}
             className={`flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 py-2 ${disabled || busy ? 'opacity-50' : 'bg-white'}`}
           >
-            <Ionicons name={s.icon} size={16} color="#374151" />
+            <Ionicons name={s.icon} size={16} color={colors.text.body} />
             <Text className="ml-1 text-sm text-gray-800">{s.label}</Text>
           </Pressable>
         ))}
       </View>
-      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color="#2563eb" /> : null}
+      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} /> : null}
       <Text className="mt-1 text-xs text-gray-500">
         Up to {MAX_FILES_PER_UPLOAD} files, {formatBytes(MAX_UPLOAD_BYTES)} each. Not allowed: {BLOCKED_EXTENSIONS.join(' ')}
       </Text>
       {files.map((f) => (
         <View key={f.uri} className="mt-2 flex-row items-center rounded-lg bg-gray-50 px-3 py-2">
-          <Ionicons name={f.type.startsWith('image/') ? 'image-outline' : 'document-outline'} size={18} color="#4b5563" />
+          <Ionicons name={f.type.startsWith('image/') ? 'image-outline' : 'document-outline'} size={18} color={palette.gray[600]} />
           <View className="ml-2 flex-1">
             <Text className="text-sm text-gray-900" numberOfLines={1}>{f.name}</Text>
             <Text className="text-xs text-gray-500">{formatBytes(f.size)}</Text>
@@ -155,7 +156,7 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             onPress={() => onChange(files.filter((x) => x.uri !== f.uri))}
             hitSlop={8}
           >
-            <Ionicons name="close-circle" size={20} color="#9ca3af" />
+            <Ionicons name="close-circle" size={20} color={colors.text.muted} />
           </Pressable>
         </View>
       ))}

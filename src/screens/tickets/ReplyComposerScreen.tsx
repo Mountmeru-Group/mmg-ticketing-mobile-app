@@ -17,6 +17,7 @@ import {
 } from '@/components';
 import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type { TicketStackScreenProps } from '@/types';
 import { canSeePrivateNotes } from '@/utils/activity';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
@@ -112,7 +113,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   }
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: palette.gray[50] }}>
       <ScreenHeader title={title} variant="close" />
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
@@ -162,7 +163,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             multiline
             textAlignVertical="top"
             placeholder={isPublic ? 'Type your reply…' : 'Type an internal note…'}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
             className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
           />

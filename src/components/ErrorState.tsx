@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, Text, View } from 'react-native';
 
 import { describeError, isOfflineError } from '@/api/errors';
+import { palette } from '@/theme';
 
 interface ErrorStateProps {
   /** Anything thrown by src/api/ (an ApiClientError) or any other error. Only describeError() text is shown. */
@@ -18,7 +19,7 @@ export function ErrorState({ error, title = 'Something went wrong', onRetry }: E
   const unreachable = isOfflineError(error);
   return (
     <View className="flex-1 items-center justify-center px-8 py-12">
-      <Ionicons name={unreachable ? 'cloud-offline-outline' : 'alert-circle-outline'} size={40} color={unreachable ? '#d97706' : '#dc2626'} />
+      <Ionicons name={unreachable ? 'cloud-offline-outline' : 'alert-circle-outline'} size={40} color={unreachable ? palette.amber[600] : palette.red[600]} />
       <Text className="mt-3 text-center text-base font-semibold text-gray-800">{unreachable ? "Can't reach the Service Desk" : title}</Text>
       <Text className="mt-1 text-center text-sm text-gray-500">{describeError(error)}</Text>
       {onRetry ? (

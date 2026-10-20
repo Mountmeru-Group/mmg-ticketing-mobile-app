@@ -17,6 +17,7 @@ import {
 } from '@/components';
 import { useDeleteTask, useSingleFlight, useTicket, useToggleTask } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type { TaskScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName } from '@/utils/format';
@@ -112,7 +113,7 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
     content = (
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       >
         <Card>
           <View className="mb-2 self-start rounded-full bg-gray-100 px-2.5 py-0.5">
@@ -159,7 +160,7 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
             onPress={viewParent}
             className="mt-3 flex-row items-center justify-center rounded-lg border border-gray-300 py-2.5 active:bg-gray-50"
           >
-            <Ionicons name="ticket-outline" size={16} color="#1f2937" />
+            <Ionicons name="ticket-outline" size={16} color={palette.gray[800]} />
             <Text className="ml-1.5 text-sm font-medium text-gray-900">View parent ticket</Text>
           </Pressable>
         </Card>
@@ -228,7 +229,7 @@ function ActionButton({
   loading?: boolean;
   tone?: 'neutral' | 'danger';
 }) {
-  const color = tone === 'danger' ? '#b91c1c' : '#1f2937';
+  const color = tone === 'danger' ? palette.red[700] : palette.gray[800];
   return (
     <Pressable
       accessibilityRole="button"
