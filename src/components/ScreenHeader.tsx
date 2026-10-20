@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { colors } from '@/theme';
+
 interface ScreenHeaderProps {
   title: string;
   /**
@@ -37,7 +39,7 @@ export function ScreenHeader({ title, variant = 'back', right }: ScreenHeaderPro
           hitSlop={8}
           className="h-10 w-10 items-center justify-center rounded-full"
         >
-          <Ionicons name={leftIcon} size={24} color="#111827" />
+          <Ionicons name={leftIcon} size={24} color={colors.text.primary} />
         </Pressable>
         <Text className="ml-2 flex-1 text-lg font-semibold text-gray-900" numberOfLines={1} accessibilityRole="header">
           {title}

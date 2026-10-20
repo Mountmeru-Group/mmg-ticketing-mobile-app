@@ -48,6 +48,7 @@ import {
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
+import { palette } from '@/theme';
 import type { Ticket, TicketStackScreenProps, TicketStatus } from '@/types';
 import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
@@ -303,7 +304,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         removeClippedSubviews
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 96, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
         ListEmptyComponent={
           <ListEmpty role={role} filter={activeFilter} search={search} onClearSearch={clearSearch} />
         }
@@ -328,7 +329,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         <View style={{ paddingTop: insets.top }} className="bg-blue-600">
           <View className="h-14 flex-row items-center px-2">
             <Pressable accessibilityRole="button" accessibilityLabel="Clear selection" onPress={clearSelection} hitSlop={8} className="h-10 w-10 items-center justify-center">
-              <Ionicons name="close" size={24} color="#ffffff" />
+              <Ionicons name="close" size={24} color={palette.white} />
             </Pressable>
             <Text className="ml-2 flex-1 text-lg font-semibold text-white" accessibilityRole="header">
               {selected.size} selected
@@ -343,14 +344,14 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
       {/* Search (08 §4.4): one box, no field selector (A22). */}
       <View className="border-b border-gray-200 bg-white px-4 pb-2 pt-2">
         <View className="h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
-          <Ionicons name="search" size={18} color="#6b7280" />
+          <Ionicons name="search" size={18} color={palette.gray[500]} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             onSubmitEditing={submitSearch}
             returnKeyType="search"
             placeholder="Ticket #, subject, requester or technician"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             autoCapitalize="none"
             autoCorrect={false}
             accessibilityLabel="Search tickets"
@@ -358,7 +359,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
           />
           {searchText ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={clearSearch} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              <Ionicons name="close-circle" size={18} color={palette.gray[400]} />
             </Pressable>
           ) : null}
         </View>
@@ -372,7 +373,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
               accessibilityLabel={`Filter from Home: ${TICKET_FILTER_LABELS[activeFilter]}`}
               className="mr-2 flex-row items-center rounded-full border border-blue-600 bg-blue-600 px-3 py-1.5"
             >
-              <Ionicons name="home-outline" size={12} color="#ffffff" />
+              <Ionicons name="home-outline" size={12} color={palette.white} />
               <Text className="ml-1 text-sm font-medium text-white">{TICKET_FILTER_LABELS[activeFilter]}</Text>
             </View>
           ) : null}
@@ -400,7 +401,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             onPress={() => setSheet('sort')}
             className="mr-2 flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1"
           >
-            <Ionicons name="swap-vertical" size={14} color="#374151" />
+            <Ionicons name="swap-vertical" size={14} color={palette.gray[700]} />
             <Text className="ml-1 text-xs text-gray-800">{TICKET_SORT_LABELS[ticketSort]}</Text>
           </Pressable>
           {countryMode === 'switch' ? (
@@ -410,9 +411,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
               onPress={() => setSheet('country')}
               className="mr-2 flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1"
             >
-              <Ionicons name="globe-outline" size={14} color="#374151" />
+              <Ionicons name="globe-outline" size={14} color={palette.gray[700]} />
               <Text className="ml-1 text-xs text-gray-800" numberOfLines={1}>{selectedCountryLabel}</Text>
-              <Ionicons name="chevron-down" size={12} color="#374151" style={{ marginLeft: 2 }} />
+              <Ionicons name="chevron-down" size={12} color={palette.gray[700]} style={{ marginLeft: 2 }} />
             </Pressable>
           ) : null}
           {countryMode === 'locked' ? (
@@ -420,7 +421,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
               accessibilityLabel={`Locked to ${selectedCountryLabel}`}
               className="mr-2 flex-row items-center rounded-full bg-gray-100 px-3 py-1"
             >
-              <Ionicons name="lock-closed" size={12} color="#6b7280" />
+              <Ionicons name="lock-closed" size={12} color={palette.gray[500]} />
               <Text className="ml-1 text-xs text-gray-600" numberOfLines={1}>{selectedCountryLabel}</Text>
             </View>
           ) : null}
@@ -458,7 +459,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
           style={{ bottom: insets.bottom + 20 }}
           className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg active:bg-blue-700"
         >
-          <Ionicons name="add" size={28} color="#ffffff" />
+          <Ionicons name="add" size={28} color={palette.white} />
         </Pressable>
       )}
 
@@ -506,7 +507,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
           <Text className="px-4 py-8 text-center text-sm text-gray-500">Countries load when you reconnect.</Text>
         ) : countries.isPending ? (
           <View className="items-center py-8">
-            <ActivityIndicator color="#2563eb" />
+            <ActivityIndicator color={palette.blue[600]} />
             <Text className="mt-2 text-sm text-gray-500">Loading countries…</Text>
           </View>
         ) : countries.isError && !countries.data ? (
@@ -568,7 +569,7 @@ function ListFooter({
   if (loading) {
     return (
       <View className="flex-row items-center justify-center py-4">
-        <ActivityIndicator color="#2563eb" />
+        <ActivityIndicator color={palette.blue[600]} />
         <Text className="ml-2 text-sm text-gray-500">Loading more…</Text>
       </View>
     );
@@ -594,7 +595,7 @@ function ListFooter({
 function BarButton({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} className="h-12 flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white active:bg-gray-50">
-      <Ionicons name={icon} size={18} color="#1f2937" />
+      <Ionicons name={icon} size={18} color={palette.gray[800]} />
       <Text className="ml-1.5 text-sm font-semibold text-gray-900">{label}</Text>
     </Pressable>
   );

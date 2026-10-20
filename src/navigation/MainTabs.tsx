@@ -8,6 +8,7 @@ import { useUnreadCount } from '@/hooks';
 import { HomeScreen } from '@/screens/dashboard/HomeScreen';
 import { NotificationsScreen } from '@/screens/notifications/NotificationsScreen';
 import { useAuthStore } from '@/store/auth.store';
+import { colors } from '@/theme';
 import type { MainTabParamList } from '@/types';
 import { TicketStack } from './TicketStack';
 
@@ -22,7 +23,8 @@ export function MainTabs() {
       initialRouteName="HomeTab"
       // Android back on a non-Home tab root returns to Home, then exits (08 §3.1).
       backBehavior="initialRoute"
-      screenOptions={{ headerShown: false, tabBarActiveTintColor: '#2563eb' }}
+      // Web MobileBottomNav: active `text-primary`, idle `text-gray-400`.
+      screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.nav.tabActive, tabBarInactiveTintColor: colors.nav.tabIdle }}
     >
       <Tab.Screen
         name="HomeTab"

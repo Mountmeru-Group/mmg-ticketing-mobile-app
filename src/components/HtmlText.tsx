@@ -13,22 +13,23 @@ import {
 } from 'react-native-render-html';
 
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
+import { palette } from '@/theme';
 import { parseTicketLink } from '@/utils/deep-links';
 import { BLOCKED_TAGS, htmlToDisplayText, looksLikeHtml, sanitizeForRender } from '@/utils/html';
 
 // ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
 
-const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: '#1f2937' };
+const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: palette.gray[800] };
 
 const TAGS_STYLES: MixedStyleRecord = {
   body: { margin: 0, padding: 0 },
   p: { marginTop: 0, marginBottom: 8 },
-  a: { color: '#1d4ed8', textDecorationLine: 'underline' },
+  a: { color: palette.blue[700], textDecorationLine: 'underline' },
   h1: { fontSize: 18, marginTop: 4, marginBottom: 8 },
   h2: { fontSize: 17, marginTop: 4, marginBottom: 8 },
   h3: { fontSize: 16, marginTop: 4, marginBottom: 6 },
   h4: { fontSize: 15, marginTop: 4, marginBottom: 6 },
-  blockquote: { marginLeft: 0, marginRight: 0, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: '#d1d5db', color: '#4b5563' },
+  blockquote: { marginLeft: 0, marginRight: 0, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: palette.gray[300], color: palette.gray[600] },
   pre: { fontSize: 12 },
   code: { fontSize: 12 },
   ul: { marginTop: 0, marginBottom: 8 },

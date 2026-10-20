@@ -17,6 +17,7 @@ import {
 } from '@/components';
 import { useCategories, useCreateTicket, useDiscardGuard, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import {
   TICKET_IMPACTS, TICKET_URGENCIES, type Category, type TicketImpact, type TicketStackScreenProps, type TicketUrgency,
   type UserRole,
@@ -166,7 +167,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
   }
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: palette.gray[50] }}>
       <ScreenHeader title="New ticket" variant="back" />
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
@@ -178,7 +179,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
             editable={!busy}
             maxLength={255}
             placeholder="Short summary of the issue"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             accessibilityLabel="Title, required"
             className="mb-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
@@ -190,7 +191,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
             multiline
             textAlignVertical="top"
             placeholder="What happened, and what do you need?"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             accessibilityLabel="Description, required"
             className="min-h-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />

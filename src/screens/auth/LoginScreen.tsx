@@ -15,11 +15,12 @@ import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
-import { OfflineBanner } from '@/components';
+import { BrandLogo, OfflineBanner } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
 import { ENVIRONMENT_LABEL } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { colors, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
@@ -82,7 +83,8 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
         ) : null}
 
         <View className="mb-4 rounded-xl bg-white p-4">
-          <Text className="text-2xl font-bold text-gray-900">MMG Service Desk</Text>
+          <BrandLogo height={64} />
+          <Text className="mt-4 text-2xl font-bold text-gray-900">Mount Meru Service Desk</Text>
           <Text className="mt-1 text-sm text-gray-600">Sign in with your Mount Meru work account.</Text>
           {/* Which backend this build talks to, always visible to testers (04 M1). */}
           <View
@@ -102,7 +104,7 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
         {failure && copy ? (
           <View accessibilityRole="alert" className="mb-3 rounded-lg bg-red-50 p-3">
             <View className="flex-row items-start">
-              <Ionicons name="alert-circle" size={18} color="#b91c1c" />
+              <Ionicons name="alert-circle" size={18} color={palette.red[700]} />
               <View className="ml-2 flex-1">
                 <Text className="text-sm font-semibold text-red-900">{copy.title}</Text>
                 <Text className="mt-1 text-sm text-red-800">{copy.message}</Text>
@@ -134,9 +136,9 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
           className={`h-12 flex-row items-center justify-center rounded-lg px-4 ${signingIn ? 'bg-gray-300' : 'bg-blue-600 active:bg-blue-700'}`}
         >
           {signingIn ? (
-            <ActivityIndicator color="#4b5563" />
+            <ActivityIndicator color={palette.gray[600]} />
           ) : (
-            <Ionicons name="logo-microsoft" size={18} color="#ffffff" />
+            <Ionicons name="logo-microsoft" size={18} color={colors.text.inverse} />
           )}
           <Text className={`ml-2 text-base font-semibold ${signingIn ? 'text-gray-600' : 'text-white'}`}>
             {signingIn ? 'Signing in…' : 'Sign in with Microsoft'}

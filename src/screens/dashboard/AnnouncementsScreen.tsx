@@ -12,6 +12,7 @@ import {
 } from '@/components';
 import { useAnnouncements } from '@/hooks';
 import { useUiStore } from '@/store/ui.store';
+import { palette } from '@/theme';
 import type { AppDrawerScreenProps } from '@/types';
 
 export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'>) {
@@ -52,7 +53,7 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
           <EmptyState icon="megaphone-outline" title="No announcements" message="Service Desk announcements for your role will appear here." />
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       />
     );
   }

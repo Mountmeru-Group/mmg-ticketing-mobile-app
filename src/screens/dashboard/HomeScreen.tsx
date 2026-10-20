@@ -22,6 +22,7 @@ import {
 import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, type SafeDashboard } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
+import { palette } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { ROLE_LABELS, isAgentOrAdmin, isTriageAgent } from '@/utils/roles';
@@ -39,13 +40,13 @@ interface Tile {
 }
 
 const TONES: Record<Tile['tone'], { bg: string; fg: string }> = {
-  blue: { bg: 'bg-blue-50', fg: '#1d4ed8' },
-  yellow: { bg: 'bg-yellow-50', fg: '#a16207' },
-  slate: { bg: 'bg-slate-100', fg: '#334155' },
-  red: { bg: 'bg-red-50', fg: '#b91c1c' },
-  green: { bg: 'bg-green-50', fg: '#15803d' },
-  gray: { bg: 'bg-gray-100', fg: '#374151' },
-  purple: { bg: 'bg-purple-50', fg: '#6d28d9' },
+  blue: { bg: 'bg-blue-50', fg: palette.blue[700] },
+  yellow: { bg: 'bg-yellow-50', fg: palette.yellow[700] },
+  slate: { bg: 'bg-slate-100', fg: palette.slate[700] },
+  red: { bg: 'bg-red-50', fg: palette.red[700] },
+  green: { bg: 'bg-green-50', fg: palette.green[700] },
+  gray: { bg: 'bg-gray-100', fg: palette.gray[700] },
+  purple: { bg: 'bg-purple-50', fg: palette.violet[700] },
 };
 
 export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
@@ -117,7 +118,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
       <QueryBanner error={primaryError} hasData={hasAnyData} onRetry={() => void onRefresh()} />
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 96 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       >
         <View className="mx-4 mb-3">
           <Text className="text-xl font-bold text-gray-900">{firstName ? `Hello, ${firstName}` : 'Hello'}</Text>
@@ -139,7 +140,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
             onPress={createTicket}
             className="mx-4 mb-4 flex-row items-center justify-center rounded-xl bg-blue-600 py-4 active:bg-blue-700"
           >
-            <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+            <Ionicons name="add-circle-outline" size={24} color={palette.white} />
             <Text className="ml-2 text-lg font-semibold text-white">Raise a ticket</Text>
           </Pressable>
         ) : null}
@@ -207,7 +208,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
           style={{ bottom: insets.bottom + 20 }}
           className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg active:bg-blue-700"
         >
-          <Ionicons name="add" size={28} color="#ffffff" />
+          <Ionicons name="add" size={28} color={palette.white} />
         </Pressable>
       ) : null}
     </View>
@@ -332,7 +333,7 @@ function Shortcut({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphM
       onPress={onPress}
       className="flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-2 active:bg-gray-50"
     >
-      <Ionicons name={icon} size={16} color="#1f2937" />
+      <Ionicons name={icon} size={16} color={palette.gray[800]} />
       <Text className="ml-1.5 text-sm text-gray-900">{label}</Text>
     </Pressable>
   );

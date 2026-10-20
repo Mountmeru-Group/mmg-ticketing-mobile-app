@@ -12,6 +12,7 @@ import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
+import { palette } from '@/theme';
 import type { KBArticleListItem, KBSearchResult, KnowledgeStackScreenProps } from '@/types';
 import { formatDate } from '@/utils/format';
 
@@ -47,7 +48,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />;
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />;
 
   let content;
   if (searching) {
@@ -99,7 +100,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
           hasNextPage && offline ? (
             <Text className="py-4 text-center text-xs text-gray-500">More articles load when you reconnect.</Text>
           ) : isFetchingNextPage ? (
-            <ActivityIndicator style={{ marginVertical: 16 }} color="#2563eb" />
+            <ActivityIndicator style={{ marginVertical: 16 }} color={palette.blue[600]} />
           ) : isFetchNextPageError ? (
             <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4">
               <Text className="text-sm text-red-700">Couldn't load more articles.</Text>
@@ -120,13 +121,13 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
       <ScreenHeader title="Knowledge base" variant="drawer" />
       <View className="border-b border-gray-200 bg-white px-4 pb-2 pt-2">
         <View className="h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
-          <Ionicons name="search" size={18} color="#6b7280" />
+          <Ionicons name="search" size={18} color={palette.gray[500]} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             returnKeyType="search"
             placeholder="Search articles"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             autoCapitalize="none"
             autoCorrect={false}
             accessibilityLabel="Search knowledge base articles"
@@ -134,7 +135,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
           />
           {searchText ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearchText('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              <Ionicons name="close-circle" size={18} color={palette.gray[400]} />
             </Pressable>
           ) : null}
         </View>
@@ -157,7 +158,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
                 onPress={() => void categories.refetch()}
                 className="mr-2 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5"
               >
-                <Ionicons name="refresh" size={14} color="#b91c1c" />
+                <Ionicons name="refresh" size={14} color={palette.red[700]} />
                 <Text className="ml-1 text-sm text-red-800">Categories didn't load · Retry</Text>
               </Pressable>
             ) : null}

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { useDebouncedValue, useUserSearch } from '@/hooks';
+import { colors, palette } from '@/theme';
 import { addEmailChip } from '@/utils/compose';
 import { formatDisplayName } from '@/utils/format';
 
@@ -59,7 +60,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
             className="m-0.5 flex-row items-center rounded-full bg-blue-100 px-2 py-1"
           >
             <Text className="text-xs text-blue-900">{email}</Text>
-            <Ionicons name="close" size={12} color="#1e3a8a" style={{ marginLeft: 2 }} />
+            <Ionicons name="close" size={12} color={palette.blue[900]} style={{ marginLeft: 2 }} />
           </Pressable>
         ))}
         <TextInput
@@ -72,7 +73,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
           }}
           submitBehavior="submit"
           placeholder={chips.length ? '' : 'name@example.com'}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"

@@ -36,6 +36,7 @@ import {
   useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type {
   ActivityAuditItem, Attachment, Comment, TicketDetail, TicketImpact, TicketStackScreenProps, TicketTaskEmbedded,
   TicketUrgency, UserRole,
@@ -233,7 +234,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
               hitSlop={8}
               className="h-10 w-10 items-center justify-center rounded-full"
             >
-              {assign.isPending ? <ActivityIndicator color="#2563eb" /> : <Ionicons name="ellipsis-vertical" size={22} color="#111827" />}
+              {assign.isPending ? <ActivityIndicator color={palette.blue[600]} /> : <Ionicons name="ellipsis-vertical" size={22} color={palette.gray[900]} />}
             </Pressable>
           ) : undefined
         }
@@ -242,7 +243,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
       <ScrollView
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       >
         <HeaderCard ticket={ticket} role={role} />
         <StatusActionBar ticket={ticket} role={role} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
@@ -322,7 +323,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
                 className={`mx-4 mt-3 items-center rounded-lg border border-gray-300 bg-white py-2.5 ${offline ? 'opacity-50' : ''}`}
               >
                 {history.isFetchingNextPage ? (
-                  <ActivityIndicator color="#2563eb" />
+                  <ActivityIndicator color={palette.blue[600]} />
                 ) : (
                   <Text className="text-sm font-medium text-gray-800">
                     {offline
@@ -406,7 +407,7 @@ function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyp
       onPress={onPress}
       className="flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white py-2.5 active:bg-gray-50"
     >
-      <Ionicons name={icon} size={16} color="#1f2937" />
+      <Ionicons name={icon} size={16} color={palette.gray[800]} />
       <Text className="ml-1.5 text-sm font-medium text-gray-900">{label}</Text>
     </Pressable>
   );
@@ -474,7 +475,7 @@ function HeaderCard({ ticket, role }: { ticket: TicketDetail; role: UserRole }) 
         Created {formatDateTime(ticket.createdAt)} · Updated {formatRelative(ticket.updatedAt)}
       </Text>
       <View className="mt-1 flex-row items-center">
-        <Ionicons name="attach" size={14} color="#6b7280" />
+        <Ionicons name="attach" size={14} color={palette.gray[500]} />
         <Text className="ml-1 text-xs text-gray-500">
           {attachmentCount} {attachmentCount === 1 ? 'attachment' : 'attachments'}
         </Text>
@@ -524,7 +525,7 @@ function StatusActionBar({
           {locked ? 'Closed and canceled tickets are locked for technicians.' : 'No status changes are available from this status.'}
         </Text>
       )}
-      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color="#2563eb" /> : null}
+      {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={palette.blue[600]} /> : null}
     </Card>
   );
 }
@@ -728,7 +729,7 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
         </View>
         {isPrivate ? (
           <View className="flex-row items-center rounded-full bg-amber-200 px-2 py-0.5">
-            <Ionicons name="lock-closed" size={10} color="#78350f" />
+            <Ionicons name="lock-closed" size={10} color={palette.amber[900]} />
             <Text className="ml-1 text-[10px] font-semibold uppercase text-amber-900">Private note</Text>
           </View>
         ) : null}
@@ -749,7 +750,7 @@ function CommentItem({ comment, role }: { comment: Comment; role: UserRole }) {
         <View className="mt-2">
           {files.map((f) => (
             <View key={f.id} className="mt-1 flex-row items-center">
-              <Ionicons name="attach" size={14} color="#6b7280" />
+              <Ionicons name="attach" size={14} color={palette.gray[500]} />
               <Text className="ml-1 flex-1 text-xs text-gray-700" numberOfLines={1}>{f.fileName}</Text>
             </View>
           ))}
@@ -805,7 +806,7 @@ function AttachmentRow({
       className="mx-4 mb-2 rounded-xl bg-white p-3 active:bg-gray-50"
     >
       <View className="flex-row items-center">
-        <Ionicons name={attachmentIcon(attachment.mimeType)} size={22} color="#4b5563" />
+        <Ionicons name={attachmentIcon(attachment.mimeType)} size={22} color={palette.gray[600]} />
         <View className="ml-3 flex-1">
           <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>{attachment.fileName || 'Unnamed file'}</Text>
           <Text className="text-xs text-gray-500" numberOfLines={1}>
@@ -813,9 +814,9 @@ function AttachmentRow({
           </Text>
         </View>
         {opening ? (
-          <ActivityIndicator color="#2563eb" />
+          <ActivityIndicator color={palette.blue[600]} />
         ) : (
-          <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color="#6b7280" />
+          <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color={palette.gray[500]} />
         )}
       </View>
       {open ? (

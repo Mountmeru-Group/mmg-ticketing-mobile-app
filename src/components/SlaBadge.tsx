@@ -1,17 +1,10 @@
 import { Text, View } from 'react-native';
 
-import type { SLAStatus } from '@/types';
+import { colors, type BadgeTone } from '@/theme';
 import { getDisplaySlaStatus, slaLabel, type SlaFields } from '@/utils/format';
 
-// 05 §A.10 (SLABadge.tsx): WITHIN_SLA green · DUE_SOON yellow · BREACHED red (with the breach label).
-// Always the hold-adjusted value from 05 §A.9, on list AND detail (decision D6).
-const SLA_STYLES: Record<SLAStatus, { container: string; text: string }> = {
-  WITHIN_SLA: { container: 'bg-green-100', text: 'text-green-800' },
-  DUE_SOON: { container: 'bg-yellow-100', text: 'text-yellow-800' },
-  BREACHED: { container: 'bg-red-100', text: 'text-red-800' },
-};
-
-const FALLBACK = { container: 'bg-gray-100', text: 'text-gray-800' };
+// 05 §A.10 (SLABadge.tsx): WITHIN_SLA green · DUE_SOON yellow · BREACHED red (with the breach label), the web's exact
+// pairs from src/theme/colors.ts. Always the hold-adjusted value from 05 §A.9, on list AND detail (decision D6).
 
 interface SlaBadgeProps {
   ticket: SlaFields;
@@ -21,10 +14,10 @@ interface SlaBadgeProps {
 
 export function SlaBadge({ ticket, now }: SlaBadgeProps) {
   const display = getDisplaySlaStatus(ticket, now);
-  const style = (SLA_STYLES as Record<string, { container: string; text: string }>)[display.status] ?? FALLBACK;
+  const tone = (colors.sla as Record<string, BadgeTone>)[display.status] ?? colors.badgeFallback;
   return (
-    <View className={`self-start rounded-full px-2.5 py-0.5 ${style.container}`}>
-      <Text className={`text-xs font-medium ${style.text}`} numberOfLines={1}>
+    <View className="self-start rounded-full px-2.5 py-0.5" style={{ backgroundColor: tone.bg }}>
+      <Text className="text-xs font-medium" style={{ color: tone.fg }} numberOfLines={1}>
         {slaLabel(display)}
       </Text>
     </View>

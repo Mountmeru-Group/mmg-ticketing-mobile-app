@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { describeError } from '@/api/errors';
+import { colors, palette } from '@/theme';
 
 /** Label with a visible, announced "required" marker. */
 export function FieldLabel({ label, required = false, hint }: { label: string; required?: boolean; hint?: string }) {
@@ -53,7 +54,7 @@ export function SelectField({
         <Text className={`flex-1 text-base ${value ? 'text-gray-900' : 'text-gray-400'}`} numberOfLines={2}>
           {value ?? placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={16} color="#6b7280" />
+        <Ionicons name="chevron-down" size={16} color={colors.text.secondary} />
       </Pressable>
     </View>
   );
@@ -63,7 +64,7 @@ export function InlineError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <View accessibilityRole="alert" className="mx-4 mb-3 flex-row items-start rounded-lg bg-red-50 p-3">
-      <Ionicons name="alert-circle" size={18} color="#b91c1c" />
+      <Ionicons name="alert-circle" size={18} color={palette.red[700]} />
       <Text className="ml-2 flex-1 text-sm text-red-800">{message}</Text>
     </View>
   );
@@ -85,7 +86,7 @@ export function LookupError({ query, what }: { query: LookupQuery; what: string 
   if (!query.isError || query.isFetching || query.data !== undefined) return null;
   return (
     <View accessibilityRole="alert" className="mb-2 flex-row items-start rounded-lg bg-red-50 p-2">
-      <Ionicons name="alert-circle" size={16} color="#b91c1c" />
+      <Ionicons name="alert-circle" size={16} color={palette.red[700]} />
       <Text className="ml-2 flex-1 text-xs text-red-800">
         Couldn't load {what}. {describeError(query.error)}
       </Text>
@@ -100,14 +101,15 @@ export function Notice({ tone = 'info', children }: { tone?: 'info' | 'warning';
   const warning = tone === 'warning';
   return (
     <View className={`mb-3 flex-row items-start rounded-lg p-3 ${warning ? 'bg-amber-50' : 'bg-blue-50'}`}>
-      <Ionicons name={warning ? 'warning-outline' : 'information-circle-outline'} size={16} color={warning ? '#92400e' : '#1d4ed8'} />
+      <Ionicons name={warning ? 'warning-outline' : 'information-circle-outline'} size={16} color={warning ? palette.amber[800] : palette.blue[700]} />
       <Text className={`ml-2 flex-1 text-xs leading-4 ${warning ? 'text-amber-900' : 'text-blue-900'}`}>{children}</Text>
     </View>
   );
 }
 
+// `primary` is the web's primary Button (frontend/src/components/ui/Button.tsx: `bg-primary text-white`).
 const BUTTON_TONES = {
-  primary: { bg: 'bg-blue-600', text: 'text-white' },
+  primary: { bg: 'bg-primary', text: 'text-primary-foreground' },
   success: { bg: 'bg-green-600', text: 'text-white' },
   danger: { bg: 'bg-red-600', text: 'text-white' },
   muted: { bg: 'bg-gray-700', text: 'text-white' },
@@ -133,7 +135,7 @@ export function SubmitButton({
       onPress={onPress}
       className={`h-12 flex-row items-center justify-center rounded-lg px-4 ${off ? 'bg-gray-300' : style.bg}`}
     >
-      {loading ? <ActivityIndicator color="#ffffff" /> : null}
+      {loading ? <ActivityIndicator color={colors.text.inverse} /> : null}
       <Text className={`text-base font-semibold ${off ? 'text-gray-600' : style.text} ${loading ? 'ml-2' : ''}`}>{label}</Text>
     </Pressable>
   );

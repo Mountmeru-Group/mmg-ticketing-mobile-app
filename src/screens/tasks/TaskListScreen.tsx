@@ -14,6 +14,7 @@ import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader, TaskRow } from '@/components';
 import { useTaskFeed } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 import type { TasksStackScreenProps } from '@/types';
 import { isStaff } from '@/utils/roles';
 import { TASK_FILTER_LABELS, type TaskFeedFilter, type TaskStatusFilter } from '@/utils/tasks';
@@ -104,7 +105,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
             {hasNextPage && offline ? (
               <Text className="text-xs text-gray-500">More tickets load when you reconnect.</Text>
             ) : isFetchingNextPage ? (
-              <ActivityIndicator color="#2563eb" />
+              <ActivityIndicator color={palette.blue[600]} />
             ) : hasNextPage ? (
               <Pressable
                 accessibilityRole="button"
@@ -121,7 +122,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
           </View>
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
       />
     );
   }
@@ -131,12 +132,12 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
       <ScreenHeader title="Tasks" variant="drawer" />
       <View className="border-b border-gray-200 bg-white px-4 pb-2 pt-2">
         <View className="h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
-          <Ionicons name="search" size={18} color="#6b7280" />
+          <Ionicons name="search" size={18} color={palette.gray[500]} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Task, ticket # or subject"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={palette.gray[400]}
             autoCapitalize="none"
             autoCorrect={false}
             accessibilityLabel="Search loaded tasks"
@@ -144,7 +145,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
           />
           {searchText ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearchText('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              <Ionicons name="close-circle" size={18} color={palette.gray[400]} />
             </Pressable>
           ) : null}
         </View>
@@ -179,7 +180,7 @@ function Chip({
       onPress={onPress}
       className={`mr-2 flex-row items-center rounded-full border px-3 py-1.5 ${active ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'}`}
     >
-      {icon ? <Ionicons name={icon} size={14} color={active ? '#ffffff' : '#374151'} style={{ marginRight: 4 }} /> : null}
+      {icon ? <Ionicons name={icon} size={14} color={active ? palette.white : palette.gray[700]} style={{ marginRight: 4 }} /> : null}
       <Text className={active ? 'text-sm font-medium text-white' : 'text-sm text-gray-800'}>{label}</Text>
     </Pressable>
   );

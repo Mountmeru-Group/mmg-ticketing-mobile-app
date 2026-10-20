@@ -7,10 +7,10 @@ handing an APK to testers, and the checklist that must be complete before any pr
 
 | Item | State |
 |---|---|
-| App identity | `MMG Service Desk`, package `com.mountmeru.servicedesk`, version `0.1.0`, versionCode `1` (`app.json`) |
+| App identity | `Mount Meru Service Desk` (renamed in Phase B, 2026-10-20), package `com.mountmeru.servicedesk`, version `0.1.0`, versionCode `1` (`app.json`) |
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24. Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin. Re-check after any Expo or React Native upgrade |
-| Icons | Generated artwork in `assets/` and wired in `app.json` (see §7). Not the official MMG logo, so get brand sign-off before a store release |
-| Splash | **Not wired.** SDK 57 can only configure the native splash through `expo-splash-screen`, which is not installed (§8). Until then, Android 12+ shows the app icon at launch and Android 7–11 show Expo's grey template placeholder |
+| Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
+| Splash | **Image ready, not wired.** `assets/splash-icon.png` is the Meru logo (§7), but SDK 57 can only configure the native splash through `expo-splash-screen`, which is not installed (§8). Until then, Android 12+ shows the app icon at launch and Android 7–11 show Expo's grey template placeholder |
 | `preview` APK | Ready to build with your Expo account (§2). It points at **UAT** |
 | Signing in on a `preview` APK | **Not possible yet.** The developer-token screen exists only in `__DEV__` builds, and `preview` is a release build. Sign-in arrives with SSO (A2). The first APK is for checking install, icon and launch, and for producing the signing hash IT needs |
 | `production` AAB | **Placeholder, refused by design** (§1, §5) |
@@ -207,20 +207,41 @@ The remaining UUID literals in the bundle are the RFC 4122 namespace constants f
 
 ## 7. App identity assets (`assets/`)
 
-| File | Size | Used for |
-|---|---|---|
-| `icon.png` | 1024×1024, opaque | `expo.icon`: legacy launcher icon (Android 7.x) and store listing source |
-| `adaptive-icon.png` | 1024×1024, transparent | `android.adaptiveIcon.foregroundImage`, and `monochromeImage` (Android 13 themed icons use its alpha) |
-| `adaptive-icon-background.png` | 1024×1024, flat `#1D4ED8` | `android.adaptiveIcon.backgroundImage` (`backgroundColor` is the same blue) |
-| `splash-icon.png` | 1024×1024, transparent | Splash image, **not wired yet** (§8) |
+Phase B (2026-10-20) replaced the Phase 5 placeholder artwork with the official Meru logo. Every file comes from
+`assets/brand/meru-logo.png`, which is byte-identical to the web portal's `frontend/public/meru-logo.png`.
 
-The design:
-- A service-desk **ticket** (rounded rectangle with side notches) with a two-peak **mountain** (Mount Meru) cut out of it.
-- "MMG" under it on the icon; "MMG / Service Desk" on the splash.
-- Flat colours only: blue `#1D4ED8`, white, grey `#374151`. No gradients.
-- Everything sits inside the adaptive-icon safe zone (the central 66/108). The splash content sits inside the central circle that Android 12+ keeps.
+| File | Size | Content | Used for |
+|---|---|---|---|
+| `icon.png` | 1024×1024, opaque | Logo 640 px wide, centred on white | `expo.icon`: legacy launcher icon (Android 7.x) and store listing source |
+| `adaptive-icon.png` | 1024×1024, transparent | Logo 512 px wide, centred | `android.adaptiveIcon.foregroundImage`, and `monochromeImage` (Android 13 themed icons use its alpha) |
+| `adaptive-icon-background.png` | 1024×1024, flat white | — | `android.adaptiveIcon.backgroundImage` (`backgroundColor` is the same `#FFFFFF`) |
+| `splash-icon.png` | 1024×1024, transparent | Logo 560 px wide, centred | Splash image, **not wired yet** (§8) |
+| `brand/meru-mark.png` | 566×346, transparent | The logo trimmed to its content | In-app logo (`src/components/BrandLogo.tsx`): login card and drawer header |
+| `brand/meru-logo.png` | 689×478, RGB | The source, untouched | — |
 
-These were generated for Phase 5 and are not an official MMG brand mark. Replacing them only needs new PNGs with the same names and sizes; no code changes.
+How they were made (Pillow; the script is not in the repo, the steps are):
+1. Trim the source to the bounding box of its non-white pixels (x 120–685, y 8–353 → 566 × 346).
+2. Make a transparent copy by "colour to alpha" against white. The source has no alpha channel, so this keeps the
+   anti-aliased edges clean on any background. The drop's white highlight and the white gap between drop and "m"
+   become transparent.
+3. Scale with one factor (aspect ratio 1.636 kept, LANCZOS) and centre on each canvas.
+
+Why white behind the logo:
+- The mark is red `#D51B28` and yellow `#FECB03`. On a red background the "m" disappears, and on a yellow one the
+  drop does.
+- White is the logo's own field, and it is what the web shows it on (favicon, sidebar, login card).
+
+Safe zones:
+- Adaptive icon: the logo's bounding-box diagonal is 600 px. Android's always-visible 66/108 circle is 626 px. So
+  nothing is cropped by any launcher mask (circle, squircle, rounded square). This was checked against rendered masks.
+- Splash: the diagonal is 656 px, inside the 683 px circle Android 12+ keeps.
+
+Resolution:
+- The source logo is only 566 px wide.
+- `icon.png` is therefore upscaled ×1.13; the other files are downscaled or unscaled.
+- At launcher and store sizes (≤ 512 px) the upscale is invisible.
+- For the store release, ask brand or marketing for a **vector (SVG/EPS/AI) or ≥ 2048 px PNG** of the mark, then
+  rebuild the four PNGs with the same names, sizes and placement. No code changes are needed.
 
 `android.blockedPermissions` removes `SYSTEM_ALERT_WINDOW` (draw over other apps). The Expo template adds it, but the app never uses it, and Play reviews flag it. `allowBackup` stays `false`, so the SecureStore token is never restored onto another device.
 
@@ -228,7 +249,7 @@ These were generated for Phase 5 and are not an official MMG brand mark. Replaci
 
 | Package | Why | After approval |
 |---|---|---|
-| `expo-splash-screen` (SDK 57 line) | SDK 57 configures the native splash only through this plugin. Without it, Android 7–11 show Expo's template placeholder at launch | `npx expo install expo-splash-screen`, then add to `plugins` in `app.json`: `["expo-splash-screen", { "image": "./assets/splash-icon.png", "imageWidth": 200, "resizeMode": "contain", "backgroundColor": "#FFFFFF" }]` |
+| `expo-splash-screen` (SDK 57 line) | SDK 57 configures the native splash only through this plugin. Without it, Android 7–11 show Expo's template placeholder at launch. The Meru splash image is already in `assets/splash-icon.png` (§7) | `npx expo install expo-splash-screen`, then add to `plugins` in `app.json`: `["expo-splash-screen", { "image": "./assets/splash-icon.png", "imageWidth": 200, "resizeMode": "contain", "backgroundColor": "#FFFFFF" }]` |
 | `expo-dev-client` (SDK 57 line) | Required by the `development` profile (a dev-client build that keeps the developer-token screen for internal testing until SSO ships) | `npx expo install expo-dev-client`, then `npx eas build --platform android --profile development` |
 
 ## 9. Phase 5 state audit (all 16 MVP screens)

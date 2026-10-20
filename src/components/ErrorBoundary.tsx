@@ -12,6 +12,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useSignOut } from '@/hooks/useProfile';
 import { useAuthStore } from '@/store/auth.store';
+import { palette } from '@/theme';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -50,7 +51,7 @@ function CrashScreen({ error, onRetry }: { error: Error; onRetry: () => void }) 
 
   return (
     <ScrollView contentContainerClassName="flex-grow items-center justify-center bg-gray-50 px-8 py-16">
-      <Ionicons name="warning-outline" size={44} color="#d97706" />
+      <Ionicons name="warning-outline" size={44} color={palette.amber[600]} />
       <Text accessibilityRole="header" className="mt-3 text-center text-lg font-semibold text-gray-900">
         Something went wrong
       </Text>
@@ -69,9 +70,9 @@ function CrashScreen({ error, onRetry }: { error: Error; onRetry: () => void }) 
       <Pressable
         accessibilityRole="button"
         onPress={onRetry}
-        className="mt-6 h-12 self-stretch flex-row items-center justify-center rounded-lg bg-blue-600 px-4 active:bg-blue-700"
+        className="mt-6 h-12 self-stretch flex-row items-center justify-center rounded-lg bg-primary px-4 active:opacity-80"
       >
-        <Text className="text-base font-semibold text-white">Try again</Text>
+        <Text className="text-base font-semibold text-primary-foreground">Try again</Text>
       </Pressable>
       {signedIn ? (
         <Pressable
