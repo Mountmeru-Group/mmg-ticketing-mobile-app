@@ -5,8 +5,9 @@
 //   refreshes on pull-to-refresh and after a decision, never polled).
 // - Tasks: every role (END_USER read-only). The list is built from TKT-1 rows; see hooks/useTasks.ts (no A20 yet).
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
-// - Header and active row follow the web sidebar (frontend/src/layouts/AppLayout.tsx): the logo with "Service Desk",
-//   and the current module as a filled brand-red row.
+// - Header and rows follow the web sidebar (frontend/src/layouts/AppLayout.tsx): a white header band with the logo
+//   (44 dp tall, 72 dp wide) and the app name beside it; the current module as a filled brand-red row; idle rows in
+//   the web's idle grey; Sign out in the web's red.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -16,7 +17,7 @@ import { BrandLogo } from '@/components';
 import { APP_ENV, APP_VERSION } from '@/config/env';
 import { countryName, useCountryOptions, usePendingApprovals, useSignOut } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { colors } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { AppDrawerParamList } from '@/types';
 import { formatDisplayName, initials } from '@/utils/format';
 import { ROLE_LABELS, isAgentOrAdmin, isCountryLockedAgent } from '@/utils/roles';
@@ -27,6 +28,7 @@ interface DrawerRow {
   icon: keyof typeof Ionicons.glyphMap;
   route?: keyof AppDrawerParamList;
   badge?: number;
+  danger?: boolean;
   onPress: () => void;
 }
 
@@ -89,6 +91,7 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
       key: 'signout',
       label: signingOut ? 'Signing out…' : 'Sign out',
       icon: 'log-out-outline',
+      danger: true,
       onPress: () => {
         if (!signingOut) void signOut();
       },
@@ -98,18 +101,19 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
       <ScrollView>
-        <View className="flex-row items-center border-b border-gray-200 px-4 py-3">
-          <BrandLogo height={40} />
-          <View className="ml-3 flex-1">
-            <Text className="text-sm font-bold text-gray-900">Service Desk</Text>
-            <Text className="text-xs text-gray-400">IT Support Portal</Text>
+        {/* Header band: logo left, vertically centred, at a fixed 44 dp; the app name beside it. */}
+        <View className="h-[72px] flex-row items-center border-b border-border bg-white px-4">
+          <BrandLogo height={44} />
+          <View className="ml-3 flex-1" accessibilityRole="header" accessibilityLabel="Mount Meru Service Desk">
+            <Text className="text-sm font-bold leading-5 text-gray-900" numberOfLines={1}>Mount Meru</Text>
+            <Text className="text-sm font-bold leading-5 text-gray-900" numberOfLines={1}>Service Desk</Text>
           </View>
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open profile and settings"
           onPress={go('Profile')}
-          className="flex-row items-center border-b border-gray-200 px-4 py-5"
+          className="flex-row items-center border-b border-border px-4 py-4 active:bg-gray-50"
         >
           <View className="h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Text className="text-base font-bold text-primary">{initials(user?.displayName)}</Text>
@@ -120,8 +124,8 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
             </Text>
             <Text className="text-sm text-gray-500">{ROLE_LABELS[role]}</Text>
             {locked ? (
-              <View className="mt-1 flex-row items-center self-start rounded-full bg-gray-100 px-2 py-0.5">
-                <Ionicons name="lock-closed" size={10} color={colors.text.body} />
+              <View className="mt-1 flex-row items-center self-start rounded-full bg-gray-100 px-2.5 py-0.5">
+                <Ionicons name="lock-closed" size={12} color={colors.text.body} />
                 <Text className="ml-1 text-xs text-gray-700">{lockedCountry ?? 'Country locked'}</Text>
               </View>
             ) : null}
@@ -133,7 +137,7 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
             <Row key={row.key} row={row} active={row.route === activeRoute} />
           ))}
         </View>
-        <View className="mx-4 border-t border-gray-200" />
+        <View className="mx-4 border-t border-border" />
         <View className="py-2">
           {account.map((row) => (
             <Row key={row.key} row={row} active={row.route === activeRoute} />
@@ -141,7 +145,7 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
           {signingOut ? <ActivityIndicator style={{ marginTop: 4 }} color={colors.primary} /> : null}
         </View>
       </ScrollView>
-      <Text className="px-4 py-3 text-xs text-gray-400">
+      <Text className="px-4 py-3 text-xs text-gray-500">
         v{APP_VERSION} · {APP_ENV}
         {__DEV__ ? ' · dev build' : ''}
       </Text>
@@ -150,15 +154,19 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
 }
 
 function Row({ row, active }: { row: DrawerRow; active: boolean }) {
+  // Web sidebar: active `bg-primary text-white`, idle `text-gray-600`, Sign out `text-red-600`.
+  const fg = active ? colors.nav.activeFg : row.danger ? palette.red[600] : colors.nav.idleFg;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={row.onPress}
-      className={`mx-2 flex-row items-center rounded-lg px-3 py-3 ${active ? 'bg-primary' : ''}`}
+      className={`mx-2 min-h-12 flex-row items-center rounded-lg px-3 ${active ? 'bg-primary' : 'active:bg-gray-100'}`}
     >
-      <Ionicons name={row.icon} size={22} color={active ? colors.nav.activeFg : colors.text.body} />
-      <Text className={`ml-4 flex-1 text-base ${active ? 'font-semibold text-primary-foreground' : 'text-gray-800'}`}>{row.label}</Text>
+      <Ionicons name={row.icon} size={24} color={fg} />
+      <Text className="ml-4 flex-1 text-base" style={{ color: fg, fontWeight: active ? '600' : '500' }}>
+        {row.label}
+      </Text>
       {/* Inverted on the active row, where a red count would vanish into the red background. */}
       {row.badge ? (
         <View className={`min-w-6 items-center rounded-full px-1.5 py-0.5 ${active ? 'bg-white' : 'bg-red-600'}`}>

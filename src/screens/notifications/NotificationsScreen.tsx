@@ -15,11 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
-import { EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
+import { EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useUnreadCount,
 } from '@/hooks';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { MainTabScreenProps, Notification } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatRelative } from '@/utils/format';
@@ -131,11 +131,10 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
       accessibilityState={{ disabled: unreadCount === 0 || markAll.isPending }}
       disabled={unreadCount === 0 || markAll.isPending}
       onPress={onMarkAll}
-      hitSlop={8}
-      className="px-2 py-1"
+      className="min-h-11 justify-center rounded-lg px-3 active:bg-gray-100"
     >
       {markAll.isPending ? (
-        <ActivityIndicator color={palette.blue[600]} />
+        <ActivityIndicator color={colors.primary} />
       ) : (
         <Text className={`text-sm font-medium ${unreadCount === 0 ? 'text-gray-400' : 'text-blue-700'}`}>Mark all read</Text>
       )}
@@ -148,7 +147,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   } else if (!hasData && list.isError) {
     content = <ErrorState error={list.error} title="Couldn't load notifications" onRetry={() => void list.refetch()} />;
   } else if (!hasData) {
-    content = <LoadingSkeleton rows={5} />;
+    content = <LoadingSkeleton variant="notifications" rows={5} />;
   } else {
     content = (
       <SectionList
@@ -169,11 +168,10 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
           />
         )}
         ListHeaderComponent={
-          <View className="mx-4 mb-3 flex-row items-start rounded-lg bg-blue-50 p-3">
-            <Ionicons name="information-circle-outline" size={16} color={palette.blue[700]} />
-            <Text className="ml-2 flex-1 text-xs leading-4 text-blue-900">
+          <View className="mx-4">
+            <Notice>
               Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
-            </Text>
+            </Notice>
           </View>
         }
         ListEmptyComponent={
@@ -191,7 +189,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[palette.blue[600]]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       />
     );
   }
@@ -217,8 +215,11 @@ function NotificationRow({
   const icon = TYPE_ICONS[n.type] ?? 'notifications-outline';
   const body = htmlToDisplayText(n.body);
   const ticket = n.ticket && typeof n.ticket.ticketNumber === 'number' ? n.ticket : null;
+  // Meta text one shade darker on the unread tint: gray-500 on blue-50 is 4.4:1, below WCAG AA.
+  const meta = n.isRead ? 'text-gray-500' : 'text-gray-600';
+  // The standard card; unread ones tinted with the app's information blue.
   return (
-    <View className={`mx-4 mb-2 flex-row rounded-xl border p-3 ${n.isRead ? 'border-gray-100 bg-white' : 'border-blue-200 bg-blue-50'}`}>
+    <View className={`mx-4 mb-3 flex-row rounded-xl border p-4 ${n.isRead ? 'border-border bg-white' : 'border-blue-200 bg-blue-50'}`}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${n.isRead ? '' : 'Unread. '}${n.title}`}
@@ -237,16 +238,16 @@ function NotificationRow({
             </Text>
           </View>
           {body ? (
-            <Text className="mt-0.5 text-xs text-gray-700" numberOfLines={3}>
+            <Text className="mt-0.5 text-sm text-gray-700" numberOfLines={3}>
               {body}
             </Text>
           ) : null}
           {ticket ? (
-            <Text className="mt-1 text-xs text-gray-500" numberOfLines={1}>
+            <Text className={`mt-1 text-xs ${meta}`} numberOfLines={1}>
               #{ticket.ticketNumber} · {ticket.title}
             </Text>
           ) : null}
-          <Text className="mt-1 text-xs text-gray-400" accessibilityLabel={formatDateTime(n.createdAt)}>
+          <Text className={`mt-1 text-xs ${meta}`} accessibilityLabel={formatDateTime(n.createdAt)}>
             {formatRelative(n.createdAt)}
           </Text>
         </View>
@@ -257,10 +258,10 @@ function NotificationRow({
           accessibilityLabel="Mark as read"
           disabled={marking}
           onPress={onMarkRead}
-          hitSlop={8}
-          className="ml-2 h-8 w-8 items-center justify-center self-start"
+          hitSlop={6}
+          className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center self-start rounded-full active:bg-blue-100"
         >
-          {marking ? <ActivityIndicator size="small" color={palette.blue[600]} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
+          {marking ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
         </Pressable>
       ) : null}
     </View>
@@ -277,7 +278,7 @@ function Footer({
   onRetry: () => void;
 }) {
   if (hasMore && offline) return <Text className="py-4 text-center text-xs text-gray-500">More load when you reconnect.</Text>;
-  if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color={palette.blue[600]} />;
+  if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />;
   if (failed) {
     return (
       <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4">

@@ -17,7 +17,7 @@ import {
 } from '@/components';
 import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps } from '@/types';
 import { canSeePrivateNotes } from '@/utils/activity';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
@@ -117,7 +117,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
       <ScreenHeader title={title} variant="close" />
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
-        <Text className="mx-4 mb-3 text-sm text-gray-600" numberOfLines={2}>
+        <Text className="mx-4 mb-3 text-sm text-gray-500" numberOfLines={2}>
           #{ticket.ticketNumber} · {ticket.title}
         </Text>
 
@@ -130,9 +130,9 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
                 accessibilityState={{ selected: m === mode, disabled: post.isPending }}
                 disabled={post.isPending}
                 onPress={() => setMode(m)}
-                className={`flex-1 items-center rounded-lg py-2 ${m === mode ? (m === 'note' ? 'bg-amber-100' : 'bg-white') : ''}`}
+                className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${m === mode ? (m === 'note' ? 'bg-amber-100' : 'bg-white') : ''}`}
               >
-                <Text className={`text-sm ${m === mode ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>{MODE_LABELS[m]}</Text>
+                <Text className={`text-center text-sm ${m === mode ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>{MODE_LABELS[m]}</Text>
               </Pressable>
             ))}
           </View>
@@ -143,7 +143,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             <>
               {mode === 'replyAll' && recipients.isFetching ? <Text className="mb-1 text-xs text-gray-500">Loading thread recipients…</Text> : null}
               {mode === 'replyAll' && recipients.isError && !recipients.isFetching ? (
-                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-2 rounded-lg bg-amber-50 p-2">
+                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-3 min-h-11 justify-center rounded-lg bg-amber-50 p-3">
                   <Text className="text-xs text-amber-900">
                     Couldn't load the thread's recipients ({describeError(recipients.error)}). To is set to the requester only.{' '}
                     <Text className="font-semibold">Tap to retry.</Text>
@@ -163,7 +163,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             multiline
             textAlignVertical="top"
             placeholder={isPublic ? 'Type your reply…' : 'Type an internal note…'}
-            placeholderTextColor={palette.gray[400]}
+            placeholderTextColor={colors.text.secondary}
             accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
             className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
           />

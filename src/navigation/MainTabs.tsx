@@ -23,15 +23,23 @@ export function MainTabs() {
       initialRouteName="HomeTab"
       // Android back on a non-Home tab root returns to Home, then exits (08 §3.1).
       backBehavior="initialRoute"
-      // Web MobileBottomNav: active `text-primary`, idle `text-gray-400`.
-      screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.nav.tabActive, tabBarInactiveTintColor: colors.nav.tabIdle }}
+      // Web MobileBottomNav: active `text-primary`; idle gray-500 here (the web's gray-400 fails WCAG AA, colors.ts).
+      // 24 dp icons, filled when active. The unread badge is brand red: React Navigation's default red is 3.5:1.
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.nav.tabActive,
+        tabBarInactiveTintColor: colors.nav.tabIdle,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
+        tabBarBadgeStyle: { backgroundColor: colors.primary, color: colors.primaryForeground },
+      }}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeScreen}
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'home' : 'home-outline'} color={color} size={24} />,
         }}
       />
       <Tab.Screen
@@ -39,7 +47,7 @@ export function MainTabs() {
         component={TicketStack}
         options={{
           title: role === 'END_USER' ? 'My Tickets' : 'Tickets',
-          tabBarIcon: ({ color, size }) => <Ionicons name="ticket-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'ticket' : 'ticket-outline'} color={color} size={24} />,
         }}
       />
       <Tab.Screen
@@ -48,7 +56,9 @@ export function MainTabs() {
         options={{
           title: 'Alerts',
           tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
-          tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} color={color} size={24} />
+          ),
         }}
       />
     </Tab.Navigator>

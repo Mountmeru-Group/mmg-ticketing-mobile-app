@@ -37,23 +37,23 @@ export function RecentTicketRow({ ticket, showRequester, onPress, last = false }
       <View className="flex-1">
         <View className="flex-row items-center">
           <Text className="text-xs font-semibold text-gray-500">#{ticket.ticketNumber ?? '—'}</Text>
-          <Text className="ml-2 flex-1 text-xs text-gray-400" numberOfLines={1}>
+          <Text className="ml-2 flex-1 text-xs text-gray-500" numberOfLines={1}>
             Updated {formatRelative(ticket.updatedAt)}
           </Text>
         </View>
         <Text className="mt-0.5 text-sm font-semibold text-gray-900" numberOfLines={2}>
           {ticket.title || '(no subject)'}
         </Text>
-        <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+        <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
           <StatusBadge status={ticket.status} />
           <PriorityBadge priority={ticket.priority} />
           <SlaBadge ticket={ticket} />
         </View>
-        <Text className="mt-1 text-xs text-gray-600" numberOfLines={1}>
+        <Text className="mt-2 text-xs text-gray-500" numberOfLines={1}>
           {who}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
+      <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />
     </Pressable>
   );
 }

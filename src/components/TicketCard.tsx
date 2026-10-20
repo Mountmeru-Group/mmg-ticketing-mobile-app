@@ -37,11 +37,15 @@ function TicketCardImpl({
   const technician = formatDisplayName(ticket.assignedTo?.displayName);
   const chipInteractive = !!onStatusPress && !selectionMode;
 
+  // The standard card (Card.tsx). Selected: brand primary edge, as every selected state. New reply: the blue accent
+  // edge, the app's information colour.
   const border = selected
-    ? 'border-blue-500 bg-blue-50'
+    ? 'border-primary bg-red-50'
     : newReply
-      ? 'border-blue-300 border-l-4 border-l-blue-600 bg-white'
-      : 'border-gray-100 bg-white';
+      ? 'border-blue-200 border-l-4 border-l-blue-600 bg-white'
+      : 'border-border bg-white';
+  // Meta text one shade darker on the selected tint: gray-500 on red-50 is 4.4:1, below WCAG AA.
+  const meta = selected ? 'text-gray-600' : 'text-gray-500';
 
   return (
     <Pressable
@@ -56,15 +60,15 @@ function TicketCardImpl({
     >
       <View className="mb-1 flex-row items-center">
         {selectionMode ? (
-          <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={18} color={selected ? palette.blue[600] : colors.text.muted} style={{ marginRight: 6 }} />
+          <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.primary : colors.text.secondary} style={{ marginRight: 6 }} />
         ) : null}
-        <Text className="text-xs font-semibold text-gray-500">#{ticket.ticketNumber ?? '—'}</Text>
-        <Text className="ml-2 flex-1 text-xs text-gray-400" numberOfLines={1}>
+        <Text className={`text-xs font-semibold ${meta}`}>#{ticket.ticketNumber ?? '—'}</Text>
+        <Text className={`ml-2 flex-1 text-xs ${meta}`} numberOfLines={1}>
           Updated {formatRelative(ticket.updatedAt)}
         </Text>
         {newReply ? (
-          <View className="rounded-full bg-blue-600 px-2 py-0.5">
-            <Text className="text-[10px] font-semibold uppercase text-white">New reply</Text>
+          <View className="rounded-full bg-blue-600 px-2.5 py-0.5">
+            <Text className="text-xs font-semibold text-white">New reply</Text>
           </View>
         ) : null}
       </View>
@@ -81,7 +85,7 @@ function TicketCardImpl({
             accessibilityState={{ disabled: statusBusy, busy: statusBusy }}
             disabled={statusBusy}
             onPress={() => onStatusPress?.(ticket)}
-            hitSlop={6}
+            hitSlop={12}
             className="flex-row items-center"
           >
             <StatusBadge status={ticket.status} />
@@ -98,7 +102,7 @@ function TicketCardImpl({
         <SlaBadge ticket={ticket} />
       </View>
 
-      <Text className="mt-2 text-xs text-gray-600" numberOfLines={1}>
+      <Text className={`mt-2 text-xs ${meta}`} numberOfLines={1}>
         {staff
           ? `${requester} · ${technician ? `Technician: ${technician}` : 'Unassigned'}`
           : technician

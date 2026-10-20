@@ -1,14 +1,14 @@
 // Searchable people picker: a local list (group members), plus USR-3 search when `searchRoles` is given.
 // USR-3 is ADMIN/AGENT only (useUserSearch enforces it). Picking a person writes nothing — the caller confirms.
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDebouncedValue, useUserSearch } from '@/hooks';
 import { colors } from '@/theme';
 import type { UserRole } from '@/types';
 import { formatDisplayName } from '@/utils/format';
+import { SearchField } from './Filters';
 import { LookupError } from './Form';
 
 export interface Person {
@@ -55,7 +55,7 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
   };
 
   const row = (p: Person) => (
-    <Pressable key={p.id} accessibilityRole="button" onPress={() => pick(p)} className="border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+    <Pressable key={p.id} accessibilityRole="button" onPress={() => pick(p)} className="min-h-12 border-b border-gray-100 px-4 py-3 active:bg-gray-50">
       <Text className="text-base text-gray-900">{formatDisplayName(p.displayName) || p.email}</Text>
       <Text className="text-xs text-gray-500">
         {p.email}
@@ -64,26 +64,25 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
     </Pressable>
   );
 
+  // Same sheet frame as OptionSheet: grab handle, title, then the list.
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
       <Pressable accessibilityLabel="Close" onPress={close} className="flex-1 bg-black/40" />
-      <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-3">
-        <Text className="px-4 pb-2 text-base font-semibold text-gray-900" accessibilityRole="header">{title}</Text>
-        <View className="mx-4 mb-2 h-10 flex-row items-center rounded-lg bg-gray-100 px-3">
-          <Ionicons name="search" size={16} color={colors.text.secondary} />
-          <TextInput
+      <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-2">
+        <View className="mb-1 h-1 w-10 self-center rounded-full bg-gray-300" />
+        <Text className="px-4 py-3 text-base font-semibold text-gray-900" accessibilityRole="header">{title}</Text>
+        <View className="mx-4 mb-2">
+          <SearchField
             value={query}
             onChangeText={setQuery}
+            onClear={() => setQuery('')}
             placeholder={searchRoles !== undefined ? 'Name or email (2+ letters)' : 'Filter by name or email'}
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            className="ml-2 flex-1 text-base text-gray-900"
+            accessibilityLabel={searchRoles !== undefined ? 'Search people by name or email' : 'Filter people by name or email'}
           />
         </View>
         <ScrollView keyboardShouldPersistTaps="handled">
           {extraOptions.map((o) => (
-            <Pressable key={o.key} accessibilityRole="button" onPress={o.onPress} className="border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+            <Pressable key={o.key} accessibilityRole="button" onPress={o.onPress} className="min-h-12 justify-center border-b border-gray-100 px-4 py-3 active:bg-gray-50">
               <Text className="text-base font-medium text-blue-700">{o.label}</Text>
             </Pressable>
           ))}

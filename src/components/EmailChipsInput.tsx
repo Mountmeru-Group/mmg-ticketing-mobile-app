@@ -48,7 +48,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
 
   return (
     <View className="mb-2">
-      <View className="flex-row flex-wrap items-center rounded-lg border border-gray-300 bg-white px-2 py-1">
+      <View className="min-h-11 flex-row flex-wrap items-center rounded-lg border border-gray-300 bg-white px-2 py-1">
         <Text className="mr-1 text-sm text-gray-500">{label}</Text>
         {chips.map((email) => (
           <Pressable
@@ -57,10 +57,11 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
             accessibilityLabel={`Remove ${email}`}
             disabled={disabled}
             onPress={() => onChangeChips(chips.filter((c) => c !== email))}
-            className="m-0.5 flex-row items-center rounded-full bg-blue-100 px-2 py-1"
+            hitSlop={6}
+            className="m-0.5 h-8 flex-row items-center rounded-full bg-blue-100 px-2.5"
           >
             <Text className="text-xs text-blue-900">{email}</Text>
-            <Ionicons name="close" size={12} color={palette.blue[900]} style={{ marginLeft: 2 }} />
+            <Ionicons name="close" size={14} color={palette.blue[900]} style={{ marginLeft: 4 }} />
           </Pressable>
         ))}
         <TextInput
@@ -73,7 +74,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
           }}
           submitBehavior="submit"
           placeholder={chips.length ? '' : 'name@example.com'}
-          placeholderTextColor={colors.text.muted}
+          placeholderTextColor={colors.text.secondary}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -83,13 +84,13 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
       </View>
       {invalid ? <Text className="mt-1 text-xs text-red-700">Not a valid email address.</Text> : null}
       {suggest && shown.length > 0 && input.trim().length >= 2 ? (
-        <View className="mt-1 rounded-lg border border-gray-200 bg-white">
+        <View className="mt-1 rounded-lg border border-border bg-white">
           {shown.map((u) => (
             <Pressable
               key={u.id}
               accessibilityRole="button"
               onPress={() => commit(u.email)}
-              className="border-b border-gray-100 px-3 py-2 active:bg-gray-50"
+              className="min-h-11 justify-center border-b border-gray-100 px-3 py-2 active:bg-gray-50"
             >
               <Text className="text-sm text-gray-900">{formatDisplayName(u.displayName)}</Text>
               <Text className="text-xs text-gray-500">{u.email}</Text>

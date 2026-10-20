@@ -17,7 +17,7 @@ import {
 } from '@/components';
 import { useCategories, useCreateTicket, useDiscardGuard, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { colors, palette } from '@/theme';
 import {
   TICKET_IMPACTS, TICKET_URGENCIES, type Category, type TicketImpact, type TicketStackScreenProps, type TicketUrgency,
   type UserRole,
@@ -179,9 +179,9 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
             editable={!busy}
             maxLength={255}
             placeholder="Short summary of the issue"
-            placeholderTextColor={palette.gray[400]}
+            placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Title, required"
-            className="mb-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
+            className="mb-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
           <FieldLabel label="Description" required />
           <TextInput
@@ -191,7 +191,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
             multiline
             textAlignVertical="top"
             placeholder="What happened, and what do you need?"
-            placeholderTextColor={palette.gray[400]}
+            placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Description, required"
             className="min-h-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />

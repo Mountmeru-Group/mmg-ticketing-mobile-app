@@ -52,7 +52,7 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
       {toggling ? (
         <ActivityIndicator size="small" color={colors.primary} />
       ) : (
-        <Ionicons name={done ? 'checkbox' : 'square-outline'} size={22} color={done ? palette.green[600] : palette.gray[600]} />
+        <Ionicons name={done ? 'checkbox' : 'square-outline'} size={20} color={done ? palette.green[600] : palette.gray[600]} />
       )}
     </Pressable>
   ) : (
@@ -68,11 +68,11 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
           #{parent.ticketNumber} · {parent.title || '(no subject)'}
         </Text>
       ) : null}
-      <Text className={`text-sm font-medium ${done ? 'text-gray-500 line-through' : 'text-gray-900'}`} numberOfLines={2}>
+      <Text className={`text-sm font-semibold ${done ? 'text-gray-500 line-through' : 'text-gray-900'}`} numberOfLines={2}>
         {task.title || '(untitled task)'}
       </Text>
       {task.description && !parent ? (
-        <Text className="mt-0.5 text-xs text-gray-600" numberOfLines={2}>
+        <Text className="mt-0.5 text-xs text-gray-500" numberOfLines={2}>
           {task.description}
         </Text>
       ) : null}
@@ -101,7 +101,7 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
           className="flex-1 flex-row items-center active:opacity-70"
         >
           {body}
-          <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
+          <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />
         </Pressable>
       ) : (
         body

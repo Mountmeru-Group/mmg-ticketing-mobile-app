@@ -48,7 +48,7 @@ export function OptionSheet<T extends string>({
                     onSelect(option.value);
                     onClose();
                   }}
-                  className="flex-row items-center px-4 py-3 active:bg-gray-50"
+                  className="min-h-12 flex-row items-center border-b border-gray-100 px-4 py-3 active:bg-gray-50"
                 >
                   <View className="flex-1">
                     <Text className={`text-base ${active ? 'font-semibold text-primary' : 'text-gray-900'}`}>{option.label}</Text>

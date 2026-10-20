@@ -29,22 +29,22 @@ export function ScreenHeader({ title, variant = 'back', right }: ScreenHeaderPro
     else if (navigation.canGoBack()) navigation.goBack();
   };
 
+  // 56 dp bar, 44 dp icon buttons, 24 dp icons (docs/brand/UI-STANDARDS.md, S1). White, so the status bar is dark.
   return (
-    <View style={{ paddingTop: insets.top }} className="border-b border-gray-200 bg-white">
-      <View className="h-14 flex-row items-center px-2">
+    <View style={{ paddingTop: insets.top }} className="border-b border-border bg-white">
+      <View className="h-14 flex-row items-center px-1">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={leftLabel}
           onPress={onLeftPress}
-          hitSlop={8}
-          className="h-10 w-10 items-center justify-center rounded-full"
+          className="h-11 w-11 items-center justify-center rounded-full active:bg-gray-100"
         >
           <Ionicons name={leftIcon} size={24} color={colors.text.primary} />
         </Pressable>
         <Text className="ml-2 flex-1 text-lg font-semibold text-gray-900" numberOfLines={1} accessibilityRole="header">
           {title}
         </Text>
-        <View className="min-w-10 flex-row items-center justify-end">{right}</View>
+        <View className="min-w-11 flex-row items-center justify-end">{right}</View>
       </View>
     </View>
   );

@@ -11,16 +11,15 @@
 // - Never: password form (production is SSO only), /auth/test-login, WebView cookie lifting (02 §6).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useIsOffline } from '@/api/network';
-import { BrandLogo, OfflineBanner } from '@/components';
+import { BrandLogo, OfflineBanner, OutlineButton, SubmitButton } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
 import { ENVIRONMENT_LABEL } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { colors, palette } from '@/theme';
+import { palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
@@ -35,7 +34,6 @@ function describeRedirectUri(): string {
 
 export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
   const signOutMessage = useAuthStore((s) => s.signOutMessage);
-  const offline = useIsOffline();
   const insets = useSafeAreaInsets();
   const [signingIn, setSigningIn] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -75,21 +73,20 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
   return (
     <View className="flex-1 bg-gray-50">
       <View style={{ paddingTop: insets.top }} className="bg-gray-50" />
-      <ScrollView contentContainerClassName="p-4 pb-12">
-        {offline ? (
-          <View className="mb-3 overflow-hidden rounded-lg">
-            <OfflineBanner />
-          </View>
-        ) : null}
-
-        <View className="mb-4 rounded-xl bg-white p-4">
+      {/* Same place as on every other screen: the top of the screen, full width. */}
+      <OfflineBanner />
+      <ScrollView contentContainerClassName="flex-grow justify-center p-4 pb-12">
+        {/* The web's login card: logo centred, the app name as the heading, one line of help. */}
+        <View className="mb-4 items-center rounded-xl border border-border bg-white px-4 py-6">
           <BrandLogo height={64} />
-          <Text className="mt-4 text-2xl font-bold text-gray-900">Mount Meru Service Desk</Text>
-          <Text className="mt-1 text-sm text-gray-600">Sign in with your Mount Meru work account.</Text>
+          <Text accessibilityRole="header" className="mt-4 text-center text-2xl font-bold text-gray-900">
+            Mount Meru Service Desk
+          </Text>
+          <Text className="mt-1 text-center text-sm text-gray-500">Sign in with your Mount Meru work account.</Text>
           {/* Which backend this build talks to, always visible to testers (04 M1). */}
           <View
             accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`}
-            className="mt-3 self-start rounded-lg bg-amber-100 px-2.5 py-1"
+            className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5"
           >
             <Text className="text-xs font-semibold text-amber-800">{ENVIRONMENT_LABEL}</Text>
           </View>
@@ -112,38 +109,23 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
                   Ref: {failure.reason}
                   {failure.status !== null ? ` · HTTP ${failure.status}` : ''}
                 </Text>
-                {__DEV__ ? <Text className="mt-1 font-mono text-[11px] text-red-700">{failure.detail}</Text> : null}
+                {__DEV__ ? <Text className="mt-1 font-mono text-xs text-red-700">{failure.detail}</Text> : null}
               </View>
             </View>
             {copy.retryLabel ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={startSignIn}
-                disabled={signingIn}
-                className="mt-3 self-end rounded-lg border border-red-300 bg-white px-3 py-2"
-              >
-                <Text className="text-sm font-semibold text-red-800">{copy.retryLabel}</Text>
-              </Pressable>
+              <View className="mt-3 self-end">
+                <OutlineButton label={copy.retryLabel} tone="danger" onPress={startSignIn} disabled={signingIn} />
+              </View>
             ) : null}
           </View>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: signingIn, busy: signingIn }}
-          disabled={signingIn}
+        <SubmitButton
+          label={signingIn ? 'Signing in…' : 'Sign in with Microsoft'}
+          icon="logo-microsoft"
           onPress={startSignIn}
-          className={`h-12 flex-row items-center justify-center rounded-lg px-4 ${signingIn ? 'bg-gray-300' : 'bg-blue-600 active:bg-blue-700'}`}
-        >
-          {signingIn ? (
-            <ActivityIndicator color={palette.gray[600]} />
-          ) : (
-            <Ionicons name="logo-microsoft" size={18} color={colors.text.inverse} />
-          )}
-          <Text className={`ml-2 text-base font-semibold ${signingIn ? 'text-gray-600' : 'text-white'}`}>
-            {signingIn ? 'Signing in…' : 'Sign in with Microsoft'}
-          </Text>
-        </Pressable>
+          loading={signingIn}
+        />
         {signingIn ? (
           <Text className="mt-2 text-center text-xs text-gray-500">
             Finish on the Microsoft page. Close it to cancel.
@@ -156,13 +138,13 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
               Developer build: if Microsoft sign-in is not ready yet (AUTH-P2 not deployed), the developer token
               below is the fallback.
             </Text>
-            <Text className="mt-2 font-mono text-[11px] text-amber-900">
+            <Text className="mt-2 font-mono text-xs text-amber-900">
               Redirect URI sent to Microsoft: {describeRedirectUri()}
             </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate('DevToken')}
-              className="mt-3 rounded-lg border border-amber-500 bg-white px-4 py-3"
+              className="mt-3 min-h-11 justify-center rounded-lg border border-amber-500 bg-white px-4 py-2"
             >
               <Text className="text-center font-medium text-amber-900">Developer: use a UAT session token</Text>
             </Pressable>

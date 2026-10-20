@@ -3,7 +3,7 @@
 // anything, and a non-image response simply fails to decode. "Share" downloads the file (ATT-4) for the share sheet.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StatusBar, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AuthenticatedRequest } from '@/api/attachments.api';
@@ -25,9 +25,11 @@ export function ImageViewerModal({
   return (
     <Modal visible={request !== null} animationType="fade" onRequestClose={onClose} statusBarTranslucent onShow={() => setState('loading')}>
       <View className="flex-1 bg-black" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        <View className="h-14 flex-row items-center px-2">
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} className="h-10 w-10 items-center justify-center">
-            <Ionicons name="close" size={26} color={colors.text.inverse} />
+        {/* Light status-bar icons on the black viewer; unmounting restores the app's dark ones. */}
+        {request !== null ? <StatusBar barStyle="light-content" /> : null}
+        <View className="h-14 flex-row items-center px-1">
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} className="h-11 w-11 items-center justify-center rounded-full">
+            <Ionicons name="close" size={24} color={colors.text.inverse} />
           </Pressable>
           <Text className="ml-2 flex-1 text-base text-white" numberOfLines={1}>{title}</Text>
           {onShare ? (
@@ -37,8 +39,7 @@ export function ImageViewerModal({
               accessibilityState={{ busy: sharing }}
               disabled={sharing}
               onPress={onShare}
-              hitSlop={8}
-              className="h-10 w-10 items-center justify-center"
+              className="h-11 w-11 items-center justify-center rounded-full"
             >
               {sharing ? <ActivityIndicator color={colors.text.inverse} /> : <Ionicons name="share-social-outline" size={22} color={colors.text.inverse} />}
             </Pressable>

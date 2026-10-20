@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { assignTicket } from '@/api/tickets.api';
 import {
   BulkProgressModal, EmptyState, ErrorState, FormCard, LoadingSkeleton, LookupError, Notice, OfflineBanner, OfflineState,
-  OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, type Person, type SheetOption,
+  OptionSheet, OutlineButton, PersonPickerSheet, ScreenHeader, SelectField, type Person, type SheetOption,
 } from '@/components';
 import {
   assertAssignment, fetchCurrentStatus, findCachedTicket, useAssignTicket, useBulkRunner, useDiscardGuard, useSingleFlight, useSuggestedAssignees, useTeams,
@@ -157,8 +157,8 @@ function SingleAssign({ navigation, route }: Props) {
       ) : (
         <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
           <FormCard>
-            <Text className="text-sm text-gray-600" numberOfLines={2}>#{ticket.ticketNumber} · {ticket.title}</Text>
-            <Text className="mt-2 text-sm text-gray-800">
+            <Text className="text-sm text-gray-500" numberOfLines={2}>#{ticket.ticketNumber} · {ticket.title}</Text>
+            <Text className="mt-2 text-sm text-gray-700">
               Technician: <Text className="font-semibold">{current || 'Unassigned'}</Text> · Group:{' '}
               <Text className="font-semibold">{ticket.team?.name ?? 'Not set'}</Text>
             </Text>
@@ -239,13 +239,13 @@ function SingleAssign({ navigation, route }: Props) {
             {!suggested.isLoading && recommended.length === 0 && !suggested.isError ? (
               <Text className="text-sm text-gray-500">No recommendations for this category and country.</Text>
             ) : null}
-            {recommended.map((p) => (
+            {recommended.map((p, i) => (
               <Pressable
                 key={p.id}
                 accessibilityRole="button"
                 disabled={busy || p.id === ticket.assignedToId}
                 onPress={() => pickPerson(p, ticket)}
-                className={`border-b border-gray-100 py-2.5 ${busy || p.id === ticket.assignedToId ? 'opacity-50' : ''}`}
+                className={`min-h-12 justify-center py-3 ${i === recommended.length - 1 ? '' : 'border-b border-gray-100'} ${busy || p.id === ticket.assignedToId ? 'opacity-50' : 'active:bg-gray-50'}`}
               >
                 <Text className="text-base text-gray-900">{formatDisplayName(p.displayName)}</Text>
                 <Text className="text-xs text-gray-500">
@@ -278,17 +278,12 @@ function SingleAssign({ navigation, route }: Props) {
   );
 }
 
+/** One action in a stack of actions: the standard outline button, left-aligned (UI-STANDARDS S5). */
 function ActionRow({ label, onPress, disabled = false, tone = 'default' }: { label: string; onPress: () => void; disabled?: boolean; tone?: 'default' | 'danger' }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      className={`mb-2 rounded-lg border px-3 py-3 ${tone === 'danger' ? 'border-red-200 bg-red-50' : 'border-gray-300 bg-white'} ${disabled ? 'opacity-50' : ''}`}
-    >
-      <Text className={`text-base ${tone === 'danger' ? 'text-red-800' : 'text-gray-900'}`}>{label}</Text>
-    </Pressable>
+    <View className="mb-2">
+      <OutlineButton label={label} onPress={onPress} disabled={disabled} tone={tone === 'danger' ? 'danger' : 'neutral'} align="start" />
+    </View>
   );
 }
 
@@ -355,7 +350,7 @@ function BulkAssign({ navigation, route }: Props) {
           <FormCard title={`${eligible.length} will be assigned`}>
             <Text className="text-sm text-gray-700">{eligible.map((t) => t.label).join(', ') || 'None of the selected tickets can be assigned.'}</Text>
             {skipped.map((t) => (
-              <Text key={t.id} className="mt-1 text-sm text-gray-600">
+              <Text key={t.id} className="mt-1 text-sm text-gray-500">
                 Skipped {t.label}: {t.skipReason}
               </Text>
             ))}

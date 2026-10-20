@@ -1,4 +1,6 @@
 import './global.css';
+// Keeps the native splash up until the first screen is ready (src/navigation/splash.ts). Must load before rendering.
+import '@/navigation/splash';
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'react-native';

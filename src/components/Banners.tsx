@@ -1,5 +1,6 @@
 // Thin banners above a screen's content.
-// - OfflineBanner: the device has no connection (NetInfo, src/api/network.ts). One per screen.
+// - OfflineBanner: the device has no connection (NetInfo, src/api/network.ts). One per screen, always directly under
+//   the screen header (above any search or filter bar); on Login, at the top of the screen.
 // - QueryBanner:   a request failed while older data is still on screen — the server could not be reached
 //                  (amber) or answered with an error (red). Silent while the device is offline: OfflineBanner
 //                  already says so, and queries pause rather than fail.
@@ -28,7 +29,7 @@ function Banner({
         <Text className={`text-xs ${textClass}`}>{detail}</Text>
       </View>
       {onRetry ? (
-        <Pressable accessibilityRole="button" onPress={onRetry} hitSlop={8} className="ml-2 rounded-md px-2 py-1">
+        <Pressable accessibilityRole="button" onPress={onRetry} className="-mr-2 ml-2 min-h-11 justify-center rounded-md px-3">
           <Text className={`text-sm font-semibold ${textClass}`}>Retry</Text>
         </Pressable>
       ) : null}
