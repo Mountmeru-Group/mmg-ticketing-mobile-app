@@ -8,7 +8,7 @@
 // - No delegation: the backend has none (A26). Never the unscoped GET /approvals (05 C.16).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from '@react-navigation/native';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -55,6 +55,9 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
       setRefreshing(false);
     }
   };
+  // Stable (Phase P): the ticket lookups are a new Map on every render, so the list re-renders its rows each time;
+  // memoised cards with stable props skip the ones that did not change.
+  const openApproval = useCallback((approvalId: string) => navigation.navigate('ApprovalDetail', { approvalId }), [navigation]);
 
   const ticketApprovalCount = (query.data ?? []).filter((a) => a.entityType === 'ticket').length;
   const hasData = query.data !== undefined;
@@ -69,17 +72,10 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
     content = (
       <FlatList
         data={rows}
-        keyExtractor={(a) => a.id}
+        keyExtractor={approvalKey}
         renderItem={({ item }) => {
           const lookup = item.entityType === 'ticket' ? tickets.get(item.entityId) : undefined;
-          return (
-            <ApprovalCard
-              approval={item}
-              ticket={lookup?.ticket}
-              ticketLoading={!!lookup?.loading}
-              onPress={() => navigation.navigate('ApprovalDetail', { approvalId: item.id })}
-            />
-          );
+          return <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />;
         }}
         ListHeaderComponent={
           ticketApprovalCount > MAX_CARD_TICKET_LOOKUPS ? (
@@ -125,13 +121,16 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
   );
 }
 
-function ApprovalCard({
+const approvalKey = (a: Approval) => a.id;
+
+/** Memoised (Phase P); `onPress` takes the approval's id, so it keeps one identity. */
+const ApprovalCard = memo(function ApprovalCard({
   approval, ticket, ticketLoading, onPress,
 }: {
   approval: Approval;
   ticket: TicketDetail | undefined;
   ticketLoading: boolean;
-  onPress: () => void;
+  onPress: (approvalId: string) => void;
 }) {
   const requester = approvalRequester(approval, ticket);
   const subject = approvalSubject(approval, ticket);
@@ -140,7 +139,7 @@ function ApprovalCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${entityLabel(approval.entityType)} approval: ${subject}`}
-      onPress={onPress}
+      onPress={() => onPress(approval.id)}
       className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80"
     >
       <View className="mb-2 flex-row items-center">
@@ -164,4 +163,4 @@ function ApprovalCard({
       </View>
     </Pressable>
   );
-}
+});

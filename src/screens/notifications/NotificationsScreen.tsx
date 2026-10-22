@@ -9,7 +9,7 @@
 // - No live updates (SSE is broken, 05 B.3) and no push (05 B.4); this phase also forbids polling. The screen says so,
 //   and pull-to-refresh reloads the newest page and the badge. Details: hooks/useNotifications.ts.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,7 +17,8 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
 import {
-  useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useUnreadCount,
+  useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
+  useUnreadCount,
 } from '@/hooks';
 import { colors, palette } from '@/theme';
 import type { MainTabScreenProps, Notification } from '@/types';
@@ -88,7 +89,9 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
     navigation.navigate('TicketsTab', { screen: 'TicketDetail', params: { ticketId: n.ticketId }, initial: false });
   };
 
-  const onPressRow = (n: Notification) => {
+  // Stable identities (Phase P): they are props of every memoised row, and SectionList re-renders all its rows on each
+  // render of this screen, so a new function per render would redo every row (and its HTML-to-text body).
+  const onPressRow = useStableCallback((n: Notification) => {
     // Marking read is part of opening it; a failure (e.g. offline) never blocks opening the ticket, but it is always
     // reported (the row stays unread). The per-call promise reports every tap, even when several overlap.
     if (!n.isRead) {
@@ -97,16 +100,17 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
       });
     }
     openRelated(n);
-  };
+  });
 
-  const onMarkOne = (n: Notification) =>
+  const onMarkOne = useStableCallback((n: Notification) =>
     void once(async () => {
       try {
         await markRead.mutateAsync(n.id);
       } catch (e) {
         reportWriteError("Couldn't mark it read", e);
       }
-    });
+    }),
+  );
 
   const unreadCount = unread.data ?? 0;
   const onMarkAll = () =>
@@ -152,7 +156,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
     content = (
       <SectionList
         sections={sections}
-        keyExtractor={(n) => n.id}
+        keyExtractor={notificationKey}
         stickySectionHeadersEnabled={false}
         renderSectionHeader={({ section }) => (
           <Text className="mx-4 mb-2 mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -162,8 +166,8 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         renderItem={({ item }) => (
           <NotificationRow
             notification={item}
-            onPress={() => onPressRow(item)}
-            onMarkRead={item.isRead ? undefined : () => onMarkOne(item)}
+            onPress={onPressRow}
+            onMarkRead={onMarkOne}
             marking={markRead.isPending && markRead.variables === item.id}
           />
         )}
@@ -204,14 +208,19 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   );
 }
 
-function NotificationRow({
-  notification: n, onPress, onMarkRead, marking,
+const notificationKey = (n: Notification) => n.id;
+
+/** Memoised (Phase P). The mark-read button shows only on an unread row, as before. */
+const NotificationRow = memo(function NotificationRow({
+  notification: n, onPress: onPressRow, onMarkRead: onMarkOne, marking,
 }: {
   notification: Notification;
-  onPress: () => void;
-  onMarkRead?: () => void;
+  onPress: (n: Notification) => void;
+  onMarkRead: (n: Notification) => void;
   marking: boolean;
 }) {
+  const onPress = () => onPressRow(n);
+  const onMarkRead = n.isRead ? undefined : () => onMarkOne(n);
   const icon = TYPE_ICONS[n.type] ?? 'notifications-outline';
   const body = htmlToDisplayText(n.body);
   const ticket = n.ticket && typeof n.ticket.ticketNumber === 'number' ? n.ticket : null;
@@ -266,7 +275,7 @@ function NotificationRow({
       ) : null}
     </View>
   );
-}
+});
 
 function Footer({
   loading, failed, hasMore, offline, onRetry,

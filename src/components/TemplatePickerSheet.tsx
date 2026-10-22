@@ -2,11 +2,11 @@
 // Search on title or category, groups by category ("General" when none), "No templates found". Loads when the sheet
 // first opens, never with the composer. Picking a template writes nothing: the composer inserts it into its own text.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { memo, useMemo, useState } from 'react';
+import { Modal, Pressable, SectionList, Text, View, type SectionListData } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useCannedResponses } from '@/hooks';
+import { useCannedResponses, useStableCallback } from '@/hooks';
 import { colors } from '@/theme';
 import type { CannedResponse } from '@/types';
 import { filterTemplates, groupTemplates, templatePreview } from '@/utils/templates';
@@ -27,15 +27,17 @@ export function TemplatePickerSheet({ visible, onPick, onClose }: TemplatePicker
   const templates = useCannedResponses({ enabled: visible });
 
   const groups = useMemo(() => groupTemplates(filterTemplates(templates.data ?? [], search)), [templates.data, search]);
+  // Phase P: a SectionList of memoised rows — each template's text preview is worked out once, not on every keystroke.
+  const sections = useMemo<TemplateSection[]>(() => groups.map((g) => ({ key: g.category, data: g.templates })), [groups]);
 
   const close = () => {
     setSearch('');
     onClose();
   };
-  const pick = (template: CannedResponse) => {
+  const pick = useStableCallback((template: CannedResponse) => {
     setSearch('');
     onPick(template);
-  };
+  });
 
   // Same sheet frame as OptionSheet and PersonPickerSheet: grab handle, title, search, then the list.
   return (
@@ -53,41 +55,59 @@ export function TemplatePickerSheet({ visible, onPick, onClose }: TemplatePicker
             accessibilityLabel="Search templates by title or category"
           />
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled">
-          {templates.data === undefined && templates.isFetching ? <LoadingSkeleton variant="lines" rows={4} topGap={false} /> : null}
-          {templates.data === undefined && templates.fetchStatus === 'paused' ? (
-            <Text className="px-4 py-6 text-center text-sm text-gray-500">Templates load when you're back online.</Text>
-          ) : null}
-          <View className="mx-4 mt-2">
-            <LookupError query={templates} what="templates" />
-          </View>
-          {templates.data !== undefined && groups.length === 0 ? (
-            <Text className="px-4 py-6 text-center text-sm text-gray-500">No templates found</Text>
-          ) : null}
-          {groups.map((group) => (
-            <View key={group.category}>
-              <Text className="border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500" accessibilityRole="header">
-                {group.category}
-              </Text>
-              {group.templates.map((t) => (
-                <Pressable
-                  key={t.id}
-                  accessibilityRole="button"
-                  accessibilityHint="Inserts this template into your message"
-                  onPress={() => pick(t)}
-                  className="min-h-12 flex-row items-center border-b border-gray-100 px-4 py-3 active:bg-gray-50"
-                >
-                  <View className="flex-1">
-                    <Text className="text-base text-gray-900" numberOfLines={1}>{t.title}</Text>
-                    <Text className="text-xs text-gray-500" numberOfLines={1}>{templatePreview(t.body)}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
-                </Pressable>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
+        <SectionList
+          sections={sections}
+          keyExtractor={templateKey}
+          stickySectionHeadersEnabled={false}
+          initialNumToRender={20}
+          removeClippedSubviews={false}
+          keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <>
+              {templates.data === undefined && templates.isFetching ? <LoadingSkeleton variant="lines" rows={4} topGap={false} /> : null}
+              {templates.data === undefined && templates.fetchStatus === 'paused' ? (
+                <Text className="px-4 py-6 text-center text-sm text-gray-500">Templates load when you're back online.</Text>
+              ) : null}
+              <View className="mx-4 mt-2">
+                <LookupError query={templates} what="templates" />
+              </View>
+              {templates.data !== undefined && groups.length === 0 ? (
+                <Text className="px-4 py-6 text-center text-sm text-gray-500">No templates found</Text>
+              ) : null}
+            </>
+          }
+          renderSectionHeader={renderGroupHeader}
+          renderItem={({ item }) => <TemplateRow template={item} onPick={pick} />}
+        />
       </View>
     </Modal>
   );
 }
+
+type TemplateSection = SectionListData<CannedResponse, { key: string }>;
+
+const templateKey = (t: CannedResponse) => t.id;
+
+const renderGroupHeader = ({ section }: { section: TemplateSection }) => (
+  <Text className="border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500" accessibilityRole="header">
+    {section.key}
+  </Text>
+);
+
+/** Memoised (Phase P): the preview (HTML to one line of text) is computed only when the template changes. */
+const TemplateRow = memo(function TemplateRow({ template: t, onPick }: { template: CannedResponse; onPick: (t: CannedResponse) => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Inserts this template into your message"
+      onPress={() => onPick(t)}
+      className="min-h-12 flex-row items-center border-b border-gray-100 px-4 py-3 active:bg-gray-50"
+    >
+      <View className="flex-1">
+        <Text className="text-base text-gray-900" numberOfLines={1}>{t.title}</Text>
+        <Text className="text-xs text-gray-500" numberOfLines={1}>{templatePreview(t.body)}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+    </Pressable>
+  );
+});

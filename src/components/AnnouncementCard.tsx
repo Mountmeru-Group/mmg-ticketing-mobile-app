@@ -1,6 +1,7 @@
 // ANN-1 announcements: the type chip, the Home banner and the full card (M16). Bodies are server HTML and go through
 // the one safe renderer (HtmlText).
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { colors, palette } from '@/theme';
@@ -74,13 +75,16 @@ export function AnnouncementBanner({
   );
 }
 
-/** Full card on M16: type chip, pin, title, dates, author and the sanitised body (collapsible). */
-export function AnnouncementCard({
+/**
+ * Full card on M16: type chip, pin, title, dates, author and the sanitised body (collapsible). Memoised (Phase P):
+ * `onShowOnHome` takes the announcement's id, so the list can pass one stable function.
+ */
+export const AnnouncementCard = memo(function AnnouncementCard({
   announcement, hiddenOnHome, onShowOnHome,
 }: {
   announcement: Announcement;
   hiddenOnHome: boolean;
-  onShowOnHome: () => void;
+  onShowOnHome: (announcementId: string) => void;
 }) {
   const author = formatDisplayName(announcement.author?.displayName);
   return (
@@ -104,10 +108,10 @@ export function AnnouncementCard({
       </Text>
       <HtmlText html={announcement.body} collapsedHeight={160} emptyText="No details" />
       {hiddenOnHome ? (
-        <Pressable accessibilityRole="button" onPress={onShowOnHome} className="mt-1 min-h-11 justify-center self-start">
+        <Pressable accessibilityRole="button" onPress={() => onShowOnHome(announcement.id)} className="mt-1 min-h-11 justify-center self-start">
           <Text className="text-sm font-medium text-blue-700">Hidden from Home for this session · Show it again</Text>
         </Pressable>
       ) : null}
     </View>
   );
-}
+});

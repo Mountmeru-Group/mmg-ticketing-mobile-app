@@ -50,6 +50,10 @@ export function ImageViewerModal({
             <Image
               source={{ uri: request.uri, headers: request.headers }}
               resizeMode="contain"
+              // Phase P: decode at the view's size, not the photo's. Android's default ('auto') only downsamples LOCAL
+              // files, so a 12-megapixel attachment was decoded whole (~48 MB of bitmap) on a 1 GB phone. The viewer
+              // has no zoom, so the picture on screen is the same.
+              resizeMethod="resize"
               style={{ width: '100%', height: '100%' }}
               onLoad={() => setState('ok')}
               onError={() => setState('error')}

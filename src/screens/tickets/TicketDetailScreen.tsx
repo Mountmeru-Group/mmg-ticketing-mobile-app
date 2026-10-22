@@ -25,9 +25,14 @@
 //   Phase G3 (docs/G3-WEB-BEHAVIOUR.md): a delete button on each file for ADMIN, AGENT and L2_MANAGER, in any status,
 //     confirmed by name, then ATT-5 (permanent); "Submit for approval…" in More options for ADMIN and AGENT, in any
 //     status, opening ./SubmitApprovalScreen.tsx.
+//
+// PERFORMANCE (Phase P, docs/PERFORMANCE.md): the screen is ONE FlatList. Everything above the tab rows is its header;
+// the open tab's replies, history entries, files or tasks are its rows, memoised, laid out as they scroll into view
+// instead of all at once (a long email thread is the most expensive thing the app renders). "Show more" on a reply and
+// a file's details are held here, not in the row, so a row that scrolls far away and back keeps them.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { memo, useCallback, useMemo, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openAttachmentExternally } from '@/api/attachmentDownload';
@@ -40,8 +45,8 @@ import {
   type SheetOption,
 } from '@/components';
 import {
-  useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useTicket, useTicketAttachments, useTicketComments,
-  useTicketHistory, useToggleTask, useUploadAttachment,
+  useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
+  useTicketComments, useTicketHistory, useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
@@ -227,6 +232,20 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     }
   }
 
+  // ── Row state and handlers for the virtualised tab rows (Phase P) ──
+  // Held here, not in the rows, so a row unmounted by the list (far off screen) comes back as it was left.
+  const [expandedComments, setExpandedComments] = useState<ReadonlySet<string>>(() => new Set());
+  const [openFileDetails, setOpenFileDetails] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleComment = useCallback((id: string) => setExpandedComments((prev) => toggledSet(prev, id)), []);
+  const toggleFileDetails = useCallback((id: string) => setOpenFileDetails((prev) => toggledSet(prev, id)), []);
+  // One identity for the screen's lifetime, so memoised rows re-render only when their own data changes.
+  const viewImage = useCallback((a: Attachment) => setViewing(a), []);
+  const openFile = useStableCallback((a: Attachment) => void once(() => openExternally(a)));
+  const askDelete = useStableCallback((a: Attachment) => void once(() => deleteFile(a)));
+  const openTask = useStableCallback((task: TicketTaskEmbedded) => navigation.navigate('TaskDetail', { ticketId, taskId: task.id }));
+  const toggleTaskDone = useStableCallback((task: TicketTaskEmbedded) => void once(() => onToggleTask(task)));
+  const contentStyle = useMemo(() => ({ paddingTop: 12, paddingBottom: insets.bottom + 24 }), [insets.bottom]);
+
   const title = ticket ? `Ticket #${ticket.ticketNumber}` : 'Ticket';
 
   if (!ticket) {
@@ -256,6 +275,198 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     else navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
   };
 
+  // ── The open tab: its placeholder or stale-data banner (in the list header) and its rows (virtualised) ──
+  const tasks = Array.isArray(ticket.tasks) ? ticket.tasks : [];
+  let body: TabBodyView;
+  let rows: DetailRow[] = [];
+  if (tab === 'conversation') {
+    body = tabBodyView(comments, {
+      what: 'The conversation',
+      loading: 'comments',
+      loadingRows: 2,
+      errorTitle: "Couldn't load the conversation",
+      isEmpty: (comments.data?.length ?? 0) === 0,
+      empty: <EmptyState icon="chatbubbles-outline" title="No replies yet" message="Replies on this ticket will appear here." />,
+    });
+    if (body.showRows) rows = (comments.data ?? []).map((c) => ({ kind: 'comment', key: `c:${c.id}`, comment: c }));
+  } else if (tab === 'history') {
+    body = tabBodyView(
+      // A failed "Load older history" is reported on its button, not as a "Couldn't refresh" banner.
+      {
+        data: history.data,
+        error: history.isFetchNextPageError ? null : history.error,
+        isError: history.isError && !history.isFetchNextPageError,
+        fetchStatus: history.fetchStatus,
+        refetch: history.refreshFirstPage,
+      },
+      {
+        what: 'The history',
+        loading: 'history',
+        loadingRows: 4,
+        errorTitle: "Couldn't load the history",
+        isEmpty: history.audits.length === 0,
+        empty: <EmptyState icon="time-outline" title="No history yet" message="Changes to this ticket will appear here." />,
+      },
+    );
+    if (body.showRows) {
+      rows = history.audits.map((a, i) => ({ kind: 'audit', key: `h:${a.id}`, audit: a, first: i === 0, last: i === history.audits.length - 1 }));
+    }
+  } else if (tab === 'attachments') {
+    body = tabBodyView(attachments, {
+      what: 'The attachment list',
+      loading: 'attachments',
+      loadingRows: 2,
+      errorTitle: "Couldn't load the attachments",
+      isEmpty: (attachments.data?.length ?? 0) === 0,
+      empty: <EmptyState icon="attach-outline" title="No attachments" message="Files added to this ticket will appear here." />,
+    });
+    if (body.showRows) rows = (attachments.data ?? []).map((a) => ({ kind: 'attachment', key: `a:${a.id}`, attachment: a }));
+  } else {
+    // Tasks are embedded in TKT-3: no query of their own, so no loading or error state.
+    body = {
+      top: tasks.length === 0 ? <EmptyState icon="checkbox-outline" title="No tasks" message="Tasks added to this ticket will appear here." /> : null,
+      showRows: tasks.length > 0,
+    };
+    rows = tasks.map((t, i) => ({ kind: 'task', key: `t:${t.id}`, task: t, first: i === 0, last: i === tasks.length - 1 }));
+  }
+
+  const togglingTaskId = toggleTask.isPending ? (toggleTask.variables?.taskId ?? null) : null;
+  const renderRow: ListRenderItem<DetailRow> = ({ item }) => {
+    switch (item.kind) {
+      case 'comment':
+        return (
+          <CommentItem
+            comment={item.comment}
+            privateNotes={can.privateNotes}
+            recipients={can.recipients}
+            expanded={expandedComments.has(item.comment.id)}
+            onToggleExpanded={toggleComment}
+          />
+        );
+      case 'audit':
+        return <AuditItem audit={item.audit} first={item.first} last={item.last} />;
+      case 'attachment': {
+        const a = item.attachment;
+        return (
+          <AttachmentRow
+            attachment={a}
+            onView={isViewableImage(a.mimeType) ? viewImage : undefined}
+            onOpen={openFile}
+            opening={openingId === a.id}
+            // Staff, any file, any status (can.deleteAttachments); absent for END_USER.
+            onDelete={can.deleteAttachments ? askDelete : undefined}
+            deleting={removeFile.isPending && removeFile.variables?.attachmentId === a.id}
+            busy={removeFile.isPending || upload.isPending}
+            detailsOpen={openFileDetails.has(a.id)}
+            onToggleDetails={toggleFileDetails}
+          />
+        );
+      }
+      case 'task':
+        return (
+          <TaskItem
+            task={item.task}
+            first={item.first}
+            last={item.last}
+            onOpen={openTask}
+            onToggle={can.editTasks ? toggleTaskDone : undefined}
+            toggling={togglingTaskId === item.task.id}
+          />
+        );
+    }
+  };
+
+  const listHeader = (
+    <>
+      <HeaderCard ticket={ticket} can={can} />
+      <StatusActionBar can={can} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
+
+      <Card title="Description">
+        <HtmlText html={ticket.description} emptyText="No description" />
+      </Card>
+
+      <PropertiesCard ticket={ticket} can={can} fields={fields} edit={edit} busy={writing} />
+      <RequesterCard ticket={ticket} />
+      <ResolutionSection ticket={ticket} can={fields} edit={edit} busy={writing} />
+
+      <TabBar
+        tab={tab}
+        onSelect={selectTab}
+        counts={{
+          // `_count.comments` includes private notes, so it is not shown; the loaded, filtered count is.
+          conversation: comments.data?.length,
+          attachments: ticket._count?.attachments,
+          tasks: Array.isArray(ticket.tasks) ? ticket.tasks.length : undefined,
+        }}
+      />
+
+      {tab === 'conversation' ? (
+        // Reply: everyone. Reply all: staff. Note: ADMIN and AGENT only — not offered at all to END_USER or L2_MANAGER.
+        <View className="mx-4 mb-3 flex-row gap-2">
+          {can.conversationActions.map((mode) => (
+            <ActionChip
+              key={mode}
+              icon={CONVERSATION_ACTIONS[mode].icon}
+              label={CONVERSATION_ACTIONS[mode].label}
+              onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode })}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      {tab === 'attachments' && can.addAttachments ? (
+        <Card title="Add files">
+          <AttachmentPicker files={newFiles} onChange={setNewFiles} disabled={upload.isPending} />
+          {newFiles.length > 0 ? (
+            <View className="mt-3">
+              <SubmitButton
+                label={`Upload ${newFiles.length} ${newFiles.length === 1 ? 'file' : 'files'}`}
+                onPress={() => void once(uploadStaged)}
+                loading={upload.isPending}
+              />
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+      {tab === 'attachments' && !can.addAttachments ? (
+        // A state, not a role limit (ROLE-MATRIX.md §3): say why "Add files" is missing instead of dropping it silently.
+        <View className="mx-4 mb-3">
+          <Notice>Closed and canceled tickets are locked for technicians, so files can't be added here.</Notice>
+        </View>
+      ) : null}
+      {tab === 'tasks' && can.editTasks ? (
+        <View className="mx-4 mb-3 flex-row">
+          <ActionChip icon="add-circle-outline" label="Add task" onPress={() => navigation.navigate('TaskEditor', { ticketId })} />
+        </View>
+      ) : null}
+
+      {body.top}
+      {tab === 'attachments' && body.showRows ? (
+        <Text className="mx-4 mb-2 text-xs text-gray-500">
+          Tap an image to view it, or any other file to open or share it. Long-press for details.
+        </Text>
+      ) : null}
+    </>
+  );
+
+  const listFooter =
+    tab === 'history' && body.showRows && history.hasNextPage ? (
+      <View className="mx-4">
+        <OutlineButton
+          label={
+            offline
+              ? 'Older history loads when you reconnect'
+              : history.isFetchNextPageError
+                ? "Couldn't load more — tap to retry"
+                : 'Load older history'
+          }
+          onPress={() => void history.fetchNextPage()}
+          loading={history.isFetchingNextPage}
+          disabled={offline}
+        />
+      </View>
+    ) : null;
+
   return (
     <View className="flex-1 bg-gray-50">
       <ScreenHeader
@@ -277,163 +488,21 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       />
       <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
-      <ScrollView
+      <FlatList
+        data={rows}
+        keyExtractor={detailRowKey}
+        renderItem={renderRow}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        // The header (ticket, properties, tabs) usually fills the first screen: a few rows are enough for the first
+        // paint, and the rest are laid out in idle batches as they near the screen.
+        initialNumToRender={6}
+        // Was a ScrollView: keep its native handling of the header's text inputs (FlatList clips by default on Android).
+        removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
-      >
-        <HeaderCard ticket={ticket} can={can} />
-        <StatusActionBar can={can} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
-
-        <Card title="Description">
-          <HtmlText html={ticket.description} emptyText="No description" />
-        </Card>
-
-        <PropertiesCard ticket={ticket} can={can} fields={fields} edit={edit} busy={writing} />
-        <RequesterCard ticket={ticket} />
-        <ResolutionSection ticket={ticket} can={fields} edit={edit} busy={writing} />
-
-        <TabBar
-          tab={tab}
-          onSelect={selectTab}
-          counts={{
-            // `_count.comments` includes private notes, so it is not shown; the loaded, filtered count is.
-            conversation: comments.data?.length,
-            attachments: ticket._count?.attachments,
-            tasks: Array.isArray(ticket.tasks) ? ticket.tasks.length : undefined,
-          }}
-        />
-
-        {tab === 'conversation' ? (
-          // Reply: everyone. Reply all: staff. Note: ADMIN and AGENT only — not offered at all to END_USER or L2_MANAGER.
-          <View className="mx-4 mb-3 flex-row gap-2">
-            {can.conversationActions.map((mode) => (
-              <ActionChip
-                key={mode}
-                icon={CONVERSATION_ACTIONS[mode].icon}
-                label={CONVERSATION_ACTIONS[mode].label}
-                onPress={() => navigation.navigate('ReplyComposer', { ticketId, mode })}
-              />
-            ))}
-          </View>
-        ) : null}
-        {tab === 'conversation' ? (
-          <TabBody
-            query={comments}
-            what="The conversation"
-            loading="comments"
-            loadingRows={2}
-            errorTitle="Couldn't load the conversation"
-            isEmpty={(comments.data?.length ?? 0) === 0}
-            empty={<EmptyState icon="chatbubbles-outline" title="No replies yet" message="Replies on this ticket will appear here." />}
-          >
-            {(comments.data ?? []).map((c) => (
-              <CommentItem key={c.id} comment={c} can={can} />
-            ))}
-          </TabBody>
-        ) : null}
-
-        {tab === 'history' ? (
-          <TabBody
-            // A failed "Load older history" is reported on its button, not as a "Couldn't refresh" banner.
-            query={{
-              data: history.data,
-              error: history.isFetchNextPageError ? null : history.error,
-              isError: history.isError && !history.isFetchNextPageError,
-              fetchStatus: history.fetchStatus,
-              refetch: history.refreshFirstPage,
-            }}
-            what="The history"
-            loading="history"
-            loadingRows={4}
-            errorTitle="Couldn't load the history"
-            isEmpty={history.audits.length === 0}
-            empty={<EmptyState icon="time-outline" title="No history yet" message="Changes to this ticket will appear here." />}
-          >
-            <Card flush>
-              {history.audits.map((a, i) => (
-                <AuditRow key={a.id} audit={a} last={i === history.audits.length - 1} />
-              ))}
-            </Card>
-            {history.hasNextPage ? (
-              <View className="mx-4">
-                <OutlineButton
-                  label={
-                    offline
-                      ? 'Older history loads when you reconnect'
-                      : history.isFetchNextPageError
-                        ? "Couldn't load more — tap to retry"
-                        : 'Load older history'
-                  }
-                  onPress={() => void history.fetchNextPage()}
-                  loading={history.isFetchingNextPage}
-                  disabled={offline}
-                />
-              </View>
-            ) : null}
-          </TabBody>
-        ) : null}
-
-        {tab === 'attachments' && can.addAttachments ? (
-          <Card title="Add files">
-            <AttachmentPicker files={newFiles} onChange={setNewFiles} disabled={upload.isPending} />
-            {newFiles.length > 0 ? (
-              <View className="mt-3">
-                <SubmitButton
-                  label={`Upload ${newFiles.length} ${newFiles.length === 1 ? 'file' : 'files'}`}
-                  onPress={() => void once(uploadStaged)}
-                  loading={upload.isPending}
-                />
-              </View>
-            ) : null}
-          </Card>
-        ) : null}
-        {tab === 'attachments' && !can.addAttachments ? (
-          // A state, not a role limit (ROLE-MATRIX.md §3): say why "Add files" is missing instead of dropping it silently.
-          <View className="mx-4 mb-3">
-            <Notice>Closed and canceled tickets are locked for technicians, so files can't be added here.</Notice>
-          </View>
-        ) : null}
-        {tab === 'attachments' ? (
-          <TabBody
-            query={attachments}
-            what="The attachment list"
-            loading="attachments"
-            loadingRows={2}
-            errorTitle="Couldn't load the attachments"
-            isEmpty={(attachments.data?.length ?? 0) === 0}
-            empty={<EmptyState icon="attach-outline" title="No attachments" message="Files added to this ticket will appear here." />}
-          >
-            <Text className="mx-4 mb-2 text-xs text-gray-500">
-              Tap an image to view it, or any other file to open or share it. Long-press for details.
-            </Text>
-            {(attachments.data ?? []).map((a) => (
-              <AttachmentRow
-                key={a.id}
-                attachment={a}
-                onView={isViewableImage(a.mimeType) ? () => setViewing(a) : undefined}
-                onOpen={() => void once(() => openExternally(a))}
-                opening={openingId === a.id}
-                // Staff, any file, any status (can.deleteAttachments); absent for END_USER.
-                onDelete={can.deleteAttachments ? () => void once(() => deleteFile(a)) : undefined}
-                deleting={removeFile.isPending && removeFile.variables?.attachmentId === a.id}
-                busy={removeFile.isPending || upload.isPending}
-              />
-            ))}
-          </TabBody>
-        ) : null}
-
-        {tab === 'tasks' ? (
-          <TasksTab
-            tasks={Array.isArray(ticket.tasks) ? ticket.tasks : []}
-            canEdit={can.editTasks}
-            togglingId={toggleTask.isPending ? (toggleTask.variables?.taskId ?? null) : null}
-            onOpen={(task) => navigation.navigate('TaskDetail', { ticketId, taskId: task.id })}
-            onToggle={(task) => void once(() => onToggleTask(task))}
-            onAdd={() => navigation.navigate('TaskEditor', { ticketId })}
-          />
-        ) : null}
-      </ScrollView>
+      />
 
       <OptionSheet visible={moreOpen} title="More options" options={moreActions} selected={null} onSelect={onMore} onClose={() => setMoreOpen(false)} />
       <ImageViewerModal
@@ -643,41 +712,91 @@ interface TabQueryState {
   refetch: () => Promise<unknown>;
 }
 
-/** Loading / offline / error / empty / content for one tab, plus a stale-data banner when a refresh failed. */
-function TabBody({
-  query, what, loading, loadingRows, errorTitle, isEmpty, empty, children,
-}: {
-  query: TabQueryState;
-  /** For the offline message, e.g. "The conversation". */
-  what: string;
-  /** The skeleton that mirrors this tab's rows. */
-  loading: ComponentProps<typeof LoadingSkeleton>['variant'];
-  loadingRows: number;
-  errorTitle: string;
-  isEmpty: boolean;
-  empty: ReactNode;
-  children: ReactNode;
-}) {
+/** What the open tab shows above its rows: a first-load placeholder, or a stale-data banner; and whether rows show. */
+interface TabBodyView {
+  top: ReactNode;
+  showRows: boolean;
+}
+
+/** Loading / offline / error / empty / rows for one tab, plus a stale-data banner when a refresh failed. */
+function tabBodyView(
+  query: TabQueryState,
+  {
+    what, loading, loadingRows, errorTitle, isEmpty, empty,
+  }: {
+    /** For the offline message, e.g. "The conversation". */
+    what: string;
+    /** The skeleton that mirrors this tab's rows. */
+    loading: ComponentProps<typeof LoadingSkeleton>['variant'];
+    loadingRows: number;
+    errorTitle: string;
+    isEmpty: boolean;
+    empty: ReactElement;
+  },
+): TabBodyView {
   const hasData = query.data !== undefined;
-  if (!hasData && query.fetchStatus === 'paused') return <OfflineState what={what} />;
-  if (!hasData && query.isError) return <ErrorState error={query.error} title={errorTitle} onRetry={() => void query.refetch()} />;
-  if (!hasData) return <LoadingSkeleton variant={loading} rows={loadingRows} topGap={false} />;
+  if (!hasData && query.fetchStatus === 'paused') return { top: <OfflineState what={what} />, showRows: false };
+  if (!hasData && query.isError) {
+    return { top: <ErrorState error={query.error} title={errorTitle} onRetry={() => void query.refetch()} />, showRows: false };
+  }
+  if (!hasData) return { top: <LoadingSkeleton variant={loading} rows={loadingRows} topGap={false} />, showRows: false };
+  const banner = query.isError ? (
+    <View className="mx-4 mb-3 overflow-hidden rounded-lg">
+      <QueryBanner error={query.error} hasData onRetry={() => void query.refetch()} />
+    </View>
+  ) : null;
+  return {
+    top: (
+      <>
+        {banner}
+        {isEmpty ? empty : null}
+      </>
+    ),
+    showRows: !isEmpty,
+  };
+}
+
+/** One row of the open tab (Phase P: the tab body is virtualised). Keys are unique across tabs. */
+type DetailRow =
+  | { kind: 'comment'; key: string; comment: Comment }
+  | { kind: 'audit'; key: string; audit: ActivityAuditItem; first: boolean; last: boolean }
+  | { kind: 'attachment'; key: string; attachment: Attachment }
+  | { kind: 'task'; key: string; task: TicketTaskEmbedded; first: boolean; last: boolean };
+
+const detailRowKey = (row: DetailRow) => row.key;
+
+function toggledSet(prev: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/**
+ * A group of rows that looks like one `Card flush` (Card.tsx): each row is its own list item, so the first and the
+ * last carry the card's top and bottom edge (the standalone task list does the same).
+ */
+function CardRow({ first, last, children }: { first: boolean; last: boolean; children: ReactNode }) {
   return (
-    <View>
-      {query.isError ? (
-        <View className="mx-4 mb-3 overflow-hidden rounded-lg">
-          <QueryBanner error={query.error} hasData onRetry={() => void query.refetch()} />
-        </View>
-      ) : null}
-      {isEmpty ? empty : children}
+    <View className={`mx-4 border-x border-border bg-white px-4 ${first ? 'rounded-t-xl border-t' : ''} ${last ? 'mb-3 rounded-b-xl border-b' : ''}`}>
+      {children}
     </View>
   );
 }
 
-function CommentItem({ comment, can }: { comment: Comment; can: TicketDetailPermissions }) {
+const CommentItem = memo(function CommentItem({
+  comment, privateNotes, recipients, expanded, onToggleExpanded,
+}: {
+  comment: Comment;
+  /** can.privateNotes and can.recipients (ticketDetailPermissions), passed as values so the row can be memoised. */
+  privateNotes: boolean;
+  recipients: boolean;
+  expanded: boolean;
+  onToggleExpanded: (commentId: string) => void;
+}) {
   const isPrivate = comment.type === 'PRIVATE';
   // visibleComments() already dropped notes for END_USER/L2; this is a second guard at the point of display.
-  if (!isCommentVisible(comment, can)) return null;
+  if (!isCommentVisible(comment, { privateNotes })) return null;
   const author = formatDisplayName(comment.author?.displayName) || 'Unknown';
   const to = Array.isArray(comment.toRecipients) ? comment.toRecipients : [];
   const cc = Array.isArray(comment.ccRecipients) ? comment.ccRecipients : [];
@@ -706,7 +825,7 @@ function CommentItem({ comment, can }: { comment: Comment; can: TicketDetailPerm
       </View>
 
       {/* Recipient addresses: staff only, public replies only (05 §A.5). */}
-      {can.recipients && !isPrivate && (to.length > 0 || cc.length > 0) ? (
+      {recipients && !isPrivate && (to.length > 0 || cc.length > 0) ? (
         <Text className="mb-2 text-xs text-gray-500" numberOfLines={2}>
           {to.length > 0 ? `To: ${to.join(', ')}` : ''}
           {to.length > 0 && cc.length > 0 ? '  ·  ' : ''}
@@ -714,7 +833,7 @@ function CommentItem({ comment, can }: { comment: Comment; can: TicketDetailPerm
         </Text>
       ) : null}
 
-      <HtmlText html={comment.body} emptyText="(no text)" />
+      <HtmlText html={comment.body} emptyText="(no text)" expanded={expanded} onToggleExpanded={() => onToggleExpanded(comment.id)} />
 
       {files.length > 0 ? (
         <View className="mt-2">
@@ -728,22 +847,24 @@ function CommentItem({ comment, can }: { comment: Comment; can: TicketDetailPerm
       ) : null}
     </View>
   );
-}
+});
 
-function AuditRow({ audit, last }: { audit: ActivityAuditItem; last: boolean }) {
+const AuditItem = memo(function AuditItem({ audit, first, last }: { audit: ActivityAuditItem; first: boolean; last: boolean }) {
   const { actor, action } = describeAudit(audit);
   return (
-    <View className={`flex-row py-3 ${last ? '' : 'border-b border-gray-100'}`}>
-      <View className="mr-3 mt-1.5 h-2 w-2 rounded-full bg-gray-300" />
-      <View className="flex-1">
-        <Text className="text-sm text-gray-700">
-          <Text className="font-semibold">{actor}</Text> {action}
-        </Text>
-        <Text className="mt-0.5 text-xs text-gray-500">{formatDateTime(audit.createdAt)}</Text>
+    <CardRow first={first} last={last}>
+      <View className={`flex-row py-3 ${last ? '' : 'border-b border-gray-100'}`}>
+        <View className="mr-3 mt-1.5 h-2 w-2 rounded-full bg-gray-300" />
+        <View className="flex-1">
+          <Text className="text-sm text-gray-700">
+            <Text className="font-semibold">{actor}</Text> {action}
+          </Text>
+          <Text className="mt-0.5 text-xs text-gray-500">{formatDateTime(audit.createdAt)}</Text>
+        </View>
       </View>
-    </View>
+    </CardRow>
   );
-}
+});
 
 function attachmentIcon(mimeType: string): keyof typeof Ionicons.glyphMap {
   const type = (mimeType || '').toLowerCase();
@@ -756,29 +877,32 @@ function attachmentIcon(mimeType: string): keyof typeof Ionicons.glyphMap {
  * Tap: images open in the in-app viewer (ATT-3); every other type — PDFs included — downloads (ATT-4) and opens the
  * system share sheet. Long-press: details. `storagePath` (a server disk path) is never displayed (03 B.4).
  * `onDelete` (G3) adds a 44 dp delete button; it is passed only for a role that may delete (can.deleteAttachments).
+ * Memoised (Phase P): the handlers take the file, so they keep one identity and only a changed row re-renders.
  */
-function AttachmentRow({
-  attachment, onView, onOpen, opening, onDelete, deleting = false, busy = false,
+const AttachmentRow = memo(function AttachmentRow({
+  attachment, onView, onOpen, opening, onDelete, deleting = false, busy = false, detailsOpen, onToggleDetails,
 }: {
   attachment: Attachment;
-  onView?: () => void;
-  onOpen: () => void;
+  onView?: (attachment: Attachment) => void;
+  onOpen: (attachment: Attachment) => void;
   opening: boolean;
-  onDelete?: () => void;
+  onDelete?: (attachment: Attachment) => void;
   deleting?: boolean;
   /** Another file write is in flight: the delete button is disabled. */
   busy?: boolean;
+  /** The long-press details; held by the screen so they survive the row scrolling out of the list's window. */
+  detailsOpen: boolean;
+  onToggleDetails: (attachmentId: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const name = attachment.fileName || 'Unnamed file';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ busy: opening || deleting, expanded: open }}
+      accessibilityState={{ busy: opening || deleting, expanded: detailsOpen }}
       accessibilityHint={onView ? 'Opens the image. Long-press for details' : 'Downloads the file and opens the share sheet. Long-press for details'}
       disabled={opening || deleting}
-      onPress={onView ?? onOpen}
-      onLongPress={() => setOpen((v) => !v)}
+      onPress={() => (onView ?? onOpen)(attachment)}
+      onLongPress={() => onToggleDetails(attachment.id)}
       className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
     >
       <View className="flex-row items-center">
@@ -801,66 +925,52 @@ function AttachmentRow({
             accessibilityHint="Asks you to confirm. Deleting can't be undone"
             accessibilityState={{ disabled: busy || opening, busy: deleting }}
             disabled={busy || opening}
-            onPress={onDelete}
+            onPress={() => onDelete(attachment)}
             className={`-my-2 -mr-2 ml-1 h-11 w-11 items-center justify-center rounded-full ${busy || opening ? 'opacity-50' : 'active:bg-red-50'}`}
           >
             {deleting ? <ActivityIndicator color={palette.red[700]} /> : <Ionicons name="trash-outline" size={18} color={palette.red[700]} />}
           </Pressable>
         ) : null}
       </View>
-      {open ? (
+      {detailsOpen ? (
         <View className="mt-2 border-t border-gray-100 pt-1">
           <Row label="Uploaded by">{formatDisplayName(attachment.uploaderName) || 'Unknown'}</Row>
           <Row label="Uploaded">{formatDateTime(attachment.createdAt)}</Row>
           <Row label="Type">{attachment.mimeType || 'Unknown'}</Row>
           <Row label="Size">{formatBytes(attachment.sizeBytes)}</Row>
           <Row label="Added with">{attachment.commentId ? 'A reply' : 'The ticket'}</Row>
-          <Pressable accessibilityRole="button" disabled={opening} onPress={onOpen} className="mt-1 min-h-11 justify-center self-start">
+          <Pressable accessibilityRole="button" disabled={opening} onPress={() => onOpen(attachment)} className="mt-1 min-h-11 justify-center self-start">
             <Text className="text-sm font-medium text-blue-700">Download and share</Text>
           </Pressable>
         </View>
       ) : null}
     </Pressable>
   );
-}
+});
 
 /**
- * Tasks embedded in TKT-3, in sortOrder. Tap → task detail (every role). Staff: checkbox (TSK-3) and "Add task" (M11).
- * END_USER sees the same rows without the checkbox or the add button (D4).
+ * A task embedded in TKT-3, in sortOrder: one row of the Tasks tab's card. Tap → task detail (every role). Staff:
+ * the checkbox (TSK-3; `onToggle` is passed only for them). END_USER sees the same rows without the checkbox (D4).
  */
-function TasksTab({
-  tasks, canEdit, togglingId, onOpen, onToggle, onAdd,
+const TaskItem = memo(function TaskItem({
+  task, first, last, onOpen, onToggle, toggling,
 }: {
-  tasks: readonly TicketTaskEmbedded[];
-  canEdit: boolean;
-  togglingId: string | null;
+  task: TicketTaskEmbedded;
+  first: boolean;
+  last: boolean;
   onOpen: (task: TicketTaskEmbedded) => void;
-  onToggle: (task: TicketTaskEmbedded) => void;
-  onAdd: () => void;
+  onToggle?: (task: TicketTaskEmbedded) => void;
+  toggling: boolean;
 }) {
   return (
-    <View>
-      {canEdit ? (
-        <View className="mx-4 mb-3 flex-row">
-          <ActionChip icon="add-circle-outline" label="Add task" onPress={onAdd} />
-        </View>
-      ) : null}
-      {tasks.length === 0 ? (
-        <EmptyState icon="checkbox-outline" title="No tasks" message="Tasks added to this ticket will appear here." />
-      ) : (
-        <Card flush>
-          {tasks.map((task, i) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onPress={() => onOpen(task)}
-              onToggle={canEdit ? () => onToggle(task) : undefined}
-              toggling={togglingId === task.id}
-              last={i === tasks.length - 1}
-            />
-          ))}
-        </Card>
-      )}
-    </View>
+    <CardRow first={first} last={last}>
+      <TaskRow
+        task={task}
+        onPress={() => onOpen(task)}
+        onToggle={onToggle ? () => onToggle(task) : undefined}
+        toggling={toggling}
+        last={last}
+      />
+    </CardRow>
   );
-}
+});

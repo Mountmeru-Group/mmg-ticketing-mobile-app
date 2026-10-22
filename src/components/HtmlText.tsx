@@ -5,7 +5,7 @@
 //   (…/ticket/<n>, …/tickets/<uuid or n>), which opens the ticket in the app (deep-link resolver, 05 §A.11).
 // - If the renderer throws, the body falls back to plain text (htmlToDisplayText), never to a blank card.
 // One renderer for every server HTML body: ticket descriptions, comments, KB articles, announcements.
-import { Component, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { Component, memo, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import {
   RenderHTMLConfigProvider, RenderHTMLSource, TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts,
@@ -128,14 +128,25 @@ interface HtmlTextProps {
   /** Horizontal space around the text on screen (card margins, borders and padding), for image sizing. */
   horizontalInset?: number;
   emptyText?: string;
+  /**
+   * "Show more" held by the caller (Phase P). A virtualised list can unmount a row that scrolled far away; with the
+   * state in the screen, an expanded body is still expanded when the row comes back. Omit both to keep it here.
+   */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 // Default inset: the standard card (Card.tsx) — 16 dp margin, 1 dp border and 16 dp padding on each side.
-export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 66, emptyText = 'No text' }: HtmlTextProps) {
+function HtmlTextImpl({
+  html, collapsedHeight = 280, horizontalInset = 66, emptyText = 'No text', expanded: expandedProp, onToggleExpanded,
+}: HtmlTextProps) {
   const prepared = useMemo(() => prepare(html), [html]);
+  const source = useMemo(() => (prepared.kind === 'html' ? { html: prepared.html } : null), [prepared]);
   const { width } = useWindowDimensions();
-  const [expanded, setExpanded] = useState(false);
+  const [expandedState, setExpandedState] = useState(false);
   const [contentHeight, setContentHeight] = useState(0);
+  const expanded = expandedProp ?? expandedState;
+  const toggle = onToggleExpanded ?? (() => setExpandedState((v) => !v));
 
   if (prepared.kind === 'empty') return <Text className="text-sm italic text-gray-500">{emptyText}</Text>;
 
@@ -149,21 +160,30 @@ export function HtmlText({ html, collapsedHeight = 280, horizontalInset = 66, em
       plain(prepared.text)
     ) : (
       <RendererBoundary fallback={plain(prepared.fallbackText)}>
-        <RenderHTMLSource source={{ html: prepared.html }} contentWidth={Math.max(width - horizontalInset, 120)} />
+        <RenderHTMLSource source={source ?? { html: prepared.html }} contentWidth={Math.max(width - horizontalInset, 120)} />
       </RendererBoundary>
     );
-  const collapsible = contentHeight > collapsedHeight + 40;
+  const threshold = collapsedHeight + 40;
+  const collapsible = contentHeight > threshold;
+  // Until the body is measured, it is held to the threshold (Phase P): anything that fits still shows in full, and a
+  // long email no longer lays out at full height for a frame only to collapse — on a slow phone that is a visible
+  // jump and a second layout of the whole list. The inner view still measures its full height (it is clipped, not
+  // shrunk), so the result after measuring is the same as before.
+  const clamp = expanded ? undefined : contentHeight === 0 ? threshold : collapsible ? collapsedHeight : undefined;
 
   return (
     <View>
-      <View style={collapsible && !expanded ? { maxHeight: collapsedHeight, overflow: 'hidden' } : undefined}>
+      <View style={clamp !== undefined ? { maxHeight: clamp, overflow: 'hidden' } : undefined}>
         <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>{body}</View>
       </View>
       {collapsible ? (
-        <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} className="min-h-11 justify-center self-start">
+        <Pressable accessibilityRole="button" onPress={toggle} className="min-h-11 justify-center self-start">
           <Text className="text-sm font-medium text-blue-700">{expanded ? 'Show less' : 'Show more'}</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
+
+/** Memoised (Phase P): a parent re-render with the same body does not re-run the snippet's render. */
+export const HtmlText = memo(HtmlTextImpl);

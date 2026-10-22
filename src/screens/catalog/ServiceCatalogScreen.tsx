@@ -7,8 +7,8 @@
 //   opens its detail, which the web does not have; other people's rows are not links, as on the web.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, BackHandler, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ActivityIndicator, BackHandler, FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
@@ -68,6 +68,8 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
       return () => sub.remove();
     }, [view, category, search]),
   );
+  // Stable (Phase P): passed to every memoised service row.
+  const openItem = useCallback((item: ServiceItem) => navigation.navigate('ServiceRequestForm', { itemId: item.id }), [navigation]);
 
   if (!can.browse) {
     return (
@@ -142,7 +144,7 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
             setCategory(null);
             setSearch('');
           }}
-          onOpenItem={(item) => navigation.navigate('ServiceRequestForm', { itemId: item.id })}
+          onOpenItem={openItem}
         />
       ) : (
         <MyRequestsView
@@ -176,6 +178,17 @@ function CatalogView({
 
   const allItems = useMemo(() => items.data ?? [], [items.data]);
   const shown = useMemo(() => filterCatalogItems(allItems, category?.id ?? null, search), [allItems, category, search]);
+  // Phase P: each category's count once per item list, not once per row per render; stable renderers, memoised rows.
+  const counts = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    for (const c of categories.data ?? []) byCategory.set(c.id, categoryItemCount(allItems, c.id));
+    return byCategory;
+  }, [categories.data, allItems]);
+  const renderCategory = useCallback<ListRenderItem<ServiceCategory>>(
+    ({ item }) => <CategoryRow category={item} count={counts.get(item.id) ?? 0} onOpen={onOpenCategory} />,
+    [counts, onOpenCategory],
+  );
+  const renderService = useCallback<ListRenderItem<ServiceItem>>(({ item }) => <ServiceRow item={item} onOpen={onOpenItem} />, [onOpenItem]);
 
   const onRefresh = async () => {
     if (offline) return;
@@ -208,7 +221,7 @@ function CatalogView({
         {banner}
         <FlatList
           data={list}
-          keyExtractor={(c) => c.id}
+          keyExtractor={rowKey}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             list.length > 0 ? (
@@ -217,15 +230,7 @@ function CatalogView({
               </Text>
             ) : null
           }
-          renderItem={({ item }) => (
-            <CatalogRow
-              icon={iconFor(item.icon, 'cube-outline')}
-              title={item.name}
-              description={item.description}
-              trailing={<Text className="text-xs text-gray-500">{itemCountLabel(categoryItemCount(allItems, item.id))}</Text>}
-              onPress={() => onOpenCategory(item)}
-            />
-          )}
+          renderItem={renderCategory}
           ListEmptyComponent={
             <EmptyState icon="file-tray-outline" title="No service categories yet" message="Services you can request will appear here." />
           }
@@ -242,7 +247,7 @@ function CatalogView({
       {banner}
       <FlatList
         data={shown}
-        keyExtractor={(i) => i.id}
+        keyExtractor={rowKey}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View className="mx-4 mb-2 flex-row items-center">
@@ -252,22 +257,7 @@ function CatalogView({
             <Text className="ml-2 text-xs text-gray-500">{itemCountLabel(shown.length)}</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <CatalogRow
-            icon={iconFor(item.icon, 'document-text-outline')}
-            title={item.name}
-            description={item.description}
-            descriptionLines={1}
-            trailing={
-              item.requiresApproval ? (
-                <View className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5">
-                  <Text className="text-xs font-medium text-amber-700">Requires approval</Text>
-                </View>
-              ) : null
-            }
-            onPress={() => onOpenItem(item)}
-          />
-        )}
+        renderItem={renderService}
         ListEmptyComponent={
           <EmptyState
             icon="search-outline"
@@ -283,6 +273,47 @@ function CatalogView({
     </>
   );
 }
+
+const rowKey = (row: { id: string }) => row.id;
+
+/** A category on the catalogue's Home view, with its item count. Memoised (Phase P). */
+const CategoryRow = memo(function CategoryRow({
+  category, count, onOpen,
+}: {
+  category: ServiceCategory;
+  count: number;
+  onOpen: (category: ServiceCategory) => void;
+}) {
+  return (
+    <CatalogRow
+      icon={iconFor(category.icon, 'cube-outline')}
+      title={category.name}
+      description={category.description}
+      trailing={<Text className="text-xs text-gray-500">{itemCountLabel(count)}</Text>}
+      onPress={() => onOpen(category)}
+    />
+  );
+});
+
+/** A service in a category or in search results. Memoised (Phase P). */
+const ServiceRow = memo(function ServiceRow({ item, onOpen }: { item: ServiceItem; onOpen: (item: ServiceItem) => void }) {
+  return (
+    <CatalogRow
+      icon={iconFor(item.icon, 'document-text-outline')}
+      title={item.name}
+      description={item.description}
+      descriptionLines={1}
+      trailing={
+        item.requiresApproval ? (
+          <View className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5">
+            <Text className="text-xs font-medium text-amber-700">Requires approval</Text>
+          </View>
+        ) : null
+      }
+      onPress={() => onOpen(item)}
+    />
+  );
+});
 
 function CatalogRow({
   icon, title, description, descriptionLines = 2, trailing, onPress,
@@ -336,6 +367,14 @@ function MyRequestsView({
   const list = useMyServiceRequests();
   const [refreshing, setRefreshing] = useState(false);
   const { requests, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = list;
+  // Stable while this view re-renders on its own (paging, refresh), so loaded rows are not redone (Phase P).
+  const renderRequest = useCallback<ListRenderItem<ServiceRequest>>(
+    ({ item }) => {
+      const own = canOpen(item);
+      return <RequestRow request={item} own={own} onPress={own ? () => onOpen(item) : undefined} />;
+    },
+    [canOpen, onOpen],
+  );
 
   const onRefresh = async () => {
     if (offline) return;
@@ -361,11 +400,8 @@ function MyRequestsView({
       <QueryBanner error={isFetchNextPageError ? null : list.error} hasData onRetry={() => void onRefresh()} />
       <FlatList
         data={requests}
-        keyExtractor={(r) => r.id}
-        renderItem={({ item }) => {
-          const own = canOpen(item);
-          return <RequestRow request={item} own={own} onPress={own ? () => onOpen(item) : undefined} />;
-        }}
+        keyExtractor={rowKey}
+        renderItem={renderRequest}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
@@ -413,7 +449,7 @@ function MyRequestsView({
  * A My Requests row: the web's columns (# SR-n, Service, Status, Requested; ServiceCatalogPage.tsx:333-352), and no
  * requester column, as on the web. Only the person's own rows are links (to the mobile-only detail).
  */
-function RequestRow({ request, own, onPress }: { request: ServiceRequest; own: boolean; onPress?: () => void }) {
+const RequestRow = memo(function RequestRow({ request, own, onPress }: { request: ServiceRequest; own: boolean; onPress?: () => void }) {
   const body = (
     <>
       <View className="flex-row items-center">
@@ -439,4 +475,4 @@ function RequestRow({ request, own, onPress }: { request: ServiceRequest; own: b
   ) : (
     <View className={className}>{body}</View>
   );
-}
+});

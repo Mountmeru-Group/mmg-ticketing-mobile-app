@@ -45,10 +45,8 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
     content = (
       <FlatList
         data={query.data}
-        keyExtractor={(a) => a.id}
-        renderItem={({ item }) => (
-          <AnnouncementCard announcement={item} hiddenOnHome={dismissed.includes(item.id)} onShowOnHome={() => restore(item.id)} />
-        )}
+        keyExtractor={announcementKey}
+        renderItem={({ item }) => <AnnouncementCard announcement={item} hiddenOnHome={dismissed.includes(item.id)} onShowOnHome={restore} />}
         ListEmptyComponent={
           <EmptyState icon="megaphone-outline" title="No announcements" message="Service Desk announcements for your role will appear here." />
         }
@@ -67,3 +65,5 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
     </View>
   );
 }
+
+const announcementKey = (a: { id: string }) => a.id;
