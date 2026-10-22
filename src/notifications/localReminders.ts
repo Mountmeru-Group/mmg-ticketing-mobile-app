@@ -12,12 +12,14 @@ const DATA_KIND = 'sla-reminder';
 /** A replanned "fire now" moves by a few seconds each time; that is the same reminder, not a new one. */
 const SAME_FIRE_TOLERANCE_MS = 60_000;
 
-interface ReminderData {
+// A type alias, not an interface: NotificationContentInput.data is Record<string, unknown>, which an interface
+// (no implicit index signature) does not satisfy.
+type ReminderData = {
   kind: typeof DATA_KIND;
   key: string;
   ticketId: string;
   fireAt: number;
-}
+};
 
 function isReminderData(data: unknown): data is ReminderData {
   if (typeof data !== 'object' || data === null) return false;
