@@ -10,6 +10,8 @@
 
 **Updated for Phase G4, 2026-10-22.** The service catalogue is built: browsing, the request form with every field type the web renders, and My Requests. §1.9 (expected behaviour) and §2.8 (rows SC1–SC9) are new; row N8, the totals, §0, §2, §6 and §7 are updated; §13 lists what G4 changed. The web's behaviour, with sources, is in `docs/G4-WEB-CATALOGUE.md`.
 
+**Updated for Phase G5, 2026-10-22.** The create form's priority preview is built (CR8, new), and "My Requests" lists every request for staff, as on the web (SC7 is now a MATCH). The full role audit was re-run over every element G1–G4 added; it found two too-permissive cases, both fixed, and one latent one, hardened. §14 has the audit, the fixes and the answers to the brief's four questions. §0, §1.6, §1.9, §2, §6 and §7 are updated.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -36,9 +38,9 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **31** of the 94 rows in §2 (28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
-| More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user |
-| More restrictive than the web UI | **28**. Of these: **16** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **0** are undocumented. G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
+| Elements whose role gating differs from the web portal | **30** of the 95 rows in §2 (31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
+| More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user. **G5 audit:** two too-permissive cases below the UI were fixed (§14.3); neither was reachable from a screen |
+| More restrictive than the web UI | **27**. Of these: **15** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **0** are undocumented. G5: SC7 (My Requests for staff) is now a MATCH, settled against the web's source (§14.2). G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
 | Attachments on private notes (check B) | **Real leak, Critical, backend-only fix.** The requester can list, view, download and zip files attached to a private note, and the header count includes them. The app cannot tell those files apart from others. It can only stop creating new ones (§5) |
 | Actions that 403 (check C) | **All hidden**, and assignment is also refused on the device (§6) |
@@ -133,7 +135,7 @@
 | Field | END_USER | AGENT | L2 | ADMIN | Source |
 |---|---|---|---|---|---|
 | Title, description, category cascade, attachments | ✅ | ✅ | ✅ | ✅ | `:201-343` |
-| Impact, urgency, priority preview, mode | ❌ | ✅ | ✅ | ✅ | `:346-400` |
+| Impact, urgency, priority preview, mode | ❌ | ✅ | ✅ (preview never computes: LKP-6 is a **403**) | ✅ | `:346-400`; preview `:49-76, :368-387` |
 | Team, Assign To | ❌ | ✅ | ✅ (**403, empty**) | ✅ | `:410-470` |
 | Source, level | ❌ | ✅ | ✅ | ✅ | `:474-486` |
 | Requester (raise on behalf) | **does not exist for any role** | | | | – |
@@ -175,7 +177,7 @@ Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.m
 | Request form: custom fields (7 types), required check, notes, "Add Request" (no confirmation) | ✅ | ✅ | ✅ | ✅ | `SRF:183-235, :467-491` |
 | Request properties: Impact, Urgency, auto Priority (only `priority` is kept) | ❌ | ✅ | ✅ | ✅ | `SRF:41, :267-318` |
 | Subject, description, category cascade, group, technician, assets, site, request type, status, mode, level, impact details, attachments | ✅ (staff extras for AGENT, L2, ADMIN; L2's group list is a **403**) | | | | `SRF:267-464`; the server keeps none (`serviceCatalog.controller.ts:26-31`, 05 B.24); files never uploaded (`SRF:158-165`) |
-| My Requests rows | own | **everyone's** | **everyone's** | **everyone's** | `SCP:44-48`; `serviceCatalog.controller.ts:117` |
+| My Requests rows | own | **everyone's** | **everyone's** | **everyone's** | `SCP:44-48`; `serviceCatalog.controller.ts:117` (deliberate: "End users see only their own requests", `:116`) |
 | Request detail | none: rows are not links | | | | `SCP:344` |
 | Cancel, edit, comment, assign, change status | none in the UI | | | | `serviceCatalog.router.ts:25-27` (staff-only routes, no web caller) |
 
@@ -202,7 +204,8 @@ Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.m
 - `bulkActions`, `inlineStatusTransitions`
 - `ticketListFilters` (G2: which of the five filters the M3 Filters sheet offers)
 - `canUseReplyTemplates`, `canDeleteAttachments`, `canSubmitForApproval` (G3; read by `composerPermissions().templates`, `ticketDetailPermissions().deleteAttachments` and `moreActions` 'approval', the write guards and the API functions)
-- `canUseServiceCatalog`, `serviceCatalogPermissions`, `isOwnServiceRequest`, `myServiceRequestRows`, `serviceRequestProblem` (G4: the drawer row, the catalogue screens, My Requests' rows, the request detail, and the SCR-5 write guard and API function)
+- `canUseServiceCatalog`, `serviceCatalogPermissions`, `isOwnServiceRequest`, `myServiceRequestRows`, `serviceRequestProblem` (G4: the drawer row, the catalogue screens, My Requests' rows, the request detail, and the SCR-5 write guard and API function; G5: `everyonesRequests`)
+- `createTicketPermissions` (G5: every role-dependent part of the create form, the priority preview included)
 
 It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`. The G4 form rules (field types, validation, the request body) are in `src/utils/service-catalog.ts`.
 
@@ -295,9 +298,10 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
 |---|---|---|---|---|---|
 | CR1 | Title, description, category, files | all | all | MATCH | `src/screens/tickets/CreateTicketScreen.tsx` |
-| CR2 | Impact, urgency | AGENT, L2, ADMIN | AGENT, L2, ADMIN | MATCH | `:128-129, :213` |
-| CR3 | Group, Assign to | ADMIN, AGENT | AGENT, L2 (403, empty), ADMIN | **NARROWER** for L2, *defect avoided* | `:130-131, :221` |
-| CR4 | Requester (raise on behalf) | ADMIN, AGENT | nobody | **WIDER**, *decision* 01 TKT-2 / 04 M8. The server accepts it from non-END_USER (`BE:tickets.controller.ts:190`). It conflicts with CLAUDE.md rule 6 → §8 item 4 | `:132, :221` |
+| CR2 | Impact, urgency | AGENT, L2, ADMIN | AGENT, L2, ADMIN | MATCH | perm `createTicketPermissions().classification` (G5; before, the screen called `isStaff` itself) |
+| CR3 | Group, Assign to | ADMIN, AGENT | AGENT, L2 (403, empty), ADMIN | **NARROWER** for L2, *defect avoided*. G5: the API allow-list no longer lets L2 carry `teamId` or `assignedToId` (§14.3) | perm `createTicketPermissions().routing`; `src/api/tickets.api.ts` `CREATE_KEYS_BY_ROLE` |
+| CR4 | Requester (raise on behalf) | ADMIN, AGENT | nobody | **WIDER**, *decision* 01 TKT-2 / 04 M8. The server accepts it from non-END_USER (`BE:tickets.controller.ts:190`). It conflicts with CLAUDE.md rule 6 → §8 item 4. G5: no longer carried for L2 by the API layer (§14.3) | perm `createTicketPermissions().raiseOnBehalf` |
+| CR8 | Priority preview while choosing impact and urgency (G5) | ADMIN, AGENT; L2 told the Service Desk sets it | ADMIN, AGENT; L2 sees the box, but it never computes (LKP-6 403) | MATCH. The G1 `PriorityPreviewBox`, reused (`target: create`); display only, no `priority` sent (01 TKT-2) | perm `createTicketPermissions().priorityPreview`; `TicketPropertyEditors.tsx` `PriorityPreviewBox`; `ticket-properties.ts` `newTicketPriority` |
 | CR5 | Mode, level, source | none | AGENT, L2, ADMIN | **NARROWER**, *decision* 05 B.13 (the server drops them) | – |
 | CR6 | AI assistant | none | all | **NARROWER**, *defect avoided* (W6) | – |
 | CR7 | END_USER routing banner | END_USER | END_USER | MATCH | `:208` |
@@ -328,18 +332,19 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | SC4 | Request form: custom fields of all seven types, the web's `required` and browser checks, notes, "Add Request" with no confirmation, back to the catalogue | all | all | MATCH | `src/screens/catalog/ServiceRequestFormScreen.tsx`, `ServiceFormFieldInput.tsx` → perm `serviceCatalogPermissions().submit`; `useSubmitServiceRequest` → `assertServiceRequest` |
 | SC5 | Request properties: Impact, Urgency, the auto Priority | AGENT, L2, ADMIN | AGENT, L2, ADMIN | MATCH. Only `priority` is sent; END_USER's request is refused on the device if it ever carries one | perm `serviceCatalogPermissions().requestProperties`, `serviceRequestProblem` |
 | SC6 | Form controls whose values the server never keeps (subject, description, category cascade, group, technician, assets, site; for staff request type, status, mode, level, impact details) and the attachment box | none | all (staff extras: AGENT, L2, ADMIN; L2's group list is a 403) | **NARROWER**, *defect avoided*: the server keeps none of them (05 B.24), some are never sent, and the files are never uploaded (`docs/G4-WEB-CATALOGUE.md` §3, D2, D3) | – |
-| SC7 | My Requests: whose rows | own, every role | END_USER own; AGENT, L2, ADMIN everyone's | MATCH for END_USER. **NARROWER** for AGENT, L2 and ADMIN, *defect avoided*: the list is unscoped for them under a "My" label (01 SCR-4 ⚠) | perm `myServiceRequestRows`, `isOwnServiceRequest`; `src/hooks/useServiceCatalog.ts` `useMyServiceRequests` |
-| SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role | none (rows are not links) | N/A (mobile addition, ➕) | `src/screens/catalog/ServiceRequestDetailScreen.tsx` → perm `isOwnServiceRequest` |
+| SC7 | My Requests: whose rows | END_USER own; AGENT, L2, ADMIN everyone's (G5) | END_USER own; AGENT, L2, ADMIN everyone's | MATCH (G5; G4 had it NARROWER for staff). The server's scoping is deliberate and there is no narrower scope (§14.2). Same four columns, no requester column | perm `serviceCatalogPermissions().everyonesRequests`, `myServiceRequestRows`; `src/hooks/useServiceCatalog.ts` `useMyServiceRequests` |
+| SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role; only one's own rows are links | none (rows are not links) | N/A (mobile addition, ➕). Never another person's answers, as on the web | `src/screens/catalog/ServiceRequestDetailScreen.tsx`, `ServiceCatalogScreen.tsx` `canOpen` → perm `isOwnServiceRequest` |
 | SC9 | Cancel, edit, comment on, assign or change the status of a request | none | none | MATCH (the server's routes are staff-only and no web page calls them) | – |
 
-**Totals** (after G4, 2026-10-22)
-- 94 rows (85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12).
-- **31 mismatches** (28 after G3, 29 after G2, 28 after G1, 30 before it):
+**Totals** (after G5, 2026-10-22)
+- 95 rows (94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12).
+- **30 mismatches** (31 after G4, 28 after G3, 29 after G2, 28 after G1, 30 before it):
   - 3 WIDER: N1, N4, CR4.
-  - 28 NARROWER:
-    - **16 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3, SC6, SC7.
+  - 27 NARROWER:
+    - **15 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3, SC6.
     - **12 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T24, C2, CR5, SC3.
     - **0 UNDOCUMENTED** (before G1: T8, T9, T11, T12).
+- G5: CR8 is a new MATCH; SC7 moved from NARROWER (*defect avoided*) to MATCH.
 - G2: L10 went from N/A (not built) to built, MATCH for ADMIN and AGENT and NARROWER for END_USER and L2 (the web shows them an empty list). L12 is a new MATCH row.
 - G3: T22 (delete) from *decision* to MATCH; T26 (submit for approval) from *decision* to MATCH for ADMIN and AGENT and *defect avoided* for END_USER and L2; C4 (templates) from N/A to MATCH.
 - G4: SC1–SC9 are new. SC1, SC2, SC4, SC5 and SC9 MATCH; SC7 matches for END_USER; SC3, SC6 and SC7 (staff) are the three new mismatches; SC8 is a mobile addition.
@@ -394,7 +399,8 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - G1 editors: category edit (L2, END_USER), country edit (L2, END_USER), resolution edit (END_USER). Each shows the value with no editor and no reason
 - G2: the Technician and Group filters (END_USER, L2): not in the Filters sheet, and never sent from a stale state
 - G3: the delete button (END_USER): not on any file row. "Submit for approval…" (END_USER, L2): not in More options; the screen itself shows "Not available for your role"; the guard and the API function refuse it before sending
-- G4: the request properties (END_USER): not on the form, and a `priority` from END_USER is refused before sending. Another person's request (any role): not in My Requests, and its detail shows "Not one of your requests"
+- G4: the request properties (END_USER): not on the form, and a `priority` from END_USER is refused before sending. Another person's request (any role): its detail shows "Not one of your requests". G5: staff see it listed in My Requests, as on the web, but the row is not a link
+- G5: on the create form, the priority preview (L2, END_USER), group and technician (L2, END_USER), requester (L2, END_USER) and impact/urgency (END_USER): not rendered, from `createTicketPermissions()`; the API allow-list drops `teamId`, `assignedToId` and `requesterId` for L2 as well
 
 **G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
@@ -490,7 +496,7 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 | **Silent** no-op: `PUT /tickets/:id {status}` | all | Status only goes through TKT-6 POST | 05 B.1 |
 | `PUT /service-catalog/requests/:id`, `POST …/status`, `POST …/assign` are `agentOrAdmin` | L2, END_USER | G4: never called by the app, for any role. The web has no page that calls them either | `BE:modules/serviceCatalog/serviceCatalog.router.ts:25-27`; 01 Appendix A |
 | **Silent** discard: the request form's subject, description, category, group, technician; files never uploaded | all | G4: not shown; SCR-5 carries only the four kept keys, and `serviceRequestProblem` refuses any other key before sending (tested: nothing sent) | `BE:serviceCatalog.controller.ts:26-31`; 05 B.24 → `src/api/serviceCatalog.api.ts` `createServiceRequest` |
-| Unscoped list: `GET /service-catalog/requests` for AGENT, L2, ADMIN | AGENT, L2, ADMIN | G4: My Requests keeps only the person's own rows; the detail shows only their own request | `BE:serviceCatalog.controller.ts:117` → perm `myServiceRequestRows`, `isOwnServiceRequest` |
+| ~~Unscoped list~~ Staff-wide list: `GET /service-catalog/requests` for AGENT, L2, ADMIN | AGENT, L2, ADMIN | G4 kept only the person's own rows. **G5: listed as on the web** (deliberate server scoping, not a rejection or a leak, §14.2). The detail still shows only one's own request | `BE:serviceCatalog.controller.ts:116-117` → perm `myServiceRequestRows`, `isOwnServiceRequest` |
 
 ---
 
@@ -597,6 +603,32 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 - **Proof the tests bite.** Twenty-eight mutations, "too permissive" or "not as the web", were each applied alone, tested and restored by script. Every one made the suite fail (1–10 failures each), and every file under `src/` and `tests/` was verified byte-identical afterwards by SHA-1:
   - too permissive: END_USER gets the request properties; My Requests shows everyone's rows; the detail shows anyone's request; END_USER may send a priority; extra keys allowed in the body; an unknown role may submit; the hook skips the guard; the form sends a priority for everyone; the detail skips the owner check; the catalogue screen gated by a raw role check;
   - not as the web: the catalogue for staff only; `required` trims spaces; no e-mail check; decimals allowed; the e-mail not trimmed; unknown types kept as such; a conditional field hidden; the phone placeholder default lost; empty option values kept; the priority map wrong for High × High; the priority not sticky; untouched fields left out of `formData`; notes trimmed; search on names only; the automatic page reading unbounded; SCR-4 asking for 100; a confirmation added; an attachment picker added.
+
+**G5 additions (2026-10-22): 533 tests in all (475 after G4).** Per file: `role-gating` 129, `service-catalog` 108, `g3-features` 83, `list-filters` 65, `property-editing` 59, `g5-audit` 55, `tests/auth/mobile-sso` 34.
+- **`tests/rbac/g5-audit.test.mjs`, 55 tests (new).**
+  - **The create form:** `createTicketPermissions()` in full for each persona and for an unknown role; the preview is offered exactly where M4 offers it.
+  - **The preview:** for all 25 impact × urgency pairs (including "not set"), it equals what TKT-2 stores, against the seeded matrix.
+  - **The request:** TKT-2 carries exactly each role's keys and never `priority`; L2 sends no group, technician or requester; an unknown role sends END_USER's keys.
+  - **Wiring:** the create screen renders the G1 `PriorityPreviewBox` and never reads the matrix or names the rule; `src/` defines exactly one `PriorityPreviewBox` and one `previewPriority`; every role decision on the screen comes from `createTicketPermissions()`.
+  - **Audit pins:** for every persona, on a CLOSED and a CANCELED ticket, exactly which G1–G4 elements are offered (the web's lock set, §14.4). An unknown role edits no field and deletes no file.
+- **`service-catalog.test.mjs`, 108 tests (106).**
+  - My Requests: staff see every row and END_USER their own; an unknown role or no session sees only their own.
+  - Only one's own rows are links, and there is no requester column.
+  - No page is read by itself: the G4 automatic reading of further pages is removed, as there is nothing to search for.
+- **`role-gating.test.mjs`, 129 tests (128):** `CreateTicketScreen.tsx` joins the wiring checks (it called `isStaff` and `isAgentOrAdmin` itself before G5).
+- **Proof the tests bite.** Eleven mutations were each applied alone, tested and restored by script. Every one made the suite fail (1–9 failures each), and every file under `src/` and `tests/` was verified byte-identical afterwards by SHA-1. The mutations:
+  - L2 gets the create preview
+  - L2's create body carries group, technician or requester
+  - an unknown role gets the staff create keys
+  - the create body sends a priority
+  - the create screen names the rule
+  - the create screen looks the matrix up itself
+  - the create screen gates "raise on behalf" with its own role check
+  - END_USER sees everyone's requests
+  - every My Requests row opens the detail
+  - an unknown role may delete files
+  - the AGENT lock dropped from category on closed tickets
+  - One first-draft mutation survived: the create screen *naming* `previewPriority` without calling it. The wiring check was tightened so the screen may not reference the rule or the matrix data at all. It, and a realistic variant that looks the matrix up itself, are now caught.
 
 ---
 
@@ -749,3 +781,149 @@ The service catalogue, as the web portal does it (`docs/G4-WEB-CATALOGUE.md`), e
 - The ticket screens and flows (status still changes only through TKT-6 POST), the create form (gap 11 stays open).
 - The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
 - The web repo: byte-for-byte unchanged (SHA-1 of every file in the clone outside `node_modules` and `.git`, before and after).
+
+---
+
+## 14. Phase G5: the last gap, My Requests settled, and the G1–G4 role audit (2026-10-22, uncommitted)
+
+The web source was re-read at the same HEAD, `d7f3887`. The web's own behaviour for G1–G4 is unchanged since those phases, so their source documents still hold (`docs/G1-WEB-BEHAVIOUR.md` … `G4-WEB-CATALOGUE.md`). This audit re-checks what the **app** does today against them, element by element. Ronit's rule: match the web. The only exception is the §5 cases in `WEB-VS-MOBILE-ROLES.md`, where the web shows a control that returns a 403 or leaks data.
+
+### 14.1 Every element G1–G4 added or changed (and G5's)
+
+"Shows to" means where the control is offered. Direction: **too permissive** = mobile offers more than the web; **too restrictive** = less.
+
+| Phase · element | App shows it to | Web shows it to (source) | Verdict |
+|---|---|---|---|
+| G1 · impact and urgency edit (T9) | AGENT (not locked), L2, ADMIN | the same (`TDP:1737-1774`; lock `:1740, :1757`) | MATCH |
+| G1 · priority shown and sent with that edit (T13) | preview and `priority`: ADMIN, AGENT (not locked); L2 neither | `priority` from ADMIN, AGENT; L2's matrix is a 403 (`TDP:294-317`) | MATCH |
+| G1 · category edit (T8) | ADMIN, AGENT (not locked); others read-only | the same (`TDP:1951-1953`) | MATCH |
+| G1 · country edit (T11) | ADMIN, triage AGENT, any status; plain AGENT locked; L2 value only | ADMIN, every AGENT, any status; L2 a no-op select (`TDP:2199`; `TC:553-556`) | too restrictive: plain AGENT (Ronit's G2 decision); L2 (*defect avoided*) |
+| G1 · resolution edit (T12) | staff, RESOLVED or CLOSED, no lock | every role, RESOLVED or CLOSED (`TDP:1440-1455`) | too restrictive for END_USER (§C gap C.5, `WEB-VS-MOBILE-ROLES.md` §5) |
+| G1/G2 · TKT-4 allow-list and write guard | only the fields above, per role and state | (UI only) | MATCH; `fieldEditProblem` refuses everything else before sending |
+| G2 · priority, category, date filters (L12) | all | all (`TLP:494-546, :573-586`) | MATCH |
+| G2 · technician and group filters (L10) | ADMIN, AGENT | all; END_USER and L2 get a 403 and an empty list (`TLP:145-156`) | MATCH for ADMIN, AGENT; too restrictive for END_USER, L2 (*defect avoided*, 403) |
+| G2 · the filters' option lists | every active AGENT; every group | the same (`users.controller.ts:44-63`; `teams.controller.ts:19-26`) | MATCH (§14.4 c) |
+| G3 · reply templates (C4) | all, every composer mode | the same (`TDP:1046`) | MATCH |
+| G3 · delete a file (T22) | ADMIN, AGENT, L2; any file; every status | the same (`TDP:1345`, lock-free; `attachments.controller.ts:149`) | MATCH (§14.4 d) |
+| G3 · submit for approval (T26) | ADMIN, AGENT; every status | the Actions menu to all roles, the tab to staff; the server allows ADMIN and AGENT (`TDP:697, :1585`; `approvals.router.ts:8`) | MATCH for ADMIN, AGENT; too restrictive for END_USER, L2 (*defect avoided*, 403) |
+| G4 · catalogue: drawer row, browse, search (SC1, SC2) | all | all (`AppLayout.tsx:30`; `SCP:36-66`) | MATCH |
+| G4 · request form and "Add Request" (SC4) | all | all (`SRF:183-235, :485-491`) | MATCH (§14.4 b) |
+| G4 · request properties (SC5) | staff; only `priority` sent | staff (`SRF:41, :267-318`) | MATCH |
+| G4 · the form's inert controls and attachments (SC6) | nobody | all (`SRF:267-464`; the server keeps none) | too restrictive (*defect avoided*: they save nothing) |
+| G4 · My Requests (SC7) | **G5:** staff every request, END_USER their own | the same (`SCP:44-48`; `SCC:117`) | **MATCH since G5** (G4: too restrictive) |
+| G4 · a request's detail (SC8) | own requests, every role | no detail at all (`SCP:344`) | mobile addition (➕); never another person's answers |
+| G4 · creating a template (SC3) | nobody | ADMIN (`SCP:398-405`) | too restrictive (*decision*: admin stays on the web) |
+| G5 · create-form priority preview (CR8) | ADMIN, AGENT; L2 told the Service Desk sets it | ADMIN, AGENT; L2's box never computes (`CTP:49-76, :368-387`) | MATCH |
+| G5 · create-form body (TKT-2) | END_USER 4 keys; L2 + impact, urgency; ADMIN, AGENT + group, technician, requester | no form offers L2 a group, technician or requester that works (`CTP:410-470`, 403) | **was too permissive below the UI; fixed** (§14.3) |
+
+**Result:**
+- **Too permissive:** two cases in the API layer, unreachable from any screen. Both fixed (§14.3).
+- **Too restrictive:** 12 (§2 totals). Each is a 403, a leak, a §C gap, a control that saves nothing, or a recorded decision.
+- **Undocumented:** none.
+
+### 14.2 My Requests: the finding
+
+**Does the web show staff all requests, or only those they are involved with?** All of them. `listRequests` adds `requesterId` to the query for END_USER only (`BE:modules/serviceCatalog/serviceCatalog.controller.ts:111-124`). The web lists the response unfiltered, with the columns number, service, status and date, and no requester (`FE:pages/service-catalog/ServiceCatalogPage.tsx:44-48, :333-352`). "Involved with" has nothing to work on:
+- A request carries `assignedToId`, `teamId` and `countryId` columns (`schema.prisma`, `model ServiceRequest`).
+- But SCR-5 never sets them (`:135-159`).
+- No web page calls the staff-only assign or status routes (`serviceCatalog.router.ts:25-27`; `FE:` has no caller).
+
+**Is the scoping enforced by the API, or a UI choice?** By the API. It is explicit: "End users see only their own requests" (`:116`). SCR-6 applies the same rule (`:129-131`, 403 for another person's request, END_USER only).
+
+**Is there a separate staff view?** No. One page, `/service-catalog`, has one "My Requests" view with no role check (`FE:router/index.tsx:145-146`; `SCP:174-187, :326-361`). No other page reads service requests; the Approvals page names a request's service only.
+
+**Against the §5 criteria:**
+- **403:** no, the list answers every role.
+- **Leak:** no. The server grants staff every request deliberately, as the side that fulfils them. The web shows four non-personal columns; it shows no requester and no answers.
+- **CLAUDE.md:** it relies on no §C gap and skips no §A rule.
+
+So the restriction was not justified, and it was removed:
+- ADMIN, AGENT and L2_MANAGER now see every request, END_USER their own (`serviceCatalogPermissions().everyonesRequests`, `myServiceRequestRows`).
+- Only one's own rows are links, so another person's answers, notes and approvals are still shown nowhere: on the web no row opens anything.
+- The rows add "by you" to one's own requests and nothing else.
+- G4's automatic reading of further pages (looking for one's own rows) is removed: pages of 50 load as the list scrolls.
+
+### 14.3 Fixes
+
+1. **Too permissive, fixed: TKT-2 let L2_MANAGER carry `teamId`, `assignedToId` and `requesterId`.**
+   - `CREATE_KEYS_STAFF` covered every role but END_USER.
+   - The screen never offered these to L2, and the web's group and technician lists are a 403 for L2. No web form has a requester field.
+   - Now `CREATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts` gives L2 `title`, `description`, `categoryId`, `source`, `impact` and `urgency`, the same narrowing G2 made to TKT-4 (§8 item 2). 01 TKT-2 updated.
+2. **Too permissive, fixed: TKT-2 gave a role the app doesn't know the staff keys.** It used `role === 'END_USER' ? … : staff`. It now gets END_USER's keys.
+3. **Latent, hardened: an unknown role counted as staff in two G1/G3 gates.** These were `ticketFieldPermissions` (impact, urgency and resolution edits) and `canDeleteAttachments`, which relied on `isStaff` (true for anything but END_USER).
+   - Both now answer as for END_USER: no edit, no delete. This matches the G3/G4 gates, which already used the known-role set.
+   - It was unreachable: sign-in and the stored session refuse an unknown role (`src/api/auth.api.ts:339`, `src/store/auth.store.ts:75`).
+4. **Structure, no change in who can do what:** the create form called `isStaff` and `isAgentOrAdmin` itself. Every role decision there now comes from `createTicketPermissions()`, and the screen is in the wiring checks (§7).
+
+**No permission was relaxed for a test.** The two G4 tests that pinned My Requests to "own rows only" now pin the web's rule. The decision behind them changed, not the test's strictness: END_USER's own-rows rule, the detail's owner check and "only own rows are links" are each tested.
+
+### 14.4 The brief's four questions
+
+**(a) Is anything editable on a closed ticket that the web locks?** **No.**
+- The web's only state lock is `isResolvedLocked`: an AGENT on a CLOSED or CANCELED ticket (`TDP:619-623`).
+- It removes the transitions, Pick up and Assign, Add Attachment, impact, urgency, category, the group and the status select (`:669, :1268, :1685, :1740, :1757, :1778, :1890, :1953`).
+- It leaves country, the resolution, deleting a file, submitting for approval, templates, replies and tasks open.
+- CLOSED and CANCELED have no transitions for any role (`:104-105`).
+- The app matches exactly. `g5-audit.test.mjs` pins, for every persona, the ten G1–G4 elements offered on a CLOSED and a CANCELED ticket.
+
+**(b) Can any role submit a catalogue field it should not?** **No.**
+- The renderer reads no role, team or country key, so every role gets the same custom fields (G4 §4).
+- The only role-gated input is the priority from the staff-only Impact and Urgency. END_USER cannot send it: the form omits it, and the hook guard, the API function and `serviceRequestProblem` each refuse it before sending.
+- Every other key is refused for everyone.
+- `formData` is built only from the item's own fields (`buildFormData`).
+
+**(c) Can a role filter by a technician or group outside their scope, and infer what it should not see?** **No, not through the filters.**
+- END_USER and L2 have neither filter. Their values never reach TKT-1, even from a stale state (`ticketListQuery`, tested).
+- ADMIN and AGENT get the web's own option lists: every active AGENT, every group.
+- The server spreads `assignedToId` and `teamId` alongside the role scope, so a filter only narrows within it (`TC:98-131`). Picking an outside technician or group returns only tickets the person could already see.
+- One known server defect widens AGENT and L2 lists, on the web exactly as on mobile, with or without filters: a search term replaces the scope `OR` (`TC:143`, 05 C.7). Mobile neither relies on it nor patches it (CLAUDE.md rule 6). A country-locked AGENT's list is still scoped, because the app always sends their country, which puts the scope under an `AND` (`TC:104-110`; `src/utils/ticket-filters.ts` `listCountryParam`).
+
+**(d) Does the web really let every staff role delete any file in any state?** **Yes, as G3 concluded.**
+- The trash icon shows for `role !== 'END_USER'` (`TDP:1345`), outside the lock that hides "Add Attachment" (`:1268`).
+- It is on every file of the list (`:1319-1351`).
+- The server refuses END_USER only and checks no state or uploader (`attachments.controller.ts:146-157`).
+- There is no other delete control in the web app (repo-wide search).
+
+### 14.5 Web defects found in G5 (report only, R3)
+
+- **W-G5-1. The create page's priority preview is sticky.** After a priority has been computed, changing to a pair with no matrix row (impact MINIMAL or urgency URGENT, by default) keeps the old value on screen and in the body (`CTP:67-72`). The server then stores it, because no row overrides it (`TC:193-201`). The stored priority depends on the order the fields were picked. Mobile stores Medium in that case and says so.
+- **W-G5-2. The create page loads the priority matrix for every role** (`CTP:49-52`, no `enabled`). Every END_USER and L2 opening "New Ticket" causes a 403. This is the detail page's G1 defect, on a second page.
+- **W-G5-3. Changing impact and urgency on the web sends two updates.** Each save-on-select sends the priority of its moment (`TDP:304-317`), so one edit can produce two "priority changed" emails and two History lines (`TC:719, :775-784`). This is the consequence of saving on selection; mobile sends one update (`WEB-VS-MOBILE-ROLES.md` §8, 5b).
+- **Already recorded, seen again in the walkthrough:**
+  - Pick up without `teamId` moves the ticket to the technician's first group (05 B.14; `WEB-VS-MOBILE-ROLES.md` §8, 2a).
+  - The web's My Requests labels everyone's requests "My" (G4 D4). G5 keeps the web's behaviour and label.
+
+### 14.6 What changed (uncommitted)
+
+**Created**
+- `tests/rbac/g5-audit.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`:
+  - `createTicketPermissions` (new);
+  - `serviceCatalogPermissions().everyonesRequests`;
+  - `myServiceRequestRows` (staff: every row);
+  - `isOwnServiceRequest` (doc);
+  - `canDeleteAttachments` and `ticketFieldPermissions` (unknown role).
+- `src/utils/ticket-properties.ts`: `newTicketPriority`.
+- `src/screens/tickets/TicketPropertyEditors.tsx`: `PriorityPreviewBox` exported, with an `update` or `create` target. M4's output is unchanged.
+- `src/screens/tickets/CreateTicketScreen.tsx`: the preview, and every role decision from `createTicketPermissions()`.
+- `src/api/tickets.api.ts`: `CREATE_KEYS_BY_ROLE`.
+- Service catalogue:
+  - `src/hooks/useServiceCatalog.ts`: no automatic page reading;
+  - `src/utils/service-catalog.ts`: the scan helpers removed;
+  - `src/screens/catalog/ServiceCatalogScreen.tsx`: every row for staff, only one's own rows are links;
+  - `src/api/serviceCatalog.api.ts`: comment.
+- Tests: `service-catalog.test.mjs`, `role-gating.test.mjs`.
+- Docs:
+  - this file;
+  - `WEB-VS-MOBILE-ROLES.md` (final state; §5 reviewed; §8 workflows);
+  - `01-API-CONTRACT.md` (TKT-2, SCR-4);
+  - `04-SCREEN-MAP.md` (M8, M17);
+  - a G5 note in `G1-WEB-BEHAVIOUR.md` and `G4-WEB-CATALOGUE.md`.
+
+**Not touched**
+- The status flow: TKT-6 POST only; `PUT /tickets/:id` never carries a status.
+- The auth flow, `auth.config.ts`, the dev-token screen.
+- No library, no EAS build, nothing committed.
+- The web repo: byte-for-byte unchanged (file list, sizes and modification times of all 840 files, and SHA-1 of every file under `frontend/src` and `backend/src`, before and after).

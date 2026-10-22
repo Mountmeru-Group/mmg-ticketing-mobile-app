@@ -7,6 +7,8 @@ This file records what the web portal **actually does** for the service catalogu
 dynamic fields, and "My Requests". Every statement cites the source. Where the source does not settle something, this
 file says so. §9 lists what mobile does differently and why.
 
+> **G5 note (2026-10-22):** the §9 row "My Requests for staff: everyone's requests → the person's own" no longer applies. G5 re-read §6's sources and found no ground for the restriction: the server's END_USER-only scoping is deliberate, there is no narrower scope a request could carry, and the web shows no personal data in that list. So mobile now lists every request for staff, as the web does. D4 below stays a description of the web (the "My" label); it is no longer a reason for mobile to differ. Only one's own rows open the detail screen. Full reasoning: `ROLE-MATRIX.md` §14.2.
+
 **Paths**
 - `FE:` = `frontend/src/`. `SCP` = `FE:pages/service-catalog/ServiceCatalogPage.tsx` (route `/service-catalog`).
   `SRF` = `FE:pages/service-catalog/ServiceRequestFormPage.tsx` (route `/service-catalog/new/:itemId`).

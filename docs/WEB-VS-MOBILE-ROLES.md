@@ -1,6 +1,8 @@
 # Web portal vs mobile app: who can do what
 
-**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1, G2, G3 and G4.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group. Phase G3 built reply templates, deleting a file and submitting a ticket for approval, each as the web does it (web behaviour: `docs/G3-WEB-BEHAVIOUR.md`). Phase G4 built the service catalogue: browsing, the request form with every field type the web renders, and My Requests (web behaviour: `docs/G4-WEB-CATALOGUE.md`).
+**Final state, 2026-10-22 (Phases G1–G5).** G1 built ticket property editing (impact and urgency with the priority preview, category, country, resolution); G2 the list's priority, category, date, technician and group filters; G3 reply templates, deleting a file and submitting a ticket for approval; G4 the service catalogue; G5 the priority preview on the create form, settled My Requests against the web (staff see every request, as on the web), re-audited every G1–G4 element, and traced six workflows end to end. **No ❌ NOT BUILT row remains: every role is at 100% parity** (section 2). What mobile still does differently is deliberate and listed with its reason: section 5 (safer), section 6 (out of scope), section 8 (workflow steps).
+
+**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1, G2, G3, G4 and G5.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group. Phase G3 built reply templates, deleting a file and submitting a ticket for approval, each as the web does it (web behaviour: `docs/G3-WEB-BEHAVIOUR.md`). Phase G4 built the service catalogue: browsing, the request form with every field type the web renders, and My Requests (web behaviour: `docs/G4-WEB-CATALOGUE.md`). Phase G5 added the create form's priority preview (the web's `CreateTicketPage.tsx:49-76, :368-387`), made My Requests list every request for staff as the web does, and re-ran the role audit over G1–G4 (`docs/ROLE-MATRIX.md` §14).
 
 ## 1. How to read this
 
@@ -19,27 +21,29 @@ This document compares, one capability per row, what the **web portal** lets eac
 | Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps |
 |---|---|---|---|---|
 | END_USER | 46 | 43 | 100% | none |
-| AGENT | 80 | 77 | 98% | 1: the priority preview on the create form |
-| triage AGENT | 79 | 78 | 98% | 1: the priority preview on the create form |
-| L2_MANAGER | 59 | 57 | 100% | none |
-| ADMIN | 82 | 78 | 98% | 1: the priority preview on the create form |
+| AGENT | 80 | 79 | 100% | none |
+| triage AGENT | 79 | 80 | 100% | none |
+| L2_MANAGER | 59 | 58 | 100% | none |
+| ADMIN | 82 | 80 | 100% | none |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
-- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 67–73%.
-- **Is anything still ❌ NOT BUILT? Yes, one row:** "See the priority a new ticket will get, before saving" (gap 11, ADMIN and AGENT). It was outside G4's scope (the service catalogue only). END_USER and L2_MANAGER have no genuine gap left.
+- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 67–76% (END_USER 67%, L2_MANAGER 71%, ADMIN 73%, AGENT 74%, triage AGENT 76%).
+- **Is anything still ❌ NOT BUILT? No.** G5 built the last row, "See the priority a new ticket will get, before saving" (gap 11). Every web capability is now on mobile, or left out on purpose with its reason in section 5 or 6.
+- **Before G5** (after G4, 2026-10-22): END_USER 43 on mobile, 100%, no gap; AGENT 77, 98%, 1 gap; triage AGENT 78, 98%, 1; L2_MANAGER 57, 100%, none; ADMIN 78, 98%, 1. With the exclusions counted as misses, 67–73%. G5 moved two rows to ✅ SAME: the create form's priority preview (❌ → ✅, ADMIN and AGENT) and everyone's requests under My Requests (🔒 → ✅, ADMIN, AGENT and L2_MANAGER).
 - **Before G4** (after G3, 2026-10-22): END_USER 39 on mobile, 97%, 1 gap; AGENT 72, 96%, 2; triage AGENT 73, 96%, 2; L2_MANAGER 52, 97%, 1; ADMIN 73, 96%, 2. With the exclusions counted as misses, 64–72%. G4 replaced the one catalogue row (❌) with seven: four ✅ SAME, one ➕ MOBILE ONLY (a request's detail), one 🔒 SAFER (everyone's requests under My Requests) and one ⊘ OUT OF SCOPE (creating templates).
 - **Before G3** (after G2, 2026-10-22): END_USER 38 on mobile, 93%, 2 gaps; AGENT 69, 91%, 5; triage AGENT 70, 91%, 5; L2_MANAGER 50, 92%, 3; ADMIN 70, 91%, 5. With the exclusions counted as misses, 61–68%. G3 moved three rows to ✅ SAME: reply templates (every role), delete a file (ADMIN, AGENT, L2_MANAGER) and submit for approval (ADMIN, AGENT).
 - **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
-- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed.
 
 ## 3. Main table: 112 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
 |---|---|---|---|---|---|
-| 48 | 22 | 1 | 23 | 18 | **112** |
+| 50 | 22 | 0 | 23 | 17 | **112** |
 
+Before G5: 48 SAME, 22 MOBILE ONLY, 1 NOT BUILT, 23 OUT OF SCOPE, 18 SAFER. G5 moved the create form's priority preview from ❌ to ✅ and everyone's requests under My Requests from 🔒 to ✅.
 Before G4: 44 SAME, 21 MOBILE ONLY, 2 NOT BUILT, 22 OUT OF SCOPE, 17 SAFER, 106 rows. G4 replaced the catalogue row with the seven rows of "Service catalogue".
 Before G3: 41 SAME, 5 NOT BUILT. G3 moved reply templates, delete a file and submit for approval to ✅ SAME.
 Before G2: 39 SAME, 8 NOT BUILT, 21 OUT OF SCOPE. G2 moved the two filter rows to ✅ SAME and the plain AGENT's country row to ⊘ OUT OF SCOPE (decided: it stays locked). The 17 🔒 SAFER rows are unchanged.
@@ -78,7 +82,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 |---|---|---|---|---|
 | Create a ticket (title, description, category, files) | All roles | All roles | ✅ SAME | |
 | Set impact and urgency when creating | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | |
-| See the priority a new ticket will get, before saving | ADMIN, AGENT (L2_MANAGER: error) | Nobody | ❌ NOT BUILT | |
+| See the priority a new ticket will get, before saving | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | Recomputed whenever impact or urgency changes, from the priority matrix, as on the web: "Auto-computed from Impact × Urgency", or "Set Impact and Urgency above to compute priority". Nobody picks the priority by hand on either side. It is the box from the ticket's impact/urgency editor (G1), reused. L2_MANAGER's web box never computes (the matrix is a 403 for L2); mobile tells L2 the Service Desk sets it. Built in G5. |
 | Choose the group and technician when creating | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | 🔒 SAFER | On the web L2_MANAGER's lists come back empty. |
 | Raise a ticket on someone else's behalf | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | The server supports it; the web form never offers it. Awaiting Ronit's confirmation. |
 | Set mode, level and source when creating | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
@@ -115,9 +119,9 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Browse the catalogue: categories, their services, search | All roles | All roles | ✅ SAME | Mobile: the drawer's "Service Request" (the web: the sidebar's "Service Request" and a "Requests" bottom tab). Every active service, for every role: nothing is scoped by role, team or country. Search covers service names and descriptions in every category, on the device, as on the web. Built in G4. |
 | Request a service through its form | All roles | All roles | ✅ SAME | All seven field types the web renders: text, long text, date, phone, e-mail, number, drop-down. Any other type is a text box on both. The web's checks: "<label> is required", a valid e-mail address, a whole number. Notes go in a collapsed "Resolution" section. No confirmation, then back to the catalogue, as on the web. Thirteen other web controls and the attachment box are not shown: the server keeps nothing they collect (see the note under section 5). Built in G4. |
 | Set impact and urgency on a request (they set its priority) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | With the web form's own map and labels (its Urgency has no Urgent). Only the priority reaches the server; without both, a request is Medium. Built in G4. |
-| See my requests (My Requests) | All roles | All roles | ✅ SAME | SR number, service, status and date, newest first. The web shows the latest 50; mobile loads older ones as the list scrolls. Built in G4. |
-| See everyone's requests under "My Requests" | ADMIN, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | The server lists every request to every role except END_USER. Mobile shows each person only their own. |
-| Open a request: its answers, notes, approvals and progress | Nobody | All roles | ➕ MOBILE ONLY | Own requests only. The web's My Requests rows are not links, and the web never shows a request's answers again. Read-only: neither side lets anyone change or cancel a request. Built in G4. |
+| See my requests (My Requests) | All roles | All roles | ✅ SAME | SR number, service, status and date, newest first; no requester column, on either side. The web shows the latest 50; mobile loads older ones as the list scrolls. Built in G4. |
+| See everyone's requests under "My Requests" | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | As on the web, since G5. The server lists every request to every role except END_USER, by design: it scopes END_USER only, and staff fulfil requests. A request carries no country, group or technician from the web, so there is no narrower scope. The rows show the same four columns as the web; your own say "by you". G4 had made this 🔒 SAFER; G5 settled it against the web's source (section 5, review). |
+| Open a request: its answers, notes, approvals and progress | Nobody | All roles | ➕ MOBILE ONLY | Own requests only: only your own rows in My Requests are links. The web's rows are never links, and the web never shows anyone a request's answers again, so another person's answers stay unshown on both. Read-only: neither side lets anyone change or cancel a request. Built in G4. |
 | Create a service template (admin) | ADMIN | Nobody | ⊘ OUT OF SCOPE | The catalogue page's "+ New Template (admin)". |
 
 ### Comments
@@ -245,17 +249,21 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open (1)**
+**Still open: none.** All eleven gaps of the 2026-10-20 list are built (1–9, 11) or decided (10).
 
-| # | Gap | What it is | Roles that lose it | Endpoint the app would call | Effort |
-|---|---|---|---|---|---|
-| 11 | See the priority before saving a new ticket | Preview the priority while choosing impact and urgency on the create form. | ADMIN, AGENT | Priority matrix, `GET /priority-matrix` (LKP-6). The app now loads it for the ticket detail preview (G1), so only the create form is missing | Small |
+**Built in Phase G5 (2026-10-22)** — the web's behaviour, with sources: `FE:pages/tickets/CreateTicketPage.tsx:26, :49-76, :346-387`; `BE:modules/tickets/tickets.controller.ts:185-201`
+
+| # | Gap | Now |
+|---|---|---|
+| 11 | See the priority before saving a new ticket | ✅ ADMIN, AGENT, in the create form's Classification card. **The G1 component, reused:** `PriorityPreviewBox` from the ticket's impact/urgency editor now takes a `create` target, so both screens show one implementation of the one rule (`previewPriority`). Recomputed whenever impact, urgency or the matrix changes, as the web's effect is. It shows the web's words: "Auto-computed from Impact × Urgency" with the badge, or "Set Impact and Urgency above to compute priority". **A preview only:** nobody sets a priority by hand on the create form, on either side (the web's only other writer is its AI panel, which mobile does not have), so there is nothing to overwrite; and the request carries no `priority` (01 TKT-2), because the server applies the same matrix row itself. Without a row, or without both values, the ticket is created as Medium, and the box says so. L2_MANAGER: impact and urgency as before, and the box says the Service Desk sets the priority (LKP-6 is a 403 for L2, so the web's box never computes either). Gated by `createTicketPermissions()` in `src/utils/permissions.ts`, which now decides every role-dependent part of the create form |
+
+One edge differs. On the web, once a priority has been computed, changing to a pair with no matrix row (the default rows have none for impact "Affects User" or urgency "Urgent") leaves the old priority on screen and sends it; the server then stores it, since no row overrides it (`CreateTicketPage.tsx:67-72`). Mobile shows and stores Medium, whatever was chosen before. The web's value depends on the order the two fields were picked, so it is recorded as a web defect (`docs/ROLE-MATRIX.md` §14), not copied.
 
 **Built in Phase G4 (2026-10-22)** — the web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`
 
 | # | Gap | Now |
 |---|---|---|
-| 7 | Request a service from the catalogue | ✅ Every role, from the drawer's "Service Request" (04 P2: a drawer item; the web also has a "Requests" bottom tab). **Browse:** categories with their item counts, a category's services, and a search over every service's name and description (SCR-1, SCR-2, filtered on the device, as the web). **Request:** the item's form (SCR-3) with **all seven field types the web renders** (text, long text, date, phone, e-mail, number, drop-down; any other type is a text box, as on the web), the web's checks ("<label> is required", where only an empty value fails; a valid e-mail; a whole number), no conditional fields (the web has none), notes, and for ADMIN, AGENT and L2_MANAGER the Impact × Urgency priority from the web form's own map. **SCR-5** carries exactly `{ serviceItemId, formData, notes, priority? }`, the four keys the server keeps (05 B.24). No confirmation; the web's toast; back to the catalogue. **My Requests:** SCR-4, the person's own requests for every role (🔒: the web shows staff everyone's), with a detail screen (SCR-6, ➕). Not shown: the thirteen web controls whose values the server discards, and the attachment box, whose files the web never uploads (section 5 note) |
+| 7 | Request a service from the catalogue | ✅ Every role, from the drawer's "Service Request" (04 P2: a drawer item; the web also has a "Requests" bottom tab). **Browse:** categories with their item counts, a category's services, and a search over every service's name and description (SCR-1, SCR-2, filtered on the device, as the web). **Request:** the item's form (SCR-3) with **all seven field types the web renders** (text, long text, date, phone, e-mail, number, drop-down; any other type is a text box, as on the web), the web's checks ("<label> is required", where only an empty value fails; a valid e-mail; a whole number), no conditional fields (the web has none), notes, and for ADMIN, AGENT and L2_MANAGER the Impact × Urgency priority from the web form's own map. **SCR-5** carries exactly `{ serviceItemId, formData, notes, priority? }`, the four keys the server keeps (05 B.24). No confirmation; the web's toast; back to the catalogue. **My Requests:** SCR-4 (G4: the person's own requests for every role; **G5: every request for staff, as on the web**), with a detail screen for one's own (SCR-6, ➕). Not shown: the thirteen web controls whose values the server discards, and the attachment box, whose files the web never uploads (section 5 note) |
 
 **Built in Phase G3 (2026-10-22)** — the web's behaviour, with sources: `docs/G3-WEB-BEHAVIOUR.md`
 
@@ -291,7 +299,7 @@ The G1 brief named the gaps to build as 1, 2, 6, 7 and 8, and described them as 
 
 The G3 brief named its three features by name, not by number: reply templates, delete a file and submit for approval. By this list's numbering they are 3, 8 and 9. It left the service catalogue (7) for G4.
 
-The G4 brief called the catalogue "the last remaining gap". By this list it is gap 7. Gap 11 (the priority preview on the create form) was also still open, and G4's scope ("the service catalogue only") left it open.
+The G4 brief called the catalogue "the last remaining gap". By this list it is gap 7. Gap 11 (the priority preview on the create form) was also still open, and G4's scope ("the service catalogue only") left it open. G5 closed it.
 
 **The prerequisite, mobile-side only.** Before G1 the app's update call would have let an L2_MANAGER send a category or group change, which the web allows neither. G1 refuses both on the device before anything is sent: every property save goes through `fieldEditProblem` in `src/utils/permissions.ts`. G2 also narrowed the API-layer allow-list (`UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`) and 01 TKT-4, so even a call that skipped the guard could not carry `categoryId`, `teamId` or `priority` for L2 (ROLE-MATRIX.md §8 item 2, RESOLVED).
 
@@ -299,26 +307,33 @@ The G4 brief called the catalogue "the last remaining gap". By this list it is g
 
 Each of these is deliberate: on the web the control fails, returns an error, or shows something it should not.
 
-| Capability | Why mobile hides it |
-|---|---|
-| Choose the group and technician when creating | The web shows L2_MANAGER group and technician pickers that the server refuses to fill, so they are always empty. |
-| AI assistant while creating | On the web it lets a requester pick the team and the technician, which the normal form deliberately prevents. |
-| Change status to any status from a drop-down | The web drop-down lists every status and ignores the transition rules. ADMIN and L2_MANAGER can even move a closed ticket to any status. Mobile offers only the rule-based buttons. |
-| Pick up a ticket | The web shows L2_MANAGER a Pick up button that the server always refuses. |
-| Assign, reassign or unassign a technician | The web shows L2_MANAGER Assign, Reassign and Remove controls that the server always refuses. |
-| Move a ticket to another group | The web shows L2_MANAGER a group selector that the server always refuses. |
-| Edit the resolution (requester) | The web lets a requester rewrite the technician's resolution on their own ticket. |
-| AI summary and AI draft reply | The web's AI summary is built from every comment, internal notes included, so it can show a requester what staff wrote privately. The server does not check who asks for a draft reply either. |
-| Write an internal (private) note | On the web an L2_MANAGER, or a requester using the Actions menu, can write what looks like an internal note, but the server sends it as a public email (7.2). Mobile does not offer it to those roles and refuses it on the phone. |
-| Read internal notes | L2_MANAGER is not meant to see internal notes, and the server's main comment feed hides them. One web screen reads a different feed that includes them. |
-| History line "added a comment" for an internal note | On the web it tells a requester that internal notes exist on their ticket. |
-| Add, tick off or remove tasks | The web lets a requester add, tick off or delete the service desk's tasks, and the server does not check who is asking. |
-| See everyone's approvals | The server does not limit that list to the person asking, so it shows other people's approvals. |
-| Open a page your role isn't meant to use | The web has no page-level checks: anyone signed in can open any page by typing its address, admin pages included. |
-| Counts for L2_MANAGER | The server keeps one set of numbers for all L2 managers, so one manager can see another's counts. |
-| See everyone's requests under "My Requests" (G4) | The server filters the request list for END_USER only, so the web's "My Requests" shows ADMIN, AGENT and L2_MANAGER every request in the organisation, with no requester column. Mobile shows each person their own, and a request's detail only when it is theirs (01 SCR-4's mobile rule). |
-| Unassigned count | For anyone other than ADMIN or a triage AGENT, the server's count includes tickets outside that person's queue. |
-| Charts, technician and team tables, trends, workload | Several of these widgets ignore the person's scope on the server and show organisation-wide numbers. |
+**Reviewed in G5 (2026-10-22), entry by entry, against the standing exception:** the web shows a control that returns a 403 (**403**) or that leaks data (**leak**). Two more grounds come from CLAUDE.md, which every phase must follow: the control works on the web only through a backend permission gap listed in 05 §C, which mobile may not rely on (rule 6, **§C gap**); or it skips a rule mobile must enforce itself, 05 §A (**§A rule**). Each of the 17 entries below meets at least one ground, cited. One G4 entry did not, and was removed (below the table).
+
+| Capability | Why mobile hides it | Ground (G5 review) |
+|---|---|---|
+| Choose the group and technician when creating | The web shows L2_MANAGER group and technician pickers that the server refuses to fill, so they are always empty. | **403**: `GET /teams` and `GET /users/search` are `agentOrAdmin` (`BE:teams.router.ts:8`, `users.router.ts:15`) |
+| AI assistant while creating | On the web it lets a requester pick the team and the technician, which the normal form deliberately prevents. | **§C gap**: the server keeps a requester's `teamId` and `assignedToId` on create (05 C.5), and the AI routes check no role (C.25). The AI endpoints are not in 01 either (CLAUDE.md rule 1) |
+| Change status to any status from a drop-down | The web drop-down lists every status and ignores the transition rules. ADMIN and L2_MANAGER can even move a closed ticket to any status. Mobile offers only the rule-based buttons. | **§A rule**: the transition map (05 §A.1) is one of the two web-only rules CLAUDE.md requires mobile to enforce |
+| Pick up a ticket | The web shows L2_MANAGER a Pick up button that the server always refuses. | **403**: `POST /tickets/:id/assign` is `agentOrAdmin` (`BE:tickets.router.ts:20`) |
+| Assign, reassign or unassign a technician | The web shows L2_MANAGER Assign, Reassign and Remove controls that the server always refuses. | **403**: as above |
+| Move a ticket to another group | The web shows L2_MANAGER a group selector that the server always refuses. | **403**: as above |
+| Edit the resolution (requester) | The web lets a requester rewrite the technician's resolution on their own ticket. | **§C gap**: it works only because the server accepts any field from a requester on their own ticket (05 C.5); mobile's END_USER update carries title and description only (01 TKT-4) |
+| AI summary and AI draft reply | The web's AI summary is built from every comment, internal notes included, so it can show a requester what staff wrote privately. The server does not check who asks for a draft reply either. | **leak**: internal notes reach the requester (05 C.24); no role or scope check on the AI routes (C.25) |
+| Write an internal (private) note | On the web an L2_MANAGER, or a requester using the Actions menu, can write what looks like an internal note, but the server sends it as a public email (7.2). Mobile does not offer it to those roles and refuses it on the phone. | **leak**: text its author believes internal is emailed to the requester and the thread (05 C.27) |
+| Read internal notes | L2_MANAGER is not meant to see internal notes, and the server's main comment feed hides them. One web screen reads a different feed that includes them. | **leak**: `/activity` sends notes to L2 while `/comments` withholds them (`BE:tickets.controller.ts:1014` vs `comments.controller.ts:24`) |
+| History line "added a comment" for an internal note | On the web it tells a requester that internal notes exist on their ticket. | **leak**: reveals that internal notes exist (05 §A.7) |
+| Add, tick off or remove tasks | The web lets a requester add, tick off or delete the service desk's tasks, and the server does not check who is asking. | **§C gap**: the task routes have no role or access check (05 C.3) |
+| See everyone's approvals | The server does not limit that list to the person asking, so it shows other people's approvals. | **leak**: unscoped `GET /approvals` (05 C.16) |
+| Open a page your role isn't meant to use | The web has no page-level checks: anyone signed in can open any page by typing its address, admin pages included. | **403 / leak**: admin pages' calls fail for other roles, and some lists they read are unscoped (ROLE-MATRIX §1). Mobile has no addresses to type |
+| Counts for L2_MANAGER | The server keeps one set of numbers for all L2 managers, so one manager can see another's counts. | **leak**: per-role cache shared by every L2 manager (05 C.19) |
+| Unassigned count | For anyone other than ADMIN or a triage AGENT, the server's count includes tickets outside that person's queue. | **leak**: the count drops the person's scope (05 B.20) |
+| Charts, technician and team tables, trends, workload | Several of these widgets ignore the person's scope on the server and show organisation-wide numbers. | **leak**: unscoped or mis-scoped widgets (05 B.20; ROLE-MATRIX §1.3) |
+
+**Removed in G5: "See everyone's requests under My Requests"** (🔒 since G4, now ✅ SAME). The web source was read again (`docs/ROLE-MATRIX.md` §14):
+- **Does the web show staff all requests, or only those they are involved with?** All of them. `GET /service-catalog/requests` filters by requester for END_USER only (`BE:serviceCatalog.controller.ts:117`), and the web lists the response as is (`FE:ServiceCatalogPage.tsx:44-48, :333-352`). "Involved with" cannot apply: a request created from the web has no group, technician or country (SCR-5 keeps only the service, priority, answers and notes, `:135-159`), and no web page calls the assign or status routes.
+- **Does the API enforce scoping, or is it a UI choice?** The API. The scoping is deliberate and explicit ("End users see only their own requests", `:116-117`), and SCR-6 applies the same rule (`:129-131`). Staff fulfil service requests: the update, status and assign routes are staff-only (`serviceCatalog.router.ts:25-27`).
+- **Is there a separate staff view?** No. There is one page and one "My Requests" view for every role (`FE:router/index.tsx:145-146`), and no other page calls the list.
+- **Against the criteria:** it is not a 403. It is not a leak: the server grants staff every request on purpose, and the web shows four columns only (number, service, status, date), with no requester and no answers. It relies on no §C gap, and skips no §A rule. So it matches the web now: ADMIN, AGENT and L2_MANAGER see every request, and END_USER their own. Another person's answers and notes are still shown nowhere on mobile: only your own rows open the detail screen (the ➕ row), and on the web no row opens anything.
 
 Three ✅ SAME rows also contain web controls that always fail, or do nothing, which mobile hides. They are not 🔒 rows, because nobody is counted as "can" on the web for those controls either:
 - **Filter by technician or group:** the web shows END_USER and L2_MANAGER these lists, always empty (403).
@@ -374,3 +389,41 @@ The audit found two problems in the backend. **The mobile app does not cause eit
 - **What happens:** on the web portal, an L2_MANAGER sees an "internal note" option, and every role, requesters included, sees "Add Note" in the Actions menu. When an L2_MANAGER or a requester uses them, the server quietly turns the note into a public reply. It then emails the reply to the requester and to everyone on the ticket's email thread.
 - **Who is affected:** everyone who receives that email gets text its author believed was internal. Only L2_MANAGERs and requesters can trigger it, through those web controls.
 - **Mobile:** does not offer a note to those roles, and refuses one on the phone if it is ever attempted, so the app cannot trigger this. It cannot stop it happening on the web.
+
+## 8. Workflow parity: six workflows traced end to end (G5)
+
+**2026-10-22.** The sequence of actions a person takes, not how the screens look. Each workflow was traced through the web's source (`FE:` pages, `BE:` controllers) and the app's (screens, hooks, guards, API functions), and every divergence was checked in both. Nothing here was changed in G5. These are differences in steps or wording, except one difference in outcome (2a), which is a known server quirk that mobile avoids.
+
+**Identical on both sides:** the status transition map and its labels; the AGENT lock on Closed and Canceled tickets; the closure form (Resolution and Closure comments required, the six closure codes, first-call resolution off by default, the same request); the service-request toast and the return to the catalogue; the ticket-list filter parameters and how they combine and clear.
+
+**Mobile safeguards on every write.** These are app-wide and apply to most of the workflows below:
+- **Confirmation before most writes.** Create a ticket, Pick up, a status change, closure Save, approve and reject. In these six workflows the web confirms none of them (it confirms deleting a file, which both sides do). Exception: "Add Request" in the catalogue sends at once on both sides.
+- **Status re-read before a write.** One GET before a status change, an assignment or a property save. If the ticket moved since the screen opened, nothing is written and the new status is shown.
+- **Leave prompt.** Leaving a form with unsaved input asks first; the web's Cancel discards silently.
+
+None of them changes who can do what, or what the server stores.
+
+| # | Workflow | Divergence (web → mobile) | Outcome differs? | Sources (web; mobile) | Recorded before? |
+|---|---|---|---|---|---|
+| 1a | Raise a ticket (END_USER) | No confirmation → "Create this ticket?" first | No | `CreateTicketPage.tsx:168`; `CreateTicketScreen.tsx:112-122` | New (G5) |
+| 1b | | `source: WEB_FORM` and plain text → `source: API` and the description as escaped HTML | Source label only | `:55, :149-167`; `useCreateTicket.ts:62-65` | 05 §A.18 D5, §A.16 |
+| 1c | | A description of spaces only is accepted → refused ("Description is required"); the 3-character title minimum is the server's | Validation only: the web creates a ticket with a blank-looking description; mobile asks for one | `:212`; `useCreateTicket.ts:39-47` | Title: 05 §A.8. Spaces: new (G5) |
+| 1d | | After creating: the web pushes the ticket (Back returns to the form) → mobile replaces the form (Back returns to the list) | No | `:185`; `CreateTicketScreen.tsx:140` | New (G5) |
+| 2a | Pick up, work, reply, resolve, close (AGENT) | **Pick up** sends `{ assignedToId }` alone, and the server then moves the ticket to the technician's first group → mobile also sends the ticket's current group, so it stays where it is | **Yes, the group.** Same whenever the ticket has no group or the technician's first group is the ticket's | `TicketDetailPage.tsx:672`, `BE:tickets.controller.ts:795-802`; `TicketDetailScreen.tsx:185` | 05 §B.14 (server quirk; mobile's workaround). Not copied: the web's result depends on the order of the technician's group memberships |
+| 2b | | Pick up, a non-closure status change and closure Save happen at once → each asks first. (08 §4.1 says other targets "post straight away"; mobile confirms first) | No | `:672, :767, :2516`; `TicketDetailScreen.tsx:161, :177`; `StatusClosureScreen.tsx:151, :169` | New (G5) |
+| 2c | | No re-check → one GET of the current status before the write (above) | No | none; `writeGuards.ts:64-73`, `useChangeStatus.ts:33` | UAT-TEST-PLAN E6 only. New here |
+| 2d | | Closure files: the web changes the status, then uploads, and ignores upload failures → mobile uploads first, and changes nothing if an upload fails | Only when an upload fails | `:2516-2535`; `useChangeStatus.ts:34-40` | 05 §A.2 |
+| 2e | | A closure error loses the typed text (the web closed the modal) → the form stays, with the error | No | `:2534`; `StatusClosureScreen.tsx:180-182` | New (G5) |
+| 2f | | Toasts "Comment added" / "Ticket assigned" → "Reply sent" / "Note saved" / "Assigned to you"; Pick up hidden on a ticket already yours | No | `:470, :570`; `ReplyComposerScreen.tsx:107` | Pick up: section 3. Wording: new (G5) |
+| 3a | Service request through the catalogue | The web sends 11 keys and shows 13 controls the server drops → mobile shows and sends the 4 the server keeps | No (the server keeps the same 4) | `ServiceRequestFormPage.tsx:142-155`; `service-catalog.ts:365-372` | Section 5 note; G4 §9 |
+| 3b | | The browser's bubble, then the field messages → every message at once, plus a line naming the fields | No (same rules, same blocking) | `:246`; `ServiceRequestFormScreen.tsx:86-91` | G4 §9 |
+| 4a | Submit for approval, then approve | Submit: a confirmation; blank comments left out instead of sent as ""; a result card with the status re-read | No | `TicketDetailPage.tsx:442-460`; `SubmitApprovalScreen.tsx:82-98` | G3 §4 |
+| 4b | | Approve on the web's Approvals page: one click, no comment (the ticket's own tab asks for an optional comment) → the inbox's detail screen: optional comment, then a confirmation | No | `ApprovalsPage.tsx:83`, `TicketDetailPage.tsx:1625-1633`; `ApprovalDetailScreen.tsx:54-64` | New (G5) |
+| 4c | | The approver reaches it from the web sidebar (ADMIN, AGENT) or the ticket → from the Approvals inbox, for anyone with a pending approval | No | `AppLayout.tsx:32`; `permissions.ts` `drawerItems` | Section 3 (Approvals); 08 S1 |
+| 5a | Change impact, urgency and category | The web saves on each selection → one explicit Save | No | `TicketDetailPage.tsx:1744, :1761, :1981-2000`; `TicketPropertyEditors.tsx` | G1 §6 |
+| 5b | | Impact **and** urgency changed: the web sends two updates (each with the priority of its moment) → mobile sends one with both | **Side effects only:** the web can write two History lines and send two "priority changed" emails where mobile sends at most one; the stored values are the same | `:304-317`, `BE:tickets.controller.ts:719, :775-784`; `ticket-properties.ts` `classificationChanges` | New (G5): a consequence of G1's explicit Save |
+| 5c | | Category: one update per level (each can re-route) → one update with the deepest level | Fewer re-routing runs; same final category | `:1981-2000`; `TicketPropertyEditors.tsx` | G1 §6 |
+| 6a | Filter by technician, then by date | Technician picked from a list of up to 100 → found by typing 2+ letters (same people: active AGENTs) | No | `TicketsListPage.tsx:153-156`; `TicketFiltersScreen.tsx` | G2 §5 |
+| 6b | | A date picker instead of typed dates; a warning when From is after To | No | `:531-546`; `TicketFiltersScreen.tsx` | G2 §5 |
+
+**Not determinable from the source:** whether 5b's second "priority changed" email is actually sent on UAT depends on its priority matrix, which was not queried (no API call was made in G5).

@@ -56,6 +56,16 @@ export function previewPriority(matrix: readonly PriorityMatrixEntry[], staged: 
   return row ? { kind: 'computed', priority: row.priority } : { kind: 'noRow' };
 }
 
+/**
+ * Phase G5, M8: the priority a NEW ticket is stored with. TKT-2 applies the same matrix row (BE:tickets.controller.ts:
+ * 192-201); without one it keeps the body's `priority`, which mobile never sends (01 TKT-2), so zod's default MEDIUM
+ * (tickets.validator.ts:19). The web sends that same MEDIUM (FE:CreateTicketPage.tsx:55, :385), except after its sticky
+ * preview (G5 note in docs/G1-WEB-BEHAVIOUR.md §2).
+ */
+export function newTicketPriority(preview: PriorityPreview): TicketPriority {
+  return preview.kind === 'computed' ? preview.priority : 'MEDIUM';
+}
+
 // ── Category cascade (G1 §3) ─────────────────────────────────
 
 export interface CategorySelection {

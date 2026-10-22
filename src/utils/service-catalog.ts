@@ -376,20 +376,6 @@ export function submittedMessage(item: Pick<ServiceItem, 'requiresApproval'>): s
   return `Service request submitted${item.requiresApproval ? ' — pending approval' : ''}`;
 }
 
-/** My Requests reads further SCR-4 pages by itself until it shows this many of the person's requests … */
-export const MY_REQUESTS_MIN_ROWS = 10;
-/** … or has read this many pages (50 requests each); after that, one more page per tap ("Look further back"). */
-export const MY_REQUESTS_AUTO_PAGES = 4;
-
-/**
- * Whether My Requests should read the next page by itself: few of the person's requests so far (staff get everyone's
- * requests from SCR-4 and see only their own), more pages exist, and the automatic pages are not used up. Bounded so a
- * busy service desk never turns one screen into dozens of requests (01 §0.4, 300 per minute per IP).
- */
-export function shouldReadMoreRequests(state: { shown: number; pagesRead: number; hasNextPage: boolean }): boolean {
-  return state.hasNextPage && state.pagesRead > 0 && state.shown < MY_REQUESTS_MIN_ROWS && state.pagesRead < MY_REQUESTS_AUTO_PAGES;
-}
-
 /** "SR-123" (SCP:345). */
 export function requestRef(requestNumber: number | null | undefined): string {
   return typeof requestNumber === 'number' ? `SR-${requestNumber}` : 'SR-?';

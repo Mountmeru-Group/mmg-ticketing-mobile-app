@@ -1,24 +1,22 @@
 // Service catalogue (Phase G4) — SCR-1 categories, SCR-2 items, SCR-3 one item, SCR-4 My Requests, SCR-6 one request,
 // SCR-5 "Add Request" (01 §10.4). The web's behaviour, with sources: docs/G4-WEB-CATALOGUE.md.
-// - My Requests keeps only the person's own rows, for every role (isOwnServiceRequest): SCR-4 returns everyone's
-//   requests to ADMIN, AGENT and L2_MANAGER. Those rows are dropped before anything renders. When few of a page's rows
-//   are the person's, the next pages are read automatically, a few at a time, then on request.
+// - My Requests shows what the web shows (G5): every request for ADMIN, AGENT and L2_MANAGER, the person's own for
+//   END_USER (myServiceRequestRows). Pages of 50, newest first, the next one as the list scrolls.
 // - "Add Request" runs only when tapped, is never retried, and its body is checked by assertServiceRequest() first.
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { assertArray, assertObject, assertPaginated, checkFields } from '@/api/drift';
 import { ApiClientError } from '@/api/errors';
 import { normalisePage } from '@/api/pagination';
 import { SERVICE_CATEGORY_SPEC, SERVICE_ITEM_SPEC, SERVICE_REQUEST_SPEC } from '@/api/responseSpecs';
 import {
-  SERVICE_REQUEST_PAGE_SIZE, createServiceRequest, getServiceItem, getServiceRequest, listServiceCategories, listServiceItems,
+  createServiceRequest, getServiceItem, getServiceRequest, listServiceCategories, listServiceItems,
   listServiceRequests,
 } from '@/api/serviceCatalog.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { CreateServiceRequestBody, ServiceCategory, ServiceItem, ServiceRequest, SimplePage } from '@/types';
 import { myServiceRequestRows } from '@/utils/permissions';
-import { shouldReadMoreRequests } from '@/utils/service-catalog';
 import { queryKeys } from './queryKeys';
 import { assertServiceRequest, requireOnline, requireRole, wasRefusedOnDevice } from './writeGuards';
 
@@ -71,8 +69,8 @@ export function useServiceItem(id: string | undefined, { enabled = true }: { ena
 }
 
 /**
- * My Requests: SCR-4 pages of 50, newest first, keeping only the signed-in person's requests. For END_USER the server
- * already sends only theirs; for every other role it sends everyone's, and the rest are dropped here.
+ * My Requests: SCR-4 pages of 50, newest first, as the web shows them: everyone's requests for staff, the person's own
+ * for END_USER (the server already sends only theirs). The web shows the first 50 only; the next page loads on scroll.
  */
 export function useMyServiceRequests() {
   const viewer = useAuthStore((s) => s.user);
@@ -94,19 +92,7 @@ export function useMyServiceRequests() {
 
   const requests = useMemo(() => myServiceRequestRows(viewer, query.data?.pages ?? []), [query.data, viewer]);
 
-  const pagesRead = query.data?.pages.length ?? 0;
-  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = query;
-  /** Reading further on its own (few of the person's rows so far); false once the automatic pages are used up. */
-  const autoScanning = shouldReadMoreRequests({ shown: requests.length, pagesRead, hasNextPage: !!hasNextPage });
-
-  useEffect(() => {
-    if (autoScanning && !isFetching && !isFetchNextPageError) void fetchNextPage();
-  }, [autoScanning, isFetching, isFetchNextPageError, fetchNextPage]);
-
-  /** How many requests (anyone's, for staff) have been read so far: "Checked the latest n". */
-  const checked = pagesRead * SERVICE_REQUEST_PAGE_SIZE;
-
-  return { ...query, requests, pagesRead, checked, autoScanning };
+  return { ...query, requests };
 }
 
 /** SCR-6: one request. The screen shows it only when it is the person's own (isOwnServiceRequest). */

@@ -28,8 +28,8 @@ import { notify, reportFieldWriteError } from '@/utils/dialogs';
 import { IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, categoryCascade, formatDateTime } from '@/utils/format';
 import { ticketFieldPermissions, type FieldAccess, type TicketFieldPermissions } from '@/utils/permissions';
 import {
-  categoryChoices, categoryIdToSave, categorySavedMessage, categorySelectionOf, classificationChanges, previewPriority,
-  selectCategoryLevel, type CategoryChoice, type CategoryLevel, type Classification,
+  categoryChoices, categoryIdToSave, categorySavedMessage, categorySelectionOf, classificationChanges, newTicketPriority,
+  previewPriority, selectCategoryLevel, type CategoryChoice, type CategoryLevel, type Classification, type PriorityPreview,
 } from '@/utils/ticket-properties';
 
 export type EditorKey = 'classification' | 'category' | 'country' | 'resolution';
@@ -299,7 +299,12 @@ function ClassificationForm({
         onPress={() => setSheet('urgency')}
         disabled={saving}
       />
-      <PriorityPreviewBox current={ticket.priority} staged={staged} enabled={preview} matrix={matrix} assigned={!!ticket.assignedToId} />
+      <PriorityPreviewBox
+        target={{ kind: 'update', current: ticket.priority, assigned: !!ticket.assignedToId }}
+        staged={staged}
+        enabled={preview}
+        matrix={matrix}
+      />
       <EditorActions canSave={dirty} saving={saving} onSave={() => onSave(body)} onCancel={onCancel} />
 
       <OptionSheet
@@ -322,32 +327,39 @@ function ClassificationForm({
   );
 }
 
+/** What the preview is for: an impact/urgency change on M4 (G1), or a new ticket on M8 (G5). */
+export type PriorityPreviewTarget =
+  /** `assigned`: the ticket has a technician, who is emailed too. */
+  | { kind: 'update'; current: TicketPriority; assigned: boolean }
+  | { kind: 'create' };
+
 /**
- * The priority the server will store once Save is tapped (LKP-6, the web's rule, G1 §2), said before saving whenever it
- * would change. Save sends that value with the change (G2, as the web does), so the server emails the requester and the
- * technician; the box says so. L2_MANAGER can't read the matrix (403, as on the web), so it is told the Service Desk
- * recalculates it, and sends no priority.
+ * The priority the server will store (LKP-6, the web's and the server's rule, G1 §2), shown as impact and urgency change.
+ * Only shown, never picked: neither the web nor the app lets anyone set a priority by hand on these forms.
+ * - `update` (M4): said before Save whenever it would change. Save sends that value with the change (G2, as the web
+ *   does), so the server emails the requester and the technician; the box says so.
+ * - `create` (M8, G5): the web's "Auto-computed from Impact × Urgency" box (FE:CreateTicketPage.tsx:368-387). Nothing is
+ *   sent for it (01 TKT-2): the server applies the same row itself, and stores Medium without one (newTicketPriority).
+ * L2_MANAGER can't read the matrix (403, as on the web), so it is told the Service Desk sets it, and sends no priority.
  */
-function PriorityPreviewBox({
-  current, staged, enabled, matrix, assigned,
+export function PriorityPreviewBox({
+  target, staged, enabled, matrix,
 }: {
-  current: TicketPriority;
+  target: PriorityPreviewTarget;
   staged: Classification;
   enabled: boolean;
   matrix: ReturnType<typeof usePriorityMatrix>;
-  /** The ticket has a technician, who is emailed too. */
-  assigned: boolean;
 }) {
-  const label = PRIORITY_LABELS[current] ?? current;
+  const when = target.kind === 'create' ? 'when the ticket is created' : 'when you save';
 
   let body: ReactNode;
   if (!enabled) {
-    body = <Text className="text-xs text-gray-700">The Service Desk recalculates the priority from impact × urgency when you save.</Text>;
+    body = <Text className="text-xs text-gray-700">The Service Desk {target.kind === 'create' ? 'sets' : 'recalculates'} the priority from impact × urgency {when}.</Text>;
   } else if (matrix.data === undefined) {
     body = matrix.isError && !matrix.isFetching ? (
       <>
         <LookupError query={matrix} what="the priority matrix" />
-        <Text className="text-xs text-gray-700">The Service Desk still recalculates the priority when you save.</Text>
+        <Text className="text-xs text-gray-700">The Service Desk still {target.kind === 'create' ? 'sets' : 'recalculates'} the priority {when}.</Text>
       </>
     ) : (
       <View className="flex-row items-center">
@@ -355,7 +367,11 @@ function PriorityPreviewBox({
         <Text className="ml-2 text-xs text-gray-700">Checking the priority matrix…</Text>
       </View>
     );
+  } else if (target.kind === 'create') {
+    body = <NewTicketPriority result={previewPriority(matrix.data, staged)} />;
   } else {
+    const { current, assigned } = target;
+    const label = PRIORITY_LABELS[current] ?? current;
     const result = previewPriority(matrix.data, staged);
     if (result.kind === 'computed' && result.priority !== current) {
       body = (
@@ -391,9 +407,28 @@ function PriorityPreviewBox({
 
   return (
     <View className="mb-3 rounded-lg border border-border bg-gray-50 p-3" accessibilityLiveRegion="polite">
-      <Text className="mb-1 text-xs font-semibold text-gray-500">Priority after saving</Text>
+      <Text className="mb-1 text-xs font-semibold text-gray-500">{target.kind === 'create' ? 'Priority' : 'Priority after saving'}</Text>
       {body}
     </View>
+  );
+}
+
+/** The create form's box, in the web's words where it has them (FE:CreateTicketPage.tsx:376, :383). */
+function NewTicketPriority({ result }: { result: PriorityPreview }) {
+  const stored = PRIORITY_LABELS[newTicketPriority(result)];
+  return (
+    <>
+      <View className="mb-1">
+        <PriorityBadge priority={newTicketPriority(result)} auto={result.kind === 'computed'} />
+      </View>
+      <Text className="text-xs text-gray-700">
+        {result.kind === 'computed'
+          ? 'Auto-computed from Impact × Urgency.'
+          : result.kind === 'noRow'
+            ? `The priority matrix has no entry for this pair, so the ticket is created as ${stored}.`
+            : `Set Impact and Urgency above to compute priority. Until then the ticket is created as ${stored}.`}
+      </Text>
+    </>
   );
 }
 

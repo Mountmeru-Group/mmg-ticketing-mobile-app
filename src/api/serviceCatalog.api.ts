@@ -30,8 +30,8 @@ export const SERVICE_REQUEST_PAGE_SIZE = 50;
 
 /**
  * SCR-4 — GET /api/v1/service-catalog/requests?page=&limit=50. Shape (b), newest first. No `status`: the web sends none
- * (an invalid one is a 500). END_USER gets their own requests; ⚠ every other role gets everyone's, so My Requests keeps
- * only the person's own rows (isOwnServiceRequest).
+ * (an invalid one is a 500). END_USER gets their own requests; every other role gets everyone's, and My Requests shows
+ * them as the web does (G5, myServiceRequestRows). A request's detail opens only for one's own (isOwnServiceRequest).
  */
 export async function listServiceRequests(page: number): Promise<SimplePage<ServiceRequest>> {
   const params = { page: toPositiveInt(page, 1), limit: SERVICE_REQUEST_PAGE_SIZE };

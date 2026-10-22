@@ -2,9 +2,9 @@
 // (FE:pages/service-catalog/ServiceCatalogPage.tsx; docs/G4-WEB-CATALOGUE.md §2, §6):
 // - Catalog: categories (SCR-1) with their item counts, then a category's items (SCR-2); the search box filters items
 //   by name or description across every category, on the device, as the web. Tapping an item opens its form.
-// - My Requests: the person's own requests, newest first (SCR-4), for every role. The web lists everyone's requests to
-//   staff here; the app keeps only their own (serviceCatalogPermissions, isOwnServiceRequest; 🔒 SAFER). Tapping one
-//   opens its detail, which the web does not have.
+// - My Requests: newest first (SCR-4), as the web lists them (G5): every request for ADMIN, AGENT and L2_MANAGER, the
+//   person's own for END_USER (serviceCatalogPermissions().everyonesRequests). Tapping one of the person's OWN requests
+//   opens its detail, which the web does not have; other people's rows are not links, as on the web.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, OutlineButton, QueryBanner, ScreenHeader,
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
   SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
@@ -21,8 +21,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { CatalogStackScreenProps, ServiceCategory, ServiceItem, ServiceRequest } from '@/types';
 import { formatDateTime } from '@/utils/format';
-import { serviceCatalogPermissions } from '@/utils/permissions';
-import { MY_REQUESTS_AUTO_PAGES, categoryItemCount, filterCatalogItems, itemCountLabel, requestRef } from '@/utils/service-catalog';
+import { isOwnServiceRequest, serviceCatalogPermissions, type ServiceCatalogPermissions } from '@/utils/permissions';
+import { categoryItemCount, filterCatalogItems, itemCountLabel, requestRef } from '@/utils/service-catalog';
 
 type Tab = 'catalog' | 'requests';
 
@@ -146,6 +146,8 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
         />
       ) : (
         <MyRequestsView
+          can={can}
+          canOpen={(request) => isOwnServiceRequest(viewer, request)}
           onOpen={(request) => navigation.navigate('ServiceRequestDetail', { requestId: request.id })}
           onBrowse={() => setView('catalog')}
         />
@@ -320,12 +322,20 @@ function CatalogRow({
 
 // ── My Requests ──────────────────────────────────────────────
 
-function MyRequestsView({ onOpen, onBrowse }: { onOpen: (r: ServiceRequest) => void; onBrowse: () => void }) {
+function MyRequestsView({
+  can, canOpen, onOpen, onBrowse,
+}: {
+  can: ServiceCatalogPermissions;
+  /** The detail opens for the person's own requests only (isOwnServiceRequest). */
+  canOpen: (r: ServiceRequest) => boolean;
+  onOpen: (r: ServiceRequest) => void;
+  onBrowse: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const offline = useIsOffline();
   const list = useMyServiceRequests();
   const [refreshing, setRefreshing] = useState(false);
-  const { requests, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage, autoScanning, pagesRead, checked } = list;
+  const { requests, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = list;
 
   const onRefresh = async () => {
     if (offline) return;
@@ -346,33 +356,30 @@ function MyRequestsView({ onOpen, onBrowse }: { onOpen: (r: ServiceRequest) => v
     return <LoadingSkeleton variant="list" rows={4} />;
   }
 
-  const lookFurther = (
-    <View className="items-center px-4 py-4">
-      <Text className="mb-2 text-center text-xs text-gray-500">Checked the latest {checked} service requests.</Text>
-      <OutlineButton label="Look further back" icon="time-outline" onPress={() => void fetchNextPage()} />
-    </View>
-  );
-
   return (
     <>
       <QueryBanner error={isFetchNextPageError ? null : list.error} hasData onRetry={() => void onRefresh()} />
       <FlatList
         data={requests}
         keyExtractor={(r) => r.id}
-        renderItem={({ item }) => <RequestRow request={item} onPress={() => onOpen(item)} />}
+        renderItem={({ item }) => {
+          const own = canOpen(item);
+          return <RequestRow request={item} own={own} onPress={own ? () => onOpen(item) : undefined} />;
+        }}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
-          requests.length > 0 ? <Text className="mx-4 mb-2 text-xs text-gray-500">Requests you sent, newest first.</Text> : null
+          requests.length === 0 ? null : (
+            <Text className="mx-4 mb-2 text-xs text-gray-500">
+              {can.everyonesRequests
+                ? "Every service request, newest first, as on the web portal. Yours open to show their details."
+                : 'Requests you sent, newest first.'}
+            </Text>
+          )
         }
         ListEmptyComponent={
-          autoScanning || isFetchingNextPage ? (
+          isFetchingNextPage ? (
             <LoadingSkeleton variant="list" rows={2} topGap={false} />
-          ) : hasNextPage ? (
-            <View className="flex-1 justify-center">
-              <EmptyState icon="send-outline" title={`None of your requests in the latest ${checked}`} message="Older requests can still be checked." />
-              {lookFurther}
-            </View>
           ) : (
             <EmptyState
               icon="send-outline"
@@ -386,15 +393,13 @@ function MyRequestsView({ onOpen, onBrowse }: { onOpen: (r: ServiceRequest) => v
         ListFooterComponent={
           requests.length === 0 ? null : hasNextPage && offline ? (
             <Text className="py-4 text-center text-xs text-gray-500">Older requests load when you reconnect.</Text>
-          ) : isFetchingNextPage || autoScanning ? (
+          ) : isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
           ) : isFetchNextPageError ? (
             <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4">
               <Text className="text-sm text-red-700">Couldn't load older requests.</Text>
               <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
             </Pressable>
-          ) : hasNextPage && pagesRead >= MY_REQUESTS_AUTO_PAGES ? (
-            lookFurther
           ) : null
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
@@ -404,22 +409,34 @@ function MyRequestsView({ onOpen, onBrowse }: { onOpen: (r: ServiceRequest) => v
   );
 }
 
-/** A My Requests row: the web's columns (# SR-n, Service, Status, Requested; ServiceCatalogPage.tsx:333-352). */
-function RequestRow({ request, onPress }: { request: ServiceRequest; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80"
-    >
-      <Text className="text-xs font-semibold text-gray-500">{requestRef(request.requestNumber)}</Text>
+/**
+ * A My Requests row: the web's columns (# SR-n, Service, Status, Requested; ServiceCatalogPage.tsx:333-352), and no
+ * requester column, as on the web. Only the person's own rows are links (to the mobile-only detail).
+ */
+function RequestRow({ request, own, onPress }: { request: ServiceRequest; own: boolean; onPress?: () => void }) {
+  const body = (
+    <>
+      <View className="flex-row items-center">
+        <Text className="flex-1 text-xs font-semibold text-gray-500">{requestRef(request.requestNumber)}</Text>
+        {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.text.secondary} /> : null}
+      </View>
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {request.serviceItem?.name || '—'}
       </Text>
       <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
         <StatusBadge status={request.status} />
       </View>
-      <Text className="mt-2 text-xs text-gray-500">Requested {formatDateTime(request.createdAt)}</Text>
+      <Text className="mt-2 text-xs text-gray-500">
+        Requested {own ? 'by you, ' : ''}{formatDateTime(request.createdAt)}
+      </Text>
+    </>
+  );
+  const className = 'mx-4 mb-3 rounded-xl border border-border bg-white p-4';
+  return onPress ? (
+    <Pressable accessibilityRole="button" onPress={onPress} className={`${className} active:opacity-80`}>
+      {body}
     </Pressable>
+  ) : (
+    <View className={className}>{body}</View>
   );
 }

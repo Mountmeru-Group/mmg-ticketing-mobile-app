@@ -291,16 +291,19 @@ export const assignTicketSchema = z.object({
 - **Body:** `createTicketSchema` (above).
 - **Fields mobile sends:**
 
-| Field | END_USER | AGENT / ADMIN / L2 |
-|---|---|---|
-| `title` (3–255) | ✅ required | ✅ |
-| `description` (HTML, min 1) | ✅ required | ✅ |
-| `categoryId` (deepest selected level) | ✅ (client-required; `05` §A) | ✅ |
-| `source` | `"API"` (pending A15 / Ronit) | `"API"` |
-| `impact`, `urgency` | ❌ never (web strips them) | ✅ optional |
-| `teamId`, `assignedToId` | ❌ never | ✅ optional |
-| `requesterId` (raise on behalf) | ❌ never (server ignores it for END_USER) | ✅ optional |
-| `priority`, `slaPolicyId`, `countryId`, `tags`, `customFields`, `level`, `mode` | ❌ | ❌ for MVP. `countryId`, `level` and `mode` are **ignored on create** |
+| Field | END_USER | L2_MANAGER | AGENT / ADMIN |
+|---|---|---|---|
+| `title` (3–255) | ✅ required | ✅ | ✅ |
+| `description` (HTML, min 1) | ✅ required | ✅ | ✅ |
+| `categoryId` (deepest selected level) | ✅ (client-required; `05` §A) | ✅ | ✅ |
+| `source` | `"API"` (pending A15 / Ronit) | `"API"` | `"API"` |
+| `impact`, `urgency` | ❌ never (web strips them) | ✅ optional | ✅ optional |
+| `teamId`, `assignedToId` | ❌ never | ❌ never (G5: the web's lists are a 403 for L2) | ✅ optional |
+| `requesterId` (raise on behalf) | ❌ never (server ignores it for END_USER) | ❌ never (G5) | ✅ optional |
+| `priority`, `slaPolicyId`, `countryId`, `tags`, `customFields`, `level`, `mode` | ❌ | ❌ | ❌ for MVP. `countryId`, `level` and `mode` are **ignored on create** |
+
+- **G5:** the allow-list is per role (`CREATE_KEYS_BY_ROLE`, `src/api/tickets.api.ts`). Before G5, L2_MANAGER shared the AGENT/ADMIN keys, although no screen offered L2 a group, technician or requester (`ROLE-MATRIX.md` §14.3). A role the app does not know sends END_USER's keys.
+- **G5, the priority preview:** ADMIN and AGENT see the priority the new ticket will get, read from LKP-6 by the server's own rule (next bullets). `priority` is still never sent: with both values and a matrix row the server applies the same row; otherwise it stores the default MEDIUM, which the preview says.
 
 - **Server behaviour** (ctrl:185-469):
   - `requesterId` = the body value if the caller isn't END_USER, else the caller (`:190`).
@@ -805,7 +808,7 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 - **Auth:** ADMIN, AGENT only. Others get 403.
 - **200:** `[{ id, impact, urgency, priority }]`, ordered impact desc, then urgency desc.
 - **⚠ Writes on GET:** if the table is empty, it seeds 9 default rows (`priorityMatrix.controller.ts:21-39`). The defaults don't cover impact `MINIMAL` or urgency `URGENT`, so a missing pair means "server keeps the sent or default priority".
-- **Mobile:** the server's value always wins (TKT-2/TKT-4). On M4, ADMIN and AGENT see the preview before Save and, as the web does, send the matching row's `priority` with the impact/urgency change (TKT-4, G2).
+- **Mobile:** the server's value always wins (TKT-2/TKT-4). On M4, ADMIN and AGENT see the preview before Save and, as the web does, send the matching row's `priority` with the impact/urgency change (TKT-4, G2). On M8 (G5), ADMIN and AGENT see the same preview while choosing impact and urgency, from the same component and cache; nothing is sent for it (TKT-2).
 - **Source:** `priorityMatrix.router.ts:8`, `priorityMatrix.controller.ts:21-39`.
 
 ### LKP-7 `GET /api/v1/canned-responses` — P2 (every role; built in G3)
@@ -1071,7 +1074,8 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
   approvals: (Approval + approver{id,displayName,email})[]  // ordered by stage
   ```
 - **Mobile:** for the P2 "My requests" screen, show only rows where `requesterId === me`, for every role. Always send `limit` ≤ 50.
-- **Mobile (G4):** M17 My Requests sends `page` and `limit=50` (the web sends `page=1&limit=50` and never pages), **never `status`**. Rows that are not the person's own are dropped before anything renders (`myServiceRequestRows`). For staff, whose pages hold everyone's requests, up to 4 pages are read automatically, then one more per tap.
+- **Mobile (G4):** M17 My Requests sends `page` and `limit=50` (the web sends `page=1&limit=50` and never pages), **never `status`**.
+- **Mobile (G5), superseding the "Mobile" line above:** the rows are shown as the web shows them. Staff see every request, END_USER their own (`myServiceRequestRows`; the END_USER scoping is the server's, deliberate, `:116-117`). The next page loads as the list scrolls; nothing is read automatically. A request's detail (SCR-6) still opens only for one's own (`isOwnServiceRequest`). Reason: `ROLE-MATRIX.md` §14.2.
 - **Source:** `serviceCatalog.router.ts:22`, `serviceCatalog.controller.ts:111-124`.
 
 #### SCR-5 `POST /api/v1/service-catalog/requests` — P2 (every role; built in G4)
