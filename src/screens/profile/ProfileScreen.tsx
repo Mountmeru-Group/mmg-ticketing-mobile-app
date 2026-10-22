@@ -11,7 +11,9 @@
 // - Sign out: confirmation → AUTH-3 (result ignored) → SecureStore, cache and stores wiped → Login (02 §5.5).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
@@ -25,13 +27,15 @@ import {
   countryName, profileChanges, useCountryOptions, useProfile, useSignOut, useSingleFlight, useUpdateProfile, validateProfile,
   type ProfileForm,
 } from '@/hooks';
+import { requestReminderPermission } from '@/notifications/localReminders';
 import { useAuthStore } from '@/store/auth.store';
+import { usePrefsStore } from '@/store/prefs.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { AppDrawerScreenProps, UserProfile } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
-import { ROLE_LABELS } from '@/utils/roles';
+import { ROLE_LABELS, isStaff } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { countrySelectorMode } from '@/utils/ticket-filters';
 
@@ -120,6 +124,13 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
 
   const set = (key: keyof ProfileForm) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
   const tz = deviceTimezone();
+
+  // ── SLA reminders (docs/SLA-REMINDERS.md): staff only, this phone only ──
+  const slaReminders = usePrefsStore((s) => s.slaReminders);
+  const setSlaReminders = usePrefsStore((s) => s.setSlaReminders);
+  const reminderPermission = usePrefsStore((s) => s.reminderPermission);
+  const setReminderPermission = usePrefsStore((s) => s.setReminderPermission);
+  const showReminders = !!user && isStaff(user.role);
   const displayName = formatDisplayName(profile.data?.displayName ?? user?.displayName);
 
   return (
@@ -236,6 +247,39 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                 <Text className="ml-2 text-xs text-gray-500">Locked to your country</Text>
               </View>
             )}
+          </Card>
+        ) : null}
+
+        {showReminders ? (
+          <Card title="Notifications">
+            <View className="flex-row items-center">
+              <View className="flex-1 pr-3">
+                <Text className="text-base text-gray-900">SLA reminders</Text>
+                <Text className="mt-0.5 text-xs text-gray-500">
+                  A notification 30 minutes before a response or resolution deadline on a ticket assigned to you. Scheduled on
+                  this phone from the tickets it has loaded; not saved to your account.
+                </Text>
+              </View>
+              <Switch
+                accessibilityLabel="SLA reminders"
+                value={slaReminders === true}
+                disabled={slaReminders === null}
+                onValueChange={(on) => void setSlaReminders(on)}
+                trackColor={{ true: colors.primary }}
+              />
+            </View>
+            {slaReminders && reminderPermission === 'undetermined' ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void requestReminderPermission().then(setReminderPermission).catch(() => undefined)}
+                className="mt-2 min-h-11 justify-center self-start"
+              >
+                <Text className="text-sm font-medium text-blue-700">Allow notifications</Text>
+              </Pressable>
+            ) : null}
+            {slaReminders && reminderPermission === 'denied' ? (
+              <Text className="mt-2 text-xs text-amber-900">Notifications for this app are blocked in Android settings.</Text>
+            ) : null}
           </Card>
         ) : null}
 

@@ -23,6 +23,7 @@ export { useAnnouncements } from './useAnnouncements';
 export { KB_PAGE_SIZE, useKbArticle, useKbArticles, useKbCategories, useKbSearch, useKbVoted } from './useKnowledgeBase';
 export { useProfile, profileChanges, validateProfile, type ProfileForm } from './useProfile';
 export { useTaskFeed } from './useTasks';
+export { useSlaReminders, useSlaWatch } from './useSlaReminders';
 
 // Writes
 export { useCreateTicket, validateNewTicket, type CreateTicketVariables } from './useCreateTicket';

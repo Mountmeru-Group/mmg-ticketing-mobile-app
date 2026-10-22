@@ -19,3 +19,13 @@ export function openTicketLinkInApp(link: string): boolean {
   });
   return true;
 }
+
+/** Open one ticket's detail (M4) by id — a tapped SLA reminder. Same conditions as openTicketLinkInApp(). */
+export function openTicketInApp(ticketId: string): boolean {
+  if (!navigationRef.isReady() || !useAuthStore.getState().isAuthenticated) return false;
+  navigationRef.navigate('App', {
+    screen: 'MainTabs',
+    params: { screen: 'TicketsTab', params: { screen: 'TicketDetail', params: { ticketId }, initial: false } },
+  });
+  return true;
+}

@@ -19,14 +19,19 @@ import {
   AnnouncementBanner, EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, QueryBanner, RecentTicketRow,
   ScreenHeader, Skeleton, SubmitButton,
 } from '@/components';
-import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, type SafeDashboard } from '@/hooks';
+import {
+  queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, useSlaWatch, type SafeDashboard,
+} from '@/hooks';
+import { requestReminderPermission } from '@/notifications/localReminders';
 import { useAuthStore } from '@/store/auth.store';
+import { usePrefsStore } from '@/store/prefs.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { homeTiles, homeVariant, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
 import { ROLE_LABELS } from '@/utils/roles';
+import { nextDeadline } from '@/utils/sla-reminders';
 import type { TicketNamedFilter } from '@/utils/ticket-filters';
 
 interface Tile {
@@ -48,6 +53,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const queryClient = useQueryClient();
   const offline = useIsOffline();
   const setTicketFilter = useUiStore((s) => s.setTicketFilter);
+  const setTicketSort = useUiStore((s) => s.setTicketSort);
   const dismissed = useUiStore((s) => s.dismissedAnnouncementIds);
   const dismissAnnouncement = useUiStore((s) => s.dismissAnnouncement);
 
@@ -125,6 +131,15 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
             moreCount={visibleAnnouncements.length - 1}
             onOpen={() => navigation.navigate('Announcements')}
             onDismiss={() => dismissAnnouncement(banner.id)}
+          />
+        ) : null}
+
+        {!isEndUser ? (
+          <SlaReminderCard
+            onOpenQueue={() => {
+              setTicketSort('DUE'); // my open tickets, soonest deadline first
+              openList('MY_OPEN');
+            }}
           />
         ) : null}
 
@@ -225,6 +240,61 @@ function buildTiles(keys: readonly HomeTile[], kpis: SafeDashboard['kpis'] | und
     const { filter, ...look } = TILES[key];
     return { key, ...look, value: kpis?.[key], onPress: () => openList(filter) };
   });
+}
+
+// ── SLA reminders (docs/SLA-REMINDERS.md) ────────────────────
+
+/**
+ * Staff only. Three states: the one-time "allow notifications" ask (the OS prompt is a tap here or in Settings, never on
+ * launch, 08 §8); a note when the OS blocks the app's notifications; and, while reminders run, a heads-up with the number
+ * of my tickets inside the 30-minute window. Nothing when there is nothing to say.
+ */
+function SlaReminderCard({ onOpenQueue }: { onOpenQueue: () => void }) {
+  const pref = usePrefsStore((s) => s.slaReminders);
+  const permission = usePrefsStore((s) => s.reminderPermission);
+  const setPermission = usePrefsStore((s) => s.setReminderPermission);
+  const watch = useSlaWatch({ enabled: pref === true && permission === 'granted' });
+  if (pref !== true || permission === null) return null;
+
+  if (permission === 'undetermined') {
+    return (
+      <View className="mx-4 mb-4">
+        <Notice tone="info">
+          Get a heads-up on this phone 30 minutes before a response or resolution deadline on a ticket assigned to you.
+        </Notice>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void requestReminderPermission().then(setPermission).catch(() => undefined)}
+          className="mt-1 min-h-11 justify-center self-start"
+        >
+          <Text className="text-sm font-medium text-blue-700">Allow notifications</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (permission === 'denied') {
+    return (
+      <View className="mx-4 mb-4">
+        <Notice tone="warning">
+          SLA reminders are on, but notifications for this app are blocked in Android settings, so none can be shown.
+        </Notice>
+      </View>
+    );
+  }
+
+  const dueSoon = (watch.data ?? []).filter((t) => nextDeadline(t)?.dueSoon).length;
+  if (dueSoon === 0) return null;
+  return (
+    <View className="mx-4 mb-4">
+      <Notice tone="warning">
+        {dueSoon === 1 ? 'One of your tickets is' : `${dueSoon} of your tickets are`} due within 30 minutes. Reply or update
+        before the SLA is missed.
+      </Notice>
+      <Pressable accessibilityRole="button" onPress={onOpenQueue} className="mt-1 min-h-11 justify-center self-start">
+        <Text className="text-sm font-medium text-blue-700">Open my queue, soonest first</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 // ── Pieces ───────────────────────────────────────────────────

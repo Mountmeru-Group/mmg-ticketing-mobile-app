@@ -3,6 +3,7 @@
 //   ['tickets', 'list', query]                       TKT-1   infinite; `query` = TKT-1 params minus page/limit
 //   ['tickets', 'recent', query]                     TKT-1   one page of 5 (Home: END_USER and L2_MANAGER) — NOT infinite
 //   ['tickets', 'link', number, query]               TKT-1   ticket-number lookup for a deep link (05 §A.11)
+//   ['tickets', 'sla-watch', meId]                    TKT-1   my open tickets, deadline order: the SLA-reminder pool — NOT infinite
 //   ['tickets', 'detail', id]                         TKT-3   one ticket (tasks are embedded; no TSK-1 call)
 //   ['tickets', 'detail', id, 'comments']             CMT-1   conversation
 //   ['tickets', 'detail', id, 'attachments']          ATT-1   attachment metadata
@@ -40,6 +41,8 @@ export const queryKeys = {
     recents: () => ['tickets', 'recent'] as const,
     recent: (params: TicketListKeyParams) => ['tickets', 'recent', params] as const,
     byNumber: (ticketNumber: number, params: TicketListKeyParams) => ['tickets', 'link', ticketNumber, params] as const,
+    slaWatchAll: () => ['tickets', 'sla-watch'] as const,
+    slaWatch: (meId: string) => ['tickets', 'sla-watch', meId] as const,
     detail: (id: string) => ['tickets', 'detail', id] as const,
     comments: (id: string) => ['tickets', 'detail', id, 'comments'] as const,
     attachments: (id: string) => ['tickets', 'detail', id, 'attachments'] as const,
