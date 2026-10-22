@@ -23,7 +23,7 @@
 //     country, and the resolution text — each from ticketFieldPermissions(), saved only on an explicit Save via
 //     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,6 +52,7 @@ import {
   isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type MoreAction,
   type TicketDetailPermissions, type TicketFieldPermissions,
 } from '@/utils/permissions';
+import { SLA_DEADLINE_LABELS, formatMinutesLeft, nextDeadline } from '@/utils/sla-reminders';
 import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
 import { statusChangeMessage } from '@/utils/writeCopy';
 import {
@@ -430,10 +431,23 @@ function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyp
 
 // ── Header ───────────────────────────────────────────────────
 
+/** A clock that ticks once a minute, for countdowns that must not go stale while the screen stays open. */
+function useMinuteNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
   // "Auto" pill when the server computed priority from impact × urgency (05 §A.3, staff).
   const autoPriority = can.classification && !!ticket.impact && !!ticket.urgency;
   const attachmentCount = ticket._count?.attachments ?? 0;
+  // The nearest open deadline, from the SLA fields on TKT-3 (docs/SLA-REMINDERS.md); none while on hold or final.
+  const now = useMinuteNow();
+  const deadline = nextDeadline(ticket, now);
   return (
     <Card>
       <View className="mb-1 flex-row items-center">
@@ -450,6 +464,12 @@ function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPe
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
       </View>
+      {deadline ? (
+        <Text className={`mt-2 text-xs font-medium ${deadline.dueSoon ? 'text-amber-800' : 'text-gray-600'}`}>
+          {SLA_DEADLINE_LABELS[deadline.kind]} due in {formatMinutesLeft(deadline.minutesLeft)}
+          {deadline.dueSoon ? ' — reply or update before the SLA is missed' : ''}
+        </Text>
+      ) : null}
       <Text className="mt-2 text-xs text-gray-500">
         Created {formatDateTime(ticket.createdAt)} · Updated {formatRelative(ticket.updatedAt)}
       </Text>

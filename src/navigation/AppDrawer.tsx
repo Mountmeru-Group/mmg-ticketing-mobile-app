@@ -1,6 +1,7 @@
 // Signed-in shell: a side drawer wrapping the bottom tabs (08 §3). Profile opens from the drawer's account card.
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
+import { useSlaReminders } from '@/hooks/useSlaReminders';
 import { AnnouncementsScreen } from '@/screens/dashboard/AnnouncementsScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import type { AppDrawerParamList } from '@/types';
@@ -11,6 +12,8 @@ import { ApprovalsStack, KnowledgeStack, TasksStack } from './ModuleStacks';
 const Drawer = createDrawerNavigator<AppDrawerParamList>();
 
 export function AppDrawer() {
+  // Lives with the signed-in shell: scheduled on sign-in, cancelled when this unmounts on sign-out.
+  useSlaReminders();
   return (
     <Drawer.Navigator
       initialRouteName="MainTabs"

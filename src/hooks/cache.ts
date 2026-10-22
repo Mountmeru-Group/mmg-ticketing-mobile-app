@@ -11,6 +11,7 @@
 // - a task write replaces that one task in the ticket's cached detail and list rows with the server's returned task.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 
+import { useAuthStore } from '@/store/auth.store';
 import type { ActivityPage, Paginated, Ticket, TicketDetail, TicketTaskEmbedded } from '@/types';
 import { queryKeys } from './queryKeys';
 
@@ -43,9 +44,25 @@ export function patchTicketInLists(queryClient: QueryClient, ticket: unknown): v
         })),
       };
     });
+    patchSlaWatch(queryClient, ticket);
   }
   void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.lists(), refetchType: 'none' });
   markHomeStale(queryClient);
+}
+
+/**
+ * The SLA-reminder pool (hooks/useSlaReminders.ts) follows every write without a request: the returned ticket replaces
+ * its row, joins the pool when it is now assigned to me, and leaves it when it is not. The planner skips final statuses.
+ */
+function patchSlaWatch(queryClient: QueryClient, ticket: Ticket): void {
+  const meId = useAuthStore.getState().user?.id;
+  if (!meId) return;
+  queryClient.setQueryData<Ticket[]>(queryKeys.tickets.slaWatch(meId), (rows) => {
+    if (!rows) return rows;
+    const current = rows.find((r) => r.id === ticket.id);
+    const others = rows.filter((r) => r.id !== ticket.id);
+    return ticket.assignedToId === meId ? [...others, current ? { ...current, ...ticket } : ticket] : others;
+  });
 }
 
 /**

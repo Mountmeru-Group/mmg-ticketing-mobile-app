@@ -266,6 +266,7 @@ Resolution:
 | Package | Why | After approval |
 |---|---|---|
 | `expo-dev-client` (SDK 57 line) | Required by the `development` profile (a dev-client build that keeps the developer-token screen for internal testing until SSO ships) | `npx expo install expo-dev-client`, then `npx eas build --platform android --profile development` |
+| `expo-notifications` (`~57.0.23`, the SDK 57 pin) | SLA reminders (`docs/SLA-REMINDERS.md`): local, on-device notifications 30 minutes before a deadline. Already listed in `package.json` and `app.json` (plugin, channel colour) on the `feature/sla-breach-alerts` branch; `package-lock.json` still has to be regenerated | `npx expo install expo-notifications` (updates the lock file), commit, then a new `preview` build — a native module, so the installed APK must be rebuilt |
 
 ## 9. Phase 5 state audit (all 16 MVP screens)
 
