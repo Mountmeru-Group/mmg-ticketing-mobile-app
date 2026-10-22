@@ -56,20 +56,30 @@ const CREATE_KEYS_END_USER = ['title', 'description', 'categoryId', 'source'] as
 const CREATE_KEYS_STAFF = [
   ...CREATE_KEYS_END_USER, 'impact', 'urgency', 'teamId', 'assignedToId', 'requesterId',
 ] as const;
+/**
+ * Phase G5 audit: L2_MANAGER sends no group, technician or requester. The web's Group and Assign To lists are a 403 for
+ * L2 (always empty, CR3) and no web form has a requester; the screen offers none of them (createTicketPermissions).
+ * A role the app doesn't know gets END_USER's keys (before G5 it got the staff set).
+ */
+const CREATE_KEYS_BY_ROLE: Record<UserRole, readonly (keyof CreateTicketBodyStaff)[]> = {
+  END_USER: CREATE_KEYS_END_USER,
+  L2_MANAGER: [...CREATE_KEYS_END_USER, 'impact', 'urgency'],
+  AGENT: CREATE_KEYS_STAFF,
+  ADMIN: CREATE_KEYS_STAFF,
+};
 
 /**
  * TKT-2 — POST /api/v1/tickets
- * Body from the per-role allow-list in 01 TKT-2: END_USER sends only title, description, categoryId, source.
+ * Body from the per-role allow-list in 01 TKT-2: END_USER sends only title, description, categoryId, source; L2_MANAGER
+ * adds impact and urgency; ADMIN and AGENT also group, technician and requester. Never `priority` (the server derives it).
  * Flow afterwards (05 §A.8): upload attachments to the new id (ATT-2), then open the detail screen.
  */
 export async function createTicket(
   input: CreateTicketBodyEndUser | CreateTicketBodyStaff,
   role: UserRole,
 ): Promise<Ticket> {
-  const body =
-    role === 'END_USER'
-      ? pickDefined(input, CREATE_KEYS_END_USER)
-      : pickDefined(input as CreateTicketBodyStaff, CREATE_KEYS_STAFF);
+  const keys = Object.prototype.hasOwnProperty.call(CREATE_KEYS_BY_ROLE, role) ? CREATE_KEYS_BY_ROLE[role] : CREATE_KEYS_END_USER;
+  const body = pickDefined(input as CreateTicketBodyStaff, keys);
   const res = await apiClient.post<Ticket>('/tickets', body);
   return res.data;
 }

@@ -530,6 +530,12 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s/,
     },
     {
+      // G5: every role decision on the create form from createTicketPermissions(); the preview is the G1 component.
+      file: 'src/screens/tickets/CreateTicketScreen.tsx',
+      uses: ['createTicketPermissions(', 'PriorityPreviewBox', 'can.priorityPreview'],
+      forbid: /createTicket\(|apiClient|getPriorityMatrix\(/,
+    },
+    {
       // G3: the Templates button comes from composerPermissions(); the list only through useCannedResponses.
       file: 'src/screens/tickets/ReplyComposerScreen.tsx',
       uses: ['composerPermissions(', 'can.templates'],

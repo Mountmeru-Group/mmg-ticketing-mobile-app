@@ -28,11 +28,11 @@ import {
   canUseServiceCatalog, drawerItems, isOwnServiceRequest, myServiceRequestRows, serviceCatalogPermissions, serviceRequestProblem,
 } from '../../src/utils/permissions.ts';
 import {
-  DATE_FORMAT_MESSAGE, EMAIL_FORMAT_MESSAGE, MY_REQUESTS_AUTO_PAGES, MY_REQUESTS_MIN_ROWS, NUMBER_FORMAT_MESSAGE, OPTION_MESSAGE,
+  DATE_FORMAT_MESSAGE, EMAIL_FORMAT_MESSAGE, NUMBER_FORMAT_MESSAGE, OPTION_MESSAGE,
   REQUEST_IMPACT_OPTIONS, REQUEST_URGENCY_OPTIONS, SERVICE_FIELD_TYPES, WHOLE_NUMBER_MESSAGE, answerRows, buildFormData,
   buildServiceRequestBody, categoryItemCount, fieldError, filterCatalogItems, formErrors, initialFormValues, isRealDay,
   itemCountLabel, localDateFromDay, nextRequestPriority, normaliseFormFields, normaliseOptions, requestPriority, requestRef,
-  rhfPath, shouldReadMoreRequests, submittedMessage, submittedValue,
+  rhfPath, submittedMessage, submittedValue,
 } from '../../src/utils/service-catalog.ts';
 import { NAMES, OTHER_USER, PERSONAS, forEachPersona } from './personas.mjs';
 
@@ -93,10 +93,17 @@ const field = (over) => normaliseFormFields([{ name: 'f', label: 'Field', ...ove
 // ══ 1. Who sees the catalogue ════════════════════════════════
 
 describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles, AppLayout.tsx:30, :266)', () => {
-  const ALL = { browse: true, submit: true, requestProperties: true, myRequests: true };
+  // G5: everyonesRequests is the web's My Requests for staff (SCC:117 scopes END_USER only); END_USER sees their own.
+  const ALL = { browse: true, submit: true, requestProperties: true, myRequests: true, everyonesRequests: true };
   forEachPersona(
     'serviceCatalogPermissions',
-    { END_USER: { ...ALL, requestProperties: false }, AGENT: ALL, TRIAGE_AGENT: ALL, L2_MANAGER: ALL, ADMIN: ALL },
+    {
+      END_USER: { ...ALL, requestProperties: false, everyonesRequests: false },
+      AGENT: ALL,
+      TRIAGE_AGENT: ALL,
+      L2_MANAGER: ALL,
+      ADMIN: ALL,
+    },
     (p) => serviceCatalogPermissions(p),
   );
 
@@ -108,7 +115,9 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
 
   test('a role the app does not know gets no catalogue, no drawer row and no request', () => {
     assert.equal(canUseServiceCatalog('GUEST'), false);
-    assert.deepEqual(serviceCatalogPermissions({ role: 'GUEST' }), { browse: false, submit: false, requestProperties: false, myRequests: false });
+    assert.deepEqual(serviceCatalogPermissions({ role: 'GUEST' }), {
+      browse: false, submit: false, requestProperties: false, myRequests: false, everyonesRequests: false,
+    });
     assert.equal(drawerItems('GUEST', 0).includes('catalog'), false);
     assert.equal(serviceCatalogPermissions(null).requestProperties, false, 'no session reads as END_USER: no request properties');
   });
@@ -341,19 +350,26 @@ describe('submit: request properties, impact × urgency → priority (SRF:24-34,
 
 // ══ 3. Whose requests appear in My Requests ═════════════════
 
-describe('My Requests: the person\'s own requests only, for every role', () => {
+describe('My Requests: as the web lists them (G5): every request for staff, END_USER their own', () => {
   const row = (id, requesterId) => ({ id, requesterId, requestNumber: 1 });
-  // SCR-4 for staff returns everyone's requests (SCC:117); for END_USER only theirs. Either way, keep only own rows.
+  // SCR-4 for staff returns everyone's requests (SCC:117) and the web lists them all under "My Requests" (SCP:44-48,
+  // :333-352); for END_USER the server returns only theirs. The pages below hold everyone's, to prove END_USER's rule.
   const PAGES = [
     { data: NAMES.map((n, i) => row(`r${i}`, PERSONAS[n].id)).concat([row('rx', OTHER_USER)]) },
     { data: [row('r0', PERSONAS.END_USER.id), ...NAMES.map((n, i) => row(`s${i}`, PERSONAS[n].id))] },
   ];
+  const EVERY_ROW = ['r0', 'r1', 'r2', 'r3', 'r4', 'rx', 's0', 's1', 's2', 's3', 's4'];
 
   forEachPersona(
     'rows shown, deduplicated, newest first as the server sent them',
-    Object.fromEntries(NAMES.map((n, i) => [n, [`r${i}`, `s${i}`]])),
+    { END_USER: ['r0', 's0'], AGENT: EVERY_ROW, TRIAGE_AGENT: EVERY_ROW, L2_MANAGER: EVERY_ROW, ADMIN: EVERY_ROW },
     (p) => myServiceRequestRows(p, PAGES).map((r) => r.id),
   );
+
+  test('a role the app does not know, or no session, sees only rows that are their own', () => {
+    assert.deepEqual(myServiceRequestRows({ id: 'user-guest', role: 'GUEST' }, [{ data: [row('g1', 'user-guest'), row('g2', OTHER_USER)] }]).map((r) => r.id), ['g1']);
+    assert.deepEqual(myServiceRequestRows(null, PAGES), []);
+  });
 
   forEachPersona(
     'another person\'s request is never shown on the detail screen (SCR-6 answers any request to staff)',
@@ -386,15 +402,9 @@ describe('My Requests: the person\'s own requests only, for every role', () => {
     ]);
   });
 
-  test('reading further pages by itself is bounded: few own rows, more pages, fewer than the automatic pages', () => {
-    assert.equal(MY_REQUESTS_MIN_ROWS, 10);
-    assert.equal(MY_REQUESTS_AUTO_PAGES, 4);
-    assert.equal(shouldReadMoreRequests({ shown: 0, pagesRead: 1, hasNextPage: true }), true);
-    assert.equal(shouldReadMoreRequests({ shown: 9, pagesRead: 3, hasNextPage: true }), true);
-    assert.equal(shouldReadMoreRequests({ shown: 10, pagesRead: 1, hasNextPage: true }), false, 'enough rows');
-    assert.equal(shouldReadMoreRequests({ shown: 0, pagesRead: 4, hasNextPage: true }), false, 'automatic pages used up');
-    assert.equal(shouldReadMoreRequests({ shown: 0, pagesRead: 1, hasNextPage: false }), false, 'no more pages');
-    assert.equal(shouldReadMoreRequests({ shown: 0, pagesRead: 0, hasNextPage: true }), false, 'the first page is not loaded yet');
+  test('no page is read by itself: the next one loads only as the list scrolls (the web reads one page of 50)', () => {
+    const hook = read('src/hooks/useServiceCatalog.ts');
+    assert.doesNotMatch(hook, /useEffect|fetchNextPage\(/);
   });
 
   test('wiring: the hook keeps rows only through myServiceRequestRows, the detail only through isOwnServiceRequest', () => {
@@ -402,6 +412,13 @@ describe('My Requests: the person\'s own requests only, for every role', () => {
     const detail = read('src/screens/catalog/ServiceRequestDetailScreen.tsx');
     assert.match(detail, /const own = isOwnServiceRequest\(viewer, request\)/);
     assert.match(detail, /if \(!own\) \{/);
+  });
+
+  test('wiring: only the person\'s own rows are links to the detail (the web\'s rows are never links, SCP:344)', () => {
+    const screen = read('src/screens/catalog/ServiceCatalogScreen.tsx');
+    assert.match(screen, /canOpen=\{\(request\) => isOwnServiceRequest\(viewer, request\)\}/);
+    assert.match(screen, /onPress=\{own \? \(\) => onOpen\(item\) : undefined\}/);
+    assert.doesNotMatch(screen, /requester\??\.(displayName|email)/, 'no requester column, as on the web');
   });
 });
 

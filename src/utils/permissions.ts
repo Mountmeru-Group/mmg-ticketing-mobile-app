@@ -126,9 +126,10 @@ export function canUseReplyTemplates(role: UserRole): boolean {
 /**
  * Delete a file (ATT-5): ADMIN, AGENT, L2_MANAGER (web :1345 `role !== 'END_USER'`; the server refuses END_USER).
  * Any file on the ticket, whoever uploaded it, in every status: the AGENT lock does not apply (web :1268 vs :1345).
+ * G5 audit, re-verified: still the web's rule. A role the app doesn't know gets no delete (isStaff alone said yes).
  */
 export function canDeleteAttachments(role: UserRole): boolean {
-  return isStaff(role);
+  return KNOWN_ROLES.has(role) && isStaff(role);
 }
 
 /**
@@ -257,7 +258,9 @@ export function ticketFieldPermissions(
   viewer: Pick<AuthUser, 'role' | 'countryId'> | null,
   ticket: { status: TicketStatus },
 ): TicketFieldPermissions {
-  const role: UserRole = viewer?.role ?? 'END_USER';
+  // G5 audit: a role the app doesn't know edits nothing, as END_USER (isStaff alone said yes). Unreachable in practice:
+  // sign-in and the stored session refuse an unknown role (auth.api.ts, auth.store.ts).
+  const role: UserRole = viewer && KNOWN_ROLES.has(viewer.role) ? viewer.role : 'END_USER';
   const agentLock = isResolvedLocked(role, ticket.status);
 
   const classification = !isStaff(role) ? HIDDEN : agentLock ? lockedBy(AGENT_LOCK_REASON) : EDIT;
@@ -354,6 +357,38 @@ export function inlineStatusTransitions(role: UserRole, status: TicketStatus): r
   return canChangeStatus(role) ? getAvailableTransitions(role, status) : [];
 }
 
+// ── Create ticket (04 M8, 05 §A.8; the web: FE:CreateTicketPage.tsx, `isStaff = role !== 'END_USER'` at :26) ──
+
+export interface CreateTicketPermissions {
+  /** Impact and urgency (:346-366): staff. END_USER never sends them (01 TKT-2; the web strips them, :159-163). */
+  classification: boolean;
+  /**
+   * Phase G5: the priority the new ticket will get, recomputed as impact and urgency change (:64-76, :368-387).
+   * ADMIN and AGENT: LKP-6 is `agentOrAdmin`, so the web's box never computes for L2_MANAGER (403); L2 is told the
+   * Service Desk sets it, as on M4 (ticketFieldPermissions().priorityPreview). No one picks the priority by hand.
+   */
+  priorityPreview: boolean;
+  /** Group and "Assign to" (:410-470): ADMIN, AGENT. L2_MANAGER's web lists are a 403, always empty (CR3). */
+  routing: boolean;
+  /** Requester, raise on behalf: ADMIN, AGENT. Not on the web form: a documented decision (CR4, ROLE-MATRIX §8 item 4). */
+  raiseOnBehalf: boolean;
+  /** "Your ticket will be automatically routed…" once a category is chosen (:403): END_USER. */
+  routingNotice: boolean;
+}
+
+export function createTicketPermissions(viewer: Pick<AuthUser, 'role'> | null): CreateTicketPermissions {
+  const role: UserRole = viewer?.role ?? 'END_USER';
+  const known = KNOWN_ROLES.has(role);
+  const agentOrAdmin = known && isAgentOrAdmin(role);
+  return {
+    classification: known && isStaff(role),
+    priorityPreview: agentOrAdmin,
+    routing: agentOrAdmin,
+    raiseOnBehalf: agentOrAdmin,
+    routingNotice: role === 'END_USER',
+  };
+}
+
 // ── Service catalogue (Phase G4; the web's behaviour, with sources: docs/G4-WEB-CATALOGUE.md) ──
 
 /**
@@ -376,38 +411,48 @@ export interface ServiceCatalogPermissions {
    * their requests are MEDIUM.
    */
   requestProperties: boolean;
-  /** My Requests and a request's detail (SCR-4, SCR-6), the person's own requests only (isOwnServiceRequest). */
+  /** The "My Requests" view (SCR-4). Whose rows: `everyonesRequests`. */
   myRequests: boolean;
+  /**
+   * Phase G5, settled against the web (WEB-VS-MOBILE-ROLES.md §5 review): ADMIN, AGENT and L2_MANAGER see every
+   * request under "My Requests", as on the web (SCP:44-48, :333-352), because the server deliberately scopes END_USER
+   * only (serviceCatalog.controller.ts:117) and staff fulfil requests. No request carries a country, group or technician
+   * from the web (SCR-5 never sets them; no web page assigns), so there is no narrower scope to apply. END_USER: own.
+   */
+  everyonesRequests: boolean;
 }
 
 export function serviceCatalogPermissions(viewer: Pick<AuthUser, 'role'> | null): ServiceCatalogPermissions {
   const role: UserRole = viewer?.role ?? 'END_USER';
   const known = canUseServiceCatalog(role);
-  return { browse: known, submit: known, requestProperties: known && isStaff(role), myRequests: known };
+  const staff = known && isStaff(role);
+  return { browse: known, submit: known, requestProperties: staff, myRequests: known, everyonesRequests: staff };
 }
 
 /**
- * My Requests and a request's detail show only the person's own requests, for every role. The web lists everyone's
- * requests to ADMIN, AGENT and L2_MANAGER under "My Requests", because SCR-4 filters END_USER only
- * (serviceCatalog.controller.ts:117): a 🔒 SAFER case (WEB-VS-MOBILE-ROLES.md §5; 01 SCR-4's mobile rule).
+ * A request's detail (SCR-6, a mobile-only screen) opens only for the person's own request, for every role. The web has
+ * no detail and its My Requests rows are not links (SCP:344), so another person's answers and notes are shown nowhere
+ * on the web; the app does not show them either (the ➕ row "own requests only"), although SCR-6 answers staff.
  */
 export function isOwnServiceRequest(viewer: Pick<AuthUser, 'id'> | null, request: { requesterId?: unknown } | null | undefined): boolean {
   return !!viewer?.id && !!request && request.requesterId === viewer.id;
 }
 
 /**
- * My Requests' rows from the SCR-4 pages read so far: the person's own requests only, each once, in the server's order
- * (newest first). For END_USER the server already sent only theirs; for every other role the rest are dropped here.
+ * My Requests' rows from the SCR-4 pages read so far, each once, in the server's order (newest first): every request for
+ * staff, as on the web; the person's own for END_USER (whom the server already sends only theirs) and for an unknown role.
  */
 export function myServiceRequestRows<T extends { id?: unknown; requesterId?: unknown }>(
-  viewer: Pick<AuthUser, 'id'> | null,
+  viewer: Pick<AuthUser, 'id' | 'role'> | null,
   pages: readonly { data?: readonly T[] }[],
 ): T[] {
+  const everyone = serviceCatalogPermissions(viewer).everyonesRequests;
   const seen = new Set<string>();
   const rows: T[] = [];
   for (const page of pages) {
     for (const row of Array.isArray(page?.data) ? page.data : []) {
-      if (!row || typeof row.id !== 'string' || seen.has(row.id) || !isOwnServiceRequest(viewer, row)) continue;
+      if (!row || typeof row.id !== 'string' || seen.has(row.id)) continue;
+      if (!everyone && !isOwnServiceRequest(viewer, row)) continue;
       seen.add(row.id);
       rows.push(row);
     }

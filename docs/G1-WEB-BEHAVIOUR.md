@@ -3,6 +3,8 @@
 **Phase G1, 2026-10-22.** Read-only inspection of the web repo clone at HEAD `d7f3887` (unchanged before and after).
 
 > **G2 update (2026-10-22):** Ronit resolved D1, D2 and D3 below by "match the web" (ROLE-MATRIX §8 items 11, 12 and 2). D1: ADMIN and AGENT now send the matrix `priority` with an impact/urgency change, as the web does. D2: the country stays locked for a country AGENT. D3: the L2 API allow-list no longer has `categoryId` or `teamId`. The rest of this file is the G1 record, unchanged.
+
+> **G5 note (2026-10-22):** the create page's preview (§2, "Create page" and "Create page quirk") is now built on mobile, from this page's preview component (`PriorityPreviewBox`, `target: create`). The quirk is not copied. On the web, after one pair computes a priority, a pair with no matrix row keeps that stale value on screen and in the body, and the server stores it (`CTP:67-72`; `TC:193-201`). Mobile shows, and the server stores, Medium for such a pair: mobile sends no `priority` (01 TKT-2), so the validator's default applies. Recorded as W-G5-1 in `ROLE-MATRIX.md` §14.5.
 This file records what the web portal **actually does** for impact, urgency, category, country and resolution on the
 ticket detail page, and for the priority preview. Every statement cites the source. Where the source does not settle
 something, this file says so.

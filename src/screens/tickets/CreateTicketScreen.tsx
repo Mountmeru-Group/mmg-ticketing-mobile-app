@@ -1,7 +1,10 @@
 // M8 Create ticket (04 M8, 05 §A.8).
 // - Title (3–255), description, 3-level category cascade from LKP-1 (flat) — all required on the device.
-// - Staff only: impact, urgency. ADMIN/AGENT only (LKP-2 and USR-3 are 403 for L2): group ("Auto (from category)"),
-//   assignee, requester (raise on behalf). END_USER sees the simple form and the routing banner.
+// - Who sees what comes from createTicketPermissions() (utils/permissions.ts): staff impact and urgency; ADMIN/AGENT
+//   the priority preview (G5), group ("Auto (from category)"), assignee, requester (raise on behalf); END_USER the
+//   simple form and the routing banner.
+// - Priority preview (Phase G5): the G1 box from TicketPropertyEditors, recomputed as impact and urgency change, as the
+//   web's create page does. Display only: no one picks a priority, and the body never carries one (01 TKT-2).
 // - Body from the per-role allow-list (createTicket): END_USER sends only title, description, categoryId, source.
 // - Create is explicit and confirmed (a ticket can't be deleted). Files upload AFTER create, to the new id (ATT-2).
 //   On success: open the new ticket.
@@ -15,7 +18,9 @@ import {
   AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, LookupError, Notice, OfflineBanner,
   OfflineState, OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
 } from '@/components';
-import { useCategories, useCreateTicket, useDiscardGuard, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
+import {
+  useCategories, useCreateTicket, useDiscardGuard, usePriorityMatrix, useSingleFlight, useTeams, validateNewTicket,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import {
@@ -24,7 +29,8 @@ import {
 } from '@/types';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { IMPACT_LABELS, URGENCY_LABELS, formatDisplayName } from '@/utils/format';
-import { isAgentOrAdmin, isStaff } from '@/utils/roles';
+import { createTicketPermissions } from '@/utils/permissions';
+import { PriorityPreviewBox } from './TicketPropertyEditors';
 
 const AUTO = '__AUTO__';
 const NOT_SET = '__NOT_SET__';
@@ -38,12 +44,15 @@ type Sheet = 'top' | 'sub' | 'item' | 'impact' | 'urgency' | 'team' | 'assignee'
 
 export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'CreateTicket'>) {
   const insets = useSafeAreaInsets();
-  const role: UserRole = useAuthStore((s) => s.user?.role) ?? 'END_USER';
-  const staff = isStaff(role);
-  const agentOrAdmin = isAgentOrAdmin(role);
+  const user = useAuthStore((s) => s.user);
+  const can = createTicketPermissions(user);
+  const staff = can.classification;
+  const agentOrAdmin = can.routing;
 
   const categoriesQuery = useCategories({ enabled: true });
   const teamsQuery = useTeams({ enabled: agentOrAdmin });
+  // G5: LKP-6 for the preview, ADMIN/AGENT only (403 for L2, as on the web). Shared cache with the M4 editor.
+  const matrix = usePriorityMatrix({ enabled: can.priorityPreview });
   const create = useCreateTicket();
   const once = useSingleFlight();
 
@@ -129,7 +138,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
         urgency: staff ? (urgency ?? undefined) : undefined,
         teamId: agentOrAdmin ? (teamId ?? undefined) : undefined,
         assignedToId: agentOrAdmin ? assignee?.id : undefined,
-        requesterId: agentOrAdmin ? requester?.id : undefined,
+        requesterId: can.raiseOnBehalf ? requester?.id : undefined,
         files,
       });
       if (result.uploadError) {
@@ -205,7 +214,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
           {items.length > 0 ? (
             <SelectField label="Item" value={find(itemId)?.name ?? null} placeholder="Select (optional)" onPress={() => setSheet('item')} disabled={busy} />
           ) : null}
-          {!staff && categoryId ? (
+          {can.routingNotice && categoryId ? (
             <Notice>Your ticket will be automatically routed to the appropriate team based on the selected category.</Notice>
           ) : null}
         </FormCard>
@@ -214,7 +223,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
           <FormCard title="Classification">
             <SelectField label="Impact" value={impact ? IMPACT_LABELS[impact] : null} placeholder="Not set" onPress={() => setSheet('impact')} disabled={busy} />
             <SelectField label="Urgency" value={urgency ? URGENCY_LABELS[urgency] : null} placeholder="Not set" onPress={() => setSheet('urgency')} disabled={busy} />
-            <Notice>Priority is set by the server from impact × urgency (Auto).</Notice>
+            <PriorityPreviewBox target={{ kind: 'create' }} staged={{ impact, urgency }} enabled={can.priorityPreview} matrix={matrix} />
           </FormCard>
         ) : null}
 
@@ -235,13 +244,15 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
               onPress={() => setSheet('assignee')}
               disabled={busy}
             />
-            <SelectField
-              label="Requester"
-              value={requester ? formatDisplayName(requester.displayName) || requester.email : 'Me'}
-              hint="Raise this ticket on behalf of someone else"
-              onPress={() => setSheet('requester')}
-              disabled={busy}
-            />
+            {can.raiseOnBehalf ? (
+              <SelectField
+                label="Requester"
+                value={requester ? formatDisplayName(requester.displayName) || requester.email : 'Me'}
+                hint="Raise this ticket on behalf of someone else"
+                onPress={() => setSheet('requester')}
+                disabled={busy}
+              />
+            ) : null}
           </FormCard>
         ) : null}
 
