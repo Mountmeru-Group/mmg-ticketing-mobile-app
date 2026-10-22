@@ -13,6 +13,7 @@
 //   ['lookups', 'categories']                         LKP-1   flat category list (create form, M4 category editor)
 //   ['lookups', 'teams']                              LKP-2   groups + members (assign picker, create form)
 //   ['lookups', 'priority-matrix']                    LKP-6   impact × urgency → priority (M4 preview; ADMIN, AGENT)
+//   ['lookups', 'canned-responses']                   LKP-7   reply templates (M5 composer; staff)
 //   ['users', 'search', term, roles]                  USR-3   typeahead (≥ 2 characters)
 //   ['users', 'profile', id]                          USR-1   own profile (M10)
 //   ['dashboard', range, countryId]                   DSH-1   Home KPIs (never for L2_MANAGER)
@@ -53,6 +54,7 @@ export const queryKeys = {
     categories: () => ['lookups', 'categories'] as const,
     teams: () => ['lookups', 'teams'] as const,
     priorityMatrix: () => ['lookups', 'priority-matrix'] as const,
+    cannedResponses: () => ['lookups', 'canned-responses'] as const,
   },
 
   users: {

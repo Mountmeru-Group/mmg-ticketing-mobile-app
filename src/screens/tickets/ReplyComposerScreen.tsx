@@ -5,28 +5,41 @@
 // - Plain-text body, sent as escaped <p> HTML. Files: camera / photos / documents, checked before staging.
 // - Send is the only write: files upload first (ATT-2), then CMT-2 with their ids. Disabled while in flight.
 //   On success the composer closes and the conversation refetches.
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+// - Templates (staff, LKP-7 canned responses, SDP "response templates"): picked from a sheet; an empty body is replaced,
+//   otherwise the template is appended (05 §A.5 insert rule, utils/compose.ts insertTemplate).
+// - Draft (02 §5.4): the text and mode are kept on this phone while typing (hooks/useDraft.ts) and restored when the
+//   composer is opened again for the same ticket; cleared on send and on Discard. Recipients and files are not drafted.
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { UploadFile } from '@/api/attachments.api';
 import { describeError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
   AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner,
-  OfflineState, ScreenHeader, SubmitButton,
+  OfflineState, OptionSheet, ScreenHeader, SubmitButton, type SheetOption,
 } from '@/components';
-import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
+import {
+  useCannedResponses, useDiscardGuard, useDraft, useEmailRecipients, usePostComment, useSingleFlight, useTicket,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps } from '@/types';
-import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
+import { finalRecipients, insertTemplate, isBlankBody, isValidEmail } from '@/utils/compose';
 import { notify } from '@/utils/dialogs';
+import { htmlToDisplayText } from '@/utils/html';
 import { composerPermissions, type ComposerMode } from '@/utils/permissions';
 import { isPlaceholderUser } from '@/utils/session';
 
 type Mode = ComposerMode;
 
 const MODE_LABELS: Record<Mode, string> = { reply: 'Reply', replyAll: 'Reply all', note: 'Private note' };
+
+/** What the local draft holds: the typed text and the composer mode. */
+interface ReplyDraft {
+  mode: Mode;
+  text: string;
+}
 
 export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProps<'ReplyComposer'>) {
   const { ticketId } = route.params;
@@ -58,6 +71,37 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   const post = usePostComment();
   const once = useSingleFlight();
 
+  // ── Draft (02 §5.4) ──
+  const draftKey = user ? `reply:${user.id}:${ticketId}` : null;
+  const draftValue = useMemo<ReplyDraft>(() => ({ mode, text }), [mode, text]);
+  const draft = useDraft<ReplyDraft>(draftKey, draftValue, (d) => isBlankBody(d.text));
+  const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+  // Applied once per restored draft: `modes` is rebuilt every render, so it must not be a dependency here.
+  useEffect(() => {
+    if (!draft.restored) return;
+    setText(draft.restored.text);
+    if (modes.includes(draft.restored.mode)) setMode(draft.restored.mode);
+    setRestoredFromDraft(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.restored]);
+  const discardDraft = () => {
+    draft.discard();
+    setText('');
+    setRestoredFromDraft(false);
+  };
+
+  // ── Templates (LKP-7, staff) ──
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const canned = useCannedResponses({ enabled: templatesOpen && staff });
+  const templateOptions = useMemo<SheetOption<string>[]>(
+    () => (canned.data ?? []).map((c) => ({ value: c.id, label: c.title, description: c.category ?? undefined })),
+    [canned.data],
+  );
+  const applyTemplate = (id: string) => {
+    const template = canned.data?.find((c) => c.id === id);
+    if (template) setText((current) => insertTemplate(current, htmlToDisplayText(template.body)));
+  };
+
   // Quick-action pre-fill (05 §A.5): Reply → To = requester; Reply all → TKT-9, falling back to the requester.
   useEffect(() => {
     if (!showRecipients) return;
@@ -75,7 +119,12 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   }, [mode, showRecipients, requesterEmail, recipients.data, recipients.isError]);
 
   const empty = isBlankBody(text) && files.length === 0;
-  const { leave } = useDiscardGuard({ dirty: !isBlankBody(text) || files.length > 0, busy: post.isPending, what: isPublic ? 'reply' : 'note' });
+  const { leave } = useDiscardGuard({
+    dirty: !isBlankBody(text) || files.length > 0,
+    busy: post.isPending,
+    what: isPublic ? 'reply' : 'note',
+    onDiscard: draft.discard,
+  });
 
   async function send() {
     setError(null);
@@ -88,6 +137,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
         cc: showRecipients ? finalRecipients(cc, ccInput) : [],
         files,
       });
+      draft.discard();
       notify(isPublic ? 'Reply sent' : 'Note saved');
       leave(() => navigation.goBack());
     } catch (e) {
@@ -166,8 +216,29 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             placeholder={isPublic ? 'Type your reply…' : 'Type an internal note…'}
             placeholderTextColor={colors.text.secondary}
             accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
-            className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
+            className={`mb-1 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
           />
+          <View className="mb-3 flex-row flex-wrap items-center">
+            {staff ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityHint="Opens the list of reply templates"
+                disabled={post.isPending}
+                onPress={() => setTemplatesOpen(true)}
+                className="mr-4 min-h-11 justify-center"
+              >
+                <Text className="text-sm font-medium text-blue-700">Insert a template</Text>
+              </Pressable>
+            ) : null}
+            {restoredFromDraft ? (
+              <View className="min-h-11 flex-1 flex-row flex-wrap items-center">
+                <Text className="text-xs text-gray-500">Draft restored. </Text>
+                <Pressable accessibilityRole="button" disabled={post.isPending} onPress={discardDraft} hitSlop={8}>
+                  <Text className="text-xs font-medium text-blue-700">Discard draft</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
 
           <FieldLabel label="Attachments" />
           <AttachmentPicker files={files} onChange={setFiles} disabled={post.isPending} />
@@ -205,6 +276,28 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
           />
         </View>
       </ScrollView>
+
+      <OptionSheet
+        visible={templatesOpen}
+        title="Reply templates"
+        options={templateOptions}
+        selected={null}
+        onSelect={applyTemplate}
+        onClose={() => setTemplatesOpen(false)}
+      >
+        {canned.fetchStatus === 'paused' && !canned.data ? (
+          <Text className="px-4 py-8 text-center text-sm text-gray-500">Templates load when you reconnect.</Text>
+        ) : canned.isPending ? (
+          <View className="items-center py-8">
+            <ActivityIndicator color={colors.primary} />
+            <Text className="mt-2 text-sm text-gray-500">Loading templates…</Text>
+          </View>
+        ) : canned.isError && !canned.data ? (
+          <ErrorState error={canned.error} title="Couldn't load the templates" onRetry={() => void canned.refetch()} />
+        ) : canned.data && canned.data.length === 0 ? (
+          <Text className="px-4 py-8 text-center text-sm text-gray-500">No reply templates have been set up yet.</Text>
+        ) : undefined}
+      </OptionSheet>
     </KeyboardAvoidingView>
   );
 }

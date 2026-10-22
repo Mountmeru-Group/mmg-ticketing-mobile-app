@@ -44,3 +44,15 @@ export function plainTextToHtml(text: string): string {
 export function isBlankBody(text: string): boolean {
   return text.trim() === '';
 }
+
+/**
+ * Canned-response insert, the web's rule (05 §A.5): an empty body is replaced by the template, otherwise the template
+ * is appended after a blank line. The template arrives as HTML (01 LKP-7) and the caller turns it into the composer's
+ * plain text first (htmlToDisplayText), so what is sent is still plainTextToHtml() of exactly what the person sees.
+ */
+export function insertTemplate(current: string, template: string): string {
+  const addition = template.replace(/\r\n?/g, '\n').trim();
+  if (!addition) return current;
+  if (isBlankBody(current)) return addition;
+  return `${current.replace(/\s+$/, '')}\n\n${addition}`;
+}

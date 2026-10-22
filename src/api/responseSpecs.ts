@@ -98,6 +98,14 @@ export const ATTACHMENT_SPEC: readonly FieldSpec[] = [
   { path: 'createdAt', kinds: S },
 ];
 
+/** `CannedResponse` inside LKP-7's `{ data }`. */
+export const CANNED_RESPONSE_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'body', kinds: S },
+  { path: 'category', kinds: S_NULL },
+];
+
 /** `ActivityPage` envelope, shape (c), from TKT-7. */
 export const ACTIVITY_PAGE_SPEC: readonly FieldSpec[] = [
   { path: 'items', kinds: ARR },
