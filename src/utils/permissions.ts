@@ -6,7 +6,8 @@
 //   - a capability the role will NEVER have is left out of the list (HIDDEN);
 //   - one the role has but the ticket's state blocks is still decided here, and the screen DISABLES it or explains why.
 // Gating mirrors the web UI for UX only; the server stays the authority (05 §C rule 3). Pure functions, no UI.
-import type { AuthUser, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
+import type { AuthUser, CreateServiceRequestBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
+import { TICKET_PRIORITIES } from '@/types';
 import { canSeePrivateNotes } from './activity';
 import { isAgentOrAdmin, isStaff, isTriageAgent } from './roles';
 import { canAssignToSelf } from './session';
@@ -19,16 +20,19 @@ export type Viewer = Pick<AuthUser, 'id' | 'role' | 'countryId'>;
 
 // ── Navigation (08 §3) ───────────────────────────────────────
 
-export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'announcements' | 'settings';
+export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'settings';
 
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
  * Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns ≥ 1 (08 S1).
+ * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
  */
 export function drawerItems(role: UserRole, pendingApprovals: number): DrawerItem[] {
   const items: DrawerItem[] = [];
   if (isAgentOrAdmin(role) || pendingApprovals >= 1) items.push('approvals');
-  items.push('tasks', 'knowledge', 'announcements', 'settings');
+  items.push('tasks', 'knowledge');
+  if (canUseServiceCatalog(role)) items.push('catalog');
+  items.push('announcements', 'settings');
   return items;
 }
 
@@ -108,15 +112,15 @@ export function composerPermissions(role: UserRole): ComposerPermissions {
 
 // ── Phase G3 (the web's behaviour, with sources: docs/G3-WEB-BEHAVIOUR.md) ──
 
-/** Every role the app knows; anything else (a malformed session) gets no templates. */
-const REPLY_TEMPLATE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN']);
+/** Every role the app knows; anything else (a malformed session) gets no templates and no service catalogue. */
+const KNOWN_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN']);
 
 /**
  * Reply templates (LKP-7): every role, in Reply, Reply all and Private note. The web's picker has no role check
  * (FE:TicketDetailPage.tsx:1046) and the server lists active templates to anyone signed in (cannedResponses.router.ts:15).
  */
 export function canUseReplyTemplates(role: UserRole): boolean {
-  return REPLY_TEMPLATE_ROLES.has(role);
+  return KNOWN_ROLES.has(role);
 }
 
 /**
@@ -348,4 +352,87 @@ export function ticketListFilters(viewer: Pick<AuthUser, 'role'> | null): Ticket
 /** The inline status chip on a list card (08 §4.1): the transitions for that row, or none (chip not tappable). */
 export function inlineStatusTransitions(role: UserRole, status: TicketStatus): readonly StatusTransition[] {
   return canChangeStatus(role) ? getAvailableTransitions(role, status) : [];
+}
+
+// ── Service catalogue (Phase G4; the web's behaviour, with sources: docs/G4-WEB-CATALOGUE.md) ──
+
+/**
+ * The catalogue, an item's request form and My Requests: every role. The web shows them to all four (sidebar and bottom
+ * tab, AppLayout.tsx:30, :266) and the server needs only a signed-in user for every read and for SCR-5
+ * (serviceCatalog.router.ts:9-24). No item or category is scoped by role, team or country.
+ */
+export function canUseServiceCatalog(role: UserRole): boolean {
+  return KNOWN_ROLES.has(role);
+}
+
+export interface ServiceCatalogPermissions {
+  /** The drawer row, the catalogue (SCR-1, SCR-2) and an item's form (SCR-3). */
+  browse: boolean;
+  /** "Add Request" (SCR-5). The server takes the requester from the token: no one requests on behalf of anyone. */
+  submit: boolean;
+  /**
+   * Request properties: Impact, Urgency and the Priority they set (FE:ServiceRequestFormPage.tsx:41, :267
+   * `isStaff`). Of the three only `priority` is sent, as the server keeps nothing else. END_USER never sends one, so
+   * their requests are MEDIUM.
+   */
+  requestProperties: boolean;
+  /** My Requests and a request's detail (SCR-4, SCR-6), the person's own requests only (isOwnServiceRequest). */
+  myRequests: boolean;
+}
+
+export function serviceCatalogPermissions(viewer: Pick<AuthUser, 'role'> | null): ServiceCatalogPermissions {
+  const role: UserRole = viewer?.role ?? 'END_USER';
+  const known = canUseServiceCatalog(role);
+  return { browse: known, submit: known, requestProperties: known && isStaff(role), myRequests: known };
+}
+
+/**
+ * My Requests and a request's detail show only the person's own requests, for every role. The web lists everyone's
+ * requests to ADMIN, AGENT and L2_MANAGER under "My Requests", because SCR-4 filters END_USER only
+ * (serviceCatalog.controller.ts:117): a 🔒 SAFER case (WEB-VS-MOBILE-ROLES.md §5; 01 SCR-4's mobile rule).
+ */
+export function isOwnServiceRequest(viewer: Pick<AuthUser, 'id'> | null, request: { requesterId?: unknown } | null | undefined): boolean {
+  return !!viewer?.id && !!request && request.requesterId === viewer.id;
+}
+
+/**
+ * My Requests' rows from the SCR-4 pages read so far: the person's own requests only, each once, in the server's order
+ * (newest first). For END_USER the server already sent only theirs; for every other role the rest are dropped here.
+ */
+export function myServiceRequestRows<T extends { id?: unknown; requesterId?: unknown }>(
+  viewer: Pick<AuthUser, 'id'> | null,
+  pages: readonly { data?: readonly T[] }[],
+): T[] {
+  const seen = new Set<string>();
+  const rows: T[] = [];
+  for (const page of pages) {
+    for (const row of Array.isArray(page?.data) ? page.data : []) {
+      if (!row || typeof row.id !== 'string' || seen.has(row.id) || !isOwnServiceRequest(viewer, row)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
+/** The only keys an SCR-5 body may carry: the four the server keeps (05 §B.24). */
+const SERVICE_REQUEST_KEYS: ReadonlySet<string> = new Set(['serviceItemId', 'formData', 'notes', 'priority']);
+
+/**
+ * Last guard before SCR-5: why this body may not be sent, or null. A role the app does not know sends nothing; a key
+ * outside the four is refused; `priority` only from someone who has the request properties (the web never sends one for
+ * END_USER), and only a ticket priority.
+ */
+export function serviceRequestProblem(viewer: Pick<AuthUser, 'role'> | null, body: CreateServiceRequestBody): string | null {
+  const can = serviceCatalogPermissions(viewer);
+  if (!viewer || !can.submit) return "Your role can't request services.";
+  if (typeof body.serviceItemId !== 'string' || !body.serviceItemId) return 'Choose a service first.';
+  for (const key of Object.keys(body)) {
+    if (!SERVICE_REQUEST_KEYS.has(key)) return "This request can't be sent from the app.";
+  }
+  if (body.priority !== undefined) {
+    if (!can.requestProperties) return "Your role can't set a request's priority.";
+    if (!(TICKET_PRIORITIES as readonly string[]).includes(body.priority)) return "This request can't be sent from the app.";
+  }
+  return null;
 }

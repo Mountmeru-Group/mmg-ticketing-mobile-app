@@ -1035,24 +1035,30 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 
 ### 10.4 Service catalog (`/api/v1/service-catalog`, `app.ts:148`)
 
-#### SCR-1 `GET /api/v1/service-catalog/categories` — P2
+> **Used by the app since Phase G4 (2026-10-22)**, for every role: M17 catalogue and My Requests, M18 request form, M19 request detail (`04`). The web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`. Client code: `src/api/serviceCatalog.api.ts`, `src/hooks/useServiceCatalog.ts`. The labels stay "P2", as for LKP-7 and APR-4. The routes in Appendix A (admin writes; `PUT /requests/:id`, `/status`, `/assign`) are still never called.
+
+#### SCR-1 `GET /api/v1/service-catalog/categories` — P2 (every role; built in G4)
 - **Auth:** any role.
 - **200:** `[{ id, name, description, icon, sortOrder, isActive, createdAt, services: ServiceItem[] }]`, active only, ordered by sortOrder; services also active only and ordered by sortOrder.
+- **Mobile (G4):** no parameters. The category list of M17's Home view. The embedded `services` are **not** used: item counts and lists come from SCR-2, as on the web (`FE:pages/service-catalog/ServiceCatalogPage.tsx:422`).
 - **Source:** `serviceCatalog.router.ts:9`, `serviceCatalog.controller.ts:34-41`.
 
-#### SCR-2 `GET /api/v1/service-catalog/items` — P2
+#### SCR-2 `GET /api/v1/service-catalog/items` — P2 (every role; built in G4)
 - **Query:** `categoryId?`.
 - **200:** `ServiceItem[]` + `category:{id,name}|null`, active only, ordered by sortOrder.
 - **ServiceItem** = `{ id, name, description, categoryId, icon, estimatedTime /* minutes */, requiresApproval, approverIds: string[], formFields: FormField[] /* Json */, isActive, sortOrder, createdAt, updatedAt }`.
+- **Mobile (G4):** sent **with no parameters**, as the web (`categoryId` is not used). M17 filters the list on the device by category and by a search on name or description. No item is scoped by role.
 - **Source:** `serviceCatalog.router.ts:15`, `serviceCatalog.controller.ts:61-71`.
 
-#### SCR-3 `GET /api/v1/service-catalog/items/:id` — P2
+#### SCR-3 `GET /api/v1/service-catalog/items/:id` — P2 (every role; built in G4)
 - **200:** `ServiceItem` + `category`. **Inactive items are still returned**; mobile checks `isActive`.
 - **`formFields`** is not validated by the server. The shape the web renders is `[{ name, label, type: 'text'|'textarea'|'date'|'phone'|'email'|'number'|'select', required?, placeholder?, options?: (string|{value,label})[] }]` (`05` §A.17).
+  - Any other `type` (or none) renders as a text box. No other key is read: no min, max, pattern, default or dependency. The only rule is `required`, plus the browser's checks on e-mail and number inputs (`docs/G4-WEB-CATALOGUE.md` §4).
+- **Mobile (G4):** M18 renders the form from it (`normaliseFormFields`, `src/utils/service-catalog.ts`); M19 uses it to label a request's answers. An inactive item shows "no longer offered" and cannot be requested.
 - **Errors:** `404 "Service item not found"`.
 - **Source:** `serviceCatalog.router.ts:16`, `serviceCatalog.controller.ts:73-80`.
 
-#### SCR-4 `GET /api/v1/service-catalog/requests` — P2
+#### SCR-4 `GET /api/v1/service-catalog/requests` — P2 (every role; built in G4)
 - **Auth:** any role. END_USER sees own requests only. ⚠ Every other role sees **all** requests.
 - **Query:**
   - `status` (TicketStatus; an invalid value gives 500);
@@ -1065,9 +1071,10 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
   approvals: (Approval + approver{id,displayName,email})[]  // ordered by stage
   ```
 - **Mobile:** for the P2 "My requests" screen, show only rows where `requesterId === me`, for every role. Always send `limit` ≤ 50.
+- **Mobile (G4):** M17 My Requests sends `page` and `limit=50` (the web sends `page=1&limit=50` and never pages), **never `status`**. Rows that are not the person's own are dropped before anything renders (`myServiceRequestRows`). For staff, whose pages hold everyone's requests, up to 4 pages are read automatically, then one more per tap.
 - **Source:** `serviceCatalog.router.ts:22`, `serviceCatalog.controller.ts:111-124`.
 
-#### SCR-5 `POST /api/v1/service-catalog/requests` — P2
+#### SCR-5 `POST /api/v1/service-catalog/requests` — P2 (every role; built in G4)
 - **Body** (verbatim, `serviceCatalog.controller.ts:26-31`):
   ```ts
   z.object({
@@ -1083,11 +1090,17 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
   - **No ticket is created and no `ticketId` is returned.**
 - **Errors:** `404 "Service item not found"` (missing or inactive), `400 Validation error`.
 - **Side effects:** one Approval per `approverIds` entry if `requiresApproval`. No notification, no audit, no SLA.
+- **Mobile (G4) sends exactly** `{ serviceItemId, formData, notes, priority? }`:
+  - `formData`: every field of the item's form, untouched ones as `""`, every value a string, as the web submits it.
+  - `notes`: always a string, `""` when blank (the web: `data.notes || ''`).
+  - `priority`: only from ADMIN, AGENT or L2_MANAGER, and only when they chose both Impact and Urgency (the web form's own map, `FE:pages/service-catalog/ServiceRequestFormPage.tsx:107-122`). Otherwise it is left out and the server stores MEDIUM.
+  - Any other key, a `priority` from END_USER, or an unknown role is refused on the device, with nothing sent (`serviceRequestProblem`, `src/utils/permissions.ts`).
 - **Source:** `serviceCatalog.router.ts:23`, `serviceCatalog.controller.ts:135-159`.
 
-#### SCR-6 `GET /api/v1/service-catalog/requests/:id` — P2
+#### SCR-6 `GET /api/v1/service-catalog/requests/:id` — P2 (every role; built in G4)
 - **200:** `ServiceRequestDTO`.
 - **Errors:** `404 "Service request not found"`; `403 "Forbidden"` for an END_USER who is not the requester.
+- ⚠ Any other role can read **any** request by id. **Mobile (G4):** M19 opens only from My Requests, and shows the request only when `requesterId === me` (`isOwnServiceRequest`). The web never calls this endpoint.
 - **Source:** `serviceCatalog.router.ts:24`, `serviceCatalog.controller.ts:126-133`.
 
 ---
@@ -1139,7 +1152,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 5 are PENDING backend asks (§1.4) and 3 are reference-only, do-not-call (§1.5).
+**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 5 are PENDING backend asks (§1.4) and 3 are reference-only, do-not-call (§1.5). SCR-1..SCR-6 are used by the app since G4; their label stays P2, as for LKP-7 and APR-4.
 
 | ID | Method | Path (under `/api/v1` unless noted) | Roles (server) | Phase |
 |---|---|---|---|---|
@@ -1196,9 +1209,9 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | KB-3 | GET | `/kb/search` | public | P2 |
 | KB-4 | GET | `/kb/articles/:slug` | public | P2 |
 | KB-5 | POST | `/kb/articles/:id/helpful` | public | P2 |
-| SCR-1 | GET | `/service-catalog/categories` | any | P2 |
-| SCR-2 | GET | `/service-catalog/items` | any | P2 |
-| SCR-3 | GET | `/service-catalog/items/:id` | any | P2 |
-| SCR-4 | GET | `/service-catalog/requests` | any (END_USER own) | P2 |
-| SCR-5 | POST | `/service-catalog/requests` | any | P2 |
-| SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) | P2 |
+| SCR-1 | GET | `/service-catalog/categories` | any | P2 (G4) |
+| SCR-2 | GET | `/service-catalog/items` | any | P2 (G4) |
+| SCR-3 | GET | `/service-catalog/items/:id` | any | P2 (G4) |
+| SCR-4 | GET | `/service-catalog/requests` | any (END_USER own) ⚠ (mobile: own rows only) | P2 (G4) |
+| SCR-5 | POST | `/service-catalog/requests` | any | P2 (G4) |
+| SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |

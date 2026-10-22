@@ -315,6 +315,46 @@ export const TASK_RESPONSE_SPEC: readonly FieldSpec[] = [
   { path: 'ticketId', kinds: S },
 ];
 
+// ── Service catalogue (Phase G4) ─────────────────────────────
+
+/** `ServiceCategory` from SCR-1 (its embedded `services` are not read). */
+export const SERVICE_CATEGORY_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'description', kinds: S_NULL },
+  { path: 'icon', kinds: S_NULL },
+];
+
+/** `ServiceItem` from SCR-2 / SCR-3. `formFields` is free JSON (the form normalises whatever arrives). */
+export const SERVICE_ITEM_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'description', kinds: S_NULL },
+  { path: 'categoryId', kinds: S_NULL },
+  { path: 'icon', kinds: S_NULL },
+  { path: 'requiresApproval', kinds: ['boolean'] },
+  { path: 'formFields', kinds: ['array', 'null'] },
+  { path: 'isActive', kinds: ['boolean'] },
+];
+
+/** `ServiceRequest` from SCR-4 rows / SCR-5 / SCR-6. */
+export const SERVICE_REQUEST_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'requestNumber', kinds: N },
+  { path: 'serviceItemId', kinds: S },
+  { path: 'requesterId', kinds: S },
+  { path: 'status', kinds: S, oneOf: TICKET_STATUSES },
+  { path: 'priority', kinds: S, oneOf: TICKET_PRIORITIES },
+  { path: 'formData', kinds: ['object', 'null'] },
+  { path: 'notes', kinds: S_NULL },
+  { path: 'createdAt', kinds: S },
+  { path: 'serviceItem', kinds: OBJ },
+  { path: 'requester', kinds: OBJ },
+  { path: 'assignedTo', kinds: OBJ_NULL },
+  { path: 'team', kinds: OBJ_NULL },
+  { path: 'approvals', kinds: ARR },
+];
+
 // ── Auth ─────────────────────────────────────────────────────
 
 /**

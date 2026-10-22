@@ -6,7 +6,7 @@ import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import type { AppDrawerParamList } from '@/types';
 import { DrawerContent } from './DrawerContent';
 import { MainTabs } from './MainTabs';
-import { ApprovalsStack, KnowledgeStack, TasksStack } from './ModuleStacks';
+import { ApprovalsStack, CatalogStack, KnowledgeStack, TasksStack } from './ModuleStacks';
 
 const Drawer = createDrawerNavigator<AppDrawerParamList>();
 
@@ -23,6 +23,7 @@ export function AppDrawer() {
       <Drawer.Screen name="Approvals" component={ApprovalsStack} />
       <Drawer.Screen name="Tasks" component={TasksStack} />
       <Drawer.Screen name="Knowledge" component={KnowledgeStack} />
+      <Drawer.Screen name="Catalog" component={CatalogStack} />
       <Drawer.Screen name="Announcements" component={AnnouncementsScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />
     </Drawer.Navigator>

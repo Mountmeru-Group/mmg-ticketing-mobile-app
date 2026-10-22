@@ -1,6 +1,6 @@
 // Typed param lists for every navigator. Structure follows 08-SDP-PARITY.md §3:
 // Root → (Auth stack | App drawer); drawer → (bottom tabs Home · Tickets · Alerts | Approvals | Tasks | Knowledge |
-// Announcements | Profile); Tickets tab → TicketStack (list → detail → reply / status / assign / create / task).
+// Catalog | Announcements | Profile); Tickets tab → TicketStack (list → detail → reply / status / assign / create / task).
 // Task detail and the task editor are registered in BOTH the Tickets stack (from a ticket's Tasks tab) and the Tasks
 // stack (from the standalone list), with the same params (TaskScreensParamList).
 // This file is client navigation, not an API shape, so it is the one file in src/types/ that does not come from 03.
@@ -79,11 +79,25 @@ export type KnowledgeStackParamList = {
   KbArticle: { slug: string };
 };
 
+/** Service catalogue (Phase G4, drawer "Service Request"). The web's behaviour: docs/G4-WEB-CATALOGUE.md. */
+export type CatalogStackParamList = {
+  /**
+   * The catalogue and My Requests, as the web's two views ("Catalog" | "My Requests"). `resetAt` changes after a request
+   * is sent: the catalogue returns to its Home view, as the web reopens /service-catalog fresh.
+   */
+  ServiceCatalog: { view?: 'catalog' | 'requests'; resetAt?: number } | undefined;
+  /** An item's request form (SCR-3, SCR-5). */
+  ServiceRequestForm: { itemId: UUID };
+  /** One of my requests (SCR-6). Mobile only: the web has no request detail. */
+  ServiceRequestDetail: { requestId: UUID };
+};
+
 export type AppDrawerParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Approvals: NavigatorScreenParams<ApprovalsStackParamList>;
   Tasks: NavigatorScreenParams<TasksStackParamList>;
   Knowledge: NavigatorScreenParams<KnowledgeStackParamList>;
+  Catalog: NavigatorScreenParams<CatalogStackParamList>;
   /** M16 */
   Announcements: undefined;
   /** M10 — opened from the drawer's account card and the "Settings" item. */
@@ -140,6 +154,11 @@ export type TasksStackScreenProps<T extends keyof TasksStackParamList> = Composi
 
 export type KnowledgeStackScreenProps<T extends keyof KnowledgeStackParamList> = CompositeScreenProps<
   NativeStackScreenProps<KnowledgeStackParamList, T>,
+  AppDrawerScreenProps<keyof AppDrawerParamList>
+>;
+
+export type CatalogStackScreenProps<T extends keyof CatalogStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<CatalogStackParamList, T>,
   AppDrawerScreenProps<keyof AppDrawerParamList>
 >;
 

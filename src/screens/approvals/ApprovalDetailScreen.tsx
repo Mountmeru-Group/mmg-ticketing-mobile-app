@@ -18,8 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiClientError } from '@/api/errors';
 import {
-  Card, EmptyState, ErrorState, FieldLabel, HtmlText, LoadingSkeleton, Notice, OfflineBanner, OfflineState, OutlineButton,
-  PriorityBadge, ScreenHeader, StatusBadge, SubmitButton,
+  ApprovalStatusChip, Card, EmptyState, ErrorState, FieldLabel, HtmlText, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
+  OutlineButton, PriorityBadge, ScreenHeader, StatusBadge, SubmitButton,
 } from '@/components';
 import { useDecideApproval, useDiscardGuard, usePendingApprovals, useSingleFlight, useTicket, type ApprovalDecision } from '@/hooks';
 import { colors, palette } from '@/theme';
@@ -331,19 +331,3 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-// 05 §A.10: APPROVED green, REJECTED red, CANCELLED gray, else yellow.
-function ApprovalStatusChip({ status }: { status: string }) {
-  const style =
-    status === 'APPROVED'
-      ? { bg: 'bg-green-100', text: 'text-green-800', label: 'Approved' }
-      : status === 'REJECTED'
-        ? { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejected' }
-        : status === 'CANCELLED'
-          ? { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Cancelled' }
-          : { bg: 'bg-yellow-100', text: 'text-yellow-800', label: status === 'PENDING' ? 'Pending' : status };
-  return (
-    <View className={`ml-auto rounded-full px-2.5 py-0.5 ${style.bg}`}>
-      <Text className={`text-xs font-medium ${style.text}`}>{style.label}</Text>
-    </View>
-  );
-}
