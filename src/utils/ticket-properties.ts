@@ -14,13 +14,27 @@ export interface Classification {
 }
 
 /**
- * The TKT-4 body for a classification edit: only the values that changed. Never `priority` (01 TKT-4: the server
- * computes it), and never null (a 400; on the web "Not Set" saves nothing either). Empty = nothing to save.
+ * The TKT-4 body for a classification edit: only the values that changed, never null (a 400; on the web "Not Set" saves
+ * nothing either). Empty = nothing to save.
+ * Plus `priority`, as the web sends it (FE:TicketDetailPage.tsx:304-317; G2, ROLE-MATRIX §8 item 11): with an impact or
+ * urgency change, when the matrix is loaded and has a row for the effective pair, that row's priority. Pass `matrix`
+ * only for a role that may read LKP-6 (ADMIN, AGENT): L2_MANAGER's matrix is a 403 on the web, so it never sends one.
+ * The server stores the same value either way; the key makes it audit the change and email the requester and the
+ * technician "priority changed" (BE:tickets.controller.ts:719, :776-784).
  */
-export function classificationChanges(ticket: Classification, staged: Classification): UpdateTicketBody {
+export function classificationChanges(
+  ticket: Classification,
+  staged: Classification,
+  matrix?: readonly PriorityMatrixEntry[],
+): UpdateTicketBody {
   const body: UpdateTicketBody = {};
   if (staged.impact && staged.impact !== ticket.impact) body.impact = staged.impact;
   if (staged.urgency && staged.urgency !== ticket.urgency) body.urgency = staged.urgency;
+  if (matrix && (body.impact || body.urgency)) {
+    const effective = { impact: staged.impact ?? ticket.impact, urgency: staged.urgency ?? ticket.urgency };
+    const preview = previewPriority(matrix, effective);
+    if (preview.kind === 'computed') body.priority = preview.priority;
+  }
   return body;
 }
 

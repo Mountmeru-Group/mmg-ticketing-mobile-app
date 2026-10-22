@@ -1,6 +1,6 @@
 // Lookup endpoints (01 §7). Priorities and statuses are enums, not endpoints (03 §A) — there is no
 // /priorities or /statuses route; calling one returns 200 HTML in production.
-import type { Category, Country, PriorityMatrixEntry, Team } from '@/types';
+import type { CannedResponse, Category, Country, PriorityMatrixEntry, Team } from '@/types';
 import { apiClient } from './client';
 
 /**
@@ -45,5 +45,15 @@ export async function listCountries(): Promise<Country[]> {
  */
 export async function getPriorityMatrix(): Promise<PriorityMatrixEntry[]> {
   const res = await apiClient.get<PriorityMatrixEntry[]>('/priority-matrix');
+  return res.data;
+}
+
+/**
+ * LKP-7 — GET /api/v1/canned-responses (any role). Active reply templates, by category then title, wrapped in
+ * `{ data }`, not paginated. No `search` or `category` is sent: the web sends neither and searches on the device
+ * (docs/G3-WEB-BEHAVIOUR.md §1). `body` is HTML.
+ */
+export async function listCannedResponses(): Promise<{ data: CannedResponse[] }> {
+  const res = await apiClient.get<{ data: CannedResponse[] }>('/canned-responses');
   return res.data;
 }

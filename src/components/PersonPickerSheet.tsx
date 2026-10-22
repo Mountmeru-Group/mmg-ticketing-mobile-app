@@ -28,11 +28,18 @@ interface PersonPickerSheetProps {
   searchRoles?: readonly UserRole[];
   /** Extra rows above the list, e.g. "Unassigned" or "Me". */
   extraOptions?: readonly { key: string; label: string; onPress: () => void }[];
+  /** People already chosen (e.g. approvers): left out of the results. */
+  excludeIds?: readonly string[];
   onPick: (person: Person) => void;
   onClose: () => void;
 }
 
-export function PersonPickerSheet({ visible, title, people = [], searchRoles, extraOptions = [], onPick, onClose }: PersonPickerSheetProps) {
+/** Module-level so the default keeps its identity between renders (it is a memo dependency). */
+const NO_ONE: readonly string[] = [];
+
+export function PersonPickerSheet({
+  visible, title, people = [], searchRoles, extraOptions = [], excludeIds = NO_ONE, onPick, onClose,
+}: PersonPickerSheetProps) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const term = useDebouncedValue(query, 350);
@@ -40,10 +47,13 @@ export function PersonPickerSheet({ visible, title, people = [], searchRoles, ex
 
   const q = query.trim().toLowerCase();
   const local = useMemo(
-    () => (q ? people.filter((p) => p.displayName.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)) : [...people]),
-    [people, q],
+    () =>
+      (q ? people.filter((p) => p.displayName.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)) : [...people]).filter(
+        (p) => !excludeIds.includes(p.id),
+      ),
+    [people, q, excludeIds],
   );
-  const remoteOnly = (remote.data ?? []).filter((r) => !local.some((p) => p.id === r.id));
+  const remoteOnly = (remote.data ?? []).filter((r) => !local.some((p) => p.id === r.id) && !excludeIds.includes(r.id));
 
   const close = () => {
     setQuery('');

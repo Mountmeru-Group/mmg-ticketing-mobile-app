@@ -3,7 +3,7 @@
 // words that name exactly what will happen (who is emailed, what becomes public).
 import { Alert, Platform, ToastAndroid } from 'react-native';
 
-import { describeFieldWriteError, describeWriteError, isSessionEndedError } from '@/api/errors';
+import { describeActionWriteError, describeFieldWriteError, describeWriteError, isSessionEndedError } from '@/api/errors';
 
 interface ConfirmOptions {
   title: string;
@@ -41,6 +41,12 @@ export function notify(message: string): void {
 export function reportWriteError(title: string, error: unknown): void {
   if (isSessionEndedError(error)) return;
   Alert.alert(title, describeWriteError(error));
+}
+
+/** reportWriteError() for a G3 action: a 403 says the role can't `action` (e.g. "delete files from a ticket"). */
+export function reportActionWriteError(title: string, action: string, error: unknown): void {
+  if (isSessionEndedError(error)) return;
+  Alert.alert(title, describeActionWriteError(action, error));
 }
 
 /** reportWriteError() for a property save on M4: a 403 names the field the role can't change (Phase G1). */

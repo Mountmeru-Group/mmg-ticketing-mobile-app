@@ -127,18 +127,21 @@ describe('ticket detail: action buttons', () => {
     classification: false,
     recipients: false,
     addAttachments: true,
+    deleteAttachments: false,
     editTasks: false,
   };
+  // G3: 'approval' (Submit for approval, ADMIN/AGENT) and deleteAttachments (staff) — docs/G3-WEB-BEHAVIOUR.md.
   const ADMIN_AGENT_OPEN = {
     locked: false,
     statusBar: true,
     transitions: ['IN_PROGRESS', 'CLOSED'],
-    moreActions: ['pickup', 'assign', 'close'],
+    moreActions: ['pickup', 'assign', 'close', 'approval'],
     conversationActions: ['reply', 'replyAll', 'note'],
     privateNotes: true,
     classification: true,
     recipients: true,
     addAttachments: true,
+    deleteAttachments: true,
     editTasks: true,
   };
 
@@ -148,7 +151,7 @@ describe('ticket detail: action buttons', () => {
       END_USER: END_USER_VIEW,
       AGENT: ADMIN_AGENT_OPEN,
       TRIAGE_AGENT: ADMIN_AGENT_OPEN,
-      // No Pick up / Assign (server 403, D2) and no Note (server would send it as a PUBLIC email).
+      // No Pick up / Assign / Submit for approval (server 403, D2, G3) and no Note (sent as a PUBLIC email).
       L2_MANAGER: { ...ADMIN_AGENT_OPEN, moreActions: ['close'], conversationActions: ['reply', 'replyAll'], privateNotes: false },
       ADMIN: ADMIN_AGENT_OPEN,
     },
@@ -156,12 +159,13 @@ describe('ticket detail: action buttons', () => {
   );
 
   // AGENT lock (05 §A.1, FE:TicketDetailPage.tsx:622): no transitions, no assignment, no "Add files" (web :669, :1268).
-  // The composer and tasks are not lock-gated on the web either (:841-883, :1376-1425).
+  // The composer and tasks are not lock-gated on the web either (:841-883, :1376-1425), nor are Submit for approval
+  // (:697, :1585) and Delete a file (:1345) — G3.
   const AGENT_LOCKED = {
     ...ADMIN_AGENT_OPEN,
     locked: true,
     transitions: [],
-    moreActions: [],
+    moreActions: ['approval'],
     addAttachments: false,
   };
   forEachPersona(
@@ -171,14 +175,14 @@ describe('ticket detail: action buttons', () => {
       AGENT: AGENT_LOCKED,
       TRIAGE_AGENT: AGENT_LOCKED,
       L2_MANAGER: { ...ADMIN_AGENT_OPEN, transitions: [], moreActions: [], conversationActions: ['reply', 'replyAll'], privateNotes: false },
-      ADMIN: { ...ADMIN_AGENT_OPEN, transitions: [], moreActions: ['pickup', 'assign'] },
+      ADMIN: { ...ADMIN_AGENT_OPEN, transitions: [], moreActions: ['pickup', 'assign', 'approval'] },
     },
     (p) => detail(p, { status: 'CLOSED', assignedToId: OTHER_USER }),
   );
 
   test('no "Pick up" on a ticket already assigned to the viewer', () => {
     const agent = PERSONAS.AGENT;
-    assert.deepEqual(ticketDetailPermissions(agent, { status: 'OPEN', assignedToId: agent.id }).moreActions, ['assign', 'close']);
+    assert.deepEqual(ticketDetailPermissions(agent, { status: 'OPEN', assignedToId: agent.id }).moreActions, ['assign', 'close', 'approval']);
   });
 
   test('with no signed-in user the screen falls back to the END_USER view', () => {
@@ -213,14 +217,15 @@ describe('ticket detail: action buttons', () => {
 // ── Composer ─────────────────────────────────────────────────
 
 describe('composer: modes and the Note option', () => {
-  const FULL = { modes: ['reply', 'replyAll', 'note'], recipients: true, suggestRecipients: true };
+  // `templates` (G3): every role, as on the web (FE:TicketDetailPage.tsx:1046).
+  const FULL = { modes: ['reply', 'replyAll', 'note'], recipients: true, suggestRecipients: true, templates: true };
   forEachPersona(
     'composer permissions',
     {
-      END_USER: { modes: ['reply'], recipients: false, suggestRecipients: false },
+      END_USER: { modes: ['reply'], recipients: false, suggestRecipients: false, templates: true },
       AGENT: FULL,
       TRIAGE_AGENT: FULL,
-      L2_MANAGER: { modes: ['reply', 'replyAll'], recipients: true, suggestRecipients: false },
+      L2_MANAGER: { modes: ['reply', 'replyAll'], recipients: true, suggestRecipients: false, templates: true },
       ADMIN: FULL,
     },
     (p) => composerPermissions(p.role),
@@ -512,9 +517,10 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     { file: 'src/navigation/MainTabs.tsx', uses: ['mainTabs('], forbid: /name="(HomeTab|TicketsTab|AlertsTab)"/ },
     {
       file: 'src/screens/tickets/TicketDetailScreen.tsx',
-      uses: ['ticketDetailPermissions(', 'isCommentVisible(', 'ticketFieldPermissions('],
-      // The Reply / Reply all / Note buttons come from the list; a hard-coded one would bypass it.
-      forbid: /mode:\s*'(reply|replyAll|note)'|isResolvedLocked\(/,
+      uses: ['ticketDetailPermissions(', 'isCommentVisible(', 'ticketFieldPermissions(', 'can.deleteAttachments', 'useDeleteAttachment('],
+      // The Reply / Reply all / Note buttons come from the list; a hard-coded one would bypass it. G3: a file is
+      // deleted only through useDeleteAttachment, never by calling the API from the screen.
+      forbid: /mode:\s*'(reply|replyAll|note)'|isResolvedLocked\(|deleteAttachment\(|apiClient/,
     },
     {
       // G1 property editors: who/when only from ticketFieldPermissions(); writes only through useUpdateTicket.
@@ -522,12 +528,29 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       uses: ['ticketFieldPermissions(', 'useUpdateTicket('],
       forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s/,
     },
-    { file: 'src/screens/tickets/ReplyComposerScreen.tsx', uses: ['composerPermissions('] },
+    {
+      // G3: the Templates button comes from composerPermissions(); the list only through useCannedResponses.
+      file: 'src/screens/tickets/ReplyComposerScreen.tsx',
+      uses: ['composerPermissions(', 'can.templates'],
+      forbid: /listCannedResponses\(|apiClient/,
+    },
+    {
+      // G3: who only from canSubmitForApproval(); the write only through useSubmitForApproval.
+      file: 'src/screens/tickets/SubmitApprovalScreen.tsx',
+      uses: ['canSubmitForApproval(', 'useSubmitForApproval('],
+      forbid: /submitTicketForApproval\(|apiClient|isResolvedLocked\(/,
+    },
     {
       file: 'src/screens/tickets/TicketListScreen.tsx',
-      uses: ['bulkActions(', 'inlineStatusTransitions(', 'countrySelectorMode(', 'isTicketFilterAllowed('],
+      uses: ['bulkActions(', 'inlineStatusTransitions(', 'countrySelectorMode(', 'isTicketFilterAllowed(', 'ticketListFilters('],
       // The selection bar's buttons come from bulkActions(); a hard-coded one would bypass it.
       forbid: /<BarButton[^>]*label="/,
+    },
+    {
+      // G2 Filters sheet: which filters only from ticketListFilters(); the query only through useTickets.
+      file: 'src/screens/tickets/TicketFiltersScreen.tsx',
+      uses: ['ticketListFilters(', 'useTickets('],
+      forbid: /listTickets\(|apiClient|searchUsers\(|listTeams\(/,
     },
     { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
     { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },

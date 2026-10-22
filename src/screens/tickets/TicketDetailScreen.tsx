@@ -22,6 +22,9 @@
 //   Properties (Phase G1, ./TicketPropertyEditors.tsx): impact and urgency with the priority preview, category,
 //     country, and the resolution text — each from ticketFieldPermissions(), saved only on an explicit Save via
 //     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
+//   Phase G3 (docs/G3-WEB-BEHAVIOUR.md): a delete button on each file for ADMIN, AGENT and L2_MANAGER, in any status,
+//     confirmed by name, then ATT-5 (permanent); "Submit for approval…" in More options for ADMIN and AGENT, in any
+//     status, opening ./SubmitApprovalScreen.tsx.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -37,14 +40,14 @@ import {
   type SheetOption,
 } from '@/components';
 import {
-  useAssignTicket, useChangeStatus, useSingleFlight, useTicket, useTicketAttachments, useTicketComments, useTicketHistory,
-  useToggleTask, useUploadAttachment,
+  useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useTicket, useTicketAttachments, useTicketComments,
+  useTicketHistory, useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { ActivityAuditItem, Attachment, Comment, TicketDetail, TicketStackScreenProps, TicketTaskEmbedded } from '@/types';
 import { describeAudit } from '@/utils/activity';
-import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
+import { confirmAction, notify, reportActionWriteError, reportWriteError } from '@/utils/dialogs';
 import {
   effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
@@ -53,7 +56,7 @@ import {
   type TicketDetailPermissions, type TicketFieldPermissions,
 } from '@/utils/permissions';
 import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
-import { statusChangeMessage } from '@/utils/writeCopy';
+import { deleteAttachmentMessage, statusChangeMessage } from '@/utils/writeCopy';
 import {
   CategorySection, ClassificationSection, CountrySection, ResolutionSection, Row, usePropertyEditing, type PropertyEditing,
 } from './TicketPropertyEditors';
@@ -65,6 +68,7 @@ const MORE_ACTION_LABELS: Record<MoreAction, { label: string; description: strin
   pickup: { label: 'Pick up', description: 'Assign this ticket to yourself' },
   assign: { label: 'Assign…', description: 'Choose a group and technician' },
   close: { label: 'Close…', description: 'Opens the closure form' },
+  approval: { label: 'Submit for approval…', description: 'Choose who approves; the ticket moves to Pending with Management Review' },
 };
 const CONVERSATION_ACTIONS: Record<ComposerMode, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
   reply: { label: 'Reply', icon: 'arrow-undo-outline' },
@@ -119,6 +123,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const changeStatus = useChangeStatus();
   const assign = useAssignTicket();
   const upload = useUploadAttachment();
+  const removeFile = useDeleteAttachment();
   const toggleTask = useToggleTask();
   const once = useSingleFlight();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -203,6 +208,25 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     }
   }
 
+  // G3: permanent, so it asks first, naming the file (web: `confirm("Delete <fileName>?")`, :1346).
+  async function deleteFile(attachment: Attachment) {
+    const name = attachment.fileName || 'this file';
+    const ok = await confirmAction({
+      title: `Delete ${name}?`,
+      message: deleteAttachmentMessage(name),
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await removeFile.mutateAsync({ ticketId, attachmentId: attachment.id });
+      notify('Attachment deleted');
+    } catch (e) {
+      // Nothing was removed on the device, so there is nothing to revert; the list refetches.
+      reportActionWriteError('Failed to delete attachment', 'delete files from a ticket', e);
+    }
+  }
+
   const title = ticket ? `Ticket #${ticket.ticketNumber}` : 'Ticket';
 
   if (!ticket) {
@@ -228,6 +252,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const onMore = (action: MoreAction) => {
     if (action === 'pickup') void once(pickUp);
     else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
+    else if (action === 'approval') navigation.navigate('SubmitApproval', { ticketId: ticket.id });
     else navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
   };
 
@@ -389,6 +414,10 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
                 onView={isViewableImage(a.mimeType) ? () => setViewing(a) : undefined}
                 onOpen={() => void once(() => openExternally(a))}
                 opening={openingId === a.id}
+                // Staff, any file, any status (can.deleteAttachments); absent for END_USER.
+                onDelete={can.deleteAttachments ? () => void once(() => deleteFile(a)) : undefined}
+                deleting={removeFile.isPending && removeFile.variables?.attachmentId === a.id}
+                busy={removeFile.isPending || upload.isPending}
               />
             ))}
           </TabBody>
@@ -726,22 +755,28 @@ function attachmentIcon(mimeType: string): keyof typeof Ionicons.glyphMap {
 /**
  * Tap: images open in the in-app viewer (ATT-3); every other type — PDFs included — downloads (ATT-4) and opens the
  * system share sheet. Long-press: details. `storagePath` (a server disk path) is never displayed (03 B.4).
+ * `onDelete` (G3) adds a 44 dp delete button; it is passed only for a role that may delete (can.deleteAttachments).
  */
 function AttachmentRow({
-  attachment, onView, onOpen, opening,
+  attachment, onView, onOpen, opening, onDelete, deleting = false, busy = false,
 }: {
   attachment: Attachment;
   onView?: () => void;
   onOpen: () => void;
   opening: boolean;
+  onDelete?: () => void;
+  deleting?: boolean;
+  /** Another file write is in flight: the delete button is disabled. */
+  busy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const name = attachment.fileName || 'Unnamed file';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ busy: opening, expanded: open }}
+      accessibilityState={{ busy: opening || deleting, expanded: open }}
       accessibilityHint={onView ? 'Opens the image. Long-press for details' : 'Downloads the file and opens the share sheet. Long-press for details'}
-      disabled={opening}
+      disabled={opening || deleting}
       onPress={onView ?? onOpen}
       onLongPress={() => setOpen((v) => !v)}
       className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
@@ -749,7 +784,7 @@ function AttachmentRow({
       <View className="flex-row items-center">
         <Ionicons name={attachmentIcon(attachment.mimeType)} size={20} color={palette.gray[600]} />
         <View className="ml-3 flex-1">
-          <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{attachment.fileName || 'Unnamed file'}</Text>
+          <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{name}</Text>
           <Text className="text-xs text-gray-500" numberOfLines={1}>
             {formatBytes(attachment.sizeBytes)} · {attachment.mimeType || 'unknown type'}
           </Text>
@@ -759,6 +794,19 @@ function AttachmentRow({
         ) : (
           <Ionicons name={onView ? 'eye-outline' : 'open-outline'} size={18} color={colors.text.secondary} />
         )}
+        {onDelete ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${name}`}
+            accessibilityHint="Asks you to confirm. Deleting can't be undone"
+            accessibilityState={{ disabled: busy || opening, busy: deleting }}
+            disabled={busy || opening}
+            onPress={onDelete}
+            className={`-my-2 -mr-2 ml-1 h-11 w-11 items-center justify-center rounded-full ${busy || opening ? 'opacity-50' : 'active:bg-red-50'}`}
+          >
+            {deleting ? <ActivityIndicator color={palette.red[700]} /> : <Ionicons name="trash-outline" size={18} color={palette.red[700]} />}
+          </Pressable>
+        ) : null}
       </View>
       {open ? (
         <View className="mt-2 border-t border-gray-100 pt-1">

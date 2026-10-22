@@ -1,7 +1,8 @@
 // TKT-4 PUT /tickets/:id — the M4 property editors (Phase G1): impact, urgency, category, country, resolution.
 // ⛔ NEVER status: PUT silently drops `status` and still answers 200 (05 B.1). UpdateTicketBody has no status
 // field, and updateTicket() copies only allow-listed keys, so a status cannot leak into this request.
-// ⛔ NEVER priority: the server computes it from impact × urgency (01 TKT-4); the editor only previews it.
+// Priority: never on its own. As on the web, ADMIN/AGENT send the LKP-6 value with an impact/urgency change (G2,
+// 01 TKT-4); the server recomputes it anyway, but the key makes it email the requester and the technician.
 // Guards, all before anything is sent: online; every key is a field ticketFieldPermissions() gives this person as
 // `edit` in the status on screen; then the same check against the server's current status (one TKT-3 GET), so a
 // ticket closed or reopened meanwhile can't be edited past its lock.

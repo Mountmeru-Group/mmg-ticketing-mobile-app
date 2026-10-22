@@ -17,6 +17,14 @@
 //   Home tiles  → tile-only filters with the KPI's exact status set (ticket-filters.ts HomeTileFilter); shown as an
 //                 extra chip until another filter is picked.
 //   Country     → countryId per 05 §A.12 (listCountryParam).
+//   Filters sheet (Phase G2, M3 → TicketFilters; the web's "More Filters", docs/G2-WEB-FILTERS.md):
+//     Priority  → priority=<LOW|MEDIUM|HIGH|URGENT>                    (every role)
+//     Category  → categoryId=<top-level id>, exact (no sub-categories) (every role)
+//     Created   → fromDate=YYYY-MM-DD and/or toDate=YYYY-MM-DD         (every role; UTC days on createdAt)
+//     Technician→ assignedToId=<user id>                               (ADMIN / AGENT; one slot with My open/Unassigned)
+//     Group     → teamId=<team id>                                     (ADMIN / AGENT)
+//   Who gets which: ticketListFilters() (utils/permissions.ts). All of the above combine in ONE request
+//   (ticketListQuery); "Clear all" is the web's Clear: named filter, search, the five and the sort (not the country).
 // CLIENT-SIDE — display only, never used to hide or reorder rows:
 //   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the hold-adjusted SLA badge (05 §A.9), which can
 //   disagree with the server slaStatus behind Overdue / Due soon. Results are never filtered on the device to
@@ -53,11 +61,12 @@ import type { Ticket, TicketStackScreenProps, TicketStatus, UserRole } from '@/t
 import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
-import { bulkActions, inlineStatusTransitions, ticketsTitle, type BulkAction } from '@/utils/permissions';
+import { bulkActions, inlineStatusTransitions, ticketListFilters, ticketsTitle, type BulkAction } from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
 import {
-  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, countrySelectorMode, isHomeTileFilter,
-  isTicketFilterAllowed, listCountryParam, normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
+  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, activeAdvancedFilters, activeFilterLabels, availableTicketFilters,
+  countrySelectorMode, isHomeTileFilter, isTicketFilterAllowed, listCountryParam, normaliseTicketSearch,
+  type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
 import { BULK_ACTION_LIMIT, isResolvedLocked, requiresClosureForm } from '@/utils/ticket-rules';
 import { bulkPickUpMessage, statusChangeMessage } from '@/utils/writeCopy';
@@ -74,7 +83,11 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? 'END_USER';
   const insets = useSafeAreaInsets();
-  const { ticketFilter, ticketSort, ticketCountryId, setTicketFilter, setTicketSort, setTicketCountryId } = useUiStore();
+  const {
+    ticketFilter, ticketSort, ticketCountryId, ticketAdvanced, ticketSearchText: searchText, ticketSearch: search,
+    setTicketFilter, setTicketSort, setTicketCountryId, setTicketSearchText: setSearchText, setTicketSearch: setSearch,
+    clearTicketFilters,
+  } = useUiStore();
 
   // Home tiles open this tab with a named filter pre-applied (08 §3.3).
   const requestedFilter = route.params?.filter;
@@ -86,8 +99,12 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   // Home tile filters are valid here too, except Unassigned for roles that can't use it (ADMIN/AGENT only).
   const activeFilter: TicketNamedFilter = isTicketFilterAllowed(role, ticketFilter) ? ticketFilter : 'ALL';
 
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState<string | undefined>(undefined);
+  // Filters sheet (G2): only the filters this person gets count, show or are sent.
+  const allowedMore = ticketListFilters(user);
+  const activeMore = activeAdvancedFilters(ticketAdvanced, allowedMore);
+  const activeLabels = activeFilterLabels({ filter: activeFilter, search, advanced: ticketAdvanced, allowed: allowedMore });
+  const openFilters = () => navigation.navigate('TicketFilters');
+
   const [sheet, setSheet] = useState<'sort' | 'country' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -98,7 +115,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     enabled: sheet === 'country' || countryMode === 'locked' || (countryMode === 'switch' && ticketCountryId !== null),
   });
 
-  const list = useTickets({ filter: activeFilter, sort: ticketSort, search, countryId });
+  const list = useTickets({ filter: activeFilter, sort: ticketSort, search, countryId, advanced: ticketAdvanced });
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = list;
   const hasData = list.data !== undefined;
 
@@ -176,7 +193,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   );
   const onCardPress = useCallback((ticketId: string) => (selectionMode ? toggle(ticketId) : openTicket(ticketId)), [selectionMode, toggle, openTicket]);
   // Rows can vanish when the query changes; start over rather than act on tickets no longer shown.
-  useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, clearSelection]);
+  useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, ticketAdvanced, clearSelection]);
   // Android back clears the selection first.
   useFocusEffect(
     useCallback(() => {
@@ -314,8 +331,10 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             role={role}
             filter={activeFilter}
             search={search}
+            moreFilters={activeMore.length}
             onClearSearch={clearSearch}
             onShowAll={() => setTicketFilter('ALL')}
+            onClearAll={clearTicketFilters}
             onCreate={() => navigation.navigate('CreateTicket')}
           />
         }
@@ -355,17 +374,34 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
       )}
       <OfflineBanner />
 
-      {/* Search (08 §4.4): one box, no field selector (A22). */}
+      {/* Search (08 §4.4): one box, no field selector (A22). Filters (G2): the sheet, with how many of the five are on. */}
       <View className="border-b border-border bg-white px-4 py-2">
-        <SearchField
-          value={searchText}
-          onChangeText={setSearchText}
-          onClear={clearSearch}
-          onSubmitEditing={submitSearch}
-          returnKeyType="search"
-          placeholder="Ticket #, subject, requester or technician"
-          accessibilityLabel="Search tickets"
-        />
+        <View className="flex-row items-center">
+          <View className="flex-1">
+            <SearchField
+              value={searchText}
+              onChangeText={setSearchText}
+              onClear={clearSearch}
+              onSubmitEditing={submitSearch}
+              returnKeyType="search"
+              placeholder="Ticket #, subject, requester or technician"
+              accessibilityLabel="Search tickets"
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={activeMore.length > 0 ? `Filters, ${activeMore.length} on` : 'Filters'}
+            onPress={openFilters}
+            className={`ml-2 h-11 w-11 items-center justify-center rounded-lg border ${activeMore.length > 0 ? 'border-primary bg-primary/10' : 'border-gray-300 bg-white active:bg-gray-50'}`}
+          >
+            <Ionicons name="options-outline" size={18} color={activeMore.length > 0 ? colors.primary : colors.text.body} />
+            {activeMore.length > 0 ? (
+              <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1">
+                <Text className="text-xs font-semibold text-primary-foreground">{activeMore.length}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
 
         {/* Named filters (08 §4.5) */}
         <ScrollView
@@ -432,6 +468,31 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             </Text>
           ) : null}
         </View>
+
+        {/* What is applied, and the web's Clear (shown when anything but the sort is set, TicketsListPage.tsx:395-397). */}
+        {activeLabels.length > 0 ? (
+          <View className="flex-row items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Filtered by ${activeLabels.join(', ')}. Open filters`}
+              onPress={openFilters}
+              className="min-h-11 flex-1 flex-row items-center"
+            >
+              <Ionicons name="funnel-outline" size={14} color={colors.text.secondary} />
+              <Text className="ml-1.5 flex-1 text-xs text-gray-700" numberOfLines={1}>
+                {activeLabels.join(' · ')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear all filters, search and sort"
+              onPress={clearTicketFilters}
+              className="min-h-11 justify-center pl-3"
+            >
+              <Text className="text-sm font-medium text-blue-700">Clear all</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       <QueryBanner
@@ -518,15 +579,29 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
 }
 
 function ListEmpty({
-  role, filter, search, onClearSearch, onShowAll, onCreate,
+  role, filter, search, moreFilters, onClearSearch, onShowAll, onClearAll, onCreate,
 }: {
   role: UserRole;
   filter: TicketNamedFilter;
   search: string | undefined;
+  /** How many of the Filters sheet's five are on. */
+  moreFilters: number;
   onClearSearch: () => void;
   onShowAll: () => void;
+  onClearAll: () => void;
   onCreate: () => void;
 }) {
+  if (moreFilters > 0) {
+    return (
+      <EmptyState
+        icon="funnel-outline"
+        title="No tickets match these filters"
+        message="Every filter applies at once. Try fewer filters or a wider date range. Pull down to refresh."
+        actionLabel="Clear all filters"
+        onAction={onClearAll}
+      />
+    );
+  }
   if (search) {
     return (
       <EmptyState

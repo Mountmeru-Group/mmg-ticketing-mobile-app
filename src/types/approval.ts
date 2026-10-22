@@ -13,3 +13,8 @@ export interface Approval {
   change: { id: UUID; changeNumber: number; title: string; status: string } | null;
   serviceRequest: (ServiceRequestScalars & { serviceItem: { id: UUID; name: string } }) | null;
 }
+/** APR-4 POST /approvals (G3). Server: entityType any string, approverIds min 1, comments optional (approvals.controller.ts:17-22) */
+export interface CreateApprovalBody {
+  entityType: 'ticket';                        // mobile submits tickets only
+  entityId: UUID; approverIds: UUID[]; comments?: string;
+}

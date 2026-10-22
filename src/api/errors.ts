@@ -106,6 +106,15 @@ export function describeFieldWriteError(field: string, error: unknown): string {
   return describeWriteError(error);
 }
 
+/**
+ * A failed action (Phase G3), e.g. `action` = "delete files from a ticket". A 403 says plainly that the role can't do
+ * it; anything else is describeWriteError() (the server's own message for a 4xx).
+ */
+export function describeActionWriteError(action: string, error: unknown): string {
+  if (error instanceof ApiClientError && error.status === 403) return `Your role can't ${action}. Nothing was changed.`;
+  return describeWriteError(error);
+}
+
 /** A 401: the API client has already ended the session and the app is returning to Login (02 §5.3). */
 export function isSessionEndedError(error: unknown): boolean {
   return error instanceof ApiClientError && error.status === 401;

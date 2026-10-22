@@ -4,7 +4,8 @@
 //
 // Like role-gating.test.mjs, these are written to FAIL when the app becomes MORE permissive: every persona's full answer
 // is spelled out per ticket state, the on-device write guard is checked for every refusal, and the request that does
-// leave the device is checked for what it carries (never status, never priority).
+// leave the device is checked for what it carries (never status; `priority` only as the matrix value riding along with
+// an impact or urgency change, ADMIN and AGENT only — the web's behaviour, applied in G2, ROLE-MATRIX §8 item 11).
 //
 // What is real: permissions.ts, ticket-properties.ts, the write guard, tickets.api.ts and the axios client.
 // What is faked: the network (axios's transport adapter records requests). Nothing calls UAT.
@@ -19,7 +20,8 @@ import { changeTicketStatus, updateTicket } from '../../src/api/tickets.api.ts';
 import { assertFieldEdits } from '../../src/hooks/writeGuards.ts';
 import { TICKET_STATUSES } from '../../src/types/index.ts';
 import {
-  AGENT_LOCK_REASON, COUNTRY_LOCK_REASON, RESOLUTION_STATE_REASON, fieldEditProblem, ticketFieldPermissions,
+  AGENT_LOCK_REASON, COUNTRY_LOCK_REASON, PRIORITY_ALONE_REASON, RESOLUTION_STATE_REASON, fieldEditProblem,
+  ticketFieldPermissions,
 } from '../../src/utils/permissions.ts';
 import {
   NO_CATEGORY, categoryChoices, categoryIdToSave, categorySavedMessage, categorySelectionOf, classificationChanges,
@@ -165,12 +167,37 @@ describe('write guard: a field a persona may not edit is refused before anything
     assert.throws(() => assertFieldEdits(PERSONAS.L2_MANAGER, 'OPEN', { impact: 'HIGH', categoryId: 'cat-new' }), /category/);
   });
 
-  test('status, priority and every field no editor offers are refused for every role', () => {
+  test('status and every field no editor offers are refused for every role', () => {
     for (const p of Object.values(PERSONAS)) {
-      for (const body of [{ status: 'CLOSED' }, { priority: 'URGENT' }, { title: 'x' }, { teamId: 't' }, { assignedToId: 'u' }, { tags: [] }]) {
+      for (const body of [{ status: 'CLOSED' }, { title: 'x' }, { teamId: 't' }, { assignedToId: 'u' }, { tags: [] }]) {
         assert.throws(() => assertFieldEdits(p, 'OPEN', body), /can't be changed from the app/, `${p.id} ${JSON.stringify(body)}`);
       }
     }
+  });
+
+  test('a priority on its own is refused for every role, in every status', () => {
+    for (const p of Object.values(PERSONAS)) {
+      for (const status of TICKET_STATUSES) {
+        assert.equal(fieldEditProblem(p, status, { priority: 'URGENT' }), PRIORITY_ALONE_REASON, `${p.id} ${status}`);
+      }
+    }
+  });
+
+  // G2 (ROLE-MATRIX §8 item 11): the web sends the matrix priority with an impact/urgency change, ADMIN and AGENT only
+  // (L2's matrix is a 403). Exactly the people who get the preview, in exactly the states they get it.
+  test('a priority with an impact or urgency change goes through only where the preview is offered', () => {
+    for (const name of NAMES) {
+      for (const status of TICKET_STATUSES) {
+        const can = fieldsFor(PERSONAS[name], status);
+        for (const body of [{ impact: 'HIGH', priority: 'URGENT' }, { urgency: 'LOW', priority: 'LOW' }]) {
+          const problem = fieldEditProblem(PERSONAS[name], status, body);
+          if (can.priorityPreview) assert.equal(problem, null, `${name} ${status} ${JSON.stringify(body)}`);
+          else assert.ok(problem, `${name} ${status} ${JSON.stringify(body)} should be refused`);
+        }
+      }
+    }
+    assert.throws(() => assertFieldEdits(PERSONAS.L2_MANAGER, 'OPEN', { impact: 'HIGH', priority: 'URGENT' }), /Your role can't change the priority/);
+    assert.throws(() => assertFieldEdits(PERSONAS.AGENT, 'CLOSED', { priority: 'URGENT', impact: 'HIGH' }), /locked for technicians/);
   });
 
   test('an empty body is refused', () => {
@@ -188,7 +215,7 @@ describe('write guard: a field a persona may not edit is refused before anything
 
 // ── 3. What leaves the device ────────────────────────────────
 
-describe('TKT-4: the request never carries status or priority', () => {
+describe('TKT-4: the request never carries status, and carries priority only for ADMIN and AGENT', () => {
   const sent = [];
   apiClient.defaults.adapter = async (config) => {
     const data = config.data ? JSON.parse(config.data) : undefined;
@@ -206,16 +233,43 @@ describe('TKT-4: the request never carries status or priority', () => {
     sent.length = 0;
   });
 
+  // The API allow-list is the layer under the write guard: it alone must already keep priority from END_USER and
+  // L2_MANAGER (the web never sends one for them), and category and group from L2_MANAGER (ROLE-MATRIX §8 item 2).
+  const PRIORITY_SENT = { END_USER: false, AGENT: true, L2_MANAGER: false, ADMIN: true };
   for (const role of ['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN']) {
-    test(`${role}: PUT /tickets/:id drops status and priority`, async () => {
+    test(`${role}: PUT /tickets/:id drops status${PRIORITY_SENT[role] ? '' : ' and priority'}`, async () => {
       await updateTicket('ticket-1', { status: 'CLOSED', priority: 'URGENT', impact: 'HIGH', resolution: 'Fixed' }, role);
       assert.equal(sent.length, 1);
       assert.equal(sent[0].method, 'put');
       assert.equal(sent[0].url, '/tickets/ticket-1');
       assert.equal('status' in sent[0].data, false);
-      assert.equal('priority' in sent[0].data, false);
+      assert.equal('priority' in sent[0].data, PRIORITY_SENT[role]);
     });
   }
+
+  test('L2_MANAGER: the API layer cannot send a category, group, assignee or country change', async () => {
+    await updateTicket('ticket-1', { categoryId: 'cat-new', teamId: 'team-1', assignedToId: 'u', countryId: 'country-ke', urgency: 'LOW' }, 'L2_MANAGER');
+    assert.deepEqual(sent[0].data, { urgency: 'LOW' });
+  });
+
+  test('every role: exactly the TKT-4 keys 01 allows it', async () => {
+    const everything = {
+      title: 't', description: 'd', categoryId: 'c', impact: 'HIGH', urgency: 'LOW', priority: 'HIGH', teamId: 'g',
+      assignedToId: 'u', tags: [], resolution: 'r', countryId: 'k', status: 'CLOSED', requesterId: 'x', slaPolicyId: 'y',
+    };
+    const STAFF = ['title', 'description', 'categoryId', 'impact', 'urgency', 'priority', 'teamId', 'assignedToId', 'tags', 'resolution', 'countryId'];
+    const ALLOWED = {
+      END_USER: ['title', 'description'],
+      AGENT: STAFF,
+      ADMIN: STAFF,
+      L2_MANAGER: ['title', 'description', 'impact', 'urgency', 'tags', 'resolution'],
+    };
+    for (const role of Object.keys(ALLOWED)) {
+      sent.length = 0;
+      await updateTicket('ticket-1', everything, role);
+      assert.deepEqual(Object.keys(sent[0].data).sort(), [...ALLOWED[role]].sort(), role);
+    }
+  });
 
   test('a status change is a POST to /status, never a PUT', async () => {
     await changeTicketStatus('ticket-1', { status: 'IN_PROGRESS' });
@@ -259,12 +313,43 @@ describe('priority preview (LKP-6): the web and server rule', () => {
     assert.deepEqual(previewPriority(MATRIX, { impact: null, urgency: null }), { kind: 'incomplete' });
   });
 
-  test('the body carries only what changed, never priority and never null', () => {
+  test('without the matrix (L2_MANAGER, or not loaded yet) the body carries only what changed, never priority, never null', () => {
     const ticket = { impact: 'LOW', urgency: null };
     assert.deepEqual(classificationChanges(ticket, { impact: 'LOW', urgency: null }), {});
     assert.deepEqual(classificationChanges(ticket, { impact: 'HIGH', urgency: null }), { impact: 'HIGH' });
     assert.deepEqual(classificationChanges(ticket, { impact: 'LOW', urgency: 'URGENT' }), { urgency: 'URGENT' });
     assert.deepEqual(classificationChanges({ impact: 'HIGH', urgency: 'HIGH' }, { impact: null, urgency: null }), {});
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: 'LOW' }, { impact: 'HIGH', urgency: 'HIGH' }), { impact: 'HIGH', urgency: 'HIGH' });
+  });
+
+  // G2: FE:TicketDetailPage.tsx:306-315 — the effective pair (the change, else the ticket's value) looked up in the matrix.
+  test('with the matrix (ADMIN, AGENT) a change also carries the matrix priority for the effective pair, as the web sends it', () => {
+    // Impact changed; urgency is the ticket's own.
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: 'HIGH' }, { impact: 'HIGH', urgency: 'HIGH' }, MATRIX), { impact: 'HIGH', priority: 'URGENT' });
+    // Urgency changed; same priority as now is still sent (the web sends it whenever the row exists).
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: 'LOW' }, { impact: 'LOW', urgency: 'MEDIUM' }, MATRIX), { urgency: 'MEDIUM', priority: 'LOW' });
+    // Both changed.
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: 'LOW' }, { impact: 'MEDIUM', urgency: 'HIGH' }, MATRIX), { impact: 'MEDIUM', urgency: 'HIGH', priority: 'HIGH' });
+  });
+
+  test('with the matrix, no priority when the pair has no row, one value is unset, or nothing changed', () => {
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: 'LOW' }, { impact: 'MINIMAL', urgency: 'LOW' }, MATRIX), { impact: 'MINIMAL' });
+    assert.deepEqual(classificationChanges({ impact: 'LOW', urgency: null }, { impact: 'HIGH', urgency: null }, MATRIX), { impact: 'HIGH' });
+    assert.deepEqual(classificationChanges({ impact: 'HIGH', urgency: 'HIGH' }, { impact: 'HIGH', urgency: 'HIGH' }, MATRIX), {});
+    assert.deepEqual(classificationChanges({ impact: 'HIGH', urgency: 'HIGH' }, { impact: null, urgency: null }, MATRIX), {});
+  });
+
+  test('what an ADMIN Save sends: the change plus the matrix priority, never status', async () => {
+    const sent = [];
+    apiClient.defaults.adapter = async (config) => {
+      const data = config.data ? JSON.parse(config.data) : undefined;
+      sent.push(data);
+      return { status: 200, statusText: '200', headers: AxiosHeaders.from({ 'content-type': 'application/json' }), data: '{}', config, request: {} };
+    };
+    const body = classificationChanges({ impact: 'LOW', urgency: 'HIGH' }, { impact: 'HIGH', urgency: 'HIGH' }, MATRIX);
+    assert.equal(fieldEditProblem(PERSONAS.ADMIN, 'OPEN', body), null);
+    await updateTicket('ticket-1', body, 'ADMIN');
+    assert.deepEqual(sent, [{ impact: 'HIGH', priority: 'URGENT' }]);
   });
 });
 

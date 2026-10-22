@@ -10,9 +10,10 @@
 //   ['tickets', 'detail', id, 'recipients']           TKT-9   Reply-All To/CC (staff, composer only)
 //   ['tickets', 'detail', id, 'suggested']            TKT-10  recommended technicians (assign picker only)
 //   ['lookups', 'countries', 'mine' | 'all']          LKP-4 / LKP-5
-//   ['lookups', 'categories']                         LKP-1   flat category list (create form, M4 category editor)
-//   ['lookups', 'teams']                              LKP-2   groups + members (assign picker, create form)
+//   ['lookups', 'categories']                         LKP-1   flat category list (create form, M4 category editor, M3 filter)
+//   ['lookups', 'teams']                              LKP-2   groups + members (assign picker, create form, M3 filter)
 //   ['lookups', 'priority-matrix']                    LKP-6   impact × urgency → priority (M4 preview; ADMIN, AGENT)
+//   ['lookups', 'canned-responses']                   LKP-7   reply templates (M5 Templates sheet; every role)
 //   ['users', 'search', term, roles]                  USR-3   typeahead (≥ 2 characters)
 //   ['users', 'profile', id]                          USR-1   own profile (M10)
 //   ['dashboard', range, countryId]                   DSH-1   Home KPIs (never for L2_MANAGER)
@@ -53,6 +54,7 @@ export const queryKeys = {
     categories: () => ['lookups', 'categories'] as const,
     teams: () => ['lookups', 'teams'] as const,
     priorityMatrix: () => ['lookups', 'priority-matrix'] as const,
+    cannedResponses: () => ['lookups', 'canned-responses'] as const,
   },
 
   users: {

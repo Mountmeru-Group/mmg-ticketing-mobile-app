@@ -7,8 +7,8 @@ export { useTicketComments } from './useTicketComments';
 export { useTicketAttachments } from './useTicketAttachments';
 export { useTicketHistory } from './useTicketHistory';
 export {
-  countryName, useCategories, useCountryOptions, useEmailRecipients, usePriorityMatrix, useSuggestedAssignees, useTeams,
-  useUserSearch,
+  countryName, useCannedResponses, useCategories, useCountryOptions, useEmailRecipients, usePriorityMatrix,
+  useSuggestedAssignees, useTeams, useUserSearch,
 } from './useLookups';
 export { useDebouncedValue } from './useDebouncedValue';
 export { useDiscardGuard } from './useDiscardGuard';
@@ -39,3 +39,6 @@ export { useDecideApproval, type ApprovalDecision } from './useApprovals';
 export { useKbHelpfulVote } from './useKnowledgeBase';
 export { useSignOut, useUpdateProfile } from './useProfile';
 export { useDeleteTask, useSaveTask, useToggleTask } from './useTasks';
+// Phase G3 writes
+export { useDeleteAttachment } from './useDeleteAttachment';
+export { useSubmitForApproval } from './useApprovals';

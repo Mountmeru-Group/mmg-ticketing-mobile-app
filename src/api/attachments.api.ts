@@ -1,8 +1,9 @@
 // Attachment endpoints (01 §4). Mounted under /api/v1/tickets/:ticketId/attachments.
 import { API_BASE_URL } from '@/config/env';
 import { useAuthStore } from '@/store/auth.store';
-import type { Attachment } from '@/types';
-import { UPLOAD_TIMEOUT_MS, apiClient } from './client';
+import type { Attachment, UserRole } from '@/types';
+import { canDeleteAttachments } from '@/utils/permissions';
+import { UPLOAD_TIMEOUT_MS, apiClient, type MessageResponse } from './client';
 import { clientError } from './errors';
 import { seg } from './helpers';
 
@@ -63,6 +64,19 @@ export async function uploadAttachments(ticketId: string, files: readonly Upload
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: UPLOAD_TIMEOUT_MS,
   });
+  return res.data;
+}
+
+/**
+ * ATT-5 — DELETE /api/v1/tickets/:ticketId/attachments/:attachmentId (Phase G3).
+ * ADMIN, AGENT and L2_MANAGER, any file, in any status (web FE:TicketDetailPage.tsx:1345); the server refuses END_USER,
+ * so a request from that role is refused here before it is sent. PERMANENT: the file is removed from disk and its row
+ * deleted, with no audit entry. The screen confirms "Delete <fileName>?" first. Pass only an id from this ticket's
+ * ATT-1 list: the server does not check that the file belongs to `ticketId` (05 C.4).
+ */
+export async function deleteAttachment(ticketId: string, attachmentId: string, role: UserRole): Promise<MessageResponse> {
+  if (!canDeleteAttachments(role)) throw clientError("Your role can't delete files from a ticket.");
+  const res = await apiClient.delete<MessageResponse>(`/tickets/${seg(ticketId)}/attachments/${seg(attachmentId)}`);
   return res.data;
 }
 

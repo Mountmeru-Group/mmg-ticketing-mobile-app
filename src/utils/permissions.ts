@@ -12,6 +12,7 @@ import { isAgentOrAdmin, isStaff, isTriageAgent } from './roles';
 import { canAssignToSelf } from './session';
 import { countrySelectorMode } from './ticket-filters';
 import { canChangeStatus, getAvailableTransitions, isResolvedLocked, type StatusTransition } from './ticket-rules';
+import type { TicketListFilterKey } from './ticket-filters';
 
 /** The signed-in user, as the gates need it. `id` is only used to hide "Pick up" on one's own ticket. */
 export type Viewer = Pick<AuthUser, 'id' | 'role' | 'countryId'>;
@@ -92,13 +93,50 @@ export interface ComposerPermissions {
   recipients: boolean;
   /** Address suggestions from USR-3: ADMIN and AGENT (403 for everyone else). */
   suggestRecipients: boolean;
+  /** The "Templates" button, in every mode (Phase G3). */
+  templates: boolean;
 }
 
 export function composerPermissions(role: UserRole): ComposerPermissions {
-  return { modes: composerModes(role), recipients: isStaff(role), suggestRecipients: isAgentOrAdmin(role) };
+  return {
+    modes: composerModes(role),
+    recipients: isStaff(role),
+    suggestRecipients: isAgentOrAdmin(role),
+    templates: canUseReplyTemplates(role),
+  };
 }
 
-export type MoreAction = 'pickup' | 'assign' | 'close';
+// ── Phase G3 (the web's behaviour, with sources: docs/G3-WEB-BEHAVIOUR.md) ──
+
+/** Every role the app knows; anything else (a malformed session) gets no templates. */
+const REPLY_TEMPLATE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN']);
+
+/**
+ * Reply templates (LKP-7): every role, in Reply, Reply all and Private note. The web's picker has no role check
+ * (FE:TicketDetailPage.tsx:1046) and the server lists active templates to anyone signed in (cannedResponses.router.ts:15).
+ */
+export function canUseReplyTemplates(role: UserRole): boolean {
+  return REPLY_TEMPLATE_ROLES.has(role);
+}
+
+/**
+ * Delete a file (ATT-5): ADMIN, AGENT, L2_MANAGER (web :1345 `role !== 'END_USER'`; the server refuses END_USER).
+ * Any file on the ticket, whoever uploaded it, in every status: the AGENT lock does not apply (web :1268 vs :1345).
+ */
+export function canDeleteAttachments(role: UserRole): boolean {
+  return isStaff(role);
+}
+
+/**
+ * Submit for approval (APR-4): ADMIN and AGENT, the server's `agentOrAdmin` (approvals.router.ts:8). The web also shows
+ * it to END_USER and L2_MANAGER, who always get 403, so it is hidden for them (WEB-VS-MOBILE-ROLES.md §5). Every
+ * status, with no AGENT lock: neither the web (:697, :1585) nor the server checks one.
+ */
+export function canSubmitForApproval(role: UserRole): boolean {
+  return isAgentOrAdmin(role);
+}
+
+export type MoreAction = 'pickup' | 'assign' | 'close' | 'approval';
 
 export interface TicketDetailPermissions {
   /**
@@ -122,6 +160,8 @@ export interface TicketDetailPermissions {
   recipients: boolean;
   /** "Add files" on the Attachments tab (05 §A.3: blocked only by the AGENT lock). */
   addAttachments: boolean;
+  /** The delete button on each file of the Attachments tab (G3): staff, never lock-gated. */
+  deleteAttachments: boolean;
   /** Tasks: tick done / not done, add, edit, remove (05 §A.3: END_USER read-only, D4). */
   editTasks: boolean;
 }
@@ -140,6 +180,7 @@ export function ticketDetailPermissions(
     moreActions.push('assign');
   }
   if (transitions.some((t) => t.target === 'CLOSED')) moreActions.push('close');
+  if (canSubmitForApproval(role)) moreActions.push('approval');
 
   return {
     locked,
@@ -151,6 +192,7 @@ export function ticketDetailPermissions(
     classification: isStaff(role),
     recipients: isStaff(role),
     addAttachments: !locked,
+    deleteAttachments: canDeleteAttachments(role),
     editTasks: isStaff(role),
   };
 }
@@ -178,6 +220,7 @@ export interface TicketFieldPermissions extends Record<TicketField, FieldAccess>
 export const AGENT_LOCK_REASON = 'Closed and canceled tickets are locked for technicians.';
 export const COUNTRY_LOCK_REASON = "You're locked to your own country, so only an Admin or a triage technician can change a ticket's country.";
 export const RESOLUTION_STATE_REASON = 'The resolution can be edited only while the ticket is Resolved or Closed.';
+export const PRIORITY_ALONE_REASON = 'The priority follows impact and urgency, so it is only sent with an impact or urgency change.';
 
 /** Statuses in which the web offers the resolution editor (FE:TicketDetailPage.tsx:1440). CANCELED is not one. */
 export const RESOLUTION_EDIT_STATUSES: ReadonlySet<TicketStatus> = new Set<TicketStatus>(['RESOLVED', 'CLOSED']);
@@ -202,7 +245,8 @@ const lockedBy = (reason: string): FieldAccess => ({ mode: 'locked', reason });
  * - Impact, urgency: staff; the AGENT lock applies (web :1737-1774). END_USER: hidden (05 §A.3, a decision).
  * - Category: ADMIN and AGENT; the AGENT lock applies. L2_MANAGER and END_USER see it read-only (web :1951-1960).
  * - Country: the 05 §A.12 roles (G1 brief): ADMIN and triage AGENT edit; a country AGENT sees it locked; L2_MANAGER and
- *   END_USER see the value only. Not lock-gated by status (web :2199). The web lets every AGENT edit: G1 discrepancy D2.
+ *   END_USER see the value only. Not lock-gated by status (web :2199). The web lets every AGENT edit (G1 D2); Ronit
+ *   decided in G2 to keep it locked (ROLE-MATRIX §8 item 12, RESOLVED).
  * - Resolution: staff while RESOLVED or CLOSED, with no AGENT lock (web :1438-1486). END_USER read-only (D3, 🔒 SAFER).
  */
 export function ticketFieldPermissions(
@@ -231,6 +275,8 @@ export function ticketFieldPermissions(
 /**
  * Last guard before TKT-4: why this body may not be sent, or null when every key is a field the person may edit in
  * this state. Keys outside FIELD_OF_UPDATE_KEY (title, team, assignee, tags …) are refused: no app screen edits them.
+ * `priority` (G2, as the web sends it) only rides along with an impact or urgency change, and only for a person who
+ * gets the priority preview (ADMIN, AGENT not locked); its value is the matrix row (classificationChanges).
  */
 export function fieldEditProblem(
   viewer: Pick<AuthUser, 'role' | 'countryId'> | null,
@@ -241,6 +287,12 @@ export function fieldEditProblem(
   if (keys.length === 0) return 'Nothing to save.';
   const can = ticketFieldPermissions(viewer, { status });
   for (const key of keys) {
+    if (key === 'priority') {
+      if (input.impact === undefined && input.urgency === undefined) return PRIORITY_ALONE_REASON;
+      if (can.impact.mode === 'locked') return can.impact.reason;
+      if (!can.priorityPreview) return "Your role can't change the priority of a ticket.";
+      continue;
+    }
     const field = FIELD_OF_UPDATE_KEY[key];
     if (!field) return "This field can't be changed from the app.";
     const access = can[field];
@@ -277,6 +329,20 @@ export function bulkActions(viewer: Pick<AuthUser, 'id' | 'role'> | null): BulkA
   }
   if (canChangeStatus(role)) actions.push('close');
   return actions;
+}
+
+/**
+ * The Filters sheet on M3 (Phase G2, docs/G2-WEB-FILTERS.md §2): which of the five filters this person gets.
+ * - Priority, category, created date: every role, as on the web (LKP-1 is open to every role).
+ * - Technician and group: ADMIN and AGENT (triage and country-locked alike). Their options come from USR-3 and LKP-2,
+ *   which are `agentOrAdmin`: the web shows END_USER and L2_MANAGER these selects, but always empty (403), so they are
+ *   left out here, and ticketListQuery() never sends them for those roles.
+ */
+export function ticketListFilters(viewer: Pick<AuthUser, 'role'> | null): TicketListFilterKey[] {
+  const role: UserRole = viewer?.role ?? 'END_USER';
+  const keys: TicketListFilterKey[] = ['priority', 'category', 'date'];
+  if (isAgentOrAdmin(role)) keys.push('technician', 'group');
+  return keys;
 }
 
 /** The inline status chip on a list card (08 §4.1): the transitions for that row, or none (chip not tappable). */

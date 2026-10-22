@@ -8,15 +8,15 @@
 //   scope gap (05 C.6).
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { approveApproval, listPendingApprovals, rejectApproval } from '@/api/approvals.api';
+import { approveApproval, listPendingApprovals, rejectApproval, submitTicketForApproval } from '@/api/approvals.api';
 import { assertArray, assertObject, checkFields } from '@/api/drift';
 import { APPROVAL_SPEC } from '@/api/responseSpecs';
 import { useAuthStore } from '@/store/auth.store';
 import type { Approval, TicketDetail } from '@/types';
-import { markHomeStale, markTicketStale } from './cache';
+import { markHomeStale, markTicketStale, patchTicketInLists, refreshTicket } from './cache';
 import { queryKeys } from './queryKeys';
 import { fetchTicketDetail } from './useTicket';
-import { refuse, requireOnline, wasRefusedOnDevice } from './writeGuards';
+import { assertCanSubmitForApproval, refuse, requireOnline, requireRole, wasRefusedOnDevice } from './writeGuards';
 
 /** Cards look up at most this many ticket approvals with TKT-3 (one GET each, cached), to keep the inbox cheap. */
 export const MAX_CARD_TICKET_LOOKUPS = 10;
@@ -94,6 +94,41 @@ export function useDecideApproval() {
         markTicketStale(queryClient, approval.entityId);
         markHomeStale(queryClient);
       }
+    },
+  });
+}
+
+export interface SubmitApprovalVariables {
+  ticketId: string;
+  approverIds: readonly string[];
+  comments: string;
+}
+
+/**
+ * APR-4 "Submit for approval" (Phase G3; docs/G3-WEB-BEHAVIOUR.md §3). Confirmed by the screen first. ADMIN and AGENT
+ * only, in every status; anyone else is refused on the device and nothing is sent. The server moves the ticket to
+ * PENDING_MGMT_REVIEW, so the ticket is refetched and its list rows marked stale.
+ */
+export function useSubmitForApproval() {
+  const queryClient = useQueryClient();
+  const role = useAuthStore((s) => s.user?.role);
+
+  return useMutation({
+    mutationFn: async ({ ticketId, approverIds, comments }: SubmitApprovalVariables): Promise<Approval[]> => {
+      requireOnline();
+      const who = requireRole(role);
+      assertCanSubmitForApproval(who, approverIds);
+      const res = await submitTicketForApproval({ ticketId, approverIds, comments }, who);
+      assertArray<Approval>('APR-4', res);
+      checkFields('APR-4', res[0], APPROVAL_SPEC, '[0].');
+      return res;
+    },
+    onSettled: (_res, error, { ticketId }) => {
+      if (wasRefusedOnDevice(error)) return;
+      patchTicketInLists(queryClient, null);
+      void refreshTicket(queryClient, ticketId);
+      // The person may have named themselves as an approver.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.approvals.pending() });
     },
   });
 }

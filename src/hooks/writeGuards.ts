@@ -7,7 +7,7 @@ import { ApiClientError, clientError, describeWriteError, isSessionEndedError } 
 import { getTicket } from '@/api/tickets.api';
 import type { AuthUser, ChangeStatusBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
 import { statusLabel } from '@/utils/format';
-import { fieldEditProblem } from '@/utils/permissions';
+import { canDeleteAttachments, canSubmitForApproval, fieldEditProblem } from '@/utils/permissions';
 import { isAgentOrAdmin } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { canChangeStatus, isResolvedLocked, isTransitionAllowed, requiresClosureForm } from '@/utils/ticket-rules';
@@ -97,6 +97,17 @@ export function assertFieldEdits(
 /** 05 §A.3: adding attachments is blocked only where the AGENT lock applies. */
 export function assertCanAttach(role: UserRole, status: TicketStatus): void {
   if (isResolvedLocked(role, status)) throw refuse('Closed and canceled tickets are locked for technicians.');
+}
+
+/** G3, ATT-5: deleting a file is for ADMIN, AGENT and L2_MANAGER, in every status (no AGENT lock, web :1345). */
+export function assertCanDeleteAttachment(role: UserRole): void {
+  if (!canDeleteAttachments(role)) throw refuse("Your role can't delete files from a ticket.");
+}
+
+/** G3, APR-4: ADMIN and AGENT only (server `agentOrAdmin`), in every status; at least one approver (server: min 1). */
+export function assertCanSubmitForApproval(role: UserRole, approverIds: readonly string[]): void {
+  if (!canSubmitForApproval(role)) throw refuse('Only Admins and Technicians can submit a ticket for approval.');
+  if (approverIds.length === 0) throw refuse('Choose at least one approver.');
 }
 
 /**

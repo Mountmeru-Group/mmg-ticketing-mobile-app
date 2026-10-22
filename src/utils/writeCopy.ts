@@ -54,6 +54,11 @@ export function bulkAssignMessage(count: number, name: string, skipped: number):
   return parts.join(' ');
 }
 
+/** ATT-5 (Phase G3): the server unlinks the file and deletes its row, with no history entry (01 ATT-5). */
+export function deleteAttachmentMessage(fileName: string): string {
+  return `${fileName} is permanently removed from this ticket, for everyone including the requester. This can't be undone, and the ticket's history won't show it.`;
+}
+
 export function bulkPickUpMessage(count: number, skipped: number): string {
   const parts = [`${plural(count, 'ticket')} will be assigned to you, one at a time.`];
   if (skipped > 0) parts.push(`${plural(skipped, 'selected ticket is', 'selected tickets are')} skipped.`);

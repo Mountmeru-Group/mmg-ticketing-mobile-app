@@ -8,9 +8,9 @@ import { TICKET_LIST_ROW_SPEC } from '@/api/responseSpecs';
 import { TICKET_PAGE_SIZE, listTickets } from '@/api/tickets.api';
 import { useAuthStore } from '@/store/auth.store';
 import type { Paginated, Ticket } from '@/types';
+import { ticketListFilters } from '@/utils/permissions';
 import {
-  roleDefaultTicketQuery, ticketFilterQuery, ticketSortQuery,
-  type TicketNamedFilter, type TicketSortOption,
+  ticketListQuery, type TicketAdvancedFilters, type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
 import { queryKeys, type TicketListKeyParams } from './queryKeys';
 
@@ -21,22 +21,19 @@ export interface UseTicketsOptions {
   search?: string;
   /** From listCountryParam(); undefined = no `countryId` key. */
   countryId?: string;
+  /** M3 Filters sheet (G2). Only the filters ticketListFilters() gives this person are sent. */
+  advanced?: TicketAdvancedFilters;
 }
 
-export function useTickets({ filter, sort, search, countryId }: UseTicketsOptions) {
+export function useTickets({ filter, sort, search, countryId, advanced }: UseTicketsOptions) {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
+  // Every filter is a server-side TKT-1 param; nothing is filtered on the device (docs/G2-WEB-FILTERS.md).
   const params = useMemo<TicketListKeyParams | null>(() => {
     if (!user) return null;
-    return {
-      ...roleDefaultTicketQuery(user.role),
-      ...(countryId !== undefined ? { countryId } : {}),
-      ...ticketFilterQuery(filter, user),
-      ...ticketSortQuery(sort),
-      ...(search ? { search } : {}),
-    };
-  }, [user, filter, sort, search, countryId]);
+    return ticketListQuery({ me: user, filter, sort, search, countryId, advanced, allowed: ticketListFilters(user) });
+  }, [user, filter, sort, search, countryId, advanced]);
 
   const queryKey = useMemo(() => queryKeys.tickets.list(params ?? {}), [params]);
 

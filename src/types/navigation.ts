@@ -24,6 +24,8 @@ export type AuthStackParamList = {
 export type TicketStackParamList = {
   /** M3. `filter` lets Home tiles open the list with a named filter pre-applied (08 §3.3, §4.5). */
   TicketList: { filter?: TicketNamedFilter } | undefined;
+  /** M3's Filters sheet (Phase G2): priority, category, created date, technician, group. State lives in ui.store. */
+  TicketFilters: undefined;
   /** M4 */
   TicketDetail: { ticketId: UUID };
   /** M5 */
@@ -32,6 +34,8 @@ export type TicketStackParamList = {
   StatusClosure: { ticketIds: UUID[]; target?: TicketStatus };
   /** M7. One ticket from M4, or up to 20 from M3 bulk mode (08 §4.2). */
   AssignPicker: { ticketIds: UUID[] };
+  /** "Submit for approval" from M4's More options (Phase G3, APR-4). ADMIN and AGENT. */
+  SubmitApproval: { ticketId: UUID };
   /** M8 */
   CreateTicket: undefined;
   /** M11. No `taskId` = create. */

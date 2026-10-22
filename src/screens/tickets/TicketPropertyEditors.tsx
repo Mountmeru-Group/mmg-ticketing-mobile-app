@@ -5,7 +5,8 @@
 //   `locked` shows the saved value with the reason, `view` shows the value only, `hidden` shows nothing.
 // - Every editor stages its changes and writes ONLY on Save: nothing saves on selection, blur or navigation, and leaving
 //   with unsaved changes asks first (useDiscardGuard). One editor is open at a time.
-// - Save → useUpdateTicket (TKT-4 PUT, never status, never priority). Controls are disabled while it is in flight.
+// - Save → useUpdateTicket (TKT-4 PUT, never status). Priority only rides along with an impact/urgency change, as the
+//   matrix value, exactly as the web sends it (G2). Controls are disabled while it is in flight.
 //   Success: a toast, and the editor closes on the server's values. Failure: the server's message (a 403 says the role
 //   can't change that field), and the editor closes so the field shows the saved value again.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -272,7 +273,9 @@ function ClassificationForm({
 }) {
   const [staged, setStaged] = useState<Classification>({ impact: ticket.impact, urgency: ticket.urgency });
   const [sheet, setSheet] = useState<'impact' | 'urgency' | null>(null);
-  const body = classificationChanges(ticket, staged);
+  // ADMIN/AGENT only (403 for L2, as on the web). Not loaded yet or failed: saved without a priority, as the web does.
+  const matrix = usePriorityMatrix({ enabled: preview });
+  const body = classificationChanges(ticket, staged, preview ? matrix.data : undefined);
   const dirty = Object.keys(body).length > 0;
   useReportDirty(dirty, onDirtyChange);
 
@@ -296,7 +299,7 @@ function ClassificationForm({
         onPress={() => setSheet('urgency')}
         disabled={saving}
       />
-      <PriorityPreviewBox current={ticket.priority} staged={staged} enabled={preview} />
+      <PriorityPreviewBox current={ticket.priority} staged={staged} enabled={preview} matrix={matrix} assigned={!!ticket.assignedToId} />
       <EditorActions canSave={dirty} saving={saving} onSave={() => onSave(body)} onCancel={onCancel} />
 
       <OptionSheet
@@ -320,12 +323,21 @@ function ClassificationForm({
 }
 
 /**
- * The priority the server will store once Save is tapped (LKP-6, the web's rule, G1 §2). A preview only: the app never
- * sends a priority, and it says so before saving whenever the priority would change. L2_MANAGER can't read the matrix
- * (403, as on the web), so it is told the Service Desk recalculates it.
+ * The priority the server will store once Save is tapped (LKP-6, the web's rule, G1 §2), said before saving whenever it
+ * would change. Save sends that value with the change (G2, as the web does), so the server emails the requester and the
+ * technician; the box says so. L2_MANAGER can't read the matrix (403, as on the web), so it is told the Service Desk
+ * recalculates it, and sends no priority.
  */
-function PriorityPreviewBox({ current, staged, enabled }: { current: TicketPriority; staged: Classification; enabled: boolean }) {
-  const matrix = usePriorityMatrix({ enabled });
+function PriorityPreviewBox({
+  current, staged, enabled, matrix, assigned,
+}: {
+  current: TicketPriority;
+  staged: Classification;
+  enabled: boolean;
+  matrix: ReturnType<typeof usePriorityMatrix>;
+  /** The ticket has a technician, who is emailed too. */
+  assigned: boolean;
+}) {
   const label = PRIORITY_LABELS[current] ?? current;
 
   let body: ReactNode;
@@ -355,7 +367,7 @@ function PriorityPreviewBox({ current, staged, enabled }: { current: TicketPrior
           </View>
           <Text className="text-xs text-gray-700">
             Saving changes the priority from {label} to {PRIORITY_LABELS[result.priority] ?? result.priority}. The SLA deadlines
-            may be recalculated.
+            may be recalculated, and the requester{assigned ? ' and the technician are' : ' is'} emailed about the new priority.
           </Text>
         </>
       );
