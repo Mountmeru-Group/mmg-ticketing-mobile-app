@@ -10,7 +10,7 @@
 // - a task write replaces that one task in the ticket's cached detail and list rows with the server's returned task.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 
-import type { ActivityPage, Paginated, Ticket, TicketTaskEmbedded } from '@/types';
+import type { ActivityPage, Paginated, Ticket, TicketDetail, TicketTaskEmbedded } from '@/types';
 import { queryKeys } from './queryKeys';
 
 type ListData = InfiniteData<Paginated<Ticket>, number>;
@@ -40,6 +40,18 @@ export function patchTicketInLists(queryClient: QueryClient, ticket: unknown): v
   }
   void queryClient.invalidateQueries({ queryKey: queryKeys.tickets.lists(), refetchType: 'none' });
   markHomeStale(queryClient);
+}
+
+/**
+ * Put the server's answer to a TKT-4 field edit into the ticket's cached detail, so the saved values show at once
+ * instead of the old ones until the refetch lands. Not optimistic: called on success. `slaPolicy` is kept, because
+ * TKT-4 returns a reference where TKT-3 has the full row; refreshTicket() brings the rest up to date.
+ */
+export function patchTicketDetail(queryClient: QueryClient, ticket: unknown): void {
+  if (!looksLikeTicket(ticket)) return;
+  queryClient.setQueryData<TicketDetail>(queryKeys.tickets.detail(ticket.id), (detail) =>
+    detail ? { ...detail, ...ticket, slaPolicy: detail.slaPolicy } : detail,
+  );
 }
 
 /** Home's recent list and DSH-1 counts: marked stale, never refetched here (pull-to-refresh on Home does that). */

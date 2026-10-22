@@ -19,6 +19,9 @@
 //   Tasks (Phase 4): every role taps a task to open task detail. Staff (ADMIN, AGENT, L2) also tick it done / not done
 //     (TSK-3, reversible) and add tasks (→ M11, TSK-2); edit and remove live on task detail. END_USER: read-only (D4).
 //     The rows are the shared TaskRow, also used by the standalone task list.
+//   Properties (Phase G1, ./TicketPropertyEditors.tsx): impact and urgency with the priority preview, category,
+//     country, and the resolution text — each from ticketFieldPermissions(), saved only on an explicit Save via
+//     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -39,21 +42,21 @@ import {
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
-import type {
-  ActivityAuditItem, Attachment, Comment, TicketDetail, TicketImpact, TicketStackScreenProps, TicketTaskEmbedded,
-  TicketUrgency,
-} from '@/types';
+import type { ActivityAuditItem, Attachment, Comment, TicketDetail, TicketStackScreenProps, TicketTaskEmbedded } from '@/types';
 import { describeAudit } from '@/utils/activity';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import {
-  IMPACT_LABELS, URGENCY_LABELS, categoryCascade, effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName,
-  formatRelative, initials, sourceLabel,
+  effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
 import {
-  isCommentVisible, ticketDetailPermissions, type ComposerMode, type MoreAction, type TicketDetailPermissions,
+  isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type MoreAction,
+  type TicketDetailPermissions, type TicketFieldPermissions,
 } from '@/utils/permissions';
 import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
 import { statusChangeMessage } from '@/utils/writeCopy';
+import {
+  CategorySection, ClassificationSection, CountrySection, ResolutionSection, Row, usePropertyEditing, type PropertyEditing,
+} from './TicketPropertyEditors';
 
 type DetailTab = 'conversation' | 'history' | 'attachments' | 'tasks';
 
@@ -140,7 +143,9 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     }
   }
   const [newFiles, setNewFiles] = useState<UploadFile[]>([]);
-  const writing = changeStatus.isPending || assign.isPending;
+  // Property editors (G1): one open at a time, saved only on Save; leaving with unsaved changes asks first.
+  const edit = usePropertyEditing(ticket);
+  const writing = changeStatus.isPending || assign.isPending || edit.saving;
 
   async function onTransition(t: StatusTransition) {
     if (!ticket) return;
@@ -216,8 +221,9 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     );
   }
 
-  // Every role-gated element below reads this one object (utils/permissions.ts, pinned per role by tests/rbac).
+  // Every role-gated element below reads these two objects (utils/permissions.ts, pinned per role by tests/rbac).
   const can = ticketDetailPermissions(user, ticket);
+  const fields = ticketFieldPermissions(user, ticket);
   const moreActions: SheetOption<MoreAction>[] = can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] }));
   const onMore = (action: MoreAction) => {
     if (action === 'pickup') void once(pickUp);
@@ -247,6 +253,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
@@ -257,9 +264,9 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
           <HtmlText html={ticket.description} emptyText="No description" />
         </Card>
 
-        <PropertiesCard ticket={ticket} can={can} />
+        <PropertiesCard ticket={ticket} can={can} fields={fields} edit={edit} busy={writing} />
         <RequesterCard ticket={ticket} />
-        <ResolutionCard ticket={ticket} />
+        <ResolutionSection ticket={ticket} can={fields} edit={edit} busy={writing} />
 
         <TabBar
           tab={tab}
@@ -419,34 +426,6 @@ function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyp
   );
 }
 
-// ── Layout pieces ────────────────────────────────────────────
-
-/** A label / value line in a card (UI-STANDARDS S6): 112 dp label column, separators between rows. */
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View className="flex-row border-b border-gray-100 py-2">
-      <Text className="w-28 pr-2 text-sm text-gray-500">{label}</Text>
-      <View className="flex-1">{typeof children === 'string' ? <Text className="text-sm text-gray-900">{children}</Text> : children}</View>
-    </View>
-  );
-}
-
-const CHIP_STYLES = {
-  red: { bg: 'bg-red-100', text: 'text-red-800' },
-  orange: { bg: 'bg-orange-100', text: 'text-orange-800' },
-  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  green: { bg: 'bg-green-100', text: 'text-green-800' },
-} as const;
-
-function Chip({ label, tone }: { label: string; tone: keyof typeof CHIP_STYLES }) {
-  const style = CHIP_STYLES[tone];
-  return (
-    <View className={`self-start rounded-full px-2.5 py-0.5 ${style.bg}`}>
-      <Text className={`text-xs font-medium ${style.text}`}>{label}</Text>
-    </View>
-  );
-}
-
 // ── Header ───────────────────────────────────────────────────
 
 function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
@@ -528,44 +507,29 @@ function StatusActionBar({
 
 // ── Properties ───────────────────────────────────────────────
 
-function impactTone(impact: TicketImpact): 'red' | 'yellow' | 'green' {
-  // 05 §A.10: HIGH red, MEDIUM yellow, else green.
-  if (impact === 'HIGH') return 'red';
-  if (impact === 'MEDIUM') return 'yellow';
-  return 'green';
-}
-
-function urgencyTone(urgency: TicketUrgency): 'red' | 'orange' | 'yellow' | 'green' {
-  // 05 §A.10: URGENT red, HIGH orange, MEDIUM yellow, else green.
-  if (urgency === 'URGENT') return 'red';
-  if (urgency === 'HIGH') return 'orange';
-  if (urgency === 'MEDIUM') return 'yellow';
-  return 'green';
-}
-
-function PropertiesCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
-  const cascade = categoryCascade(ticket.category);
+/**
+ * Impact / urgency (hidden for END_USER, 05 §A.3), category and country each come with their editor or lock reason
+ * from ticketFieldPermissions(); group and technician change through Assign (M7), so they are read-only here.
+ */
+function PropertiesCard({
+  ticket, can, fields, edit, busy,
+}: {
+  ticket: TicketDetail;
+  can: TicketDetailPermissions;
+  fields: TicketFieldPermissions;
+  edit: PropertyEditing;
+  busy: boolean;
+}) {
   const resolveBy = effectiveResolveDue(ticket);
   const technician = formatDisplayName(ticket.assignedTo?.displayName);
+  const section = { ticket, can: fields, edit, busy };
   return (
     <Card title="Properties">
-      {/* Impact / urgency are hidden for END_USER (05 §A.3). */}
-      {can.classification ? (
-        <>
-          <Row label="Impact">
-            {ticket.impact ? <Chip label={IMPACT_LABELS[ticket.impact] ?? ticket.impact} tone={impactTone(ticket.impact)} /> : 'Not set'}
-          </Row>
-          <Row label="Urgency">
-            {ticket.urgency ? <Chip label={URGENCY_LABELS[ticket.urgency] ?? ticket.urgency} tone={urgencyTone(ticket.urgency)} /> : 'Not set'}
-          </Row>
-        </>
-      ) : null}
-      <Row label="Category">{cascade.category ?? 'Not set'}</Row>
-      {cascade.subcategory ? <Row label="Subcategory">{cascade.subcategory}</Row> : null}
-      {cascade.item ? <Row label="Item">{cascade.item}</Row> : null}
+      <ClassificationSection {...section} />
+      <CategorySection {...section} />
       <Row label="Group">{ticket.team?.name ?? 'Not set'}</Row>
       <Row label="Technician">{technician || 'Unassigned'}</Row>
-      <Row label="Country">{ticket.country?.displayName || ticket.country?.name || 'Not set'}</Row>
+      <CountrySection {...section} />
       <Row label="Resolve by">{resolveBy ? formatDateTime(resolveBy) : 'No SLA'}</Row>
       {ticket.slaHoldStartedAt ? <Row label="SLA paused">{`Since ${formatDateTime(ticket.slaHoldStartedAt)}`}</Row> : null}
       {can.classification ? (
@@ -591,30 +555,6 @@ function RequesterCard({ ticket }: { ticket: TicketDetail }) {
           {r?.department ? <Text className="text-xs text-gray-500">{r.department}</Text> : null}
         </View>
       </View>
-    </Card>
-  );
-}
-
-/** Resolution section (04 M4): shown once a ticket is resolved/closed/canceled or has closure data. */
-function ResolutionCard({ ticket }: { ticket: TicketDetail }) {
-  const done = ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' || ticket.status === 'CANCELED';
-  const hasData = !!(ticket.resolution || ticket.closureCode || ticket.closureComments);
-  if (!done && !hasData) return null;
-  return (
-    <Card title="Resolution">
-      {ticket.resolution ? <HtmlText html={ticket.resolution} collapsedHeight={140} /> : <Text className="text-sm text-gray-500">No resolution recorded</Text>}
-      <View className="mt-2">
-        <Row label="Closure code">{ticket.closureCode || 'Not set'}</Row>
-        <Row label="First call fix">{ticket.isFcr ? 'Yes' : 'No'}</Row>
-        {ticket.resolvedAt ? <Row label="Resolved">{formatDateTime(ticket.resolvedAt)}</Row> : null}
-        {ticket.closedAt ? <Row label="Closed">{formatDateTime(ticket.closedAt)}</Row> : null}
-      </View>
-      {ticket.closureComments ? (
-        <View className="mt-2">
-          <Text className="mb-1 text-xs font-semibold text-gray-500">Closure comments</Text>
-          <HtmlText html={ticket.closureComments} collapsedHeight={140} />
-        </View>
-      ) : null}
     </Card>
   );
 }

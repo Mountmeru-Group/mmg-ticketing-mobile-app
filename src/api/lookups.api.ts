@@ -1,6 +1,6 @@
 // Lookup endpoints (01 §7). Priorities and statuses are enums, not endpoints (03 §A) — there is no
 // /priorities or /statuses route; calling one returns 200 HTML in production.
-import type { Category, Country, Team } from '@/types';
+import type { Category, Country, PriorityMatrixEntry, Team } from '@/types';
 import { apiClient } from './client';
 
 /**
@@ -35,5 +35,15 @@ export async function listMyCountries(): Promise<Country[]> {
 /** LKP-5 — GET /api/v1/countries. All active countries, by name. */
 export async function listCountries(): Promise<Country[]> {
   const res = await apiClient.get<Country[]>('/countries');
+  return res.data;
+}
+
+/**
+ * LKP-6 — GET /api/v1/priority-matrix (ADMIN, AGENT only; 403 for others).
+ * Preview only: the server computes the priority itself on TKT-2/TKT-4, and the app never sends `priority`.
+ * ⚠ Writes on GET: an empty table is seeded with 9 default rows (01 LKP-6).
+ */
+export async function getPriorityMatrix(): Promise<PriorityMatrixEntry[]> {
+  const res = await apiClient.get<PriorityMatrixEntry[]>('/priority-matrix');
   return res.data;
 }

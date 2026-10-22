@@ -160,6 +160,13 @@ export const COUNTRY_SPEC: readonly FieldSpec[] = [
   { path: 'displayName', kinds: S },
 ];
 
+/** `PriorityMatrixEntry` from LKP-6. */
+export const PRIORITY_MATRIX_SPEC: readonly FieldSpec[] = [
+  { path: 'impact', kinds: S, oneOf: TICKET_IMPACTS },
+  { path: 'urgency', kinds: S, oneOf: TICKET_URGENCIES },
+  { path: 'priority', kinds: S, oneOf: TICKET_PRIORITIES },
+];
+
 // ── Phase 4 ──────────────────────────────────────────────────
 
 /** DSH-1 — only the keys Home reads (the safe KPIs, 05 B.20) and `recent`. */
