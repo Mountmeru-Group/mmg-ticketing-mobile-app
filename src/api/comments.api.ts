@@ -2,6 +2,7 @@
 // ⚠ The server does not check that the caller may access the ticket. Only call these for a ticket the
 // user already opened with TKT-3 (05 §C hygiene rules).
 import type { Comment, CreateCommentBody, UserRole } from '@/types';
+import { isAgentOrAdmin } from '@/utils/roles';
 import { apiClient } from './client';
 import { clientError } from './errors';
 import { pickDefined, seg } from './helpers';
@@ -22,7 +23,7 @@ export async function listComments(ticketId: string): Promise<Comment[]> {
  * so a note from those roles is refused here before it can leak to the requester (05 §A.3, §A.5).
  */
 export async function createComment(ticketId: string, input: CreateCommentBody, authorRole: UserRole): Promise<Comment> {
-  if (input.type === 'PRIVATE' && authorRole !== 'ADMIN' && authorRole !== 'AGENT') {
+  if (input.type === 'PRIVATE' && !isAgentOrAdmin(authorRole)) {
     throw clientError('Only Admins and Technicians can add internal notes');
   }
   const body = pickDefined(input, ['body', 'type', 'to', 'cc', 'attachmentIds'] as const);

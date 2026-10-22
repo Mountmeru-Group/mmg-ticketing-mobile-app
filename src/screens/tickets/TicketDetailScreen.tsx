@@ -121,6 +121,8 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const upload = useUploadAttachment();
   const toggleTask = useToggleTask();
   const once = useSingleFlight();
+  // Reads get their own guard: a download or an open share sheet must never swallow a tap on Pick up or a transition.
+  const onceRead = useSingleFlight();
   const [moreOpen, setMoreOpen] = useState(false);
   const [viewing, setViewing] = useState<Attachment | null>(null);
   // ATT-3 with the Bearer header, built once per opened image so a background refetch doesn't reload it. The token
@@ -387,7 +389,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
                 key={a.id}
                 attachment={a}
                 onView={isViewableImage(a.mimeType) ? () => setViewing(a) : undefined}
-                onOpen={() => void once(() => openExternally(a))}
+                onOpen={() => void onceRead(() => openExternally(a))}
                 opening={openingId === a.id}
               />
             ))}
@@ -410,7 +412,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       <ImageViewerModal
         request={viewRequest}
         title={viewing?.fileName ?? ''}
-        onShare={viewing ? () => void once(() => openExternally(viewing)) : undefined}
+        onShare={viewing ? () => void onceRead(() => openExternally(viewing)) : undefined}
         sharing={!!viewing && openingId === viewing.id}
         onClose={() => setViewing(null)}
       />

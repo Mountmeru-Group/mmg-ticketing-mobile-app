@@ -3,6 +3,7 @@
 // These mirror the web UI for UX; they are not a security fix (05 §C rule 3).
 import { onlineManager } from '@tanstack/react-query';
 
+import type { UploadFile } from '@/api/attachments.api';
 import { ApiClientError, clientError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import { getTicket } from '@/api/tickets.api';
 import type { AuthUser, ChangeStatusBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
@@ -104,8 +105,18 @@ export function assertCanAttach(role: UserRole, status: TicketStatus): void {
  * so the person learns what did happen. Keeps the HTTP status, so a 401 still reads as "session ended".
  * The result is an already-worded message: describeWriteError() passes it through unchanged.
  */
-export function afterPartialSuccess(done: string, error: unknown): ApiClientError {
+/** Files ATT-2 accepted before a later step failed. ATT-2 has no de-dup, so a retry must not send them again. */
+const uploadedBeforeFailure = new WeakMap<object, readonly UploadFile[]>();
+
+export function afterPartialSuccess(done: string, error: unknown, uploaded: readonly UploadFile[] = []): ApiClientError {
   if (isSessionEndedError(error)) return error as ApiClientError;
   const status = error instanceof ApiClientError ? error.status : null;
-  return new ApiClientError('client', status, { error: `${done} ${describeWriteError(error)}` });
+  const wrapped = new ApiClientError('client', status, { error: `${done} ${describeWriteError(error)}` });
+  if (uploaded.length > 0) uploadedBeforeFailure.set(wrapped, uploaded);
+  return wrapped;
+}
+
+/** The files already on the ticket when `error` was thrown (see afterPartialSuccess); the form drops them before a retry. */
+export function filesUploadedBefore(error: unknown): readonly UploadFile[] {
+  return (typeof error === 'object' && error !== null && uploadedBeforeFailure.get(error)) || [];
 }

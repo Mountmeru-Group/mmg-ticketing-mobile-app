@@ -32,7 +32,9 @@ export { useAssignTicket } from './useAssignTicket';
 export { usePostComment } from './usePostComment';
 export { useUploadAttachment } from './useUploadAttachment';
 export { useBulkRunner, type BulkOutcome, type BulkProgress, type BulkTarget } from './useBulkRunner';
-export { assertAssignment, assertStatusChange, assertStatusUnchanged, fetchCurrentStatus, requireRole } from './writeGuards';
+export {
+  assertAssignment, assertStatusChange, assertStatusUnchanged, fetchCurrentStatus, filesUploadedBefore, requireRole,
+} from './writeGuards';
 // Phase 4 writes
 export { useMarkAllNotificationsRead, useMarkNotificationRead } from './useNotifications';
 export { useDecideApproval, type ApprovalDecision } from './useApprovals';

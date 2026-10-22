@@ -2,20 +2,20 @@
 
 > **Read this file first in every session. Then read the doc in `docs/web-system/` that matches your task.**
 >
-> **Auth is a PENDING DECISION.** Until a backend ask (A1 or A2) ships, the app cannot log in against production. See `docs/web-system/02-AUTH.md`.
+> **Auth:** native Microsoft SSO (backend ask A2, contract AUTH-P2) is implemented. See `docs/web-system/02-AUTH.md` §7 and `11-SSO-VERIFY.md`; the redirect URI is the fixed `msauth://…` form in `src/config/auth.config.ts`.
 
 ## What this repo is
 
 - This is the **MMG Ticketing MOBILE app**, the phone client for the Mount Meru Group Service Desk.
 - Stack:
-  - React Native / **Expo SDK 52**, TypeScript
-  - React Navigation v6
+  - React Native 0.86 / **Expo SDK 57**, TypeScript
+  - React Navigation v7
   - TanStack Query v5
   - Zustand
   - NativeWind
   - expo-secure-store
   - Axios
-- Current state: **documentation only.** There is no application code yet. The docs in `docs/web-system/` were written on 2026-10-09 from a read-only inspection of the web repo.
+- Current state: **application code in `src/`** (the 16 MVP screens, native SSO, RBAC per `docs/ROLE-MATRIX.md`); release steps in `docs/RELEASE.md`. The docs in `docs/web-system/` were written on 2026-10-09 from a read-only inspection of the web repo; `07`–`11` were added as the build progressed.
 
 ## The backend is the single source of truth
 
@@ -40,9 +40,9 @@
    - The brief that produced these docs named it `C:\Users\Ronit Chaudhari\Desktop\Service Desk Mobile APP\MMG-Ticketing-Platform`. No such folder exists directly under the home folder; the Desktop path above is the clone that was analysed.
 4. **Environment.** Point the app only at the environment marked **ALLOWED** in `docs/web-system/00-OVERVIEW.md` §3.
    - Never point a development build at production.
-5. **Auth.** Do not build a workaround while auth is a PENDING DECISION.
+5. **Auth.** The only sign-in is the A2 native SSO flow (`02-AUTH.md` §7). Do not add another.
    - No scraping of `Set-Cookie`, no use of `/auth/test-login`, no embedding of the web SSO flow.
-   - See `02-AUTH.md`.
+   - The `__DEV__`-only developer-token screen is removed before any production build (`docs/RELEASE.md` §5).
 6. **Security holes.** Do not rely on, exploit, or try to patch the backend permission gaps in `05-RULES-AND-GAPS.md` §C.
    - The UI must offer only the actions the web UI offers for that role.
    - Fixing the gaps is the web team's job.
@@ -67,6 +67,7 @@
 | `04-SCREEN-MAP.md` | Deciding what screen to build and which endpoints it uses |
 | `05-RULES-AND-GAPS.md` | Status transitions, closure rules, validation, known backend bugs and their workarounds, security findings |
 | `06-BACKEND-ASKS.md` | What we have asked the backend team for, and what is blocking |
+| `07`–`11` | Added during the build: drift check, SDP parity, API drift (`src/api/drift.ts`), A2 status, SSO verification. Read the one a code comment cites |
 
 If code and docs disagree, **the backend source wins**. Re-verify against the web repo (read-only), then ask Ronit before updating the doc.
 
@@ -96,6 +97,6 @@ R7. If a step seems to need a write outside the allowed paths, a state change,
 
 > Note for future sessions:
 > - R4 and R5 were written for the documentation phase that produced these files. The 8 files are `CLAUDE.md` plus `docs/web-system/00` to `06`.
-> - When mobile development starts, Ronit will say which of R4 and R5 are relaxed **for this mobile repo only**, for example to allow `npm install` and writing `src/`.
-> - Until Ronit says so in writing, they apply as stated.
+> - Mobile development started in Phase 1 (2026-10): this repo now carries `src/`, `package.json` and the EAS build config, so R4 and R5 no longer describe it as written. Ronit confirms their relaxed form **for this mobile repo only** (e.g. `npm ci`, writing `src/`, commits on `dev`).
+> - Until Ronit states that form in writing, treat anything beyond building and testing this repo as still forbidden.
 > - R1, R2, R3 and R6 apply to the web repo and its databases **permanently**.

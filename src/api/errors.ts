@@ -106,9 +106,13 @@ export function describeFieldWriteError(field: string, error: unknown): string {
   return describeWriteError(error);
 }
 
-/** A 401: the API client has already ended the session and the app is returning to Login (02 §5.3). */
+/**
+ * The API client has already ended the session and the app is returning to Login (02 §5.3): the endpoint's own
+ * JSON 401 (`http`) or the device-side 8 h expiry (`client`). A non-JSON 401 — a proxy or captive-portal page — is
+ * not one: the session is kept and the request fails like any other `not-json` response.
+ */
 export function isSessionEndedError(error: unknown): boolean {
-  return error instanceof ApiClientError && error.status === 401;
+  return error instanceof ApiClientError && error.status === 401 && (error.kind === 'http' || error.kind === 'client');
 }
 
 /** No response at all: offline, DNS failure, or the server restarting. Screens show the offline banner for it. */

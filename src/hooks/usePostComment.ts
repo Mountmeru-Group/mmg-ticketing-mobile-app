@@ -56,7 +56,7 @@ export function usePostComment() {
         return comment;
       } catch (error) {
         if (files.length === 0) throw error;
-        throw afterPartialSuccess(`Your files were uploaded to the ticket, but the ${what} was not confirmed.`, error);
+        throw afterPartialSuccess(`Your files were uploaded to the ticket, but the ${what} was not confirmed.`, error, files);
       }
     },
     onSettled: (_data, error, { ticketId }) => {

@@ -19,8 +19,8 @@ import {
   OfflineBanner, OfflineState, OptionSheet, ScreenHeader, SelectField, StatusBadge, SubmitButton, type SheetOption,
 } from '@/components';
 import {
-  assertStatusChange, assertStatusUnchanged, findCachedTicket, useBulkRunner, useChangeStatus, useDiscardGuard, useSingleFlight, useTicket,
-  type BulkTarget,
+  assertStatusChange, assertStatusUnchanged, filesUploadedBefore, findCachedTicket, useBulkRunner, useChangeStatus, useDiscardGuard,
+  useSingleFlight, useTicket, type BulkTarget,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
@@ -178,6 +178,9 @@ function SingleStatus({ navigation, route }: Props) {
       notify('Status updated');
       leave(() => navigation.goBack());
     } catch (e) {
+      // Files ATT-2 already accepted stay on the ticket: take them off the form so a retry doesn't upload them twice.
+      const uploaded = filesUploadedBefore(e);
+      if (uploaded.length > 0) setFiles((prev) => prev.filter((f) => !uploaded.some((u) => u === f || u.uri === f.uri)));
       if (!isSessionEndedError(e)) setError(describeWriteError(e));
     }
   }

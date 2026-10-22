@@ -125,8 +125,6 @@ export interface ClosureForm {
 
 export const EMPTY_CLOSURE_FORM: ClosureForm = { resolution: '', closureCode: '', isFcr: false, closureComments: '' };
 
-export const REQUIRED_CLOSURE_FIELDS = ['resolution', 'closureComments'] as const satisfies readonly (keyof ClosureForm)[];
-
 /** Save is disabled (verbatim rule, :2514): `!resolution.trim() || !closureComments.trim() || isPending`. */
 export function canSubmitClosure(form: ClosureForm, isPending: boolean): boolean {
   return !(!form.resolution.trim() || !form.closureComments.trim() || isPending);

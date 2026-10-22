@@ -15,7 +15,7 @@ import {
   AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner,
   OfflineState, ScreenHeader, SubmitButton,
 } from '@/components';
-import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
+import { filesUploadedBefore, useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps } from '@/types';
@@ -91,6 +91,9 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
       notify(isPublic ? 'Reply sent' : 'Note saved');
       leave(() => navigation.goBack());
     } catch (e) {
+      // Files ATT-2 already accepted stay on the ticket: take them off the form so a retry doesn't upload them twice.
+      const uploaded = filesUploadedBefore(e);
+      if (uploaded.length > 0) setFiles((prev) => prev.filter((f) => !uploaded.some((u) => u === f || u.uri === f.uri)));
       if (!isSessionEndedError(e)) setError(describeWriteError(e));
     }
   }

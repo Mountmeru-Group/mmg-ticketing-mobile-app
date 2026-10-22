@@ -135,7 +135,10 @@ apiClient.interceptors.response.use(
   },
   (error: unknown) => {
     const normalised = normaliseError(error);
-    if (normalised.status === 401 && normalised.kind !== 'client') {
+    // Only the endpoint's own JSON `{ error }` answer ends the session (02 §5.3 step 2, §7.4). A non-JSON 401 is an
+    // IIS/ARR or captive-portal page, not the backend rejecting the token: it surfaces as a `not-json` error instead.
+    // A `client` 401 (8 h expiry) already ended the session in the request interceptor.
+    if (normalised.status === 401 && normalised.kind === 'http') {
       handleUnauthorized(normalised.body.error);
     }
     return Promise.reject(normalised);

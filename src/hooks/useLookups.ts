@@ -36,7 +36,7 @@ export function useCountryOptions({ enabled }: { enabled: boolean }) {
       checkFields(endpoint, res[0], COUNTRY_SPEC, '[0].');
       return res;
     },
-    enabled: enabled && (role === 'ADMIN' || role === 'AGENT'),
+    enabled: enabled && role !== undefined && isAgentOrAdmin(role),
     staleTime: LOOKUP_STALE_TIME_MS,
   });
 }
