@@ -6,10 +6,11 @@
 //   - a capability the role will NEVER have is left out of the list (HIDDEN);
 //   - one the role has but the ticket's state blocks is still decided here, and the screen DISABLES it or explains why.
 // Gating mirrors the web UI for UX only; the server stays the authority (05 §C rule 3). Pure functions, no UI.
-import type { AuthUser, TicketStatus, UserRole } from '@/types';
+import type { AuthUser, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
 import { canSeePrivateNotes } from './activity';
 import { isAgentOrAdmin, isStaff, isTriageAgent } from './roles';
 import { canAssignToSelf } from './session';
+import { countrySelectorMode } from './ticket-filters';
 import { canChangeStatus, getAvailableTransitions, isResolvedLocked, type StatusTransition } from './ticket-rules';
 
 /** The signed-in user, as the gates need it. `id` is only used to hide "Pick up" on one's own ticket. */
@@ -152,6 +153,101 @@ export function ticketDetailPermissions(
     addAttachments: !locked,
     editTasks: isStaff(role),
   };
+}
+
+// ── Ticket property editors on M4 (Phase G1; the web's behaviour, with sources: docs/G1-WEB-BEHAVIOUR.md) ──
+
+/** The fields M4 edits through TKT-4. Impact and urgency share one rule and one editor. */
+export type TicketField = 'impact' | 'urgency' | 'category' | 'country' | 'resolution';
+
+export type FieldAccess =
+  /** The editor is offered. */
+  | { mode: 'edit' }
+  /** The role has this edit, but the ticket's state (or the person's country lock) blocks it: show the value and why. */
+  | { mode: 'locked'; reason: string }
+  /** The role never edits it: the value only, with no editor and no reason (ROLE-MATRIX.md §3 rule 1). */
+  | { mode: 'view' }
+  /** Not shown at all. */
+  | { mode: 'hidden' };
+
+export interface TicketFieldPermissions extends Record<TicketField, FieldAccess> {
+  /** Show, before Save, the priority the server will compute. LKP-6 is ADMIN/AGENT only (403 for L2, as on the web). */
+  priorityPreview: boolean;
+}
+
+export const AGENT_LOCK_REASON = 'Closed and canceled tickets are locked for technicians.';
+export const COUNTRY_LOCK_REASON = "You're locked to your own country, so only an Admin or a triage technician can change a ticket's country.";
+export const RESOLUTION_STATE_REASON = 'The resolution can be edited only while the ticket is Resolved or Closed.';
+
+/** Statuses in which the web offers the resolution editor (FE:TicketDetailPage.tsx:1440). CANCELED is not one. */
+export const RESOLUTION_EDIT_STATUSES: ReadonlySet<TicketStatus> = new Set<TicketStatus>(['RESOLVED', 'CLOSED']);
+
+/** TKT-4 body key → the field whose rule decides it. A key missing here is not editable from the app at all. */
+export const FIELD_OF_UPDATE_KEY: Partial<Record<keyof UpdateTicketBody, TicketField>> = {
+  impact: 'impact',
+  urgency: 'urgency',
+  categoryId: 'category',
+  countryId: 'country',
+  resolution: 'resolution',
+};
+
+const EDIT: FieldAccess = { mode: 'edit' };
+const VIEW: FieldAccess = { mode: 'view' };
+const HIDDEN: FieldAccess = { mode: 'hidden' };
+const lockedBy = (reason: string): FieldAccess => ({ mode: 'locked', reason });
+
+/**
+ * Who may edit which property on M4, in this ticket state. The screen renders the editors from this, and the write
+ * guard (useUpdateTicket → fieldEditProblem) refuses anything this does not return as `edit`.
+ * - Impact, urgency: staff; the AGENT lock applies (web :1737-1774). END_USER: hidden (05 §A.3, a decision).
+ * - Category: ADMIN and AGENT; the AGENT lock applies. L2_MANAGER and END_USER see it read-only (web :1951-1960).
+ * - Country: the 05 §A.12 roles (G1 brief): ADMIN and triage AGENT edit; a country AGENT sees it locked; L2_MANAGER and
+ *   END_USER see the value only. Not lock-gated by status (web :2199). The web lets every AGENT edit: G1 discrepancy D2.
+ * - Resolution: staff while RESOLVED or CLOSED, with no AGENT lock (web :1438-1486). END_USER read-only (D3, 🔒 SAFER).
+ */
+export function ticketFieldPermissions(
+  viewer: Pick<AuthUser, 'role' | 'countryId'> | null,
+  ticket: { status: TicketStatus },
+): TicketFieldPermissions {
+  const role: UserRole = viewer?.role ?? 'END_USER';
+  const agentLock = isResolvedLocked(role, ticket.status);
+
+  const classification = !isStaff(role) ? HIDDEN : agentLock ? lockedBy(AGENT_LOCK_REASON) : EDIT;
+  const category = !isAgentOrAdmin(role) ? VIEW : agentLock ? lockedBy(AGENT_LOCK_REASON) : EDIT;
+  const countryMode = viewer ? countrySelectorMode(viewer) : 'hidden';
+  const country = countryMode === 'switch' ? EDIT : countryMode === 'locked' ? lockedBy(COUNTRY_LOCK_REASON) : VIEW;
+  const resolution = !isStaff(role) ? VIEW : RESOLUTION_EDIT_STATUSES.has(ticket.status) ? EDIT : lockedBy(RESOLUTION_STATE_REASON);
+
+  return {
+    impact: classification,
+    urgency: classification,
+    category,
+    country,
+    resolution,
+    priorityPreview: isAgentOrAdmin(role) && classification.mode === 'edit',
+  };
+}
+
+/**
+ * Last guard before TKT-4: why this body may not be sent, or null when every key is a field the person may edit in
+ * this state. Keys outside FIELD_OF_UPDATE_KEY (title, team, assignee, tags …) are refused: no app screen edits them.
+ */
+export function fieldEditProblem(
+  viewer: Pick<AuthUser, 'role' | 'countryId'> | null,
+  status: TicketStatus,
+  input: UpdateTicketBody,
+): string | null {
+  const keys = (Object.keys(input) as (keyof UpdateTicketBody)[]).filter((key) => input[key] !== undefined);
+  if (keys.length === 0) return 'Nothing to save.';
+  const can = ticketFieldPermissions(viewer, { status });
+  for (const key of keys) {
+    const field = FIELD_OF_UPDATE_KEY[key];
+    if (!field) return "This field can't be changed from the app.";
+    const access = can[field];
+    if (access.mode === 'locked') return access.reason;
+    if (access.mode !== 'edit') return `Your role can't change the ${field} of a ticket.`;
+  }
+  return null;
 }
 
 /**

@@ -5,8 +5,9 @@ import { onlineManager } from '@tanstack/react-query';
 
 import { ApiClientError, clientError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import { getTicket } from '@/api/tickets.api';
-import type { ChangeStatusBody, TicketStatus, UserRole } from '@/types';
+import type { AuthUser, ChangeStatusBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
 import { statusLabel } from '@/utils/format';
+import { fieldEditProblem } from '@/utils/permissions';
 import { isAgentOrAdmin } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { canChangeStatus, isResolvedLocked, isTransitionAllowed, requiresClosureForm } from '@/utils/ticket-rules';
@@ -78,6 +79,19 @@ export function assertAssignment(role: UserRole, status: TicketStatus, assignedT
   if (assignedToId && isPlaceholderUser({ id: assignedToId })) {
     throw refuse('This session has a placeholder user that cannot be assigned. Sign out and paste the developer token again.');
   }
+}
+
+/**
+ * TKT-4 property edits (Phase G1): every key must be a field ticketFieldPermissions() gives this person as `edit` in
+ * this status. Status is never one of them (05 B.1: PUT drops it), and neither is anything no screen edits.
+ */
+export function assertFieldEdits(
+  viewer: Pick<AuthUser, 'role' | 'countryId'>,
+  status: TicketStatus,
+  input: UpdateTicketBody,
+): void {
+  const problem = fieldEditProblem(viewer, status, input);
+  if (problem) throw refuse(problem);
 }
 
 /** 05 §A.3: adding attachments is blocked only where the AGENT lock applies. */

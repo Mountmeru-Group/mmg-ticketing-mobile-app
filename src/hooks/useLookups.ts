@@ -3,15 +3,15 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { assertArray, assertObject, checkFields } from '@/api/drift';
-import { listCategories, listCountries, listMyCountries, listTeams } from '@/api/lookups.api';
+import { getPriorityMatrix, listCategories, listCountries, listMyCountries, listTeams } from '@/api/lookups.api';
 import {
-  CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, TEAM_SPEC, USER_REF_SPEC,
+  CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, PRIORITY_MATRIX_SPEC, TEAM_SPEC, USER_REF_SPEC,
 } from '@/api/responseSpecs';
 import { getEmailRecipients, getSuggestedAssignees } from '@/api/tickets.api';
 import { searchUsers } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
 import type {
-  Category, Country, EmailRecipients, SuggestedAssignee, Team, UserRole, UserSearchResult,
+  Category, Country, EmailRecipients, PriorityMatrixEntry, SuggestedAssignee, Team, UserRole, UserSearchResult,
 } from '@/types';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { queryKeys } from './queryKeys';
@@ -52,6 +52,25 @@ export function useCategories({ enabled }: { enabled: boolean }) {
       return res;
     },
     enabled,
+    staleTime: LOOKUP_STALE_TIME_MS,
+  });
+}
+
+/**
+ * LKP-6 `GET /priority-matrix` — ADMIN and AGENT only (403 otherwise, so it is never requested for anyone else).
+ * Loaded when the impact/urgency editor opens. Preview only: the server's computed priority always wins.
+ */
+export function usePriorityMatrix({ enabled }: { enabled: boolean }) {
+  const role = useAuthStore((s) => s.user?.role);
+  return useQuery({
+    queryKey: queryKeys.lookups.priorityMatrix(),
+    queryFn: async (): Promise<PriorityMatrixEntry[]> => {
+      const res = await getPriorityMatrix();
+      assertArray<PriorityMatrixEntry>('LKP-6', res);
+      checkFields('LKP-6', res[0], PRIORITY_MATRIX_SPEC, '[0].');
+      return res;
+    },
+    enabled: enabled && !!role && isAgentOrAdmin(role),
     staleTime: LOOKUP_STALE_TIME_MS,
   });
 }

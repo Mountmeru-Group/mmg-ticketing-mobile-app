@@ -7,7 +7,8 @@ export { useTicketComments } from './useTicketComments';
 export { useTicketAttachments } from './useTicketAttachments';
 export { useTicketHistory } from './useTicketHistory';
 export {
-  countryName, useCategories, useCountryOptions, useEmailRecipients, useSuggestedAssignees, useTeams, useUserSearch,
+  countryName, useCategories, useCountryOptions, useEmailRecipients, usePriorityMatrix, useSuggestedAssignees, useTeams,
+  useUserSearch,
 } from './useLookups';
 export { useDebouncedValue } from './useDebouncedValue';
 export { useDiscardGuard } from './useDiscardGuard';

@@ -30,30 +30,9 @@ import {
   availableTicketFilters, countrySelectorMode, isTicketFilterAllowed, listCountryParam, roleDefaultTicketQuery,
 } from '../../src/utils/ticket-filters.ts';
 import { STATUS_TRANSITIONS, canCloseInBulk, getAvailableTransitions } from '../../src/utils/ticket-rules.ts';
+import { NAMES, OTHER_USER, PERSONAS, forEachPersona } from './personas.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-
-// ── The five people the matrix is about ──────────────────────
-// Triage AGENT: the server's definition is an email in TRIAGE_USER_EMAILS, which the app cannot see (ask A4). The app
-// uses the web UI's definition, an AGENT with no countryId (05 §A.12, FE:CountrySelector.tsx:30), so that is tested.
-const PERSONAS = {
-  END_USER: { id: 'user-end', role: 'END_USER', countryId: 'country-tz', email: 'end@example.test', displayName: 'End User', ldapSamAccount: null },
-  AGENT: { id: 'user-agent', role: 'AGENT', countryId: 'country-tz', email: 'agent@example.test', displayName: 'Agent', ldapSamAccount: null },
-  TRIAGE_AGENT: { id: 'user-triage', role: 'AGENT', countryId: null, email: 'triage@example.test', displayName: 'Triage', ldapSamAccount: null },
-  L2_MANAGER: { id: 'user-l2', role: 'L2_MANAGER', countryId: 'country-tz', email: 'l2@example.test', displayName: 'L2', ldapSamAccount: null },
-  ADMIN: { id: 'user-admin', role: 'ADMIN', countryId: null, email: 'admin@example.test', displayName: 'Admin', ldapSamAccount: null },
-};
-const NAMES = Object.keys(PERSONAS);
-const OTHER_USER = 'user-someone-else';
-
-/** For each persona: the expected value, written out in full so an extra permission shows up as a diff. */
-function forEachPersona(title, expected, actual) {
-  for (const name of NAMES) {
-    test(`${title}: ${name}`, () => {
-      assert.deepEqual(actual(PERSONAS[name]), expected[name]);
-    });
-  }
-}
 
 const targets = (transitions) => transitions.map((t) => t.target);
 
@@ -533,9 +512,15 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     { file: 'src/navigation/MainTabs.tsx', uses: ['mainTabs('], forbid: /name="(HomeTab|TicketsTab|AlertsTab)"/ },
     {
       file: 'src/screens/tickets/TicketDetailScreen.tsx',
-      uses: ['ticketDetailPermissions(', 'isCommentVisible('],
+      uses: ['ticketDetailPermissions(', 'isCommentVisible(', 'ticketFieldPermissions('],
       // The Reply / Reply all / Note buttons come from the list; a hard-coded one would bypass it.
       forbid: /mode:\s*'(reply|replyAll|note)'|isResolvedLocked\(/,
+    },
+    {
+      // G1 property editors: who/when only from ticketFieldPermissions(); writes only through useUpdateTicket.
+      file: 'src/screens/tickets/TicketPropertyEditors.tsx',
+      uses: ['ticketFieldPermissions(', 'useUpdateTicket('],
+      forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s/,
     },
     { file: 'src/screens/tickets/ReplyComposerScreen.tsx', uses: ['composerPermissions('] },
     {

@@ -97,6 +97,15 @@ export function describeWriteError(error: unknown): string {
   return error.body.error;
 }
 
+/**
+ * A failed property save on M4 (Phase G1), e.g. `field` = "the category". A 403 says plainly that the role can't
+ * change that field; anything else is describeWriteError() (the server's own message for a 4xx).
+ */
+export function describeFieldWriteError(field: string, error: unknown): string {
+  if (error instanceof ApiClientError && error.status === 403) return `Your role can't change ${field} on this ticket. Nothing was saved.`;
+  return describeWriteError(error);
+}
+
 /** A 401: the API client has already ended the session and the app is returning to Login (02 §5.3). */
 export function isSessionEndedError(error: unknown): boolean {
   return error instanceof ApiClientError && error.status === 401;
