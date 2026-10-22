@@ -5,8 +5,11 @@
 // - Body from the per-role allow-list (createTicket): END_USER sends only title, description, categoryId, source.
 // - Create is explicit and confirmed (a ticket can't be deleted). Files upload AFTER create, to the new id (ATT-2).
 //   On success: open the new ticket.
+// - Draft (02 §5.4): title, description, category picks and classification are kept on this phone while typing
+//   (hooks/useDraft.ts) and restored next time the form opens; cleared on create and on Discard. Routing picks and
+//   files are not drafted.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { UploadFile } from '@/api/attachments.api';
@@ -15,7 +18,7 @@ import {
   AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, LookupError, Notice, OfflineBanner,
   OfflineState, OptionSheet, PersonPickerSheet, ScreenHeader, SelectField, SubmitButton, type Person, type SheetOption,
 } from '@/components';
-import { useCategories, useCreateTicket, useDiscardGuard, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
+import { useCategories, useCreateTicket, useDiscardGuard, useDraft, useSingleFlight, useTeams, validateNewTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import {
@@ -36,8 +39,25 @@ const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 
 type Sheet = 'top' | 'sub' | 'item' | 'impact' | 'urgency' | 'team' | 'assignee' | 'requester' | null;
 
+/** What the local draft holds (02 §5.4). */
+interface TicketDraft {
+  title: string;
+  description: string;
+  topId: string | null;
+  subId: string | null;
+  itemId: string | null;
+  impact: TicketImpact | null;
+  urgency: TicketUrgency | null;
+}
+
+function isDraftEmpty(d: TicketDraft): boolean {
+  const title = d.title.trim();
+  return (!title || title === INITIAL_TITLE.trim()) && !d.description.trim() && !d.topId && !d.impact && !d.urgency;
+}
+
 export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'CreateTicket'>) {
   const insets = useSafeAreaInsets();
+  const userId = useAuthStore((s) => s.user?.id);
   const role: UserRole = useAuthStore((s) => s.user?.role) ?? 'END_USER';
   const staff = isStaff(role);
   const agentOrAdmin = isAgentOrAdmin(role);
@@ -96,8 +116,39 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
     setAssignee(member?.user ? { id: member.user.id, displayName: member.user.displayName, email: member.user.email } : null);
   }, [agentOrAdmin, teamTouched, teams, itemId, subId, topId, find]);
 
+  // ── Draft (02 §5.4) ──
+  const draftValue = useMemo<TicketDraft>(
+    () => ({ title, description, topId, subId, itemId, impact, urgency }),
+    [title, description, topId, subId, itemId, impact, urgency],
+  );
+  const draft = useDraft<TicketDraft>(userId ? `create:${userId}` : null, draftValue, isDraftEmpty);
+  const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+  useEffect(() => {
+    const d = draft.restored;
+    if (!d) return;
+    setTitle(d.title);
+    setDescription(d.description);
+    setTopId(d.topId);
+    setSubId(d.subId);
+    setItemId(d.itemId);
+    setImpact(d.impact);
+    setUrgency(d.urgency);
+    setRestoredFromDraft(true);
+  }, [draft.restored]);
+  const discardDraft = () => {
+    draft.discard();
+    setTitle(INITIAL_TITLE);
+    setDescription('');
+    setTopId(null);
+    setSubId(null);
+    setItemId(null);
+    setImpact(null);
+    setUrgency(null);
+    setRestoredFromDraft(false);
+  };
+
   const dirty = title !== INITIAL_TITLE || !!description.trim() || !!categoryId || files.length > 0;
-  const { leave } = useDiscardGuard({ dirty, busy: create.isPending, what: 'ticket' });
+  const { leave } = useDiscardGuard({ dirty, busy: create.isPending, what: 'ticket', onDiscard: draft.discard });
 
   async function submit() {
     setError(null);
@@ -132,6 +183,7 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
         requesterId: agentOrAdmin ? requester?.id : undefined,
         files,
       });
+      draft.discard();
       if (result.uploadError) {
         Alert.alert('Ticket created', `Ticket created but some attachments failed to upload. ${describeWriteError(result.uploadError)}`);
       } else {
@@ -171,6 +223,14 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
       <ScreenHeader title="New ticket" variant="back" />
       <OfflineBanner />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}>
+        {restoredFromDraft ? (
+          <View className="mx-4 mb-3 flex-row flex-wrap items-center">
+            <Text className="text-xs text-gray-500">Draft restored from your last visit. </Text>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={discardDraft} hitSlop={8} className="min-h-11 justify-center">
+              <Text className="text-xs font-medium text-blue-700">Discard draft</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <FormCard>
           <FieldLabel label="Title" required hint="3 to 255 characters" />
           <TextInput

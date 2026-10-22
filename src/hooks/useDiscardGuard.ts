@@ -5,7 +5,15 @@ import { usePreventRemove, useNavigation } from '@react-navigation/native';
 import { useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 
-export function useDiscardGuard({ dirty, busy, what }: { dirty: boolean; busy: boolean; what: string }) {
+export function useDiscardGuard({
+  dirty, busy, what, onDiscard,
+}: {
+  dirty: boolean;
+  busy: boolean;
+  what: string;
+  /** Runs when the person chooses Discard — e.g. to drop the local draft (02 §5.4) so it is not restored next time. */
+  onDiscard?: () => void;
+}) {
   const navigation = useNavigation();
   const allowed = useRef(false);
 
@@ -20,7 +28,14 @@ export function useDiscardGuard({ dirty, busy, what }: { dirty: boolean; busy: b
     }
     Alert.alert(`Discard this ${what}?`, 'What you entered will be lost. Nothing has been sent.', [
       { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          onDiscard?.();
+          navigation.dispatch(data.action);
+        },
+      },
     ]);
   });
 

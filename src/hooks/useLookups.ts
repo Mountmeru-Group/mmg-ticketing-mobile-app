@@ -3,15 +3,15 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { assertArray, assertObject, checkFields } from '@/api/drift';
-import { getPriorityMatrix, listCategories, listCountries, listMyCountries, listTeams } from '@/api/lookups.api';
+import { getPriorityMatrix, listCannedResponses, listCategories, listCountries, listMyCountries, listTeams } from '@/api/lookups.api';
 import {
-  CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, PRIORITY_MATRIX_SPEC, TEAM_SPEC, USER_REF_SPEC,
+  CANNED_RESPONSE_SPEC, CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, PRIORITY_MATRIX_SPEC, TEAM_SPEC, USER_REF_SPEC,
 } from '@/api/responseSpecs';
 import { getEmailRecipients, getSuggestedAssignees } from '@/api/tickets.api';
 import { searchUsers } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
 import type {
-  Category, Country, EmailRecipients, PriorityMatrixEntry, SuggestedAssignee, Team, UserRole, UserSearchResult,
+  CannedResponse, Category, Country, EmailRecipients, PriorityMatrixEntry, SuggestedAssignee, Team, UserRole, UserSearchResult,
 } from '@/types';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { queryKeys } from './queryKeys';
@@ -71,6 +71,26 @@ export function usePriorityMatrix({ enabled }: { enabled: boolean }) {
       return res;
     },
     enabled: enabled && !!role && isAgentOrAdmin(role),
+    staleTime: LOOKUP_STALE_TIME_MS,
+  });
+}
+
+/**
+ * LKP-7 `GET /canned-responses` — reply templates for the composer (SDP "response templates"). Staff only on mobile,
+ * as on the web (01 LKP-7). Loaded when the picker opens; the whole list comes at once (no pagination).
+ */
+export function useCannedResponses({ enabled }: { enabled: boolean }) {
+  const role = useAuthStore((s) => s.user?.role);
+  return useQuery({
+    queryKey: queryKeys.lookups.cannedResponses(),
+    queryFn: async (): Promise<CannedResponse[]> => {
+      const res = await listCannedResponses();
+      assertObject<{ data: unknown }>('LKP-7', res);
+      assertArray<CannedResponse>('LKP-7', res.data);
+      checkFields('LKP-7', res.data[0], CANNED_RESPONSE_SPEC, 'data[0].');
+      return res.data;
+    },
+    enabled: enabled && !!role && isStaff(role),
     staleTime: LOOKUP_STALE_TIME_MS,
   });
 }

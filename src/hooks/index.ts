@@ -7,11 +7,12 @@ export { useTicketComments } from './useTicketComments';
 export { useTicketAttachments } from './useTicketAttachments';
 export { useTicketHistory } from './useTicketHistory';
 export {
-  countryName, useCategories, useCountryOptions, useEmailRecipients, usePriorityMatrix, useSuggestedAssignees, useTeams,
-  useUserSearch,
+  countryName, useCannedResponses, useCategories, useCountryOptions, useEmailRecipients, usePriorityMatrix, useSuggestedAssignees,
+  useTeams, useUserSearch,
 } from './useLookups';
 export { useDebouncedValue } from './useDebouncedValue';
 export { useDiscardGuard } from './useDiscardGuard';
+export { useDraft } from './useDraft';
 export { useSingleFlight } from './useSingleFlight';
 export { findCachedTicket } from './cache';
 

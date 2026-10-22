@@ -24,7 +24,7 @@
 //     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openAttachmentExternally } from '@/api/attachmentDownload';
@@ -44,6 +44,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { ActivityAuditItem, Attachment, Comment, TicketDetail, TicketStackScreenProps, TicketTaskEmbedded } from '@/types';
 import { describeAudit } from '@/utils/activity';
+import { APP_ORIGIN } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import {
   effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
@@ -72,6 +73,20 @@ const CONVERSATION_ACTIONS: Record<ComposerMode, { label: string; icon: keyof ty
   replyAll: { label: 'Reply all', icon: 'arrow-undo-circle-outline' },
   note: { label: 'Note', icon: 'lock-closed-outline' },
 };
+
+/**
+ * The system share sheet with the ticket's web link, in the shape the server's own emails use (05 §A.11:
+ * `${APP_URL}/ticket/<number>`), so a colleague who taps it lands on the web, or in this app once A18 ships.
+ * No token, no description: the link alone. A dismissed sheet is not an error.
+ */
+async function shareTicketLink(ticket: Pick<TicketDetail, 'ticketNumber' | 'title'>): Promise<void> {
+  const url = `${APP_ORIGIN}/ticket/${ticket.ticketNumber}`;
+  try {
+    await Share.share({ message: `Ticket #${ticket.ticketNumber}: ${ticket.title}\n${url}` }, { dialogTitle: `Share ticket #${ticket.ticketNumber}` });
+  } catch {
+    Alert.alert("Couldn't open the share sheet", 'Try again, or copy the ticket number instead.');
+  }
+}
 
 /** Images (not SVG) open in the in-app viewer; PDFs and other types show their details only. */
 function isViewableImage(mimeType: string): boolean {
@@ -227,10 +242,16 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   // Every role-gated element below reads these two objects (utils/permissions.ts, pinned per role by tests/rbac).
   const can = ticketDetailPermissions(user, ticket);
   const fields = ticketFieldPermissions(user, ticket);
-  const moreActions: SheetOption<MoreAction>[] = can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] }));
-  const onMore = (action: MoreAction) => {
+  // "Share link" is not a write and not role-gated: the link is the one the server itself puts in emails
+  // (05 §A.11), and the server decides who may open it. It is appended after the permission-driven actions.
+  const moreActions: SheetOption<MoreAction | 'share'>[] = [
+    ...can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] })),
+    { value: 'share', label: 'Share link', description: `Send a link to #${ticket.ticketNumber}` },
+  ];
+  const onMore = (action: MoreAction | 'share') => {
     if (action === 'pickup') void once(pickUp);
     else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
+    else if (action === 'share') void shareTicketLink(ticket);
     else navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
   };
 
