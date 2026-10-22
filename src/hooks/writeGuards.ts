@@ -5,9 +5,9 @@ import { onlineManager } from '@tanstack/react-query';
 
 import { ApiClientError, clientError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import { getTicket } from '@/api/tickets.api';
-import type { AuthUser, ChangeStatusBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
+import type { AuthUser, ChangeStatusBody, CreateServiceRequestBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
 import { statusLabel } from '@/utils/format';
-import { canDeleteAttachments, canSubmitForApproval, fieldEditProblem } from '@/utils/permissions';
+import { canDeleteAttachments, canSubmitForApproval, fieldEditProblem, serviceRequestProblem } from '@/utils/permissions';
 import { isAgentOrAdmin } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { canChangeStatus, isResolvedLocked, isTransitionAllowed, requiresClosureForm } from '@/utils/ticket-rules';
@@ -108,6 +108,12 @@ export function assertCanDeleteAttachment(role: UserRole): void {
 export function assertCanSubmitForApproval(role: UserRole, approverIds: readonly string[]): void {
   if (!canSubmitForApproval(role)) throw refuse('Only Admins and Technicians can submit a ticket for approval.');
   if (approverIds.length === 0) throw refuse('Choose at least one approver.');
+}
+
+/** G4, SCR-5: every role may request a service; only the four kept keys; `priority` only with the request properties. */
+export function assertServiceRequest(role: UserRole, body: CreateServiceRequestBody): void {
+  const problem = serviceRequestProblem({ role }, body);
+  if (problem) throw refuse(problem);
 }
 
 /**

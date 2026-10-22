@@ -3,12 +3,15 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ApprovalDetailScreen } from '@/screens/approvals/ApprovalDetailScreen';
 import { ApprovalsInboxScreen } from '@/screens/approvals/ApprovalsInboxScreen';
+import { ServiceCatalogScreen } from '@/screens/catalog/ServiceCatalogScreen';
+import { ServiceRequestDetailScreen } from '@/screens/catalog/ServiceRequestDetailScreen';
+import { ServiceRequestFormScreen } from '@/screens/catalog/ServiceRequestFormScreen';
 import { KbArticleScreen } from '@/screens/knowledge/KbArticleScreen';
 import { KnowledgeBaseScreen } from '@/screens/knowledge/KnowledgeBaseScreen';
 import { TaskDetailScreen } from '@/screens/tasks/TaskDetailScreen';
 import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { TaskListScreen } from '@/screens/tasks/TaskListScreen';
-import type { ApprovalsStackParamList, KnowledgeStackParamList, TasksStackParamList } from '@/types';
+import type { ApprovalsStackParamList, CatalogStackParamList, KnowledgeStackParamList, TasksStackParamList } from '@/types';
 
 const Approvals = createNativeStackNavigator<ApprovalsStackParamList>();
 
@@ -46,5 +49,18 @@ export function KnowledgeStack() {
       <Knowledge.Screen name="KnowledgeBase" component={KnowledgeBaseScreen} />
       <Knowledge.Screen name="KbArticle" component={KbArticleScreen} />
     </Knowledge.Navigator>
+  );
+}
+
+const Catalog = createNativeStackNavigator<CatalogStackParamList>();
+
+/** Service catalogue (Phase G4): catalogue and My Requests → an item's request form, or one of my requests. */
+export function CatalogStack() {
+  return (
+    <Catalog.Navigator initialRouteName="ServiceCatalog" screenOptions={{ headerShown: false }}>
+      <Catalog.Screen name="ServiceCatalog" component={ServiceCatalogScreen} />
+      <Catalog.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} />
+      <Catalog.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
+    </Catalog.Navigator>
   );
 }

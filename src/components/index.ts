@@ -1,4 +1,5 @@
 export { AnnouncementBanner, AnnouncementCard, AnnouncementTypeChip } from './AnnouncementCard';
+export { ApprovalStatusChip } from './ApprovalStatusChip';
 export { AttachmentPicker } from './AttachmentPicker';
 export { OfflineBanner, QueryBanner } from './Banners';
 export { BrandLogo } from './BrandLogo';

@@ -8,6 +8,8 @@
 
 **Updated for Phase G3, 2026-10-22.** Reply templates, deleting a file and submitting a ticket for approval are built, each matching the web's roles and state rules. Rows T22, T26 and C4, the totals, §0, §2, §3, §6 and §7 are updated; §12 lists what G3 changed. The web's behaviour, with sources, is in `docs/G3-WEB-BEHAVIOUR.md`.
 
+**Updated for Phase G4, 2026-10-22.** The service catalogue is built: browsing, the request form with every field type the web renders, and My Requests. §1.9 (expected behaviour) and §2.8 (rows SC1–SC9) are new; row N8, the totals, §0, §2, §6 and §7 are updated; §13 lists what G4 changed. The web's behaviour, with sources, is in `docs/G4-WEB-CATALOGUE.md`.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -34,9 +36,9 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **28** of the 85 rows in §2 (29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
+| Elements whose role gating differs from the web portal | **31** of the 94 rows in §2 (28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
 | More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user |
-| More restrictive than the web UI | **25**. Of these: **14** avoid a web defect, a 403 or a mis-scoped number (mobile is correct). **11** are documented product decisions. **0** are undocumented. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
+| More restrictive than the web UI | **28**. Of these: **16** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **0** are undocumented. G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
 | Attachments on private notes (check B) | **Real leak, Critical, backend-only fix.** The requester can list, view, download and zip files attached to a private note, and the header count includes them. The app cannot tell those files apart from others. It can only stop creating new ones (§5) |
 | Actions that 403 (check C) | **All hidden**, and assignment is also refused on the device (§6) |
@@ -161,6 +163,22 @@
 - **W8.** "Submit for Approval" in the Actions menu is ungated (`:697`), so END_USER and L2 get a 403.
 - **W9.** A stale country selection survives logout (`FE:store/auth.store.ts:18` does not reset `sd-country`), and the next END_USER's list is narrowed by it.
 
+### 1.9 Service catalogue (`FE:pages/service-catalog/ServiceCatalogPage.tsx` = SCP, `ServiceRequestFormPage.tsx` = SRF; Phase G4)
+Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.md`.
+
+| Element | END_USER | AGENT | L2 | ADMIN | Source |
+|---|---|---|---|---|---|
+| Sidebar "Service Request"; phone bottom tab "Requests" | ✅ | ✅ | ✅ | ✅ | `AppLayout.tsx:30, :266` |
+| Catalogue: categories, items, search (client-side, name or description) | ✅ | ✅ | ✅ | ✅ | `SCP:36-66, :364-479` |
+| Per-item or per-category visibility | none: every active item for every role | | | | `BE:modules/serviceCatalog/serviceCatalog.controller.ts:34-41, :61-71` |
+| "+ New Template (admin)" | ❌ | ❌ | ❌ | ✅ | `SCP:398-405` |
+| Request form: custom fields (7 types), required check, notes, "Add Request" (no confirmation) | ✅ | ✅ | ✅ | ✅ | `SRF:183-235, :467-491` |
+| Request properties: Impact, Urgency, auto Priority (only `priority` is kept) | ❌ | ✅ | ✅ | ✅ | `SRF:41, :267-318` |
+| Subject, description, category cascade, group, technician, assets, site, request type, status, mode, level, impact details, attachments | ✅ (staff extras for AGENT, L2, ADMIN; L2's group list is a **403**) | | | | `SRF:267-464`; the server keeps none (`serviceCatalog.controller.ts:26-31`, 05 B.24); files never uploaded (`SRF:158-165`) |
+| My Requests rows | own | **everyone's** | **everyone's** | **everyone's** | `SCP:44-48`; `serviceCatalog.controller.ts:117` |
+| Request detail | none: rows are not links | | | | `SCP:344` |
+| Cancel, edit, comment, assign, change status | none in the UI | | | | `serviceCatalog.router.ts:25-27` (staff-only routes, no web caller) |
+
 ---
 
 ## 2. Audit: the mobile app against §1
@@ -184,8 +202,9 @@
 - `bulkActions`, `inlineStatusTransitions`
 - `ticketListFilters` (G2: which of the five filters the M3 Filters sheet offers)
 - `canUseReplyTemplates`, `canDeleteAttachments`, `canSubmitForApproval` (G3; read by `composerPermissions().templates`, `ticketDetailPermissions().deleteAttachments` and `moreActions` 'approval', the write guards and the API functions)
+- `canUseServiceCatalog`, `serviceCatalogPermissions`, `isOwnServiceRequest`, `myServiceRequestRows`, `serviceRequestProblem` (G4: the drawer row, the catalogue screens, My Requests' rows, the request detail, and the SCR-5 write guard and API function)
 
-It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
+It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`. The G4 form rules (field types, validation, the request body) are in `src/utils/service-catalog.ts`.
 
 ### 2.1 Drawer and tab bar
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -197,7 +216,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | N5 | Drawer · Settings | all | – (no web page) | N/A | same |
 | N6 | Sign out | all | all | MATCH | `DrawerContent.tsx` account card |
 | N7 | Locked-country chip | country AGENT | country AGENT (lock icon) | MATCH | `DrawerContent.tsx:59` |
-| N8 | Tabs Home · Tickets · Alerts | all, same three | all, five tabs | MATCH. KB is in the drawer; Requests is P2 | `src/navigation/MainTabs.tsx:46` → perm `mainTabs` |
+| N8 | Tabs Home · Tickets · Alerts | all, same three | all, five tabs | MATCH. KB and the catalogue (the web's "Requests" tab, SC1) are in the drawer | `src/navigation/MainTabs.tsx:46` → perm `mainTabs` |
 
 ### 2.2 Home (M2) vs Dashboard
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -300,16 +319,30 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | AN2 | Announcements: create, delete | none | ADMIN | N/A (skipped) | – |
 | DL1 | Ticket link → ticket (deep link) | all, server scope | all | MATCH | `src/screens/tickets/TicketLinkScreen.tsx` |
 
-**Totals** (after G3, 2026-10-22)
-- 85 rows (84 after G1; G2 added L12).
-- **28 mismatches** (29 after G2, 28 after G1, 30 before it):
+### 2.8 Service catalogue (Phase G4)
+| # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
+|---|---|---|---|---|---|
+| SC1 | Drawer · Service Request | all | all (sidebar; phone bottom tab "Requests") | MATCH. A drawer row, as 04 P2; the bottom bar keeps its three tabs (08 §3.1) | `src/navigation/DrawerContent.tsx` → perm `drawerItems` ('catalog'), `canUseServiceCatalog` |
+| SC2 | Catalogue: categories with item counts, a category's items, search; no per-item scoping | all | all | MATCH | `src/screens/catalog/ServiceCatalogScreen.tsx` → perm `serviceCatalogPermissions().browse`; `src/utils/service-catalog.ts` `filterCatalogItems` (no viewer argument) |
+| SC3 | "+ New Template (admin)" | none | ADMIN | **NARROWER**, *decision* (admin stays on the web, 04 §2.3) | – |
+| SC4 | Request form: custom fields of all seven types, the web's `required` and browser checks, notes, "Add Request" with no confirmation, back to the catalogue | all | all | MATCH | `src/screens/catalog/ServiceRequestFormScreen.tsx`, `ServiceFormFieldInput.tsx` → perm `serviceCatalogPermissions().submit`; `useSubmitServiceRequest` → `assertServiceRequest` |
+| SC5 | Request properties: Impact, Urgency, the auto Priority | AGENT, L2, ADMIN | AGENT, L2, ADMIN | MATCH. Only `priority` is sent; END_USER's request is refused on the device if it ever carries one | perm `serviceCatalogPermissions().requestProperties`, `serviceRequestProblem` |
+| SC6 | Form controls whose values the server never keeps (subject, description, category cascade, group, technician, assets, site; for staff request type, status, mode, level, impact details) and the attachment box | none | all (staff extras: AGENT, L2, ADMIN; L2's group list is a 403) | **NARROWER**, *defect avoided*: the server keeps none of them (05 B.24), some are never sent, and the files are never uploaded (`docs/G4-WEB-CATALOGUE.md` §3, D2, D3) | – |
+| SC7 | My Requests: whose rows | own, every role | END_USER own; AGENT, L2, ADMIN everyone's | MATCH for END_USER. **NARROWER** for AGENT, L2 and ADMIN, *defect avoided*: the list is unscoped for them under a "My" label (01 SCR-4 ⚠) | perm `myServiceRequestRows`, `isOwnServiceRequest`; `src/hooks/useServiceCatalog.ts` `useMyServiceRequests` |
+| SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role | none (rows are not links) | N/A (mobile addition, ➕) | `src/screens/catalog/ServiceRequestDetailScreen.tsx` → perm `isOwnServiceRequest` |
+| SC9 | Cancel, edit, comment on, assign or change the status of a request | none | none | MATCH (the server's routes are staff-only and no web page calls them) | – |
+
+**Totals** (after G4, 2026-10-22)
+- 94 rows (85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12).
+- **31 mismatches** (28 after G3, 29 after G2, 28 after G1, 30 before it):
   - 3 WIDER: N1, N4, CR4.
-  - 25 NARROWER:
-    - **14 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3.
-    - **11 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T24, C2, CR5.
+  - 28 NARROWER:
+    - **16 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3, SC6, SC7.
+    - **12 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T24, C2, CR5, SC3.
     - **0 UNDOCUMENTED** (before G1: T8, T9, T11, T12).
 - G2: L10 went from N/A (not built) to built, MATCH for ADMIN and AGENT and NARROWER for END_USER and L2 (the web shows them an empty list). L12 is a new MATCH row.
 - G3: T22 (delete) from *decision* to MATCH; T26 (submit for approval) from *decision* to MATCH for ADMIN and AGENT and *defect avoided* for END_USER and L2; C4 (templates) from N/A to MATCH.
+- G4: SC1–SC9 are new. SC1, SC2, SC4, SC5 and SC9 MATCH; SC7 matches for END_USER; SC3, SC6 and SC7 (staff) are the three new mismatches; SC8 is a mobile addition.
 - **No mismatch is a security problem.**
 
 ---
@@ -345,6 +378,8 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | G3: delete a file, submit for approval | – (not built) | **no state rule on the web, so none here:** both are offered in every status, CLOSED and CANCELED included, for a locked AGENT too ✅ |
 | G3: the delete button | – | a spinner on the file being deleted; every delete button disabled while a delete or an upload is in flight ✅ |
 | G3: "Submit (n)" | – | disabled until one approver is chosen, and while sending; the chips and "Add an approver" disabled while sending ✅ |
+| G4: a retired service (SCR-3 still returns it) | – (not built) | the form says the service is no longer offered and has no "Add Request" ✅ |
+| G4: "Add Request", "Reset" | – | disabled while sending; the field messages appear after the first try and follow each change, as on the web ✅ |
 
 **Role-never elements, checked against rule 1:** all hidden ✅.
 - Note (END_USER, L2)
@@ -359,6 +394,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - G1 editors: category edit (L2, END_USER), country edit (L2, END_USER), resolution edit (END_USER). Each shows the value with no editor and no reason
 - G2: the Technician and Group filters (END_USER, L2): not in the Filters sheet, and never sent from a stale state
 - G3: the delete button (END_USER): not on any file row. "Submit for approval…" (END_USER, L2): not in More options; the screen itself shows "Not available for your role"; the guard and the API function refuse it before sending
+- G4: the request properties (END_USER): not on the form, and a `priority` from END_USER is refused before sending. Another person's request (any role): not in My Requests, and its detail shows "Not one of your requests"
 
 **G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
@@ -452,6 +488,9 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 | **Silent** rewrite: note → PUBLIC email | L2, END_USER | Note hidden and refused on the device | `BE:comments.controller.ts:56` → perm `composerModes`; `comments.api.ts:25` |
 | **Silent** no-op: `countryId` edit | L2 | Country edit is not offered to L2, and `fieldEditProblem` refuses `countryId` from L2 before sending (G1) | `BE:tickets.controller.ts:554-556` → perm `ticketFieldPermissions`; `src/hooks/useUpdateTicket.ts` |
 | **Silent** no-op: `PUT /tickets/:id {status}` | all | Status only goes through TKT-6 POST | 05 B.1 |
+| `PUT /service-catalog/requests/:id`, `POST …/status`, `POST …/assign` are `agentOrAdmin` | L2, END_USER | G4: never called by the app, for any role. The web has no page that calls them either | `BE:modules/serviceCatalog/serviceCatalog.router.ts:25-27`; 01 Appendix A |
+| **Silent** discard: the request form's subject, description, category, group, technician; files never uploaded | all | G4: not shown; SCR-5 carries only the four kept keys, and `serviceRequestProblem` refuses any other key before sending (tested: nothing sent) | `BE:serviceCatalog.controller.ts:26-31`; 05 B.24 → `src/api/serviceCatalog.api.ts` `createServiceRequest` |
+| Unscoped list: `GET /service-catalog/requests` for AGENT, L2, ADMIN | AGENT, L2, ADMIN | G4: My Requests keeps only the person's own rows; the detail shows only their own request | `BE:serviceCatalog.controller.ts:117` → perm `myServiceRequestRows`, `isOwnServiceRequest` |
 
 ---
 
@@ -546,6 +585,18 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - too permissive: END_USER deletes; L2 or everyone submits for approval; More options or the delete button bypassing the gate; an unknown role gets templates; the delete and submit API functions without their role check, or submit with no approver; either guard loosened or skipped in its hook; an extra field in the submit body; templates loaded with the composer; the delete button not behind the gate;
   - not as the web: the AGENT lock applied to delete or to submit; templates for staff only; a template replacing a non-blank message, or appended without a paragraph break; search matching the body; no "General" group; LKP-7 sending a parameter; the confirmation saying the ticket moves on after approval; the SLA clock judged "paused" from the status alone; the outcome claiming a status it never read; the cache dropping the row but not the count.
   - One first-draft mutation survived ("the delete hook skips the guard"): the order check passed because a missing call counts as position −1. The check now requires both calls to be present; the mutation is caught.
+
+**G4 additions (2026-10-22): 475 tests in all (366 after G3: 106 new in `service-catalog`, 3 new in `role-gating`).** Per file: `service-catalog` 106, `role-gating` 128, `g3-features` 83, `list-filters` 65, `property-editing` 59, `tests/auth/mobile-sso` 34.
+- **`tests/rbac/service-catalog.test.mjs`, 106 tests (new).** For each persona (END_USER, AGENT, triage AGENT, L2_MANAGER, ADMIN):
+  - **Catalogue visibility:** the exact `serviceCatalogPermissions()` answer; the drawer row's position after Knowledge base; an unknown role gets nothing. **No per-item scoping:** every persona sees exactly the server's item list, and the screen never passes a viewer to the browse filter. The drawer row's label and route, and the three stack screens, are registered.
+  - **Who can submit:** each persona sends exactly one `POST /service-catalog/requests` with exactly `{ serviceItemId, formData, notes }`; `priority` goes through for staff and is refused for END_USER with nothing sent; any other key (title, description, categoryId, teamId, assignedToId, impact, urgency, requesterId) is refused for every persona with nothing sent; an unknown role, a missing service or an invalid priority likewise. The write guard agrees, as a device refusal. A 404's message is kept.
+  - **Whose requests:** from SCR-4 pages holding everyone's requests, each persona sees only their own, once each, in the server's order; another person's request never reaches the detail screen, for ADMIN too. SCR-4 sends `page` and `limit=50`, never `status`. The automatic reading of further pages is bounded (10 rows or 4 pages).
+  - **The form:** the seven field types kept as themselves and every other type (case-sensitive) as text; labels, `required` truthiness and per-type placeholders; select options (strings, objects, numeric values, label-only, and the ones the web crashes on or renders blank); malformed entries skipped and counted; a non-array `formFields`; **no conditional logic** (dependency keys ignored, the field still required, no pattern applied); nothing prefilled. **Validation per type:** `required` fails only on empty (spaces pass, except in an e-mail, which the browser trims); text, long text and phone have no format rule; e-mail is the HTML "valid e-mail address"; number must be a number and a whole one; date a real day, any year; a select value must be an option; the browser check wins over `required`; errors in the form's order. **The `formData`:** every field, untouched ones as `""`, every value a string; the browser's value cleaning; react-hook-form's nesting for dotted and bracketed names; no prototype key. **The body:** exactly the four kept keys; blank notes as `""`, untrimmed; the web's toast text. **Priority:** the web form's options, all 12 pairs of its map, none without both, and sticky after clearing one.
+  - **Wiring:** no attachments and no confirmation on the form; the body only from `buildServiceRequestBody`; the toast and the return to the catalogue's Home view; validation before sending, and the guard before the API call in the hook; the field control's seven branches; an inactive item cannot be requested.
+- **`role-gating.test.mjs`, 128 tests (125):** the drawer rows now include `catalog` for every persona (a feature added for all roles, not a relaxation); the wiring checks add the three catalogue screens (no direct API call; no attachment picker or confirmation on the form; the detail checks ownership).
+- **Proof the tests bite.** Twenty-eight mutations, "too permissive" or "not as the web", were each applied alone, tested and restored by script. Every one made the suite fail (1–10 failures each), and every file under `src/` and `tests/` was verified byte-identical afterwards by SHA-1:
+  - too permissive: END_USER gets the request properties; My Requests shows everyone's rows; the detail shows anyone's request; END_USER may send a priority; extra keys allowed in the body; an unknown role may submit; the hook skips the guard; the form sends a priority for everyone; the detail skips the owner check; the catalogue screen gated by a raw role check;
+  - not as the web: the catalogue for staff only; `required` trims spaces; no e-mail check; decimals allowed; the e-mail not trimmed; unknown types kept as such; a conditional field hidden; the phone placeholder default lost; empty option values kept; the priority map wrong for High × High; the priority not sticky; untouched fields left out of `formData`; notes trimmed; search on names only; the automatic page reading unbounded; SCR-4 asking for 100; a confirmation added; an attachment picker added.
 
 ---
 
@@ -671,3 +722,30 @@ The three features were identified by name, as the G3 brief asked: reply templat
 - `GET /approvals` (unscoped, C.16): not called, so the web's per-ticket Approvals tab is not built.
 - The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
 - The web repo: byte-for-byte unchanged (SHA-1 of every file under `frontend/src`, `backend/src` and `backend/prisma`, before and after).
+
+---
+
+## 13. What Phase G4 changed (2026-10-22, uncommitted)
+
+The service catalogue, as the web portal does it (`docs/G4-WEB-CATALOGUE.md`), except where the web shows controls that save nothing or a list it should not (SC6, SC7).
+
+**Created**
+- `docs/G4-WEB-CATALOGUE.md`: the web's catalogue, request form (every field type and rule) and My Requests, with a source line for every statement; nine web defects (report only); what mobile does differently and why.
+- `src/utils/service-catalog.ts`: browsing, the field definitions, validation, `formData`, the request body, the impact × urgency map and the answer rows, as pure functions.
+- `src/api/serviceCatalog.api.ts`: SCR-1 to SCR-6. `createServiceRequest` refuses, before sending, any body `serviceRequestProblem` rejects.
+- `src/hooks/useServiceCatalog.ts`: `useServiceCategories`, `useServiceItems`, `useServiceItem`, `useMyServiceRequests` (own rows only), `useServiceRequest`, `useSubmitServiceRequest` (behind `assertServiceRequest`).
+- `src/screens/catalog/`: `ServiceCatalogScreen` (catalogue and My Requests), `ServiceRequestFormScreen`, `ServiceFormFieldInput` (the seven field types), `ServiceRequestDetailScreen`.
+- `src/components/ApprovalStatusChip.tsx`: moved out of `ApprovalDetailScreen.tsx`, unchanged, so the request detail reuses it.
+- `tests/rbac/service-catalog.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`: the `catalog` drawer row; `canUseServiceCatalog`, `serviceCatalogPermissions`, `isOwnServiceRequest`, `myServiceRequestRows`, `serviceRequestProblem`. The set of known roles is shared with `canUseReplyTemplates` (same answer).
+- Navigation: `CatalogStack` in `ModuleStacks.tsx`, the `Catalog` drawer screen, the drawer row "Service Request"; `CatalogStackParamList` in `src/types/navigation.ts`.
+- `src/hooks/writeGuards.ts` (`assertServiceRequest`), `src/hooks/queryKeys.ts` (`serviceCatalog`), `src/api/responseSpecs.ts` (three specs), `src/hooks/index.ts`, `src/components/index.ts`; `ApprovalDetailScreen.tsx` imports the chip.
+- `tests/rbac/role-gating.test.mjs`: the drawer rows include `catalog`; wiring checks for the three screens.
+- Docs: this file, `WEB-VS-MOBILE-ROLES.md`, `01-API-CONTRACT.md` (SCR-1 to SCR-6), `04-SCREEN-MAP.md` (the catalogue screens are now MVP: M17–M19), `05-RULES-AND-GAPS.md` (§A.17 and B.24, a G4 note each).
+
+**Not touched**
+- The ticket screens and flows (status still changes only through TKT-6 POST), the create form (gap 11 stays open).
+- The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
+- The web repo: byte-for-byte unchanged (SHA-1 of every file in the clone outside `node_modules` and `.git`, before and after).

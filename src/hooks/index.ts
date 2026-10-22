@@ -23,6 +23,8 @@ export { useAnnouncements } from './useAnnouncements';
 export { KB_PAGE_SIZE, useKbArticle, useKbArticles, useKbCategories, useKbSearch, useKbVoted } from './useKnowledgeBase';
 export { useProfile, profileChanges, validateProfile, type ProfileForm } from './useProfile';
 export { useTaskFeed } from './useTasks';
+// Phase G4 reads
+export { useMyServiceRequests, useServiceCategories, useServiceItem, useServiceItems, useServiceRequest } from './useServiceCatalog';
 
 // Writes
 export { useCreateTicket, validateNewTicket, type CreateTicketVariables } from './useCreateTicket';
@@ -42,3 +44,5 @@ export { useDeleteTask, useSaveTask, useToggleTask } from './useTasks';
 // Phase G3 writes
 export { useDeleteAttachment } from './useDeleteAttachment';
 export { useSubmitForApproval } from './useApprovals';
+// Phase G4 writes
+export { useSubmitServiceRequest } from './useServiceCatalog';

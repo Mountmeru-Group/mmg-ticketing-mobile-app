@@ -5,6 +5,7 @@
 //   sees an empty module they can't use. Badge = APR-1 count (one cached query, shared with Home and the inbox; it
 //   refreshes on pull-to-refresh and after a decision, never polled).
 // - Tasks: every role (END_USER read-only). The list is built from TKT-1 rows; see hooks/useTasks.ts (no A20 yet).
+// - Service Request (Phase G4): every role, the service catalogue and My Requests (docs/G4-WEB-CATALOGUE.md).
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
 // - Layout follows the web sidebar (frontend/src/layouts/AppLayout.tsx), top to bottom:
 //   - a white header band with the logo (44 dp tall, 72 dp wide) and the app name beside it;
@@ -43,6 +44,8 @@ const DRAWER_ROWS: Record<DrawerItem, { label: string; icon: keyof typeof Ionico
   approvals: { label: 'Approvals', icon: 'checkmark-done-outline', route: 'Approvals' },
   tasks: { label: 'Tasks', icon: 'checkbox-outline', route: 'Tasks' },
   knowledge: { label: 'Knowledge base', icon: 'book-outline', route: 'Knowledge' },
+  // The web sidebar's label (AppLayout.tsx:30); its phone bottom tab says "Requests" (:266). Phase G4.
+  catalog: { label: 'Service Request', icon: 'clipboard-outline', route: 'Catalog' },
   announcements: { label: 'Announcements', icon: 'megaphone-outline', route: 'Announcements' },
   settings: { label: 'Settings', icon: 'settings-outline', route: 'Profile' },
 };
@@ -72,6 +75,9 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
       case 'Knowledge':
         navigation.navigate('Knowledge', { screen: 'KnowledgeBase', pop: true });
         break;
+      case 'Catalog':
+        navigation.navigate('Catalog', { screen: 'ServiceCatalog', pop: true });
+        break;
       case 'MainTabs':
         navigation.navigate('MainTabs', { screen: 'HomeTab' });
         break;
@@ -86,7 +92,7 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
     badge: item === 'approvals' ? pendingApprovals : undefined,
     onPress: go(DRAWER_ROWS[item].route),
   }));
-  // Hidden until their asks ship: Service catalog (P2), Assets (P18). No approval delegation (A26).
+  // Hidden until its ask ships: Assets (P18). No approval delegation (A26). The Service catalog is built (Phase G4).
 
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>

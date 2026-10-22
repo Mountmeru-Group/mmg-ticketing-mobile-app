@@ -39,7 +39,8 @@ const targets = (transitions) => transitions.map((t) => t.target);
 // ── Drawer and tab bar ───────────────────────────────────────
 
 describe('drawer and tab bar', () => {
-  const ALWAYS = ['tasks', 'knowledge', 'announcements', 'settings'];
+  // G4: "Service Request" (the catalogue) for every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
+  const ALWAYS = ['tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
   const WITH_APPROVALS = ['approvals', ...ALWAYS];
 
   forEachPersona(
@@ -551,6 +552,24 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       file: 'src/screens/tickets/TicketFiltersScreen.tsx',
       uses: ['ticketListFilters(', 'useTickets('],
       forbid: /listTickets\(|apiClient|searchUsers\(|listTeams\(/,
+    },
+    {
+      // G4: the catalogue's views only from serviceCatalogPermissions(); the lists only through the hooks.
+      file: 'src/screens/catalog/ServiceCatalogScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'useMyServiceRequests(', 'can.myRequests'],
+      forbid: /listServiceRequests\(|listServiceItems\(|listServiceCategories\(|apiClient/,
+    },
+    {
+      // G4: request properties only from serviceCatalogPermissions(); the write only through useSubmitServiceRequest.
+      file: 'src/screens/catalog/ServiceRequestFormScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'useSubmitServiceRequest(', 'can.requestProperties'],
+      forbid: /createServiceRequest\(|apiClient|AttachmentPicker|confirmAction\(/,
+    },
+    {
+      // G4: a request is shown only when it is the person's own.
+      file: 'src/screens/catalog/ServiceRequestDetailScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'isOwnServiceRequest('],
+      forbid: /getServiceRequest\(|apiClient/,
     },
     { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
     { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },

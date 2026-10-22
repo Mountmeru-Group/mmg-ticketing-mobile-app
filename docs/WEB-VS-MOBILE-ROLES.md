@@ -1,6 +1,6 @@
 # Web portal vs mobile app: who can do what
 
-**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1, G2 and G3.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group. Phase G3 built reply templates, deleting a file and submitting a ticket for approval, each as the web does it (web behaviour: `docs/G3-WEB-BEHAVIOUR.md`).
+**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1, G2, G3 and G4.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group. Phase G3 built reply templates, deleting a file and submitting a ticket for approval, each as the web does it (web behaviour: `docs/G3-WEB-BEHAVIOUR.md`). Phase G4 built the service catalogue: browsing, the request form with every field type the web renders, and My Requests (web behaviour: `docs/G4-WEB-CATALOGUE.md`).
 
 ## 1. How to read this
 
@@ -18,26 +18,29 @@ This document compares, one capability per row, what the **web portal** lets eac
 
 | Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps |
 |---|---|---|---|---|
-| END_USER | 44 | 39 | 97% | 1: service catalogue |
-| AGENT | 76 | 72 | 96% | 2: all of section 4 |
-| triage AGENT | 75 | 73 | 96% | 2: all of section 4 |
-| L2_MANAGER | 55 | 52 | 97% | 1: service catalogue |
-| ADMIN | 77 | 73 | 96% | 2: all of section 4 |
+| END_USER | 46 | 43 | 100% | none |
+| AGENT | 80 | 77 | 98% | 1: the priority preview on the create form |
+| triage AGENT | 79 | 78 | 98% | 1: the priority preview on the create form |
+| L2_MANAGER | 59 | 57 | 100% | none |
+| ADMIN | 82 | 78 | 98% | 1: the priority preview on the create form |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
-- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 64–72%.
+- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 67–73%.
+- **Is anything still ❌ NOT BUILT? Yes, one row:** "See the priority a new ticket will get, before saving" (gap 11, ADMIN and AGENT). It was outside G4's scope (the service catalogue only). END_USER and L2_MANAGER have no genuine gap left.
+- **Before G4** (after G3, 2026-10-22): END_USER 39 on mobile, 97%, 1 gap; AGENT 72, 96%, 2; triage AGENT 73, 96%, 2; L2_MANAGER 52, 97%, 1; ADMIN 73, 96%, 2. With the exclusions counted as misses, 64–72%. G4 replaced the one catalogue row (❌) with seven: four ✅ SAME, one ➕ MOBILE ONLY (a request's detail), one 🔒 SAFER (everyone's requests under My Requests) and one ⊘ OUT OF SCOPE (creating templates).
 - **Before G3** (after G2, 2026-10-22): END_USER 38 on mobile, 93%, 2 gaps; AGENT 69, 91%, 5; triage AGENT 70, 91%, 5; L2_MANAGER 50, 92%, 3; ADMIN 70, 91%, 5. With the exclusions counted as misses, 61–68%. G3 moved three rows to ✅ SAME: reply templates (every role), delete a file (ADMIN, AGENT, L2_MANAGER) and submit for approval (ADMIN, AGENT).
 - **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
-- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed.
 
-## 3. Main table: 106 capabilities
+## 3. Main table: 112 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
 |---|---|---|---|---|---|
-| 44 | 21 | 2 | 22 | 17 | **106** |
+| 48 | 22 | 1 | 23 | 18 | **112** |
 
+Before G4: 44 SAME, 21 MOBILE ONLY, 2 NOT BUILT, 22 OUT OF SCOPE, 17 SAFER, 106 rows. G4 replaced the catalogue row with the seven rows of "Service catalogue".
 Before G3: 41 SAME, 5 NOT BUILT. G3 moved reply templates, delete a file and submit for approval to ✅ SAME.
 Before G2: 39 SAME, 8 NOT BUILT, 21 OUT OF SCOPE. G2 moved the two filter rows to ✅ SAME and the plain AGENT's country row to ⊘ OUT OF SCOPE (decided: it stays locked). The 17 🔒 SAFER rows are unchanged.
 Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and split the country row in two, because mobile now treats the triage AGENT and the plain AGENT differently there.
@@ -47,7 +50,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 - **AGENT** means every AGENT. A **triage AGENT** has no fixed country and can switch between countries. A **plain AGENT** is fixed to one country. Rows name them separately only where they differ.
 - **AGENT (lock)** means an AGENT cannot do this once the ticket is closed or canceled. The lock is identical on web and mobile.
 - **(L2_MANAGER: error)** in the web column means the web shows that role the control, but it fails. That role is not counted as "can".
-- ROLE-MATRIX.md audits 84 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 106 rows.
+- ROLE-MATRIX.md audits 94 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 112 rows.
 
 ### Tickets
 
@@ -104,7 +107,18 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Submit a ticket for approval | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In "More options", in every status: the AGENT lock doesn't apply, as on the web. Approvers can be any user; a comment is optional. The ticket moves to Pending with Management Review at once (on a resolved, closed or canceled ticket that reopens it), and approving or rejecting doesn't move it again. Mobile says so; the web says "until all approvers respond". The web also shows END_USER and L2_MANAGER the action, which always fails; mobile hides it. Built in G3. |
 | AI summary and AI draft reply | All roles | Nobody | 🔒 SAFER | |
 | Print, duplicate, delete, "email the technician", tags, link to a problem or change | All roles (some staff only) | Nobody | ⊘ OUT OF SCOPE | Most of these do nothing on the web. |
-| Request a service from the catalogue | All roles | Nobody | ❌ NOT BUILT | The web's "Requests" tab. Planned for Phase 2. |
+
+### Service catalogue
+
+| Capability | WEB: who can | MOBILE: who can | Status | Note |
+|---|---|---|---|---|
+| Browse the catalogue: categories, their services, search | All roles | All roles | ✅ SAME | Mobile: the drawer's "Service Request" (the web: the sidebar's "Service Request" and a "Requests" bottom tab). Every active service, for every role: nothing is scoped by role, team or country. Search covers service names and descriptions in every category, on the device, as on the web. Built in G4. |
+| Request a service through its form | All roles | All roles | ✅ SAME | All seven field types the web renders: text, long text, date, phone, e-mail, number, drop-down. Any other type is a text box on both. The web's checks: "<label> is required", a valid e-mail address, a whole number. Notes go in a collapsed "Resolution" section. No confirmation, then back to the catalogue, as on the web. Thirteen other web controls and the attachment box are not shown: the server keeps nothing they collect (see the note under section 5). Built in G4. |
+| Set impact and urgency on a request (they set its priority) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | With the web form's own map and labels (its Urgency has no Urgent). Only the priority reaches the server; without both, a request is Medium. Built in G4. |
+| See my requests (My Requests) | All roles | All roles | ✅ SAME | SR number, service, status and date, newest first. The web shows the latest 50; mobile loads older ones as the list scrolls. Built in G4. |
+| See everyone's requests under "My Requests" | ADMIN, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | The server lists every request to every role except END_USER. Mobile shows each person only their own. |
+| Open a request: its answers, notes, approvals and progress | Nobody | All roles | ➕ MOBILE ONLY | Own requests only. The web's My Requests rows are not links, and the web never shows a request's answers again. Read-only: neither side lets anyone change or cancel a request. Built in G4. |
+| Create a service template (admin) | ADMIN | Nobody | ⊘ OUT OF SCOPE | The catalogue page's "+ New Template (admin)". |
 
 ### Comments
 
@@ -182,7 +196,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
-| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts. |
+| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts; Knowledge and the catalogue ("Service Request", G4) are in the drawer. |
 | Main menu | All roles | All roles | ✅ SAME | Its items differ by role; each one is compared in its own row. |
 | Country lock label in the menu | plain AGENT | plain AGENT | ✅ SAME | |
 | Open a ticket from an email link | All roles | All roles | ✅ SAME | |
@@ -231,12 +245,17 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open (2)**
+**Still open (1)**
 
 | # | Gap | What it is | Roles that lose it | Endpoint the app would call | Effort |
 |---|---|---|---|---|---|
-| 7 | Request a service from the catalogue | Order a standard service (a laptop, an account) from a catalogue instead of writing a free-text ticket. | All roles | Service catalogue, SCR-1 to SCR-6 | Large: each catalogue item brings its own form. Held for Phase 2 by decision (G4) |
 | 11 | See the priority before saving a new ticket | Preview the priority while choosing impact and urgency on the create form. | ADMIN, AGENT | Priority matrix, `GET /priority-matrix` (LKP-6). The app now loads it for the ticket detail preview (G1), so only the create form is missing | Small |
+
+**Built in Phase G4 (2026-10-22)** — the web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`
+
+| # | Gap | Now |
+|---|---|---|
+| 7 | Request a service from the catalogue | ✅ Every role, from the drawer's "Service Request" (04 P2: a drawer item; the web also has a "Requests" bottom tab). **Browse:** categories with their item counts, a category's services, and a search over every service's name and description (SCR-1, SCR-2, filtered on the device, as the web). **Request:** the item's form (SCR-3) with **all seven field types the web renders** (text, long text, date, phone, e-mail, number, drop-down; any other type is a text box, as on the web), the web's checks ("<label> is required", where only an empty value fails; a valid e-mail; a whole number), no conditional fields (the web has none), notes, and for ADMIN, AGENT and L2_MANAGER the Impact × Urgency priority from the web form's own map. **SCR-5** carries exactly `{ serviceItemId, formData, notes, priority? }`, the four keys the server keeps (05 B.24). No confirmation; the web's toast; back to the catalogue. **My Requests:** SCR-4, the person's own requests for every role (🔒: the web shows staff everyone's), with a detail screen (SCR-6, ➕). Not shown: the thirteen web controls whose values the server discards, and the attachment box, whose files the web never uploads (section 5 note) |
 
 **Built in Phase G3 (2026-10-22)** — the web's behaviour, with sources: `docs/G3-WEB-BEHAVIOUR.md`
 
@@ -272,6 +291,8 @@ The G1 brief named the gaps to build as 1, 2, 6, 7 and 8, and described them as 
 
 The G3 brief named its three features by name, not by number: reply templates, delete a file and submit for approval. By this list's numbering they are 3, 8 and 9. It left the service catalogue (7) for G4.
 
+The G4 brief called the catalogue "the last remaining gap". By this list it is gap 7. Gap 11 (the priority preview on the create form) was also still open, and G4's scope ("the service catalogue only") left it open.
+
 **The prerequisite, mobile-side only.** Before G1 the app's update call would have let an L2_MANAGER send a category or group change, which the web allows neither. G1 refuses both on the device before anything is sent: every property save goes through `fieldEditProblem` in `src/utils/permissions.ts`. G2 also narrowed the API-layer allow-list (`UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`) and 01 TKT-4, so even a call that skipped the guard could not carry `categoryId`, `teamId` or `priority` for L2 (ROLE-MATRIX.md §8 item 2, RESOLVED).
 
 ## 5. Where mobile is safer than the web
@@ -295,12 +316,14 @@ Each of these is deliberate: on the web the control fails, returns an error, or 
 | See everyone's approvals | The server does not limit that list to the person asking, so it shows other people's approvals. |
 | Open a page your role isn't meant to use | The web has no page-level checks: anyone signed in can open any page by typing its address, admin pages included. |
 | Counts for L2_MANAGER | The server keeps one set of numbers for all L2 managers, so one manager can see another's counts. |
+| See everyone's requests under "My Requests" (G4) | The server filters the request list for END_USER only, so the web's "My Requests" shows ADMIN, AGENT and L2_MANAGER every request in the organisation, with no requester column. Mobile shows each person their own, and a request's detail only when it is theirs (01 SCR-4's mobile rule). |
 | Unassigned count | For anyone other than ADMIN or a triage AGENT, the server's count includes tickets outside that person's queue. |
 | Charts, technician and team tables, trends, workload | Several of these widgets ignore the person's scope on the server and show organisation-wide numbers. |
 
-Two ✅ SAME rows also contain a web control that always fails for some roles, which mobile hides in the same way. They are not 🔒 rows, because those roles are not counted as "can" on the web either:
+Three ✅ SAME rows also contain web controls that always fail, or do nothing, which mobile hides. They are not 🔒 rows, because nobody is counted as "can" on the web for those controls either:
 - **Filter by technician or group:** the web shows END_USER and L2_MANAGER these lists, always empty (403).
 - **Submit a ticket for approval (G3):** the web's Actions menu offers it to END_USER and L2_MANAGER, and the Approvals tab offers it to L2_MANAGER. The server always answers 403. Mobile offers it to ADMIN and AGENT only and refuses it on the device for anyone else.
+- **Request a service through its form (G4):** the web's form also shows a subject, a description, a category cascade, a group, a technician, assets and a site, for staff a request type, status, mode, level and impact details, and an attachment box. The server keeps none of them: it stores only the service, the priority, the custom fields and the notes (05 §B.24). Some are not even sent, the group list is a 403 for L2_MANAGER, and the files are never uploaded. Mobile shows only what is kept. Sources: `docs/G4-WEB-CATALOGUE.md` §3.
 
 ## 6. Out of scope by design
 
@@ -317,6 +340,7 @@ Two ✅ SAME rows also contain a web control that always fails for some roles, w
 | Choose the To and Cc addresses | For a requester the server chooses the recipients itself, so mobile does not ask for addresses. |
 | Download all files as one zip | Not allowed by the mobile API contract: an error during a zip download can crash the server for everyone. |
 | Create or delete announcements | Administration; it stays on the web. |
+| Create a service template (admin) | Administration; it stays on the web. The web page that offers it cannot define a template's form fields either. |
 | Write, edit or delete articles; see drafts | Rich-text writing with embedded images, and publishing is broken on the web. |
 | Requester's other counts | The phone Home screen keeps to a short, fixed set of counts; the full set stays on the web dashboard. |
 | Closed count and pending-reason counts | Same: the phone Home screen keeps to a short, fixed set of counts. |

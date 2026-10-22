@@ -25,6 +25,11 @@
 //   ['kb', 'articles', categoryId]                    KB-2    infinite, 20 per page
 //   ['kb', 'search', term]                            KB-3    (≥ 2 characters)
 //   ['kb', 'article', slug]                           KB-4
+//   ['service-catalog', 'categories']                 SCR-1   catalogue categories (G4)
+//   ['service-catalog', 'items']                      SCR-2   every active item (G4)
+//   ['service-catalog', 'item', id]                   SCR-3   one item and its form (G4)
+//   ['service-catalog', 'requests']                   SCR-4   infinite, 50 per page; My Requests keeps own rows (G4)
+//   ['service-catalog', 'request', id]                SCR-6   one request (G4)
 //
 // Keys nest by prefix: invalidating ['tickets', 'detail', id] also hits that ticket's comments, attachments
 // and history. Writes invalidate the narrowest key that changed; the whole cache is cleared ONLY on sign-out (02 §5.5).
@@ -87,5 +92,14 @@ export const queryKeys = {
     articles: (categoryId: string | null) => ['kb', 'articles', categoryId] as const,
     search: (term: string) => ['kb', 'search', term] as const,
     article: (slug: string) => ['kb', 'article', slug] as const,
+  },
+
+  serviceCatalog: {
+    all: () => ['service-catalog'] as const,
+    categories: () => ['service-catalog', 'categories'] as const,
+    items: () => ['service-catalog', 'items'] as const,
+    item: (id: string) => ['service-catalog', 'item', id] as const,
+    requests: () => ['service-catalog', 'requests'] as const,
+    request: (id: string) => ['service-catalog', 'request', id] as const,
   },
 } as const;

@@ -5,6 +5,7 @@
 - Navigation and role visibility: `frontend/src/layouts/AppLayout.tsx:18-58, 258-289`.
 - Endpoints per page: from each page's API calls. Endpoint IDs refer to `01-API-CONTRACT.md`.
 - **SDP parity (2026-10-14):** the MVP was revised to follow the ManageEngine ServiceDesk Plus Android structure wherever the backend allows. Feature verdicts, the navigation design and the list-view spec are in `08-SDP-PARITY.md`. Every change to this file is listed in §3.
+- **Phase G4 (2026-10-22):** the service catalogue (P2, P3) is built and is now MVP: M17–M19. The web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`.
 
 **Key facts about the web UI**
 - **No web route has a role guard.** Roles only hide sidebar items, so any logged-in user can open any URL. The backend is the only enforcement, and it has gaps (`05` §C).
@@ -31,8 +32,8 @@
 | `/notifications` · `pages/notifications/NotificationsPage.tsx` | Inbox, mark read / all read | ALL | **M9 Notifications** ("Alerts" tab + badge) | **MVP** | NTF-1, NTF-2, NTF-3, NTF-4 |
 | `/kb`, `/kb/:slug` · `pages/kb/KBPage.tsx`, `KBArticlePage.tsx` | Browse, search, read, "helpful" vote | ALL | **M14 Knowledge base**, **M15 KB article** (drawer) | **MVP** (was Phase 2 P1) | KB-1, KB-2, KB-3, KB-4, KB-5 |
 | `/kb/new`, `/kb/edit/:slug` · `pages/kb/KBArticleFormPage.tsx` | Author articles | ADMIN, AGENT | — | **Skip** | *`POST/PUT /kb/articles`. Publish is never called; edit links are broken* |
-| `/service-catalog` · `pages/service-catalog/ServiceCatalogPage.tsx` | Catalog browse + "my requests" | ALL ("Requests" tab) | P2 Service catalog + My requests | **Phase 2** | SCR-1, SCR-2, SCR-4 |
-| `/service-catalog/new/:itemId` · `ServiceRequestFormPage.tsx` | Dynamic request form | ALL | P3 Service request form | **Phase 2** | SCR-3, SCR-5, SCR-6 |
+| `/service-catalog` · `pages/service-catalog/ServiceCatalogPage.tsx` | Catalog browse + "my requests" | ALL (sidebar "Service Request", bottom tab "Requests") | **M17 Service catalogue** (drawer "Service Request"; Catalog and My Requests views), **M19 Request detail** (mobile only) | **MVP** (G4; was Phase 2 P2) | SCR-1, SCR-2, SCR-4, SCR-6, SCR-3 (answer labels on M19) |
+| `/service-catalog/new/:itemId` · `ServiceRequestFormPage.tsx` | Dynamic request form | ALL | **M18 Service request form** | **MVP** (G4; was Phase 2 P3) | SCR-3, SCR-5. *The web never calls SCR-6* |
 | `/approvals` · `pages/approvals/ApprovalsPage.tsx` | My pending approvals; approve/reject | nav: ADMIN, AGENT. Server: any approver | **M12 Approvals inbox**, **M13 Approval detail** (drawer; END_USER/L2 only while they have pending approvals, `08` S1) | **MVP** (was Phase 2 P4) | APR-1, APR-2, APR-3, TKT-3/TKT-7/ATT-1 best-effort (ticket approvals carry no ticket data; `08` 1.49) |
 | `/announcements` · `pages/announcements/AnnouncementsPage.tsx` | Read; ADMIN manages | ADMIN, AGENT, L2 | **M16 Announcements** (drawer) + pinned banner on M2 Home | **MVP** (was Phase 2 P5) | ANN-1 |
 | `/reports`, `/reports/scheduled`, `/reports/query-builder` | 10 report tabs, ~20 charts, exports, scheduled reports, ad-hoc queries | ADMIN, AGENT, L2 (query builder: URL only) | — | **Skip** | *`/reports/*`, `/query-builder/*`* |
@@ -62,7 +63,7 @@
 
 ## 2. Proposed mobile screens
 
-### 2.1 MVP: 16 screens
+### 2.1 MVP: 19 screens (16, plus the service catalogue's three since G4)
 
 **Navigation** (full spec: `08-SDP-PARITY.md` §3)
 - A **side drawer** ("Menu", as in SDP), opened by ☰ top-left on every root screen or by an edge-swipe, wraps **three bottom tabs: Home · Tickets · Alerts**.
@@ -72,9 +73,10 @@
 - **Drawer items by role**
   - **Approvals** (badge): ADMIN and AGENT always; END_USER and L2 only while APR-1 returns ≥ 1 (`08` S1).
   - **Knowledge base** and **Announcements**: all roles.
+  - **Service Request** (the service catalogue, M17; G4): all roles, after Knowledge base, as in the web sidebar.
   - **Settings** and **Sign out**: all roles.
   - Footer: app version + environment.
-  - Later (hidden until their asks ship): My tasks (A20), Service catalog (P2), Assets (P18).
+  - Later (hidden until their asks ship): My tasks (A20), Assets (P18). The Service catalog (P2) is built (G4).
 - **"+" FAB** on Home and Tickets → M8.
 - **Android back:** closes the drawer or sheet first, then returns to Home, then exits.
 - Ticket detail, composer, closure, assign, task editor and approval detail are stack or modal screens.
@@ -97,6 +99,9 @@
 | **M14** | **Knowledge base** | all | Category list (hide `isPublic:false`), article list (paged), search (≥ 2 chars, KB-3) | KB-1, KB-2, KB-3 | `05` B.26; never send `published` |
 | **M15** | **KB article** | all | Sanitised HTML body, tags, "Was this helpful?" (one vote per article per device) | KB-4, KB-5 | `01` KB-4 (show "not available" if `isPublished` is false) |
 | **M16** | **Announcements** | all | List ordered as the server returns it (pinned first), type chip (INFO / WARNING / CRITICAL / MAINTENANCE), expandable sanitised body. Pinned ones also appear as the M2 banner | ANN-1 | `08` 1.60, S1 |
+| **M17** | **Service catalogue + My Requests** (G4; drawer "Service Request") | all | The web's two views. **Catalog:** categories with their item counts, a category's services ("Requires approval" pill), search over every service's name and description, on the device; Android back leaves a category first. **My Requests:** the person's **own** requests for every role (SR number, service, status, date), newest first, pages of 50 read as the list scrolls (for staff, whose SCR-4 page holds everyone's requests, further pages are read automatically up to 4, then on request) | SCR-1, SCR-2, SCR-4 | `docs/G4-WEB-CATALOGUE.md` §2, §6; `01` SCR-4 (own rows only, `limit` ≤ 50) |
+| **M18** | **Service request form** (G4) | all | The item's custom fields in "Employee Details", **all seven types the web renders** (text, long text, date, phone, e-mail, number, drop-down; anything else as text); the web's checks; notes in a collapsed "Resolution"; for staff Impact, Urgency and the auto Priority (the web form's map). "Add Request" sends at once (no confirmation), shows the web's toast and returns to M17's Catalog view. Not shown: the web controls the server discards and the attachment box | SCR-3, SCR-5 | `05` §A.17, §B.24; `docs/G4-WEB-CATALOGUE.md` §3–§5 |
+| **M19** | **Request detail** (G4, mobile only) | all (own requests) | SR number, service, status, priority, dates, technician and group when set, the answers (labelled from the item's form), notes, approvals. Read-only: nothing to change or cancel, as on the web | SCR-6, SCR-3 | `docs/G4-WEB-CATALOGUE.md` §7 |
 
 **Shared components (not screens)**
 - Navigation drawer (§2.1 Navigation).
@@ -110,6 +115,7 @@
 
 **MVP endpoint coverage**
 - **44 endpoints:** the 33 from `01` Appendix B, plus KB-1..KB-5, APR-1..APR-3, ANN-1, TSK-2 and TSK-4.
+- G4 adds SCR-1..SCR-6 (M17–M19), which makes **50**. (G1–G3 also built LKP-6, LKP-7, ATT-5 and APR-4; see M4 and M5.)
 - Plus the pending auth endpoint (A1 or A2).
 - ⚠ `01` Appendix B still labels these 11 as P2 until Ronit approves the label update (`08` §9 R7-1).
 
@@ -134,6 +140,8 @@
 | Announcements | ✅ (`08` S1) | ✅ | ✅ | ✅ |
 | Notifications | ✅ | ✅ | ✅ | ✅ |
 | Theme (System / Light / Dark) | ✅ | ✅ | ✅ | ✅ |
+| Service catalogue: browse, request a service, My Requests (own), request detail (G4) | ✅ | ✅ | ✅ | ✅ |
+| Request properties on a service request: impact, urgency → priority (G4) | ❌ | ✅ | ✅ | ✅ |
 
 ### 2.2 Phase 2
 
@@ -142,8 +150,8 @@ P-IDs are stable. Items moved into the MVP keep their ID and are marked as moved
 | # | Screen / feature | Endpoints | Notes / dependency |
 |---|---|---|---|
 | P1 | ~~Knowledge base~~ **→ moved to MVP (M14, M15)** | KB-1..KB-5 | 2026-10-14, SDP parity |
-| P2 | Service catalog + My requests | SCR-1, SCR-2, SCR-4 | Drawer item "Request a service". Stays Phase 2 (`08` S7: B.24, SCR-4 scope gap) |
-| P3 | Service request form (dynamic `formFields`) | SCR-3, SCR-5, SCR-6 | Send only kept fields; no attachments (`05` §B.24) |
+| P2 | ~~Service catalog + My requests~~ **→ moved to MVP in G4 (M17, M19)** | SCR-1, SCR-2, SCR-4, SCR-6 | Drawer item, labelled "Service Request" as the web sidebar. The SCR-4 scope gap is handled by showing each person only their own requests |
+| P3 | ~~Service request form (dynamic `formFields`)~~ **→ moved to MVP in G4 (M18)** | SCR-3, SCR-5 | Sends only the kept fields; no attachments (`05` §B.24) |
 | P4 | ~~Approvals inbox~~ **→ moved to MVP (M12, M13)** | APR-1..APR-3, TKT-3 | 2026-10-14, SDP parity |
 | P5 | ~~Announcements banner and list~~ **→ moved to MVP (M16 + M2 banner)** | ANN-1 | 2026-10-14, SDP parity |
 | P6 | ~~Composer: canned responses~~ **→ built in G3** (M5 "Templates") | LKP-7 | ~~Staff~~ Every role, as on the web (`docs/G3-WEB-BEHAVIOUR.md` §1) |
@@ -217,3 +225,11 @@ P-IDs are stable. Items moved into the MVP keep their ID and are marked as moved
     - "Submit ticket for approval" removed (now P16);
     - added ticket delete, request-type filter and SAML.
 19. This change log added.
+
+### 2026-10-22: Phase G4, the service catalogue (source: `docs/G4-WEB-CATALOGUE.md`)
+1. Header: a Phase G4 line.
+2. §1, `/service-catalog` row: M17 Service catalogue and M19 Request detail; **MVP** (was Phase 2 P2). Endpoints add SCR-6 and SCR-3 (M19's answer labels).
+3. §1, `/service-catalog/new/:itemId` row: M18 Service request form; **MVP** (was Phase 2 P3). SCR-6 moved to M19: the web's form never calls it.
+4. §2.1 retitled "MVP: 19 screens". The drawer gains **Service Request** (all roles); "Service catalog (P2)" leaves the "Later" list.
+5. §2.1 rows **M17, M18 and M19** added. Endpoint coverage: SCR-1..SCR-6, 50 in all. Role table: two catalogue rows.
+6. §2.2: P2 and P3 marked moved to the MVP (IDs kept). P2's drawer label is "Service Request" (the web sidebar's), not "Request a service".
