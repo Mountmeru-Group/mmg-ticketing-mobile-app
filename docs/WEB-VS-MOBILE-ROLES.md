@@ -1,6 +1,6 @@
 # Web portal vs mobile app: who can do what
 
-**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1 and G2.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group.
+**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1, G2 and G3.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group. Phase G3 built reply templates, deleting a file and submitting a ticket for approval, each as the web does it (web behaviour: `docs/G3-WEB-BEHAVIOUR.md`).
 
 ## 1. How to read this
 
@@ -18,25 +18,27 @@ This document compares, one capability per row, what the **web portal** lets eac
 
 | Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps |
 |---|---|---|---|---|
-| END_USER | 44 | 38 | 93% | 2: reply templates, service catalogue |
-| AGENT | 76 | 69 | 91% | 5: all of section 4 |
-| triage AGENT | 75 | 70 | 91% | 5: all of section 4 |
-| L2_MANAGER | 55 | 50 | 92% | 3: delete a file, reply templates, service catalogue |
-| ADMIN | 77 | 70 | 91% | 5: all of section 4 |
+| END_USER | 44 | 39 | 97% | 1: service catalogue |
+| AGENT | 76 | 72 | 96% | 2: all of section 4 |
+| triage AGENT | 75 | 73 | 96% | 2: all of section 4 |
+| L2_MANAGER | 55 | 52 | 97% | 1: service catalogue |
+| ADMIN | 77 | 73 | 96% | 2: all of section 4 |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
-- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 61–68%.
+- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 64–72%.
+- **Before G3** (after G2, 2026-10-22): END_USER 38 on mobile, 93%, 2 gaps; AGENT 69, 91%, 5; triage AGENT 70, 91%, 5; L2_MANAGER 50, 92%, 3; ADMIN 70, 91%, 5. With the exclusions counted as misses, 61–68%. G3 moved three rows to ✅ SAME: reply templates (every role), delete a file (ADMIN, AGENT, L2_MANAGER) and submit for approval (ADMIN, AGENT).
 - **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
-- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed.
 
 ## 3. Main table: 106 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
 |---|---|---|---|---|---|
-| 41 | 21 | 5 | 22 | 17 | **106** |
+| 44 | 21 | 2 | 22 | 17 | **106** |
 
+Before G3: 41 SAME, 5 NOT BUILT. G3 moved reply templates, delete a file and submit for approval to ✅ SAME.
 Before G2: 39 SAME, 8 NOT BUILT, 21 OUT OF SCOPE. G2 moved the two filter rows to ✅ SAME and the plain AGENT's country row to ⊘ OUT OF SCOPE (decided: it stays locked). The 17 🔒 SAFER rows are unchanged.
 Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and split the country row in two, because mobile now treats the triage AGENT and the plain AGENT differently there.
 
@@ -99,7 +101,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Edit the resolution (staff) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | While the ticket is Resolved or Closed, as on the web; the AGENT lock does not apply. Built in G1. |
 | Edit the resolution (requester) | END_USER | Nobody | 🔒 SAFER | |
 | See the priority | All roles | All roles | ✅ SAME | Nobody edits it; it follows impact and urgency. Staff see an "Auto" label. |
-| Submit a ticket for approval | ADMIN, AGENT (END_USER, L2_MANAGER: error) | Nobody | ❌ NOT BUILT | |
+| Submit a ticket for approval | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In "More options", in every status: the AGENT lock doesn't apply, as on the web. Approvers can be any user; a comment is optional. The ticket moves to Pending with Management Review at once (on a resolved, closed or canceled ticket that reopens it), and approving or rejecting doesn't move it again. Mobile says so; the web says "until all approvers respond". The web also shows END_USER and L2_MANAGER the action, which always fails; mobile hides it. Built in G3. |
 | AI summary and AI draft reply | All roles | Nobody | 🔒 SAFER | |
 | Print, duplicate, delete, "email the technician", tags, link to a problem or change | All roles (some staff only) | Nobody | ⊘ OUT OF SCOPE | Most of these do nothing on the web. |
 | Request a service from the catalogue | All roles | Nobody | ❌ NOT BUILT | The web's "Requests" tab. Planned for Phase 2. |
@@ -116,7 +118,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Read internal notes | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT | 🔒 SAFER | The web shows them to L2_MANAGER by mistake. |
 | History line "added a comment" for an internal note | All roles | ADMIN, AGENT | 🔒 SAFER | |
 | Conversation count on the ticket | Nobody | All roles | ➕ MOBILE ONLY | Counts only the replies that person may see. |
-| Reply templates (canned responses) | All roles | Nobody | ❌ NOT BUILT | Planned for Phase 2. |
+| Reply templates (canned responses) | All roles | All roles | ✅ SAME | A "Templates" button in the composer, for replies and private notes alike. Search by title or category; grouped by category. A blank message is replaced by the template, otherwise it is added at the end. Neither side fills in placeholders. Mobile inserts the text without its formatting or images, because the phone composer is plain text. Built in G3. |
 | Attach files to a reply | All roles | All roles | ✅ SAME | |
 | Attach files to an internal note | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | ⚠ The requester can see these files. See 7.1. |
 
@@ -127,7 +129,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Add files to a ticket | All roles; AGENT (lock) | All roles; AGENT (lock) | ✅ SAME | Mobile tells a locked AGENT why they cannot. |
 | View or download a file | All roles | All roles | ✅ SAME | |
 | Download all files as one zip | All roles | Nobody | ⊘ OUT OF SCOPE | |
-| Delete a file | ADMIN, AGENT, L2_MANAGER | Nobody | ❌ NOT BUILT | Planned for Phase 2. |
+| Delete a file | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | Any file on the ticket, whoever uploaded it, in every status (the AGENT lock doesn't apply). It asks first, naming the file; deleting is permanent. The list and both file counts update. Built in G3. |
 | See how many files a ticket has | All roles | All roles | ✅ SAME | The number includes files on internal notes. See 7.1. |
 
 ### Tasks
@@ -229,15 +231,20 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open (5)**
+**Still open (2)**
 
 | # | Gap | What it is | Roles that lose it | Endpoint the app would call | Effort |
 |---|---|---|---|---|---|
-| 3 | Reply templates (canned responses) | Insert a saved reply instead of typing it. | All roles (the Phase 2 plan offers it to staff only) | `GET /canned-responses` (LKP-7) | Small |
-| 7 | Request a service from the catalogue | Order a standard service (a laptop, an account) from a catalogue instead of writing a free-text ticket. | All roles | Service catalogue, SCR-1 to SCR-6 | Large: each catalogue item brings its own form. Held for Phase 2 by decision |
-| 8 | Delete a file | Remove a file uploaded by mistake. | ADMIN, AGENT, L2_MANAGER | Delete attachment, `DELETE /tickets/:id/attachments/:attachmentId` (ATT-5) | Small |
-| 9 | Submit a ticket for approval | Ask a manager to approve a ticket before work continues. | ADMIN, AGENT | `POST /approvals`. The route exists on the server but is not yet listed in the mobile API contract, so adding it needs Ronit's sign-off | Medium |
+| 7 | Request a service from the catalogue | Order a standard service (a laptop, an account) from a catalogue instead of writing a free-text ticket. | All roles | Service catalogue, SCR-1 to SCR-6 | Large: each catalogue item brings its own form. Held for Phase 2 by decision (G4) |
 | 11 | See the priority before saving a new ticket | Preview the priority while choosing impact and urgency on the create form. | ADMIN, AGENT | Priority matrix, `GET /priority-matrix` (LKP-6). The app now loads it for the ticket detail preview (G1), so only the create form is missing | Small |
+
+**Built in Phase G3 (2026-10-22)** — the web's behaviour, with sources: `docs/G3-WEB-BEHAVIOUR.md`
+
+| # | Gap | Now |
+|---|---|---|
+| 3 | Reply templates (canned responses) | ✅ Every role, in Reply, Reply all and Private note, as on the web (the old Phase 2 plan said staff only; the web's source says every role). A "Templates" sheet: search by title or category, grouped by category ("General" when none). Loaded with LKP-7, no parameters, only when the button is tapped. A blank message is replaced, otherwise the template is appended. No placeholders, on either side. The phone composer is plain text, so a template goes in without its formatting, and without images (the composer says so) |
+| 8 | Delete a file | ✅ ADMIN, AGENT, L2_MANAGER, any file, in every status (the AGENT lock doesn't apply, as on the web). A confirmation naming the file, then ATT-5. The list, the tab count and the header count update. END_USER: no button, and refused on the device |
+| 9 | Submit a ticket for approval | ✅ ADMIN, AGENT, in every status, from More options. Approvers: any active user (USR-3, no role filter, as on the web); comment optional; "Submit (n)". A confirmation that says what the server does, then **APR-4 `POST /approvals`**, added to 01 with Ronit's sign-off in the G3 brief. Afterwards the screen shows the ticket's status as re-read from the server and says that approving or rejecting won't move it (05 B.22). END_USER and L2_MANAGER: hidden (the web shows them a control that always returns 403) and refused on the device |
 
 **Built in Phase G2 (2026-10-22)**
 
@@ -262,6 +269,8 @@ The gaps are ranked by how much each one matters day to day. Each one uses an en
 | 10 | Change the ticket's country | ✅ ADMIN and triage AGENT, in any status. The plain AGENT part is still open (above) |
 
 The G1 brief named the gaps to build as 1, 2, 6, 7 and 8, and described them as impact/urgency, category, resolution, country and the priority preview. By this list's numbering those are 1, 2, 6, 10 and 11. G1 built the named fields on the ticket detail screen; it did not build 7 (catalogue), 8 (delete a file) or the create-form preview in 11.
+
+The G3 brief named its three features by name, not by number: reply templates, delete a file and submit for approval. By this list's numbering they are 3, 8 and 9. It left the service catalogue (7) for G4.
 
 **The prerequisite, mobile-side only.** Before G1 the app's update call would have let an L2_MANAGER send a category or group change, which the web allows neither. G1 refuses both on the device before anything is sent: every property save goes through `fieldEditProblem` in `src/utils/permissions.ts`. G2 also narrowed the API-layer allow-list (`UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`) and 01 TKT-4, so even a call that skipped the guard could not carry `categoryId`, `teamId` or `priority` for L2 (ROLE-MATRIX.md §8 item 2, RESOLVED).
 
@@ -288,6 +297,10 @@ Each of these is deliberate: on the web the control fails, returns an error, or 
 | Counts for L2_MANAGER | The server keeps one set of numbers for all L2 managers, so one manager can see another's counts. |
 | Unassigned count | For anyone other than ADMIN or a triage AGENT, the server's count includes tickets outside that person's queue. |
 | Charts, technician and team tables, trends, workload | Several of these widgets ignore the person's scope on the server and show organisation-wide numbers. |
+
+Two ✅ SAME rows also contain a web control that always fails for some roles, which mobile hides in the same way. They are not 🔒 rows, because those roles are not counted as "can" on the web either:
+- **Filter by technician or group:** the web shows END_USER and L2_MANAGER these lists, always empty (403).
+- **Submit a ticket for approval (G3):** the web's Actions menu offers it to END_USER and L2_MANAGER, and the Approvals tab offers it to L2_MANAGER. The server always answers 403. Mobile offers it to ADMIN and AGENT only and refuses it on the device for anyone else.
 
 ## 6. Out of scope by design
 
@@ -330,6 +343,7 @@ The audit found two problems in the backend. **The mobile app does not cause eit
   It happens on the web portal exactly as on mobile.
 - **Why the app cannot fix it:** the server gives such a file nothing that marks it as belonging to a note, so the app cannot tell it apart from a file the requester uploaded. Hiding files on the phone would still leave them open on the web and through a direct download.
 - **What mobile can do:** stop staff attaching files to notes in the app, so the app adds no new cases. This is a pending decision for Ronit. It does not protect files attached to notes on the web.
+- **Found in G3:** the "Approval requested" email attaches every ticket-level file, so these files also go to each approver, and an approver can be any user (05 C.28). This happens whether the request is made on the web or on mobile; the mobile confirmation says the approvers are emailed the ticket's files.
 
 ### 7.2 A web "internal note" can be emailed to the requester (High)
 

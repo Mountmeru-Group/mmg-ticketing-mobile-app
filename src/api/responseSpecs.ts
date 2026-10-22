@@ -160,6 +160,14 @@ export const COUNTRY_SPEC: readonly FieldSpec[] = [
   { path: 'displayName', kinds: S },
 ];
 
+/** `CannedResponse` from LKP-7 `data[]` (G3). */
+export const CANNED_RESPONSE_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'title', kinds: S },
+  { path: 'body', kinds: S },
+  { path: 'category', kinds: S_NULL },
+];
+
 /** `PriorityMatrixEntry` from LKP-6. */
 export const PRIORITY_MATRIX_SPEC: readonly FieldSpec[] = [
   { path: 'impact', kinds: S, oneOf: TICKET_IMPACTS },

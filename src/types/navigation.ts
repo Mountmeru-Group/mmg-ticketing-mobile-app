@@ -34,6 +34,8 @@ export type TicketStackParamList = {
   StatusClosure: { ticketIds: UUID[]; target?: TicketStatus };
   /** M7. One ticket from M4, or up to 20 from M3 bulk mode (08 §4.2). */
   AssignPicker: { ticketIds: UUID[] };
+  /** "Submit for approval" from M4's More options (Phase G3, APR-4). ADMIN and AGENT. */
+  SubmitApproval: { ticketId: UUID };
   /** M8 */
   CreateTicket: undefined;
   /** M11. No `taskId` = create. */

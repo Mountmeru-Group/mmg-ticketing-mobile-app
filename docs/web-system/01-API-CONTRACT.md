@@ -614,7 +614,7 @@ Mounted at `/api/v1/tickets/:ticketId/attachments` (`tickets.router.ts:13`; `mer
 - **Errors:** `404 "Attachment not found"`, `403 "Forbidden"`.
 - **Side effects:** the file is removed from disk (best effort) and the row deleted. No audit.
 - **Source:** `attachments.router.ts:13`, `attachments.controller.ts:146-157`.
-- **Mobile:** show the delete action only to ADMIN, AGENT and L2_MANAGER, matching web.
+- **Mobile (built in G3):** `deleteAttachment()` in `src/api/attachments.api.ts`, `useDeleteAttachment`. The delete button is shown to ADMIN, AGENT and L2_MANAGER only, matching the web (`FE:pages/tickets/TicketDetailPage.tsx:1345`). It works on any file, whoever uploaded it, in every status: the web does not apply the AGENT lock here. A request from END_USER is refused on the device and nothing is sent. The app asks "Delete <fileName>?" first. It sends only ids from this ticket's ATT-1 list, then refetches ATT-1 and TKT-3 (`_count.attachments`).
 
 ---
 
@@ -808,17 +808,17 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 - **Mobile:** the server's value always wins (TKT-2/TKT-4). On M4, ADMIN and AGENT see the preview before Save and, as the web does, send the matching row's `priority` with the impact/urgency change (TKT-4, G2).
 - **Source:** `priorityMatrix.router.ts:8`, `priorityMatrix.controller.ts:21-39`.
 
-### LKP-7 `GET /api/v1/canned-responses` — P2 (staff)
-- **Purpose:** quick-reply templates in the composer.
-- **Auth:** any role. The web uses it for staff only, and so does mobile.
-- **Query:**
+### LKP-7 `GET /api/v1/canned-responses` — P2 (every role; built in G3)
+- **Purpose:** reply templates in the composer.
+- **Auth:** any role. **Correction (G3):** this entry used to say the web uses it for staff only. The web's picker has no role check and is offered to every role, in replies and private notes alike (`FE:pages/tickets/TicketDetailPage.tsx:1046`; `docs/G3-WEB-BEHAVIOUR.md` §1). Mobile does the same.
+- **Query:** both optional, and **neither is sent**, by the web or by mobile:
   - `search`: case-insensitive match on title or body;
   - `category`: exact match.
 - **200, wrapped:** `{ data: [{ id, title, body /* HTML */, category: string|null }] }`.
   - Active only, ordered by category then title.
   - No pagination and no limit.
 - **Source:** `cannedResponses.router.ts:15`, `cannedResponses.controller.ts:4-20`.
-- **Mobile:** insert rule in `05` §A.5.
+- **Mobile (G3):** `listCannedResponses()` in `src/api/lookups.api.ts`, `useCannedResponses` in `src/hooks/useLookups.ts`. Loaded only when the person taps "Templates", cached 60 s as on the web. Search (title or category) and grouping (by category, "General" when none) happen on the device. The insert rule is in `05` §A.5: a blank body is replaced, otherwise the template is appended. No placeholders. The phone composer is plain text, so the template's formatting and images are not kept.
 
 ---
 
@@ -959,7 +959,24 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - **Errors:** same as APR-2.
 - **Source:** `approvals.router.ts:12`, `approvals.controller.ts:182-247`.
 
-> `GET /api/v1/approvals` (the list) is **unscoped** (⚠ `05` §C.16) and out of scope for mobile. `POST /api/v1/approvals` (submit a ticket for approval) is ADMIN/AGENT only and also out of scope for the MVP and P2.
+#### APR-4 `POST /api/v1/approvals` — P2 (ADMIN, AGENT; added in G3)
+- **Purpose:** submit a ticket for approval. Added to this contract in Phase G3, with Ronit's sign-off in the G3 brief. The web's behaviour, with sources: `docs/G3-WEB-BEHAVIOUR.md` §3.
+- **Auth:** `agentOrAdmin`: **ADMIN, AGENT only.** L2_MANAGER and END_USER get `403 "Forbidden: insufficient role"` (`approvals.router.ts:8`). There is no ticket-state check: any status is accepted.
+- **Body** (zod, `approvals.controller.ts:17-22`): `{ entityType: string, entityId: string, approverIds: string[] (min 1, "At least one approver required"), comments?: string }`.
+  - **Mobile sends exactly** `{ entityType: 'ticket', entityId: <ticket id>, approverIds, comments? }` (`CreateApprovalBody`, 03 §C). It removes duplicate ids and leaves out a blank `comments`; the web sends `''`, which stores the same "no comment".
+  - `approverIds` are user ids from USR-3 **with no `role` filter**, as on the web: an approver can be any active user (`FE:pages/tickets/TicketDetailPage.tsx:415-421`).
+- **201:** `Approval[]`, one per approver (the Approval object above), `stage` 1, 2, 3… in the order sent.
+- **Errors:** `403` (role); `400 "Validation error"` with `details.approverIds`; `500` for an unknown approver or ticket id (Prisma, §0.2).
+- **Side effects** (`approvals.controller.ts:24-84`):
+  1. Every **PENDING** approval already on the ticket becomes **CANCELLED**.
+  2. One approval per approver. The stage is not enforced: all approvers are notified at once.
+  3. ⚠ **The ticket's status is set to `PENDING_MGMT_REVIEW` by a direct update, from any status** (CLOSED and CANCELED included). It bypasses TKT-6, so there is no `STATUS_CHANGED` audit, no email or in-app notice to the requester, and **the SLA clock is not paused** (`05` B.35).
+  4. Each approver gets an in-app `TICKET_UPDATED` notification ("Approval requested") and an email. The email carries the PUBLIC conversation and attaches every ticket-level file (⚠ `05` C.28).
+  - Approving or rejecting later never changes the ticket's status (APR-2, APR-3; `05` B.22).
+- **Source:** `approvals.router.ts:8`, `approvals.controller.ts:16-88`; email `modules/email/notification.service.ts:113-156, :506-528`.
+- **Mobile (G3):** `submitTicketForApproval()` in `src/api/approvals.api.ts`, `useSubmitForApproval`, `SubmitApprovalScreen`. ADMIN and AGENT, every status (no AGENT lock, as on the web). A request from END_USER or L2_MANAGER is refused on the device and nothing is sent. The app confirms first, then re-reads the ticket's status (TKT-3) and shows it as the server has it.
+
+> `GET /api/v1/approvals` (the list) is **unscoped** (⚠ `05` §C.16) and out of scope for mobile. That includes the web's per-ticket use of it (`?entityType=ticket&entityId=`, the ticket's Approvals tab), which G3 did not build.
 
 ### 10.2 Announcements
 
@@ -1093,7 +1110,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | priority-matrix | `PUT /` |
 | canned-responses | `GET /all`, `POST /`, `PUT /:id`, `DELETE /:id` |
 | dashboard | `GET /kpis`, `/tickets-by-status`, `/tickets-by-priority`, `/tickets-by-category`, `/agent-workload`, `/sla-trends`, `/recent-tickets` (ADMIN/AGENT, globally unscoped) |
-| approvals | `POST /` (submit for approval), `GET /` (unscoped list) |
+| approvals | `GET /` (unscoped list). (`POST /`, submit for approval, is APR-4 since G3.) |
 | announcements | `GET /` (unfiltered list), `POST /`, `PUT /:id`, `DELETE /:id` |
 | kb | `POST /import`, `POST/PUT/DELETE /categories[/:id]`, `POST /articles`, `PUT/DELETE /articles/:id`, `POST /articles/:id/publish` |
 | service-catalog | `POST/PUT/DELETE /categories[/:id]`, `POST/PUT/DELETE /items[/:id]`, `PUT /requests/:id`, `POST /requests/:id/status`, `POST /requests/:id/assign` |
@@ -1122,7 +1139,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**58 documented endpoints:** 33 MVP and 25 Phase 2. A further 5 are PENDING backend asks (§1.4) and 3 are reference-only, do-not-call (§1.5).
+**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 5 are PENDING backend asks (§1.4) and 3 are reference-only, do-not-call (§1.5).
 
 | ID | Method | Path (under `/api/v1` unless noted) | Roles (server) | Phase |
 |---|---|---|---|---|
@@ -1163,7 +1180,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | LKP-4 | GET | `/countries/my-countries` | any | MVP |
 | LKP-5 | GET | `/countries` | any | MVP |
 | LKP-6 | GET | `/priority-matrix` | ADMIN, AGENT | P2 |
-| LKP-7 | GET | `/canned-responses` | any (mobile: staff) | P2 |
+| LKP-7 | GET | `/canned-responses` | any (mobile: every role, G3) | P2 |
 | DSH-1 | GET | `/dashboard/all` | any (scoped) | MVP |
 | NTF-1 | GET | `/notifications` | own | MVP |
 | NTF-2 | GET | `/notifications/count` | own | MVP |
@@ -1172,6 +1189,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | APR-1 | GET | `/approvals/pending` | own | P2 |
 | APR-2 | POST | `/approvals/:id/approve` | approver | P2 |
 | APR-3 | POST | `/approvals/:id/reject` | approver | P2 |
+| APR-4 | POST | `/approvals` | ADMIN, AGENT | P2 (G3) |
 | ANN-1 | GET | `/announcements/active` | any | P2 |
 | KB-1 | GET | `/kb/categories` | public | P2 |
 | KB-2 | GET | `/kb/articles` | public | P2 |

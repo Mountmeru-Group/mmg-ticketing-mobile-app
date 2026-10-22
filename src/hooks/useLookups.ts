@@ -3,20 +3,26 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { assertArray, assertObject, checkFields } from '@/api/drift';
-import { getPriorityMatrix, listCategories, listCountries, listMyCountries, listTeams } from '@/api/lookups.api';
 import {
-  CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, PRIORITY_MATRIX_SPEC, TEAM_SPEC, USER_REF_SPEC,
+  getPriorityMatrix, listCannedResponses, listCategories, listCountries, listMyCountries, listTeams,
+} from '@/api/lookups.api';
+import {
+  CANNED_RESPONSE_SPEC, CATEGORY_SPEC, COUNTRY_SPEC, EMAIL_RECIPIENTS_SPEC, PRIORITY_MATRIX_SPEC, TEAM_SPEC, USER_REF_SPEC,
 } from '@/api/responseSpecs';
 import { getEmailRecipients, getSuggestedAssignees } from '@/api/tickets.api';
 import { searchUsers } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
 import type {
-  Category, Country, EmailRecipients, PriorityMatrixEntry, SuggestedAssignee, Team, UserRole, UserSearchResult,
+  CannedResponse, Category, Country, EmailRecipients, PriorityMatrixEntry, SuggestedAssignee, Team, UserRole,
+  UserSearchResult,
 } from '@/types';
+import { canUseReplyTemplates } from '@/utils/permissions';
 import { isAgentOrAdmin, isStaff } from '@/utils/roles';
 import { queryKeys } from './queryKeys';
 
 const LOOKUP_STALE_TIME_MS = 10 * 60_000;
+/** The web caches its template list for 60 s (FE:components/ui/CannedResponsePicker.tsx:18). */
+const TEMPLATES_STALE_TIME_MS = 60_000;
 
 /**
  * Countries for the selector. Source per 05 §A.12: AGENT → LKP-4 `my-countries` (a triage agent gets every
@@ -72,6 +78,26 @@ export function usePriorityMatrix({ enabled }: { enabled: boolean }) {
     },
     enabled: enabled && !!role && isAgentOrAdmin(role),
     staleTime: LOOKUP_STALE_TIME_MS,
+  });
+}
+
+/**
+ * LKP-7 `GET /canned-responses` — reply templates (Phase G3), every role. Pass `enabled: true` only once the person has
+ * tapped "Templates": nothing loads when the composer opens. Every active template, unscoped, as on the web.
+ */
+export function useCannedResponses({ enabled }: { enabled: boolean }) {
+  const role = useAuthStore((s) => s.user?.role);
+  return useQuery({
+    queryKey: queryKeys.lookups.cannedResponses(),
+    queryFn: async (): Promise<CannedResponse[]> => {
+      const res = await listCannedResponses();
+      assertObject<{ data: CannedResponse[] }>('LKP-7', res);
+      assertArray<CannedResponse>('LKP-7', res.data);
+      checkFields('LKP-7', res.data[0], CANNED_RESPONSE_SPEC, 'data[0].');
+      return res.data.filter((t) => t && typeof t.id === 'string' && typeof t.title === 'string' && typeof t.body === 'string');
+    },
+    enabled: enabled && !!role && canUseReplyTemplates(role),
+    staleTime: TEMPLATES_STALE_TIME_MS,
   });
 }
 

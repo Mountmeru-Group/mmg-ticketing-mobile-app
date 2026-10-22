@@ -93,13 +93,50 @@ export interface ComposerPermissions {
   recipients: boolean;
   /** Address suggestions from USR-3: ADMIN and AGENT (403 for everyone else). */
   suggestRecipients: boolean;
+  /** The "Templates" button, in every mode (Phase G3). */
+  templates: boolean;
 }
 
 export function composerPermissions(role: UserRole): ComposerPermissions {
-  return { modes: composerModes(role), recipients: isStaff(role), suggestRecipients: isAgentOrAdmin(role) };
+  return {
+    modes: composerModes(role),
+    recipients: isStaff(role),
+    suggestRecipients: isAgentOrAdmin(role),
+    templates: canUseReplyTemplates(role),
+  };
 }
 
-export type MoreAction = 'pickup' | 'assign' | 'close';
+// ── Phase G3 (the web's behaviour, with sources: docs/G3-WEB-BEHAVIOUR.md) ──
+
+/** Every role the app knows; anything else (a malformed session) gets no templates. */
+const REPLY_TEMPLATE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN']);
+
+/**
+ * Reply templates (LKP-7): every role, in Reply, Reply all and Private note. The web's picker has no role check
+ * (FE:TicketDetailPage.tsx:1046) and the server lists active templates to anyone signed in (cannedResponses.router.ts:15).
+ */
+export function canUseReplyTemplates(role: UserRole): boolean {
+  return REPLY_TEMPLATE_ROLES.has(role);
+}
+
+/**
+ * Delete a file (ATT-5): ADMIN, AGENT, L2_MANAGER (web :1345 `role !== 'END_USER'`; the server refuses END_USER).
+ * Any file on the ticket, whoever uploaded it, in every status: the AGENT lock does not apply (web :1268 vs :1345).
+ */
+export function canDeleteAttachments(role: UserRole): boolean {
+  return isStaff(role);
+}
+
+/**
+ * Submit for approval (APR-4): ADMIN and AGENT, the server's `agentOrAdmin` (approvals.router.ts:8). The web also shows
+ * it to END_USER and L2_MANAGER, who always get 403, so it is hidden for them (WEB-VS-MOBILE-ROLES.md §5). Every
+ * status, with no AGENT lock: neither the web (:697, :1585) nor the server checks one.
+ */
+export function canSubmitForApproval(role: UserRole): boolean {
+  return isAgentOrAdmin(role);
+}
+
+export type MoreAction = 'pickup' | 'assign' | 'close' | 'approval';
 
 export interface TicketDetailPermissions {
   /**
@@ -123,6 +160,8 @@ export interface TicketDetailPermissions {
   recipients: boolean;
   /** "Add files" on the Attachments tab (05 §A.3: blocked only by the AGENT lock). */
   addAttachments: boolean;
+  /** The delete button on each file of the Attachments tab (G3): staff, never lock-gated. */
+  deleteAttachments: boolean;
   /** Tasks: tick done / not done, add, edit, remove (05 §A.3: END_USER read-only, D4). */
   editTasks: boolean;
 }
@@ -141,6 +180,7 @@ export function ticketDetailPermissions(
     moreActions.push('assign');
   }
   if (transitions.some((t) => t.target === 'CLOSED')) moreActions.push('close');
+  if (canSubmitForApproval(role)) moreActions.push('approval');
 
   return {
     locked,
@@ -152,6 +192,7 @@ export function ticketDetailPermissions(
     classification: isStaff(role),
     recipients: isStaff(role),
     addAttachments: !locked,
+    deleteAttachments: canDeleteAttachments(role),
     editTasks: isStaff(role),
   };
 }

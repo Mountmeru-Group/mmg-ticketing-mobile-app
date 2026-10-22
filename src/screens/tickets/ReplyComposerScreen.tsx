@@ -5,6 +5,9 @@
 // - Plain-text body, sent as escaped <p> HTML. Files: camera / photos / documents, checked before staging.
 // - Send is the only write: files upload first (ATT-2), then CMT-2 with their ids. Disabled while in flight.
 //   On success the composer closes and the conversation refetches.
+// - Templates (Phase G3, LKP-7): every role, every mode, as on the web. The list loads when "Templates" is tapped.
+//   A blank message is replaced by the template, otherwise it is appended at the end (docs/G3-WEB-BEHAVIOUR.md §1).
+//   Inserting writes nothing; the person still edits and sends the message.
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,16 +16,17 @@ import type { UploadFile } from '@/api/attachments.api';
 import { describeError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
   AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner,
-  OfflineState, ScreenHeader, SubmitButton,
+  OfflineState, OutlineButton, ScreenHeader, SubmitButton, TemplatePickerSheet,
 } from '@/components';
 import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
-import type { TicketStackScreenProps } from '@/types';
+import type { CannedResponse, TicketStackScreenProps } from '@/types';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { notify } from '@/utils/dialogs';
 import { composerPermissions, type ComposerMode } from '@/utils/permissions';
 import { isPlaceholderUser } from '@/utils/session';
+import { insertTemplate, templateHasImages } from '@/utils/templates';
 
 type Mode = ComposerMode;
 
@@ -55,8 +59,20 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
   const [text, setText] = useState('');
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null);
   const post = usePostComment();
   const once = useSingleFlight();
+
+  function onPickTemplate(template: CannedResponse) {
+    setTemplatesOpen(false);
+    setText((current) => insertTemplate(current, template.body));
+    setTemplateNotice(
+      templateHasImages(template.body)
+        ? `"${template.title}" has images, which were left out: the app sends text only. Attach them as files if they're needed.`
+        : null,
+    );
+  }
 
   // Quick-action pre-fill (05 §A.5): Reply → To = requester; Reply all → TKT-9, falling back to the requester.
   useEffect(() => {
@@ -168,6 +184,17 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
             className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
           />
+          {can.templates ? (
+            <View className="mb-3 flex-row">
+              <OutlineButton
+                icon="chatbox-ellipses-outline"
+                label="Templates"
+                onPress={() => setTemplatesOpen(true)}
+                disabled={post.isPending}
+              />
+            </View>
+          ) : null}
+          {templateNotice ? <Notice tone="warning">{templateNotice}</Notice> : null}
 
           <FieldLabel label="Attachments" />
           <AttachmentPicker files={files} onChange={setFiles} disabled={post.isPending} />
@@ -205,6 +232,9 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
           />
         </View>
       </ScrollView>
+      {can.templates ? (
+        <TemplatePickerSheet visible={templatesOpen} onPick={onPickTemplate} onClose={() => setTemplatesOpen(false)} />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

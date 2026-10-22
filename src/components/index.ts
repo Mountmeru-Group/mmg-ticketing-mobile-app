@@ -21,4 +21,5 @@ export { ScreenHeader } from './ScreenHeader';
 export { SlaBadge } from './SlaBadge';
 export { StatusBadge } from './StatusBadge';
 export { TaskRow, taskStatusLabel } from './TaskRow';
+export { TemplatePickerSheet } from './TemplatePickerSheet';
 export { TicketCard } from './TicketCard';

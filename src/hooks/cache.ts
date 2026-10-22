@@ -10,7 +10,7 @@
 // - a task write replaces that one task in the ticket's cached detail and list rows with the server's returned task.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 
-import type { ActivityPage, Paginated, Ticket, TicketDetail, TicketTaskEmbedded } from '@/types';
+import type { ActivityPage, Attachment, Paginated, Ticket, TicketDetail, TicketTaskEmbedded } from '@/types';
 import { queryKeys } from './queryKeys';
 
 type ListData = InfiniteData<Paginated<Ticket>, number>;
@@ -51,6 +51,26 @@ export function patchTicketDetail(queryClient: QueryClient, ticket: unknown): vo
   if (!looksLikeTicket(ticket)) return;
   queryClient.setQueryData<TicketDetail>(queryKeys.tickets.detail(ticket.id), (detail) =>
     detail ? { ...detail, ...ticket, slaPolicy: detail.slaPolicy } : detail,
+  );
+}
+
+/**
+ * After ATT-5 succeeded (G3): drop the file from the ticket's cached list and lower `_count.attachments`, so the row and
+ * both counts change at once. Not optimistic: called on success. refreshTicket() then brings both up to date.
+ */
+export function removeAttachmentFromCache(queryClient: QueryClient, ticketId: string, attachmentId: string): void {
+  let removed = false;
+  queryClient.setQueryData<Attachment[]>(queryKeys.tickets.attachments(ticketId), (list) => {
+    if (!Array.isArray(list)) return list;
+    const next = list.filter((a) => a?.id !== attachmentId);
+    removed = next.length < list.length;
+    return next;
+  });
+  if (!removed) return;
+  queryClient.setQueryData<TicketDetail>(queryKeys.tickets.detail(ticketId), (detail) =>
+    detail?._count && typeof detail._count.attachments === 'number'
+      ? { ...detail, _count: { ...detail._count, attachments: Math.max(0, detail._count.attachments - 1) } }
+      : detail,
   );
 }
 

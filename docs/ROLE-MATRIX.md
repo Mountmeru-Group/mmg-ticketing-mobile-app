@@ -6,6 +6,8 @@
 
 **Updated for Phase G2, 2026-10-22.** §8 items 2, 11 and 12 are RESOLVED, each by "match the web" (Ronit). The ticket list now has the web's priority, category, date, technician and group filters. Rows L10 (now filled in), L12 (new), T11 and T13, the totals, §0, §1.4, §3, §6, §7 and §8 are updated; §11 lists what G2 changed. The web's filter behaviour, with sources, is in `docs/G2-WEB-FILTERS.md`.
 
+**Updated for Phase G3, 2026-10-22.** Reply templates, deleting a file and submitting a ticket for approval are built, each matching the web's roles and state rules. Rows T22, T26 and C4, the totals, §0, §2, §3, §6 and §7 are updated; §12 lists what G3 changed. The web's behaviour, with sources, is in `docs/G3-WEB-BEHAVIOUR.md`.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -32,9 +34,9 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **29** of the 85 rows in §2 (28 of 84 after G1, 30 before it). **0 are security problems** |
+| Elements whose role gating differs from the web portal | **28** of the 85 rows in §2 (29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
 | More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user |
-| More restrictive than the web UI | **26**. Of these: **13** avoid a web defect, a 403 or a mis-scoped number (mobile is correct). **13** are documented product decisions. **0** are undocumented. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10) |
+| More restrictive than the web UI | **25**. Of these: **14** avoid a web defect, a 403 or a mis-scoped number (mobile is correct). **11** are documented product decisions. **0** are undocumented. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
 | Attachments on private notes (check B) | **Real leak, Critical, backend-only fix.** The requester can list, view, download and zip files attached to a private note, and the header count includes them. The app cannot tell those files apart from others. It can only stop creating new ones (§5) |
 | Actions that 403 (check C) | **All hidden**, and assignment is also refused on the device (§6) |
@@ -181,6 +183,7 @@
 - `ticketFieldPermissions`, `fieldEditProblem` (G1: the M4 property editors and their write guard)
 - `bulkActions`, `inlineStatusTransitions`
 - `ticketListFilters` (G2: which of the five filters the M3 Filters sheet offers)
+- `canUseReplyTemplates`, `canDeleteAttachments`, `canSubmitForApproval` (G3; read by `composerPermissions().templates`, `ticketDetailPermissions().deleteAttachments` and `moreActions` 'approval', the write guards and the API functions)
 
 It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 
@@ -249,11 +252,11 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | T19 | Conversation count | the visible comments only | none | MATCH (no leak; `_count.comments` is never shown) | `TicketDetailScreen.tsx:267-271` |
 | T20 | Attachment count | all | all (Properties row) | MATCH, but the server's number includes note files (§5) | `TicketDetailScreen.tsx:270, :455` |
 | T21 | Add files | all except a locked AGENT, who **now sees why** | all except a locked AGENT | MATCH (**fixed** per §3) | `TicketDetailScreen.tsx:345, :359-364` |
-| T22 | Delete attachment | not built | AGENT, L2, ADMIN | **NARROWER**, *decision* P7 (Phase 2) | – |
+| T22 | Delete attachment | AGENT, L2, ADMIN; any file, every status (no AGENT lock); "Delete <fileName>?" first | AGENT, L2, ADMIN; any file; no lock (`:1345-1346`) | MATCH (G3). END_USER: no button, refused on the device | `TicketDetailScreen.tsx` `AttachmentRow` `onDelete` → perm `deleteAttachments`; `src/hooks/useDeleteAttachment.ts` |
 | T23 | View / download | all | all | MATCH | `TicketDetailScreen.tsx` AttachmentRow |
 | T24 | Tasks: tick, add, remove | AGENT, L2, ADMIN; no lock | all; no lock | **NARROWER** for END_USER, *decision* D4 | perm `editTasks`; `src/screens/tasks/TaskDetailScreen.tsx:163` |
 | T25 | Task edit (title, due date, technician) | AGENT, L2, ADMIN; technician picker ADMIN, AGENT | no UI | N/A (M11 addition) | `src/screens/tasks/TaskEditorScreen.tsx:126, :197` |
-| T26 | Submit for approval | none | all via the Actions menu (END_USER, L2 get 403); staff via the tab | **NARROWER**, *decision* (out of MVP, P16) | – |
+| T26 | Submit for approval | ADMIN, AGENT; every status (no AGENT lock); More options → `SubmitApprovalScreen` | all via the Actions menu (END_USER, L2 get 403); staff via the tab (L2 403); no lock | MATCH for ADMIN, AGENT (G3). **NARROWER** for END_USER and L2, *defect avoided* (403, W8) | perm `moreActions` ('approval'), `canSubmitForApproval`; `src/screens/tickets/SubmitApprovalScreen.tsx`; `useSubmitForApproval` |
 | T27 | AI Summary / Draft reply | none | all | **NARROWER**, *defect avoided* (05 C.24: the summary leaks notes) | – |
 | T28 | Print, Duplicate, Delete, Email technician, Problem/Change links, Tags | none | various | N/A (dead or out of scope, 05 B.33) | – |
 
@@ -263,7 +266,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | C1 | Composer modes | END_USER: Reply. L2: Reply, Reply all. ADMIN, AGENT: + Private note | see T14–T16 | see T14–T16 | `src/screens/tickets/ReplyComposerScreen.tsx:39` → perm `composerPermissions` |
 | C2 | To / CC chips | AGENT, L2, ADMIN (PUBLIC only) | all (PUBLIC only) | **NARROWER** for END_USER, *decision* 04 M5 | `ReplyComposerScreen.tsx:44` |
 | C3 | Address suggestions (USR-3) | ADMIN, AGENT | – | MATCH 05 §A.5 (403 for others) | perm `suggestRecipients` |
-| C4 | Canned responses | not built | all | N/A (P6) | – |
+| C4 | Canned responses ("Templates") | all, in every mode (Reply, Reply all, Note); LKP-7 loads when the sheet opens | all, in both comment types (`:1046-1051`) | MATCH (G3) | `ReplyComposerScreen.tsx` → perm `composerPermissions().templates`; `src/components/TemplatePickerSheet.tsx` |
 | C5 | Attach files to a reply or note | all, no lock | all, no lock | MATCH. Note files leak (§5) → §8 item 1 | `ReplyComposerScreen.tsx:173` |
 | C6 | A PRIVATE post from END_USER or L2 | refused on the device, nothing sent | sent; the server makes it a PUBLIC email | stricter, correct | `src/api/comments.api.ts:25`; `src/hooks/usePostComment.ts:36` |
 | S1 | Status sheet | AGENT, L2, ADMIN; map; locked reason | = T1, T2 | MATCH | `src/screens/tickets/StatusClosureScreen.tsx:203, :231-233` |
@@ -297,15 +300,16 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | AN2 | Announcements: create, delete | none | ADMIN | N/A (skipped) | – |
 | DL1 | Ticket link → ticket (deep link) | all, server scope | all | MATCH | `src/screens/tickets/TicketLinkScreen.tsx` |
 
-**Totals** (after G2, 2026-10-22)
+**Totals** (after G3, 2026-10-22)
 - 85 rows (84 after G1; G2 added L12).
-- **29 mismatches** (28 after G1, 30 before it):
+- **28 mismatches** (29 after G2, 28 after G1, 30 before it):
   - 3 WIDER: N1, N4, CR4.
-  - 26 NARROWER:
-    - **13 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T27, CR3, CR6, AP3.
-    - **13 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T22, T24, T26, C2, CR5.
+  - 25 NARROWER:
+    - **14 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3.
+    - **11 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T24, C2, CR5.
     - **0 UNDOCUMENTED** (before G1: T8, T9, T11, T12).
 - G2: L10 went from N/A (not built) to built, MATCH for ADMIN and AGENT and NARROWER for END_USER and L2 (the web shows them an empty list). L12 is a new MATCH row.
+- G3: T22 (delete) from *decision* to MATCH; T26 (submit for approval) from *decision* to MATCH for ADMIN and AGENT and *defect avoided* for END_USER and L2; C4 (templates) from N/A to MATCH.
 - **No mismatch is a security problem.**
 
 ---
@@ -338,6 +342,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | G1: country for a country-locked AGENT | – (not built) | the saved value, with the lock reason ✅ |
 | G1: resolution for staff outside RESOLVED / CLOSED (e.g. CANCELED) | – (not built) | the saved text, with "The resolution can be edited only while the ticket is Resolved or Closed." ✅ |
 | G1: Save on every property editor | – | disabled until something changed, and while saving; Cancel and the pickers disabled while saving ✅ |
+| G3: delete a file, submit for approval | – (not built) | **no state rule on the web, so none here:** both are offered in every status, CLOSED and CANCELED included, for a locked AGENT too ✅ |
+| G3: the delete button | – | a spinner on the file being deleted; every delete button disabled while a delete or an upload is in flight ✅ |
+| G3: "Submit (n)" | – | disabled until one approver is chosen, and while sending; the chips and "Add an approver" disabled while sending ✅ |
 
 **Role-never elements, checked against rule 1:** all hidden ✅.
 - Note (END_USER, L2)
@@ -351,6 +358,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - Unassigned tile and filter (non-ADMIN/AGENT)
 - G1 editors: category edit (L2, END_USER), country edit (L2, END_USER), resolution edit (END_USER). Each shows the value with no editor and no reason
 - G2: the Technician and Group filters (END_USER, L2): not in the Filters sheet, and never sent from a stale state
+- G3: the delete button (END_USER): not on any file row. "Submit for approval…" (END_USER, L2): not in More options; the screen itself shows "Not available for your role"; the guard and the API function refuse it before sending
 
 **G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
@@ -438,8 +446,8 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 |---|---|---|---|
 | `POST /tickets/:id/assign` is `agentOrAdmin` → 403 | L2, END_USER | Pick up, Assign, Reassign, Remove and Move to group are hidden. Bulk Pick up / Assign are hidden. The M7 screen refuses. `assertAssignment` refuses before sending | `BE:tickets.router.ts:20` → perm `moreActions`, `bulkActions`; `src/hooks/writeGuards.ts:76` |
 | `GET /teams`, `GET /users/search` are `agentOrAdmin` → 403 | L2, END_USER | Create's Group and Assign to, M7, the task technician picker, recipient suggestions and (G2) the M3 Technician and Group filters are all hidden. The queries are disabled for those roles | `BE:teams.router.ts:8`, `BE:users.router.ts:15` → `src/hooks/useLookups.ts` `useTeams`, `useUserSearch`; perm `ticketListFilters` |
-| `POST /approvals` is `agentOrAdmin` → 403 | L2, END_USER | Submit for approval is not offered to anyone | `BE:approvals.router.ts:8` |
-| `DELETE /attachments/:id` → 403 | END_USER | Delete is not offered to anyone (P7) | `BE:attachments.controller.ts:149` |
+| `POST /approvals` is `agentOrAdmin` → 403 | L2, END_USER | G3: Submit for approval is offered to ADMIN and AGENT only. For L2 and END_USER it is not in More options, `SubmitApprovalScreen` refuses, and `assertCanSubmitForApproval` and `submitTicketForApproval` refuse before sending (tested: nothing sent) | `BE:approvals.router.ts:8` → perm `canSubmitForApproval`; `src/hooks/writeGuards.ts`; `src/api/approvals.api.ts` |
+| `DELETE /attachments/:id` → 403 | END_USER | G3: Delete is offered to ADMIN, AGENT and L2 only. For END_USER there is no button, and `assertCanDeleteAttachment` and `deleteAttachment` refuse before sending (tested: nothing sent) | `BE:attachments.controller.ts:149` → perm `canDeleteAttachments`; `src/hooks/writeGuards.ts`; `src/api/attachments.api.ts` |
 | `GET /priority-matrix` is `agentOrAdmin` | L2, END_USER | Called only for ADMIN and AGENT, when the impact/urgency editor opens (G1). L2 gets no preview; the query is disabled for L2 and END_USER | `BE:priorityMatrix.router.ts:8` → perm `priorityPreview`; `src/hooks/useLookups.ts` `usePriorityMatrix` |
 | **Silent** rewrite: note → PUBLIC email | L2, END_USER | Note hidden and refused on the device | `BE:comments.controller.ts:56` → perm `composerModes`; `comments.api.ts:25` |
 | **Silent** no-op: `countryId` edit | L2 | Country edit is not offered to L2, and `fieldEditProblem` refuses `countryId` from L2 before sending (G1) | `BE:tickets.controller.ts:554-556` → perm `ticketFieldPermissions`; `src/hooks/useUpdateTicket.ts` |
@@ -526,6 +534,18 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - the Technician filter beats My open; My open keeps the technician; Clear all keeps the sort;
   - L2's allow-list sends category and group, or priority; `priority` accepted on its own, or from L2; `priority` sent without a matrix row.
   - Two first-draft mutations survived and were fixed: a redundant `delete` in `ticketListQuery` (removed; the spread order already decides) and a wiring check too loose to catch an unguarded Technician field (tightened).
+
+**G3 additions (2026-10-22): 366 tests in all (282 after G2: 83 new in `g3-features`, 1 new in `role-gating`).** Per file: `g3-features` 83, `role-gating` 125, `property-editing` 59, `list-filters` 65, `tests/auth/mobile-sso` 34.
+- **`tests/rbac/g3-features.test.mjs`, 83 tests (new).** For each persona (END_USER, AGENT, triage AGENT, L2_MANAGER, ADMIN):
+  - **Templates:** the composer's `templates` flag and the modes it is offered in; the LKP-7 query allowed; an unknown role gets none. The request is `GET /canned-responses` with no parameters. Search on title or category, never the body; groups by category with "General", sorted, with the server's order inside each group. Insertion: a blank body is replaced; otherwise the template is appended as a new paragraph; inserting twice appends twice; no placeholders; HTML becomes text; images are dropped and flagged.
+  - **Delete a file:** the exact list of statuses (of all 11) in which the button is offered: none for END_USER, all 11 for every staff persona. A locked AGENT cannot add files but can delete them. The guard refuses END_USER; END_USER's request is refused with nothing sent; staff send exactly one `DELETE /tickets/:id/attachments/:attachmentId`. The server's message is shown; a 403 is worded plainly. The cache drops the row and `_count.attachments` once, not twice. The confirmation names the file.
+  - **Submit for approval:** the exact list of statuses in which More options offers it: all 11 for ADMIN, AGENT and triage AGENT, none for END_USER and L2_MANAGER, always the last item. The guard refuses END_USER, L2 and an empty approver list; their requests are refused with nothing sent. ADMIN and AGENT send exactly `{ entityType: 'ticket', entityId, approverIds, comments }`, with blank comments left out and duplicates removed. A 400 and a 403 are worded. The confirmation names the approvers, the cancelled approvals, the move to Pending with Management Review, any reopening and no requester email, and never says "until all approvers respond". It says the SLA clock stays paused only when the server would count it as paused: a hold status with `slaHoldStartedAt` set (`BE:utils/sla.ts:15-19`). The outcome shows only a status re-read from the server.
+  - **Wiring:** templates load only while the sheet is open; the hooks run their guard before the API call; the delete button is behind `can.deleteAttachments`, with a destructive confirmation naming the file; the route is registered; the approval screen confirms before sending and re-reads the status after; `GET /approvals` is never called.
+- **`role-gating.test.mjs`, 125 tests (124):** the exact objects now include `deleteAttachments`, More options' `approval`, and the composer's `templates`. The wiring checks add `SubmitApprovalScreen.tsx`, and `TicketDetailScreen.tsx` and `ReplyComposerScreen.tsx` must not call the API directly.
+- **Proof the tests bite.** Twenty-nine mutations, "too permissive" or "not as the web", were each applied alone, tested and restored by script. Every one made the suite fail (1–14 failures each), and each file was verified byte-identical afterwards by SHA-1, as was every file under `src/` and `tests/` after the run:
+  - too permissive: END_USER deletes; L2 or everyone submits for approval; More options or the delete button bypassing the gate; an unknown role gets templates; the delete and submit API functions without their role check, or submit with no approver; either guard loosened or skipped in its hook; an extra field in the submit body; templates loaded with the composer; the delete button not behind the gate;
+  - not as the web: the AGENT lock applied to delete or to submit; templates for staff only; a template replacing a non-blank message, or appended without a paragraph break; search matching the body; no "General" group; LKP-7 sending a parameter; the confirmation saying the ticket moves on after approval; the SLA clock judged "paused" from the status alone; the outcome claiming a status it never read; the cache dropping the row but not the count.
+  - One first-draft mutation survived ("the delete hook skips the guard"): the order check passed because a missing call counts as position −1. The check now requires both calls to be present; the mutation is caught.
 
 ---
 
@@ -620,5 +640,34 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 
 **Not touched**
 - The status flow (TKT-6 POST only), the create form (gap 11), gaps 3, 7, 8 and 9.
+- The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
+- The web repo: byte-for-byte unchanged (SHA-1 of every file under `frontend/src`, `backend/src` and `backend/prisma`, before and after).
+
+---
+
+## 12. What Phase G3 changed (2026-10-22, uncommitted)
+
+The three features were identified by name, as the G3 brief asked: reply templates, delete a file, submit a ticket for approval. The service catalogue was not built (G4).
+
+**Created**
+- `docs/G3-WEB-BEHAVIOUR.md`: the web's behaviour for the three features, with a source line for every statement, and what mobile does differently and why.
+- `src/utils/templates.ts`: the web picker's search, grouping and insert rules, as pure functions.
+- `src/components/TemplatePickerSheet.tsx`: the "Templates" sheet.
+- `src/hooks/useDeleteAttachment.ts`: ATT-5, behind `assertCanDeleteAttachment`.
+- `src/screens/tickets/SubmitApprovalScreen.tsx`: the approval form, its confirmation and the outcome.
+- `tests/rbac/g3-features.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`: `canUseReplyTemplates`, `canDeleteAttachments`, `canSubmitForApproval`; `composerPermissions().templates`; `ticketDetailPermissions().deleteAttachments` and More options' `approval`.
+- API: `listCannedResponses` (LKP-7) in `lookups.api.ts`; `deleteAttachment` (ATT-5) in `attachments.api.ts`; **`submitTicketForApproval` (APR-4, new in 01)** in `approvals.api.ts`. Each API function refuses a role that may not use it, before sending. `CANNED_RESPONSE_SPEC`; `describeActionWriteError` (a 403 says plainly that the role can't do it).
+- Hooks: `useCannedResponses`, `useSubmitForApproval`, `assertCanDeleteAttachment`, `assertCanSubmitForApproval`, `removeAttachmentFromCache`, the `canned-responses` query key.
+- Types: `CreateApprovalBody` in `src/types/approval.ts`, copied from 03 §C, where it was added first.
+- Screens: `ReplyComposerScreen.tsx` (Templates button and sheet), `TicketDetailScreen.tsx` (delete button per file; "Submit for approval…" in More options), `PersonPickerSheet` (`excludeIds`), the `SubmitApproval` route in `TicketStack.tsx` and `types/navigation.ts`. Copy: `utils/approvals.ts` (`submitApprovalMessage`, `submitApprovalOutcome`), `utils/writeCopy.ts` (`deleteAttachmentMessage`), `utils/dialogs.ts` (`reportActionWriteError`).
+- `tests/rbac/role-gating.test.mjs`: expected objects updated for the three features (no permission relaxed); wiring for the new screen.
+- Docs: this file, `WEB-VS-MOBILE-ROLES.md`, `01-API-CONTRACT.md` (LKP-7 corrected, ATT-5, APR-4, the index), `03-DATA-MODEL.md` (`CreateApprovalBody`), `04-SCREEN-MAP.md` (M4, M5, P6, P7, P16), `05-RULES-AND-GAPS.md` (§A.3, §A.5, B.22 re-checked, **B.35** and **C.28** new, report only).
+
+**Not touched**
+- The status flow: status still changes only through TKT-6 POST. (APR-4 changes the status on the server by itself; that is the web's behaviour, recorded as 05 B.35.)
+- `GET /approvals` (unscoped, C.16): not called, so the web's per-ticket Approvals tab is not built.
 - The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
 - The web repo: byte-for-byte unchanged (SHA-1 of every file under `frontend/src`, `backend/src` and `backend/prisma`, before and after).

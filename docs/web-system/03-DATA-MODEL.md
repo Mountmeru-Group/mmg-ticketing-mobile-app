@@ -608,6 +608,11 @@ export interface Approval {
   change: { id: UUID; changeNumber: number; title: string; status: string } | null;
   serviceRequest: (ServiceRequestScalars & { serviceItem: { id: UUID; name: string } }) | null;
 }
+/** APR-4 POST /approvals (G3). Server: entityType any string, approverIds min 1, comments optional (approvals.controller.ts:17-22) */
+export interface CreateApprovalBody {
+  entityType: 'ticket';                        // mobile submits tickets only
+  entityId: UUID; approverIds: UUID[]; comments?: string;
+}
 
 export interface Announcement {
   id: UUID; title: string; body: string; type: AnnouncementType; authorId: UUID;
@@ -702,7 +707,9 @@ export interface CreateServiceRequestBody {
   - NTF-1 → `Paginated<Notification>`
   - NTF-2 → `UnreadCount`
 - **Phase 2**
-  - APR-* → `Approval` / `Approval[]`
+  - APR-1 → `Approval[]`; APR-2 / APR-3 → `Approval`
+  - APR-4 → body `CreateApprovalBody`, 201 `Approval[]` (G3)
+  - ATT-5 → `{ message: string }` (G3)
   - ANN-1 → `Announcement[]`
   - KB-1 → `KBCategory[]`
   - KB-2 → `Paginated<KBArticleListItem>`

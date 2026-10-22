@@ -8,6 +8,7 @@ import { AssignPickerScreen } from '@/screens/tickets/AssignPickerScreen';
 import { CreateTicketScreen } from '@/screens/tickets/CreateTicketScreen';
 import { ReplyComposerScreen } from '@/screens/tickets/ReplyComposerScreen';
 import { StatusClosureScreen } from '@/screens/tickets/StatusClosureScreen';
+import { SubmitApprovalScreen } from '@/screens/tickets/SubmitApprovalScreen';
 import { TicketDetailScreen } from '@/screens/tickets/TicketDetailScreen';
 import { TicketFiltersScreen } from '@/screens/tickets/TicketFiltersScreen';
 import { TicketLinkScreen } from '@/screens/tickets/TicketLinkScreen';
@@ -29,6 +30,7 @@ export function TicketStack() {
         <Stack.Screen name="ReplyComposer" component={ReplyComposerScreen} />
         <Stack.Screen name="StatusClosure" component={StatusClosureScreen} />
         <Stack.Screen name="AssignPicker" component={AssignPickerScreen} />
+        <Stack.Screen name="SubmitApproval" component={SubmitApprovalScreen} />
         <Stack.Screen name="TaskEditor" component={TaskEditorScreen} />
         <Stack.Screen name="TicketFilters" component={TicketFiltersScreen} />
       </Stack.Group>
