@@ -71,6 +71,7 @@ export interface CreateTicketBodyStaff extends CreateTicketBodyEndUser {
 export interface UpdateTicketBody {           // staff fields; END_USER: title/description only
   title?: string; description?: string; categoryId?: UUID | null; impact?: TicketImpact; urgency?: TicketUrgency;
   teamId?: UUID | null; assignedToId?: UUID | null; tags?: string[]; resolution?: string; countryId?: string | null;
+  priority?: TicketPriority;                  // ADMIN/AGENT only, = the LKP-6 value, only with impact/urgency (01 TKT-4, G2)
 }
 export interface AssignTicketBody { assignedToId?: UUID | null; teamId?: UUID; }
 export interface ChangeStatusBody {

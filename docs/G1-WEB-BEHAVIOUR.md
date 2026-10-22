@@ -1,6 +1,8 @@
 # G1 — How the web portal edits five ticket fields
 
 **Phase G1, 2026-10-22.** Read-only inspection of the web repo clone at HEAD `d7f3887` (unchanged before and after).
+
+> **G2 update (2026-10-22):** Ronit resolved D1, D2 and D3 below by "match the web" (ROLE-MATRIX §8 items 11, 12 and 2). D1: ADMIN and AGENT now send the matrix `priority` with an impact/urgency change, as the web does. D2: the country stays locked for a country AGENT. D3: the L2 API allow-list no longer has `categoryId` or `teamId`. The rest of this file is the G1 record, unchanged.
 This file records what the web portal **actually does** for impact, urgency, category, country and resolution on the
 ticket detail page, and for the priority preview. Every statement cites the source. Where the source does not settle
 something, this file says so.

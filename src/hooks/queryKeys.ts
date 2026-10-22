@@ -10,8 +10,8 @@
 //   ['tickets', 'detail', id, 'recipients']           TKT-9   Reply-All To/CC (staff, composer only)
 //   ['tickets', 'detail', id, 'suggested']            TKT-10  recommended technicians (assign picker only)
 //   ['lookups', 'countries', 'mine' | 'all']          LKP-4 / LKP-5
-//   ['lookups', 'categories']                         LKP-1   flat category list (create form, M4 category editor)
-//   ['lookups', 'teams']                              LKP-2   groups + members (assign picker, create form)
+//   ['lookups', 'categories']                         LKP-1   flat category list (create form, M4 category editor, M3 filter)
+//   ['lookups', 'teams']                              LKP-2   groups + members (assign picker, create form, M3 filter)
 //   ['lookups', 'priority-matrix']                    LKP-6   impact × urgency → priority (M4 preview; ADMIN, AGENT)
 //   ['users', 'search', term, roles]                  USR-3   typeahead (≥ 2 characters)
 //   ['users', 'profile', id]                          USR-1   own profile (M10)

@@ -525,9 +525,15 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     { file: 'src/screens/tickets/ReplyComposerScreen.tsx', uses: ['composerPermissions('] },
     {
       file: 'src/screens/tickets/TicketListScreen.tsx',
-      uses: ['bulkActions(', 'inlineStatusTransitions(', 'countrySelectorMode(', 'isTicketFilterAllowed('],
+      uses: ['bulkActions(', 'inlineStatusTransitions(', 'countrySelectorMode(', 'isTicketFilterAllowed(', 'ticketListFilters('],
       // The selection bar's buttons come from bulkActions(); a hard-coded one would bypass it.
       forbid: /<BarButton[^>]*label="/,
+    },
+    {
+      // G2 Filters sheet: which filters only from ticketListFilters(); the query only through useTickets.
+      file: 'src/screens/tickets/TicketFiltersScreen.tsx',
+      uses: ['ticketListFilters(', 'useTickets('],
+      forbid: /listTickets\(|apiClient|searchUsers\(|listTeams\(/,
     },
     { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
     { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },

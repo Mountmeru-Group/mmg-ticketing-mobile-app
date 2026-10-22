@@ -47,7 +47,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const offline = useIsOffline();
-  const setTicketFilter = useUiStore((s) => s.setTicketFilter);
+  const openTicketList = useUiStore((s) => s.openTicketList);
   const dismissed = useUiStore((s) => s.dismissedAnnouncementIds);
   const dismissAnnouncement = useUiStore((s) => s.dismissAnnouncement);
 
@@ -80,9 +80,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   };
 
   // The store holds the filter, so a second tap on the same tile still applies it; `pop` returns to the existing
-  // list instead of stacking another one.
+  // list instead of stacking another one. Like a web dashboard link, the tile's filter applies alone: the Filters
+  // sheet, search and sort start empty, so the list matches the tile (docs/G2-WEB-FILTERS.md §4).
   const openList = (filter: TicketNamedFilter) => {
-    setTicketFilter(filter);
+    openTicketList(filter);
     navigation.navigate('TicketsTab', { screen: 'TicketList', params: { filter }, pop: true });
   };
   const openTicket = (ticketId: string) =>

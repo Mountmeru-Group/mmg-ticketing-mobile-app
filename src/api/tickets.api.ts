@@ -86,13 +86,16 @@ export async function getTicket(id: string): Promise<TicketDetail> {
 
 /**
  * Fields mobile may send to TKT-4, by role (01 TKT-4; 05 §A.3 for `resolution` and `countryId`).
- * Never `status` (stripped server-side, 05 B.1), `requesterId`, `slaPolicyId`, `priority` or `customFields`.
+ * Never `status` (stripped server-side, 05 B.1), `requesterId`, `slaPolicyId` or `customFields`.
+ * `priority`: ADMIN and AGENT only, the LKP-6 value sent with an impact/urgency change, as the web does (G2).
+ * L2_MANAGER (G2, ROLE-MATRIX §8 item 2): no `categoryId` (read-only for L2 on the web) and no `teamId` (the web
+ * changes the group through TKT-5, a 403 for L2), and no `priority` (L2 can't read LKP-6).
  */
 const UPDATE_KEYS_BY_ROLE: Record<UserRole, readonly (keyof UpdateTicketBody)[]> = {
   END_USER: ['title', 'description'],
-  AGENT: ['title', 'description', 'categoryId', 'impact', 'urgency', 'teamId', 'assignedToId', 'tags', 'resolution', 'countryId'],
-  ADMIN: ['title', 'description', 'categoryId', 'impact', 'urgency', 'teamId', 'assignedToId', 'tags', 'resolution', 'countryId'],
-  L2_MANAGER: ['title', 'description', 'categoryId', 'impact', 'urgency', 'teamId', 'tags', 'resolution'],
+  AGENT: ['title', 'description', 'categoryId', 'impact', 'urgency', 'priority', 'teamId', 'assignedToId', 'tags', 'resolution', 'countryId'],
+  ADMIN: ['title', 'description', 'categoryId', 'impact', 'urgency', 'priority', 'teamId', 'assignedToId', 'tags', 'resolution', 'countryId'],
+  L2_MANAGER: ['title', 'description', 'impact', 'urgency', 'tags', 'resolution'],
 };
 
 /**

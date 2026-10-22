@@ -1,8 +1,14 @@
 // M3 named filters and sorts → TKT-1 query params (08-SDP-PARITY.md §4.3, §4.5). Pure functions.
 // Status lists are always sent as ONE comma-separated `status` value built from the 03 enum only:
 // an unknown status value gives a 500 (01 TKT-1).
-import { TICKET_STATUSES, type AuthUser, type TicketListQuery, type TicketStatus, type UserRole } from '@/types';
+// Phase G2 adds the web's "More Filters" (priority, category, created date, technician, group): docs/G2-WEB-FILTERS.md.
+import {
+  TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type Category, type Team, type TicketListQuery, type TicketPriority,
+  type TicketStatus, type UserRole,
+} from '@/types';
+import { PRIORITY_LABELS } from './format';
 import { isAgentOrAdmin } from './roles';
+import { dayToDueDate, formatDueDay } from './tasks';
 
 export type TicketNamedFilter =
   | 'ALL'
@@ -145,6 +151,201 @@ export function ticketSortQuery(sort: TicketSortOption): Pick<TicketListQuery, '
 /** END_USER always sends `countryId=` so every own ticket shows regardless of country (D8, 01 TKT-1). */
 export function roleDefaultTicketQuery(role: UserRole): Pick<TicketListQuery, 'countryId'> {
   return role === 'END_USER' ? { countryId: '' } : {};
+}
+
+// ── More filters (Phase G2; the web's "More Filters" row, docs/G2-WEB-FILTERS.md) ──
+// All five are SERVER-SIDE TKT-1 params, as on the web (TicketsListPage.tsx:256-268): nothing is filtered on the device.
+// Which roles get which filter is decided in permissions.ts (ticketListFilters); this file only builds the query.
+
+/** The five filters of the Filters sheet. `date` is the created-date range (From and To). */
+export type TicketListFilterKey = 'priority' | 'category' | 'date' | 'technician' | 'group';
+
+export const TICKET_LIST_FILTER_KEYS: readonly TicketListFilterKey[] = ['priority', 'category', 'date', 'technician', 'group'];
+
+/** A picked category, technician or group, with its name for the summary line (the technician comes from a search). */
+export interface FilterPick {
+  id: string;
+  name: string;
+}
+
+export interface TicketAdvancedFilters {
+  priority: TicketPriority | null;
+  /** A top-level category: the web offers only those (TicketsListPage.tsx:580). */
+  category: FilterPick | null;
+  /** Created on or after this day, `YYYY-MM-DD` (the device's calendar day, as the browser's date input gives it). */
+  fromDate: string | null;
+  /** Created on or before this day, `YYYY-MM-DD`. */
+  toDate: string | null;
+  technician: FilterPick | null;
+  group: FilterPick | null;
+}
+
+export const NO_ADVANCED_FILTERS: TicketAdvancedFilters = {
+  priority: null, category: null, fromDate: null, toDate: null, technician: null, group: null,
+};
+
+/** The web's technician list is active users with role AGENT only (TicketsListPage.tsx:155): the same people via USR-3. */
+export const TECHNICIAN_FILTER_ROLES: readonly UserRole[] = ['AGENT'];
+
+/** Priorities in the web's order (TicketsListPage.tsx:58). */
+export const PRIORITY_FILTER_OPTIONS: readonly TicketPriority[] = TICKET_PRIORITIES;
+
+/** A day the server accepts: anything but `YYYY-MM-DD` gives a 500 (01 TKT-1), so nothing else is ever sent. */
+export function isFilterDay(day: string | null | undefined): day is string {
+  return !!day && /^\d{4}-\d{2}-\d{2}$/.test(day) && dayToDueDate(day) !== null;
+}
+
+function isActive(filters: TicketAdvancedFilters, key: TicketListFilterKey): boolean {
+  switch (key) {
+    case 'priority':
+      return filters.priority !== null;
+    case 'category':
+      return filters.category !== null;
+    case 'date':
+      return isFilterDay(filters.fromDate) || isFilterDay(filters.toDate);
+    case 'technician':
+      return filters.technician !== null;
+    case 'group':
+      return filters.group !== null;
+  }
+}
+
+/** The filters in effect: the ones set AND allowed for this role. Anything else in the state is ignored. */
+export function activeAdvancedFilters(
+  filters: TicketAdvancedFilters,
+  allowed: readonly TicketListFilterKey[],
+): TicketListFilterKey[] {
+  return TICKET_LIST_FILTER_KEYS.filter((key) => allowed.includes(key) && isActive(filters, key));
+}
+
+/** The TKT-1 params for the five filters, only for the allowed ones (the date range counts as one filter). */
+export function advancedFilterQuery(
+  filters: TicketAdvancedFilters,
+  allowed: readonly TicketListFilterKey[],
+): Pick<TicketListQuery, 'priority' | 'categoryId' | 'fromDate' | 'toDate' | 'assignedToId' | 'teamId'> {
+  const on = new Set(activeAdvancedFilters(filters, allowed));
+  return {
+    ...(on.has('priority') && filters.priority ? { priority: filters.priority } : {}),
+    ...(on.has('category') && filters.category ? { categoryId: filters.category.id } : {}),
+    ...(on.has('date') && isFilterDay(filters.fromDate) ? { fromDate: filters.fromDate } : {}),
+    ...(on.has('date') && isFilterDay(filters.toDate) ? { toDate: filters.toDate } : {}),
+    ...(on.has('technician') && filters.technician ? { assignedToId: filters.technician.id } : {}),
+    ...(on.has('group') && filters.group ? { teamId: filters.group.id } : {}),
+  };
+}
+
+/**
+ * Named filters that already set `assignedToId`. TKT-1 has one technician slot, so these and the Technician filter
+ * replace each other: the web's last choice wins (one `assignedToId` key, TicketsListPage.tsx:256-258).
+ */
+const SETS_TECHNICIAN: ReadonlySet<TicketNamedFilter> = new Set<TicketNamedFilter>(['MY_OPEN', 'UNASSIGNED', 'UNASSIGNED_KPI']);
+
+export function namedFilterSetsTechnician(filter: TicketNamedFilter): boolean {
+  return SETS_TECHNICIAN.has(filter);
+}
+
+export interface TicketFilterState {
+  filter: TicketNamedFilter;
+  advanced: TicketAdvancedFilters;
+}
+
+/** Pick a named filter. "My open" or "Unassigned" drops a technician filter (one slot, last choice wins). */
+export function withNamedFilter(state: TicketFilterState, filter: TicketNamedFilter): TicketFilterState {
+  const advanced = namedFilterSetsTechnician(filter) && state.advanced.technician ? { ...state.advanced, technician: null } : state.advanced;
+  return { filter, advanced };
+}
+
+/** Change some of the five. Picking a technician while "My open" or "Unassigned" is on moves the named filter to All. */
+export function withAdvancedFilters(state: TicketFilterState, patch: Partial<TicketAdvancedFilters>): TicketFilterState {
+  const advanced = { ...state.advanced, ...patch };
+  const filter = patch.technician && namedFilterSetsTechnician(state.filter) ? 'ALL' : state.filter;
+  return { filter, advanced };
+}
+
+export interface TicketListQueryInput {
+  me: Pick<AuthUser, 'id' | 'role'>;
+  filter: TicketNamedFilter;
+  sort: TicketSortOption;
+  /** Already normalised (normaliseTicketSearch); undefined = no `search` key. */
+  search?: string;
+  /** From listCountryParam(); undefined = no `countryId` key. */
+  countryId?: string;
+  advanced?: TicketAdvancedFilters;
+  /** permissions.ts ticketListFilters() for this person. */
+  allowed?: readonly TicketListFilterKey[];
+}
+
+/**
+ * The one TKT-1 query for M3 (minus page/limit): role default, country, named filter, the five filters, sort, search.
+ * The server ANDs them all (BE:tickets.controller.ts:98-131). If a named filter sets the technician, it wins over a
+ * stale Technician filter.
+ */
+export function ticketListQuery({
+  me, filter, sort, search, countryId, advanced = NO_ADVANCED_FILTERS, allowed = [],
+}: TicketListQueryInput): Omit<TicketListQuery, 'page' | 'limit'> {
+  return {
+    ...roleDefaultTicketQuery(me.role),
+    ...(countryId !== undefined ? { countryId } : {}),
+    ...advancedFilterQuery(advanced, allowed),
+    // After the five, so a named filter's `assignedToId` (My open, Unassigned) replaces a Technician filter's.
+    ...ticketFilterQuery(filter, me),
+    ...ticketSortQuery(sort),
+    ...(search ? { search } : {}),
+  };
+}
+
+/** "01 Oct 2026" for a filter day, as that calendar day (never shifted by the device timezone). */
+export function formatFilterDay(day: string): string {
+  return formatDueDay(dayToDueDate(day));
+}
+
+/** The created-date range in words, or null when neither day is set. */
+export function dateRangeLabel(fromDate: string | null, toDate: string | null): string | null {
+  const from = isFilterDay(fromDate) ? formatFilterDay(fromDate) : null;
+  const to = isFilterDay(toDate) ? formatFilterDay(toDate) : null;
+  if (from && to) return `Created ${from} – ${to}`;
+  if (from) return `Created from ${from}`;
+  if (to) return `Created until ${to}`;
+  return null;
+}
+
+/**
+ * Everything that narrows the list, in words, for the line under the quick filters: the named filter, the search and
+ * the five. Empty = nothing to clear (the web shows its Clear button on the same condition, :395-397; sort excluded).
+ */
+export function activeFilterLabels({
+  filter, search, advanced, allowed,
+}: {
+  filter: TicketNamedFilter;
+  search: string | undefined;
+  advanced: TicketAdvancedFilters;
+  allowed: readonly TicketListFilterKey[];
+}): string[] {
+  const labels: string[] = [];
+  if (filter !== 'ALL') labels.push(TICKET_FILTER_LABELS[filter]);
+  if (search) labels.push(`“${search}”`);
+  for (const key of activeAdvancedFilters(advanced, allowed)) {
+    if (key === 'priority' && advanced.priority) labels.push(`${PRIORITY_LABELS[advanced.priority]} priority`);
+    if (key === 'category' && advanced.category) labels.push(advanced.category.name);
+    if (key === 'date') labels.push(dateRangeLabel(advanced.fromDate, advanced.toDate) ?? '');
+    if (key === 'technician' && advanced.technician) labels.push(advanced.technician.name);
+    if (key === 'group' && advanced.group) labels.push(advanced.group.name);
+  }
+  return labels.filter(Boolean);
+}
+
+/** Category options, as the web lists them: active top-level categories (LKP-1 flat), sorted by name (:579-585). */
+export function categoryFilterOptions(categories: readonly Category[]): FilterPick[] {
+  return categories
+    .filter((c) => !c.level || c.level === 'CATEGORY')
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((c) => ({ id: c.id, name: c.name }));
+}
+
+/** Group options, as the web lists them: every team from LKP-2, inactive ones included, in the server's order (by name). */
+export function groupFilterOptions(teams: readonly Team[]): (FilterPick & { inactive: boolean })[] {
+  return teams.map((t) => ({ id: t.id, name: t.name, inactive: t.isActive === false }));
 }
 
 /**

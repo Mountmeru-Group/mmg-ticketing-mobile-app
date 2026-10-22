@@ -78,8 +78,11 @@ export function usePriorityMatrix({ enabled }: { enabled: boolean }) {
 /** Module-level so the selected array keeps its identity between renders (screens use it in effect deps). */
 const activeTeamsOnly = (teams: Team[]) => teams.filter((t) => t.isActive !== false);
 
-/** LKP-2 `GET /teams` — ADMIN and AGENT only (403 otherwise). Inactive groups are dropped (01 LKP-2). */
-export function useTeams({ enabled }: { enabled: boolean }) {
+/**
+ * LKP-2 `GET /teams` — ADMIN and AGENT only (403 otherwise). Inactive groups are dropped (01 LKP-2), except for the M3
+ * group filter (`includeInactive`), which lists every group as the web's does (docs/G2-WEB-FILTERS.md §2).
+ */
+export function useTeams({ enabled, includeInactive = false }: { enabled: boolean; includeInactive?: boolean }) {
   const role = useAuthStore((s) => s.user?.role);
   return useQuery({
     queryKey: queryKeys.lookups.teams(),
@@ -89,7 +92,7 @@ export function useTeams({ enabled }: { enabled: boolean }) {
       checkFields('LKP-2', res[0], TEAM_SPEC, '[0].');
       return res;
     },
-    select: activeTeamsOnly,
+    select: includeInactive ? undefined : activeTeamsOnly,
     enabled: enabled && !!role && isAgentOrAdmin(role),
     staleTime: LOOKUP_STALE_TIME_MS,
   });

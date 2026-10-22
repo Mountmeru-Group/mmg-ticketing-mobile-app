@@ -24,6 +24,8 @@ export type AuthStackParamList = {
 export type TicketStackParamList = {
   /** M3. `filter` lets Home tiles open the list with a named filter pre-applied (08 §3.3, §4.5). */
   TicketList: { filter?: TicketNamedFilter } | undefined;
+  /** M3's Filters sheet (Phase G2): priority, category, created date, technician, group. State lives in ui.store. */
+  TicketFilters: undefined;
   /** M4 */
   TicketDetail: { ticketId: UUID };
   /** M5 */

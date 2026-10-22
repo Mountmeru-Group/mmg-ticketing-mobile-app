@@ -4,6 +4,8 @@
 
 **Updated for Phase G1, 2026-10-22.** Staff property editing on M4 is now built: impact and urgency (with the priority preview), category, country and resolution. Rows T8, T9, T11, T12 and T13, the totals, §0, §3, §6, §7 and §8 are updated; §10 lists what G1 changed. The web's behaviour for these fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`.
 
+**Updated for Phase G2, 2026-10-22.** §8 items 2, 11 and 12 are RESOLVED, each by "match the web" (Ronit). The ticket list now has the web's priority, category, date, technician and group filters. Rows L10 (now filled in), L12 (new), T11 and T13, the totals, §0, §1.4, §3, §6, §7 and §8 are updated; §11 lists what G2 changed. The web's filter behaviour, with sources, is in `docs/G2-WEB-FILTERS.md`.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -30,14 +32,14 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **28** of the 84 rows in §2 (30 before G1). **0 are security problems** |
+| Elements whose role gating differs from the web portal | **29** of the 85 rows in §2 (28 of 84 after G1, 30 before it). **0 are security problems** |
 | More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user |
-| More restrictive than the web UI | **25**. Of these: **12** avoid a web defect, a 403 or a mis-scoped number (mobile is correct). **13** are documented product decisions. **0** are undocumented: G1 built the staff property editing that was missing (T8, T9 now MATCH; T11, T12 now decisions) |
+| More restrictive than the web UI | **26**. Of these: **13** avoid a web defect, a 403 or a mis-scoped number (mobile is correct). **13** are documented product decisions. **0** are undocumented. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10) |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
 | Attachments on private notes (check B) | **Real leak, Critical, backend-only fix.** The requester can list, view, download and zip files attached to a private note, and the header count includes them. The app cannot tell those files apart from others. It can only stop creating new ones (§5) |
 | Actions that 403 (check C) | **All hidden**, and assignment is also refused on the device (§6) |
 | Fixed in this pass | One hide-vs-disable fix: T21, the Attachments tab now says why a locked AGENT can't add files. All role gating now goes through one tested module, `src/utils/permissions.ts`, and screens render its output. No permission was relaxed |
-| Needs Ronit | §8, twelve items. The first is Critical: whether staff may attach files to notes. Items 11 and 12 came from G1 |
+| Needs Ronit | §8: **nine open** of twelve. The first is Critical: whether staff may attach files to notes. Items 2, 11 and 12 were RESOLVED in G2 |
 
 ---
 
@@ -83,7 +85,9 @@
 - The page has one role check, the triage country parameter at `:86`.
 - It has **no bulk actions, no inline status change and no quick filters** for any role. Status is a read-only badge (`:635, :693`).
 - New Ticket, CSV export, saved views, search, status, priority and sort: all roles, ungated (`:410-512`).
+- "More Filters" (date range, technician, group, category): shown to every role (`:514-588`). Date and category work for every role.
 - Technician and Group filters are shown to every role, but END_USER and L2 get a 403 and an empty list (`:549-570`).
+- Every filter is a TKT-1 parameter; nothing is filtered on the device. Full behaviour, with sources: `docs/G2-WEB-FILTERS.md`.
 
 ### 1.5 Ticket detail (`FE:pages/tickets/TicketDetailPage.tsx`)
 `locked` = `role === 'AGENT' && status ∈ {CLOSED, CANCELED}` (`:619-622`). The lock exists only in the UI; the server enforces none (05 B.2).
@@ -176,6 +180,7 @@
 - `ticketDetailPermissions`, `composerPermissions`
 - `ticketFieldPermissions`, `fieldEditProblem` (G1: the M4 property editors and their write guard)
 - `bulkActions`, `inlineStatusTransitions`
+- `ticketListFilters` (G2: which of the five filters the M3 Filters sheet offers)
 
 It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 
@@ -216,8 +221,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | L7 | Country selector · country AGENT | locked chip | locked | MATCH | `TicketListScreen.tsx:419` |
 | L8 | Country selector · L2 | hidden | hidden | MATCH | same |
 | L9 | Country selector · END_USER | hidden | read-only `—` | **NARROWER**, *decision* D8 (END_USER always sends `countryId=`). This conflicts with the text of 05 §A.12 → §8 item 3 | same; `src/screens/profile/ProfileScreen.tsx:216` |
-| L10 | Technician / Group advanced filters | not built | all (END_USER and L2 get 403/empty) | N/A | – |
+| L10 | Technician / Group filters (Filters sheet) | ADMIN, AGENT (triage and country-locked alike); same option lists for all of them, as on the web | all; END_USER and L2 get 403 and an always-empty list | MATCH for ADMIN, AGENT. **NARROWER** for END_USER and L2, *defect avoided* (403, G2) | `src/screens/tickets/TicketFiltersScreen.tsx` → perm `ticketListFilters`; query `ticket-filters.ts` `ticketListQuery` |
 | L11 | CSV export, saved views | – | all | N/A (04 §2.3) | – |
+| L12 | Priority, category and created-date filters (Filters sheet) | all | all | MATCH (G2) | same |
 
 ### 2.4 Ticket detail (M4)
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -232,9 +238,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | T8 | Category edit (3-level cascade) | ADMIN, AGENT (not locked); a locked AGENT sees the reason; L2 and END_USER read-only | ADMIN, AGENT (not locked) | MATCH (G1) | `src/screens/tickets/TicketPropertyEditors.tsx` `CategorySection` → perm `ticketFieldPermissions` |
 | T9 | Impact / urgency edit | AGENT (not locked), L2, ADMIN; a locked AGENT sees the reason | AGENT (not locked), L2, ADMIN | MATCH (G1) | `TicketPropertyEditors.tsx` `ClassificationSection` → perm `ticketFieldPermissions` |
 | T10 | Impact / urgency display for END_USER | hidden | read-only in the Details tab | **NARROWER**, *decision* 05 §A.3 | perm `ticketFieldPermissions` (`hidden`); `TicketPropertyEditors.tsx` |
-| T11 | Country edit | ADMIN, triage AGENT, in every status; a country AGENT sees the value with a lock reason; L2 and END_USER see the value only | ADMIN, every AGENT, not lock-gated; L2 sees a select that saves nothing | **NARROWER** for the country AGENT, *decision* (G1 brief, 05 §A.12; G1 D2 → §8 item 12). For L2 *defect avoided* (silent no-op) | `TicketPropertyEditors.tsx` `CountrySection` → perm `ticketFieldPermissions` |
+| T11 | Country edit | ADMIN, triage AGENT, in every status; a country AGENT sees the value with a lock reason; L2 and END_USER see the value only | ADMIN, every AGENT, not lock-gated; L2 sees a select that saves nothing | **NARROWER** for the country AGENT, *decision* (05 §A.12; G1 D2; §8 item 12 RESOLVED in G2: stays locked). For L2 *defect avoided* (silent no-op) | `TicketPropertyEditors.tsx` `CountrySection` → perm `ticketFieldPermissions` |
 | T12 | Resolution edit | AGENT (even locked), L2, ADMIN, while RESOLVED or CLOSED; otherwise the reason | all roles, while RESOLVED or CLOSED | **NARROWER** for END_USER, *decision* D3. Staff MATCH (G1) | `TicketPropertyEditors.tsx` `ResolutionSection` → perm `ticketFieldPermissions` |
-| T13 | Priority read-only; "Auto" pill; priority shown before saving an impact/urgency change | pill for staff; preview for ADMIN, AGENT (LKP-6); L2 told the server recalculates (LKP-6 is 403) | pill for staff; no preview, the priority is computed at save time and shown after | MATCH. Mobile never sends `priority` → §8 item 11 (G1 D1) | `TicketDetailScreen.tsx` `HeaderCard`; `TicketPropertyEditors.tsx` `PriorityPreviewBox` |
+| T13 | Priority read-only; "Auto" pill; priority shown before saving an impact/urgency change | pill for staff; preview for ADMIN, AGENT (LKP-6); L2 told the server recalculates (LKP-6 is 403) | pill for staff; no preview, the priority is computed at save time and shown after | MATCH. Since G2, ADMIN and AGENT send the matrix `priority` with the change, as the web does (§8 item 11 RESOLVED); L2 sends none, as on the web | `TicketDetailScreen.tsx` `HeaderCard`; `TicketPropertyEditors.tsx` `PriorityPreviewBox`; `ticket-properties.ts` `classificationChanges` |
 | T14 | Reply | all | all | MATCH | perm `conversationActions`, `:278` |
 | T15 | Reply all | AGENT, L2, ADMIN | all | **NARROWER** for END_USER, *decision* 04 M5 / 01 TKT-9 (TKT-9 has no access check, C.1) | same |
 | T16 | Note (private) | ADMIN, AGENT | AGENT, L2, ADMIN (+ END_USER via the Actions menu) | **NARROWER**, *defect avoided*: their "note" is emailed publicly (W1) | same |
@@ -291,14 +297,15 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | AN2 | Announcements: create, delete | none | ADMIN | N/A (skipped) | – |
 | DL1 | Ticket link → ticket (deep link) | all, server scope | all | MATCH | `src/screens/tickets/TicketLinkScreen.tsx` |
 
-**Totals** (after G1, 2026-10-22)
-- 84 rows.
-- **28 mismatches** (30 before G1: T8 and T9 are now MATCH):
+**Totals** (after G2, 2026-10-22)
+- 85 rows (84 after G1; G2 added L12).
+- **29 mismatches** (28 after G1, 30 before it):
   - 3 WIDER: N1, N4, CR4.
-  - 25 NARROWER:
-    - **12 defect avoided:** H5, H6, T5, T6, T7, T16, T17, T18, T27, CR3, CR6, AP3.
+  - 26 NARROWER:
+    - **13 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T27, CR3, CR6, AP3.
     - **13 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T22, T24, T26, C2, CR5.
     - **0 UNDOCUMENTED** (before G1: T8, T9, T11, T12).
+- G2: L10 went from N/A (not built) to built, MATCH for ADMIN and AGENT and NARROWER for END_USER and L2 (the web shows them an empty list). L12 is a new MATCH row.
 - **No mismatch is a security problem.**
 
 ---
@@ -343,6 +350,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - country selector (L2, END_USER)
 - Unassigned tile and filter (non-ADMIN/AGENT)
 - G1 editors: category edit (L2, END_USER), country edit (L2, END_USER), resolution edit (END_USER). Each shows the value with no editor and no reason
+- G2: the Technician and Group filters (END_USER, L2): not in the Filters sheet, and never sent from a stale state
+
+**G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
 ---
 
@@ -427,7 +437,7 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 | Server rejection | Who | Mobile | Source (server → app) |
 |---|---|---|---|
 | `POST /tickets/:id/assign` is `agentOrAdmin` → 403 | L2, END_USER | Pick up, Assign, Reassign, Remove and Move to group are hidden. Bulk Pick up / Assign are hidden. The M7 screen refuses. `assertAssignment` refuses before sending | `BE:tickets.router.ts:20` → perm `moreActions`, `bulkActions`; `src/hooks/writeGuards.ts:76` |
-| `GET /teams`, `GET /users/search` are `agentOrAdmin` → 403 | L2, END_USER | Create's Group and Assign to, M7, the task technician picker and recipient suggestions are all hidden. The queries are disabled for those roles | `BE:teams.router.ts:8`, `BE:users.router.ts:15` → `src/hooks/useLookups.ts:39, :74, :94` |
+| `GET /teams`, `GET /users/search` are `agentOrAdmin` → 403 | L2, END_USER | Create's Group and Assign to, M7, the task technician picker, recipient suggestions and (G2) the M3 Technician and Group filters are all hidden. The queries are disabled for those roles | `BE:teams.router.ts:8`, `BE:users.router.ts:15` → `src/hooks/useLookups.ts` `useTeams`, `useUserSearch`; perm `ticketListFilters` |
 | `POST /approvals` is `agentOrAdmin` → 403 | L2, END_USER | Submit for approval is not offered to anyone | `BE:approvals.router.ts:8` |
 | `DELETE /attachments/:id` → 403 | END_USER | Delete is not offered to anyone (P7) | `BE:attachments.controller.ts:149` |
 | `GET /priority-matrix` is `agentOrAdmin` | L2, END_USER | Called only for ADMIN and AGENT, when the impact/urgency editor opens (G1). L2 gets no preview; the query is disabled for L2 and END_USER | `BE:priorityMatrix.router.ts:8` → perm `priorityPreview`; `src/hooks/useLookups.ts` `usePriorityMatrix` |
@@ -497,14 +507,34 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - an editor sends `priority`
   - the API allow-list sends `priority`
 
+**G2 additions (2026-10-22): 282 tests in all (209 after G1).**
+- **`tests/rbac/list-filters.test.mjs`, 65 tests (new).** For each persona (END_USER, AGENT, triage AGENT, L2_MANAGER, ADMIN):
+  - exactly which of the five filters the Filters sheet shows, the active count, and that the summary line never names a filter the persona can't see;
+  - the exact TKT-1 parameters with every filter set in the state, alone and combined with "Open", a search, sort by priority and a country: technician and group never reach the server for END_USER or L2, even from a stale state;
+  - each filter alone sends only its own parameter; a malformed day is never sent; the date range counts once; From after To is sent as on the web;
+  - the one technician slot: My open / Unassigned win over the Technician filter, and choosing one clears the other;
+  - the option requests: technicians are USR-3 `role=AGENT`, the same for ADMIN, triage and country AGENT; groups are LKP-2 with no country (a country AGENT included); nothing for END_USER or L2; categories are top-level only, by name; inactive groups kept and marked;
+  - the quick filters, search and sort give the same query as before G2, for every persona × quick filter × sort × search;
+  - Clear all (the web's Clear), a Home tile (filter alone), sign-out (everything wiped);
+  - wiring: `useTickets` sends only `ticketListFilters()`'s keys; the list counts only allowed filters; each field of the sheet sits directly behind its own check.
+- **`property-editing.test.mjs`, 59 tests (52).** The G1 "never send `priority`" assertions are replaced by Ronit's G2 rule, as strictly: `priority` on its own is refused for everyone in every status; with an impact/urgency change it goes through exactly where the preview is offered (ADMIN, AGENT not locked); the API layer sends it for ADMIN and AGENT only; L2's API allow-list carries no category, group, assignee, country or priority; the exact allowed keys per role; `classificationChanges` adds the matrix row's priority for the effective pair, and none without a row, a value or a change.
+- **`role-gating.test.mjs`, 124 tests (123):** the Filters sheet joins the wiring checks; the list must call `ticketListFilters()`.
+- **Proof the tests bite.** Eighteen "too permissive" or "not as the web" mutations were each applied, tested and reverted by script; every one made the suite fail (1–17 failures each), and each file was verified byte-identical afterwards by SHA-1:
+  - technician and group for every role; group for L2; the query ignores the allow-list; `useTickets` sends every filter;
+  - the sheet shows Technician, Group or the technician picker to every role; groups loaded for every role;
+  - the technician list includes ADMIN; sub-categories offered as categories;
+  - the Technician filter beats My open; My open keeps the technician; Clear all keeps the sort;
+  - L2's allow-list sends category and group, or priority; `priority` accepted on its own, or from L2; `priority` sent without a matrix row.
+  - Two first-draft mutations survived and were fixed: a redundant `delete` in `ticketListQuery` (removed; the spread order already decides) and a wiring check too loose to catch an unguarded Technician field (tightened).
+
 ---
 
-## 8. For Ronit to decide (not changed)
+## 8. For Ronit to decide (items 2, 11 and 12 RESOLVED in G2; the rest not changed)
 
 | # | Question | Recommendation |
 |---|---|---|
 | 1 | **Critical (§5).** Private-note files are visible to the requester. Should mobile stop offering attachments in Note mode until the backend fix ships? The composer's note text is misleading today | **Yes.** Hide the attachment picker in Note mode. In the meantime, change the text to: "Files are added to the ticket and the requester can see them." Raise §5 with the web team as part of A7 |
-| 2 | ~~Staff property editing on M4 was never built~~ **Built in G1** (T8, T9, T11, T12). Still open: `UPDATE_KEYS_BY_ROLE.L2_MANAGER` in `src/api/tickets.api.ts` allows `categoryId` and `teamId`, which the web keeps read-only or 403s for L2. G1 refuses them on the device instead (`fieldEditProblem` in `permissions.ts`, called by `useUpdateTicket`), so no screen can send them; the allow-list and 01 TKT-4 were left as they are because they are API-layer changes | Narrow the L2 allow-list to `title`, `description`, `impact`, `urgency`, `tags`, `resolution`, and correct 01 TKT-4 to match. Needs your OK |
+| 2 | ~~Staff property editing on M4 was never built~~ **Built in G1** (T8, T9, T11, T12). ~~`UPDATE_KEYS_BY_ROLE.L2_MANAGER` allows `categoryId` and `teamId`~~ | ✅ **RESOLVED (G2, Ronit: match the web).** The L2 allow-list is now `title`, `description`, `impact`, `urgency`, `tags`, `resolution`: no `categoryId` (read-only for L2 on the web) and no `teamId` (the web changes the group through TKT-5, a 403 for L2). 01 TKT-4 matches. Tested at the API layer, under the write guard |
 | 3 | END_USER country selector: the app hides it (D8); 05 §A.12 says "shown read-only" | Keep it hidden: END_USER always sends `countryId=`, so a country label would be wrong. Update the 05 §A.12 text to match |
 | 4 | "Raise on behalf" (requester picker) for ADMIN and AGENT: not in the web UI, but in 01 TKT-2 and 04 M8. CLAUDE.md rule 6 says the UI offers only what the web offers | Keep it: it is the server's intended feature and SDP parity, and exposes nothing. Record the exception against rule 6 |
 | 5 | 08 S1 (Approvals for END_USER/L2 approvers, Announcements for END_USER) is implemented on its *proposed* default | Confirm S1 as decided |
@@ -513,8 +543,8 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 | 8 | Approval detail shows ticket context whenever TKT-3 returns 200. For AGENT that is always true, because TKT-3 is unscoped for AGENT (C.6) | Keep: the approver is designated for that ticket, and the 403 path takes over automatically once A7 scopes TKT-3 |
 | 9 | 04 M3 says the Unassigned filter is "(staff)"; 08 §4.5 and the app say ADMIN and AGENT | Fix 04's wording to ADMIN, AGENT |
 | 10 | The comment at `src/hooks/usePostComment.ts:51` says "END_USER and L2 never send recipients". L2 does send To/CC, and the server keeps them | Correct the comment. I left it because hooks with mutations were out of bounds for this pass |
-| 11 | **G1 D1.** On an impact or urgency change, the web also sends the matrix `priority` (ADMIN and AGENT only; L2 can't read the matrix). The stored priority is the same either way, but because `priority` is in the body the server emails the requester and the assignee "priority changed" and records it in History. Mobile never sends `priority` (01 TKT-4), so a mobile edit sends no such email and History shows only the impact/urgency change | Keep mobile as it is unless the requester email matters. If it does, allow `priority` in TKT-4 for ADMIN and AGENT only, set to the LKP-6 value for the effective pair, exactly as the web does, and update 01 |
-| 12 | **G1 D2.** Country on the ticket: the G1 brief (from 05 §A.12) locks it for a country AGENT. The web lets **every** AGENT change it, with the full country list (`FE:TicketDetailPage.tsx:2199`). 05 §A.12 describes the ticket-list filter, not this field | Keep it locked: a country AGENT moving a ticket to another country moves it out of their own queue. If you agree, record it as a decision; otherwise flip `ticketFieldPermissions` and its tests |
+| 11 | **G1 D1.** On an impact or urgency change, the web also sends the matrix `priority` (ADMIN and AGENT only; L2 can't read the matrix). The stored priority is the same either way, but because `priority` is in the body the server emails the requester and the assignee "priority changed" and records it in History | ✅ **RESOLVED (G2, Ronit: match the web).** ADMIN and AGENT now send `priority` = the LKP-6 row for the effective pair, only with an impact/urgency change, only when the matrix is loaded and has that row, exactly as `FE:TicketDetailPage.tsx:304-317`. L2 sends none. **Restored side effect:** when that priority differs from the stored one, the server emails the requester and the assigned technician "priority changed" (`BE:tickets.controller.ts:776-784`) and History's UPDATED row shows the priority change (`:719`). The preview says so before Save. 01 TKT-4 and 03 `UpdateTicketBody` updated |
+| 12 | **G1 D2.** Country on the ticket: the G1 brief (from 05 §A.12) locks it for a country AGENT. The web lets **every** AGENT change it, with the full country list (`FE:TicketDetailPage.tsx:2199`). 05 §A.12 describes the ticket-list filter, not this field | ✅ **RESOLVED (G2, Ronit: keep it locked, per 05 §A.12).** No code change: `ticketFieldPermissions` already locks it for a country AGENT, with the reason, and the tests already pin it (T11). WEB-VS-MOBILE-ROLES.md now lists it as ⊘ OUT OF SCOPE instead of a gap |
 
 ---
 
@@ -563,3 +593,32 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 - The create form (no priority preview there: gap 11 in `WEB-VS-MOBILE-ROLES.md`).
 - `src/api/tickets.api.ts` allow-lists (§8 item 2), the auth flow, `auth.config.ts`, the dev-token screen.
 - No library. No EAS build. The web repo.
+
+---
+
+## 11. What Phase G2 changed (2026-10-22, uncommitted)
+
+**Decisions applied (§8 items 2, 11, 12, all "match the web")**
+- Priority with an impact/urgency change: `classificationChanges` (`src/utils/ticket-properties.ts`) adds the LKP-6 row's priority for ADMIN and AGENT; `fieldEditProblem` accepts `priority` only alongside impact or urgency and only where the preview is offered; `UPDATE_KEYS_BY_ROLE` lets ADMIN and AGENT carry it; the M4 preview says the requester and technician are emailed. `UpdateTicketBody` gained `priority` in `src/types/ticket.ts` and `03-DATA-MODEL.md`.
+- Country for a country-locked AGENT: unchanged, recorded as decided.
+- L2 allow-list: `categoryId` and `teamId` removed in `src/api/tickets.api.ts`.
+
+**Created**
+- `docs/G2-WEB-FILTERS.md`: the web's list filters, with sources, and six web defects (report only).
+- `src/screens/tickets/TicketFiltersScreen.tsx`: the Filters sheet (M3 → modal), opened from a button beside the search box.
+- `tests/rbac/list-filters.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`: `ticketListFilters`; the `priority` rule in `fieldEditProblem`.
+- `src/utils/ticket-filters.ts`: the five filters' state, `advancedFilterQuery`, `ticketListQuery` (one query for the list), the technician-slot rules, option lists, labels.
+- `src/store/ui.store.ts`: the five filters and the search live here (in memory, wiped on sign-out); `clearTicketFilters` (the web's Clear) and `openTicketList` (a Home tile, like a web dashboard link).
+- `src/hooks/useTickets.ts` builds its query with `ticketListQuery` and `ticketListFilters`; `src/hooks/useLookups.ts` `useTeams({ includeInactive })` for the group filter.
+- `src/screens/tickets/TicketListScreen.tsx`: the Filters button with its count, the line listing what is applied with **Clear all**, the "No tickets match these filters" empty state. The named filters, search, sort, country, infinite scroll, pull-to-refresh, inline status and bulk actions are unchanged.
+- `src/screens/dashboard/HomeScreen.tsx`: tiles call `openTicketList`.
+- `src/navigation/TicketStack.tsx`, `src/types/navigation.ts`: the `TicketFilters` route.
+- Docs: this file, `WEB-VS-MOBILE-ROLES.md`, `01-API-CONTRACT.md` (TKT-1 filters, TKT-4, USR-3, LKP-1, LKP-2, LKP-6), `03-DATA-MODEL.md`, a G2 note in `G1-WEB-BEHAVIOUR.md`.
+
+**Not touched**
+- The status flow (TKT-6 POST only), the create form (gap 11), gaps 3, 7, 8 and 9.
+- The auth flow, `auth.config.ts`, the dev-token screen. No library. No EAS build. Nothing committed.
+- The web repo: byte-for-byte unchanged (SHA-1 of every file under `frontend/src`, `backend/src` and `backend/prisma`, before and after).

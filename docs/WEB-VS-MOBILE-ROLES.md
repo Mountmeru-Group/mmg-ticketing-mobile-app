@@ -1,6 +1,6 @@
 # Web portal vs mobile app: who can do what
 
-**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phase G1.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`.
+**Mount Meru Service Desk, 2026-10-20; updated 2026-10-22 for Phases G1 and G2.** This is a presentation of the Phase D-pre role audit. The evidence, with file and line references, is in `docs/ROLE-MATRIX.md`; this document only reformats its findings. Phase G1 built ticket property editing: impact and urgency, category, country (ADMIN and triage AGENT) and the staff resolution edit. The web's behaviour for those fields, with sources, is in `docs/G1-WEB-BEHAVIOUR.md`. Phase G2 built the ticket list's priority, category, date, technician and group filters (web behaviour: `docs/G2-WEB-FILTERS.md`) and applied three decisions: priority is now sent with an impact/urgency change as on the web, the country stays locked for a plain AGENT, and L2_MANAGER's update call can no longer carry a category or group.
 
 ## 1. How to read this
 
@@ -18,23 +18,26 @@ This document compares, one capability per row, what the **web portal** lets eac
 
 | Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps |
 |---|---|---|---|---|
-| END_USER | 44 | 37 | 90% | 3: priority/category/date filter, reply templates, service catalogue |
-| AGENT | 76 | 67 | 86% | 8: all of section 4 |
-| triage AGENT | 75 | 68 | 88% | 7: all of section 4 except changing the country |
-| L2_MANAGER | 55 | 49 | 89% | 4: delete a file, priority/category/date filter, reply templates, service catalogue |
-| ADMIN | 77 | 68 | 88% | 7: all of section 4 except changing the country |
+| END_USER | 44 | 38 | 93% | 2: reply templates, service catalogue |
+| AGENT | 76 | 69 | 91% | 5: all of section 4 |
+| triage AGENT | 75 | 70 | 91% | 5: all of section 4 |
+| L2_MANAGER | 55 | 50 | 92% | 3: delete a file, reply templates, service catalogue |
+| ADMIN | 77 | 70 | 91% | 5: all of section 4 |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
-- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒). What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 59–65%.
+- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 61–68%.
+- **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly.
 
 ## 3. Main table: 106 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
 |---|---|---|---|---|---|
-| 39 | 21 | 8 | 21 | 17 | **106** |
+| 41 | 21 | 5 | 22 | 17 | **106** |
 
+Before G2: 39 SAME, 8 NOT BUILT, 21 OUT OF SCOPE. G2 moved the two filter rows to ✅ SAME and the plain AGENT's country row to ⊘ OUT OF SCOPE (decided: it stays locked). The 17 🔒 SAFER rows are unchanged.
 Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and split the country row in two, because mobile now treats the triage AGENT and the plain AGENT differently there.
 
 **Key to the "who can" columns**
@@ -55,8 +58,8 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Filter by status | All roles | All roles | ✅ SAME | A drop-down on the web; named filters (Open, Pending, Resolved, Closed) on mobile. |
 | Quick filters "My open", "Overdue", "Due soon" | Nobody | All roles | ➕ MOBILE ONLY | |
 | Filter to unassigned tickets | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | A plain AGENT sees the unassigned tickets in their own groups. |
-| Filter by technician or group | ADMIN, AGENT (END_USER, L2_MANAGER: error) | Nobody | ❌ NOT BUILT | |
-| Filter by priority, category or date | All roles | Nobody | ❌ NOT BUILT | |
+| Filter by technician or group | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In the Filters sheet. The web shows END_USER and L2_MANAGER these two lists, always empty; mobile leaves them out. Technicians are found by name (the web lists its first 100). Built in G2. |
+| Filter by priority, category or date | All roles | All roles | ✅ SAME | In the Filters sheet, combined with the quick filters, search and sort. As on the web, the category filter lists top-level categories and skips tickets filed under their sub-categories, and the date is the day the ticket was created. Built in G2. |
 | Export the list to a spreadsheet | All roles | Nobody | ⊘ OUT OF SCOPE | |
 | Saved views | All roles | Nobody | ⊘ OUT OF SCOPE | |
 | Switch the country filter (any country or "All") | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | L2_MANAGER has no country filter on either. |
@@ -89,10 +92,10 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Assign, reassign or unassign a technician | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | |
 | Move a ticket to another group | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | |
 | Change category | ADMIN, AGENT (lock) | ADMIN, AGENT (lock) | ✅ SAME | Three levels; changing a level clears the ones below. L2_MANAGER sees it read-only on both. The server may re-route the ticket, and mobile says so. Built in G1. |
-| Change impact and urgency | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Together they set the priority and the SLA deadline. Mobile shows ADMIN and AGENT the resulting priority before Save; the web saves on selection, then shows it. Built in G1. |
+| Change impact and urgency | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Together they set the priority and the SLA deadline. Mobile shows ADMIN and AGENT the resulting priority before Save; the web saves on selection, then shows it. Since G2, ADMIN and AGENT send that priority with the change, as the web does, so the requester and the technician get the "priority changed" email. Built in G1. |
 | See impact and urgency | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | Requesters see them read-only on the web. |
 | Change the ticket's country: ADMIN, triage AGENT | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | In any status, as on the web. On the web L2_MANAGER gets a success message, but nothing is saved; mobile shows L2_MANAGER the value only. Built in G1. |
-| Change the ticket's country: plain AGENT | plain AGENT | Nobody | ❌ NOT BUILT | Mobile shows the value with a lock reason (G1 brief, 05 §A.12). The web lets every AGENT change it. Awaiting Ronit's decision (ROLE-MATRIX.md §8 item 12). |
+| Change the ticket's country: plain AGENT | plain AGENT | Nobody | ⊘ OUT OF SCOPE | Mobile shows the value with a lock reason. The web lets every AGENT change it. Ronit decided in G2 to keep it locked (05 §A.12; ROLE-MATRIX.md §8 item 12). |
 | Edit the resolution (staff) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | While the ticket is Resolved or Closed, as on the web; the AGENT lock does not apply. Built in G1. |
 | Edit the resolution (requester) | END_USER | Nobody | 🔒 SAFER | |
 | See the priority | All roles | All roles | ✅ SAME | Nobody edits it; it follows impact and urgency. Staff see an "Auto" label. |
@@ -226,18 +229,28 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open (8)**
+**Still open (5)**
 
 | # | Gap | What it is | Roles that lose it | Endpoint the app would call | Effort |
 |---|---|---|---|---|---|
 | 3 | Reply templates (canned responses) | Insert a saved reply instead of typing it. | All roles (the Phase 2 plan offers it to staff only) | `GET /canned-responses` (LKP-7) | Small |
-| 4 | Filter by technician or group | See one technician's or one group's tickets, for example to balance the queue. | ADMIN, AGENT | Ticket list `GET /tickets` with technician or group (TKT-1), plus the group list (LKP-2) and people search (USR-3), which the app already loads | Small to medium |
-| 5 | Filter by priority, category or date | Narrow the list to urgent tickets, one category, or this week. | All roles | Ticket list `GET /tickets` with priority, category and from/to dates (TKT-1) | Small |
 | 7 | Request a service from the catalogue | Order a standard service (a laptop, an account) from a catalogue instead of writing a free-text ticket. | All roles | Service catalogue, SCR-1 to SCR-6 | Large: each catalogue item brings its own form. Held for Phase 2 by decision |
 | 8 | Delete a file | Remove a file uploaded by mistake. | ADMIN, AGENT, L2_MANAGER | Delete attachment, `DELETE /tickets/:id/attachments/:attachmentId` (ATT-5) | Small |
 | 9 | Submit a ticket for approval | Ask a manager to approve a ticket before work continues. | ADMIN, AGENT | `POST /approvals`. The route exists on the server but is not yet listed in the mobile API contract, so adding it needs Ronit's sign-off | Medium |
-| 10 | Change the ticket's country: **plain AGENT only** | Fix the country when a ticket was logged against the wrong one. | plain AGENT | Built for ADMIN and the triage AGENT in G1; a country-locked AGENT sees it locked, pending Ronit's decision (ROLE-MATRIX.md §8 item 12) | None: a one-line permission change if approved |
 | 11 | See the priority before saving a new ticket | Preview the priority while choosing impact and urgency on the create form. | ADMIN, AGENT | Priority matrix, `GET /priority-matrix` (LKP-6). The app now loads it for the ticket detail preview (G1), so only the create form is missing | Small |
+
+**Built in Phase G2 (2026-10-22)**
+
+| # | Gap | Now |
+|---|---|---|
+| 4 | Filter by technician or group | ✅ ADMIN, AGENT, in the Filters sheet: technicians found by name (USR-3, AGENTs as on the web), every group (LKP-2). Sent as `assignedToId` / `teamId` on the ticket list call |
+| 5 | Filter by priority, category or date | ✅ All roles, in the Filters sheet. Sent as `priority`, `categoryId`, `fromDate` / `toDate` |
+
+**Decided in Phase G2, no longer a gap**
+
+| # | Gap | Decision |
+|---|---|---|
+| 10 | Change the ticket's country: plain AGENT | Stays locked (05 §A.12; ROLE-MATRIX.md §8 item 12). Now ⊘ OUT OF SCOPE in section 3 and listed in section 6 |
 
 **Built in Phase G1 (2026-10-22)**
 
@@ -250,7 +263,7 @@ The gaps are ranked by how much each one matters day to day. Each one uses an en
 
 The G1 brief named the gaps to build as 1, 2, 6, 7 and 8, and described them as impact/urgency, category, resolution, country and the priority preview. By this list's numbering those are 1, 2, 6, 10 and 11. G1 built the named fields on the ticket detail screen; it did not build 7 (catalogue), 8 (delete a file) or the create-form preview in 11.
 
-**The prerequisite, mobile-side only.** Before G1 the app's update call would have let an L2_MANAGER send a category or group change, which the web allows neither. G1 refuses both on the device before anything is sent: every property save goes through `fieldEditProblem` in `src/utils/permissions.ts`. The API-layer allow-list itself (`UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`) and 01 TKT-4 still list them for L2; narrowing those needs Ronit's OK (ROLE-MATRIX.md §8, item 2).
+**The prerequisite, mobile-side only.** Before G1 the app's update call would have let an L2_MANAGER send a category or group change, which the web allows neither. G1 refuses both on the device before anything is sent: every property save goes through `fieldEditProblem` in `src/utils/permissions.ts`. G2 also narrowed the API-layer allow-list (`UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`) and 01 TKT-4, so even a call that skipped the guard could not carry `categoryId`, `teamId` or `priority` for L2 (ROLE-MATRIX.md §8 item 2, RESOLVED).
 
 ## 5. Where mobile is safer than the web
 
@@ -283,6 +296,7 @@ Each of these is deliberate: on the web the control fails, returns an error, or 
 | Export the list to a spreadsheet | It builds a file by paging through every ticket: desk work, not phone work. |
 | Saved views | Desktop filter sets; mobile uses fixed quick filters instead. |
 | See your country filter, read-only | Mobile always shows a requester every ticket they raised, whatever the country, so a country label would be wrong. |
+| Change the ticket's country: plain AGENT | Decided in G2: an AGENT locked to one country keeps the ticket's country locked, as 05 §A.12 locks their list. Moving a ticket to another country would move it out of their own queue. ADMIN and the triage AGENT change it as on the web. |
 | Set mode, level and source when creating | The server throws away mode and level on a new ticket, and mobile sets the source itself. |
 | See impact and urgency (requester) | Classification is a service-desk field, so by decision mobile shows it to staff only. |
 | Print, duplicate, delete, "email the technician", tags, link to a problem or change | On the web, delete and "email the technician" send nothing and duplicate reopens the same ticket. The problem and change links call server routes that do not exist. Printing is desk work. |

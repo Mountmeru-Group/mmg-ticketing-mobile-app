@@ -272,6 +272,18 @@ export const assignTicketSchema = z.object({
   - **AGENT and ADMIN:** send the country selector value, or `countryId=` for all.
   - Never send `pageSize`.
   - The list payload is heavy, since each row includes tasks and the category chain (ask A9).
+- **Mobile filters on M3** (Phase G2, as the web ticket list sends them; sources in `docs/G2-WEB-FILTERS.md`). All are **server-side**: the app filters nothing on the device. They are ANDed by the server with the role scope, the country, the named filter (`status`, `sla`, `assignedToId`), `search` and `sortBy`, in **one** request per page (`src/utils/ticket-filters.ts` `ticketListQuery`).
+
+| Filter | Parameter and value | Who | Options from |
+|---|---|---|---|
+| Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, one value | every role | the 03 enum, in that order |
+| Category | `categoryId=<top-level category id>`. **Exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name |
+| Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500) | every role | the system date picker |
+| Technician | `assignedToId=<user id>` | ADMIN, AGENT | USR-3 `role=AGENT` (the web lists active AGENTs) |
+| Group | `teamId=<team id>` | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web) |
+
+  - Technician and group are never sent for END_USER or L2_MANAGER, even if set: their lookups are 403 for those roles (`permissions.ts` `ticketListFilters`).
+  - One `assignedToId`: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other, as the web's single select does.
 
 ### TKT-2 `POST /api/v1/tickets` — MVP
 - **Purpose:** raise a ticket.
@@ -334,11 +346,12 @@ export const assignTicketSchema = z.object({
 - **Body:** `updateTicketSchema` (all optional; no defaults applied).
   - **`status` is NOT accepted.** It is silently stripped, and the call still returns 200. Use TKT-6 for status.
   - `source`, `closureCode`, `isFcr` and `closureComments` are also stripped.
-- **Fields mobile may send, by role** (mirrors the web UI; `05` §A):
+- **Fields mobile may send, by role** (mirrors the web UI; `05` §A). This is the API-layer allow-list, `UPDATE_KEYS_BY_ROLE` in `src/api/tickets.api.ts`; the screens send less (`permissions.ts` `fieldEditProblem`).
   - END_USER: `title`, `description` only (and only if the web lets them; see `05` §A).
-  - AGENT / ADMIN: `categoryId`, `impact`, `urgency`, `teamId`, `assignedToId`, `tags`, `title`, `description`.
-  - L2: as AGENT, minus `assignedToId`.
-  - **Never send** `requesterId`, `slaPolicyId`, `priority` or `customFields`. ⚠ The server would accept them.
+  - AGENT / ADMIN: `categoryId`, `impact`, `urgency`, `priority` (see below), `teamId`, `assignedToId`, `tags`, `title`, `description`, `resolution`, `countryId`.
+  - L2: `title`, `description`, `impact`, `urgency`, `tags`, `resolution`. **No `categoryId`** (read-only for L2 on the web, `FE:TicketDetailPage.tsx:1951`), **no `teamId`** (the web changes the group through TKT-5, a 403 for L2), no `assignedToId`, no `priority`, no `countryId`. Narrowed in G2 (ROLE-MATRIX §8 item 2).
+  - **`priority`, as the web sends it** (G2, ROLE-MATRIX §8 item 11; `FE:TicketDetailPage.tsx:304-317`): ADMIN and AGENT only, **only together with an `impact` or `urgency` change**, and only when the LKP-6 matrix is loaded and has a row for the effective pair (the new value, else the ticket's own). The value is that row's priority. Never on its own, never for L2 (LKP-6 is a 403 for L2, so the web never sends one either). If the matrix has not loaded or has no row, the change is sent without `priority`, as on the web.
+  - **Never send** `requesterId`, `slaPolicyId` or `customFields`. ⚠ The server would accept them.
 - **Server behaviour:**
   - **Priority:** recomputed from the matrix when the effective impact and urgency are both set; this overrides an explicit `priority` (`:563-573`).
   - **Category change:** re-runs auto-assignment using the requester's country. The assignee is only applied if they are a member of the resolved team. This **can replace the current assignee** (`:577-673`).
@@ -356,6 +369,7 @@ export const assignTicketSchema = z.object({
   - Audit `UPDATED` (title, priority, urgency, impact and category diffs, or `{updated:true}`), plus `ASSIGNED` on an assignee change.
   - Emails: new assignee; requester and assignee on an explicit priority change.
   - Dashboard cache invalidated.
+  - **The `priority` key itself is what triggers two of these.** The stored priority is the matrix value whether or not `priority` is sent, but the priority line in the audit row (ctrl:719) and the "priority changed" email to the requester and the assignee (ctrl:776-784) are keyed on the body's `priority` differing from the stored one. Sending it with an impact/urgency change, as the web does, is what restores that email and the History line for a mobile edit (G2).
 - **Source:** rtr:19, ctrl:531-788, val:35-37.
 
 ### TKT-5 `POST /api/v1/tickets/:id/assign` — MVP (staff)
@@ -695,7 +709,7 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 - **Source:** `users.router.ts:19`, `users.controller.ts:123-139`.
 
 ### USR-3 `GET /api/v1/users/search` — MVP (staff only)
-- **Purpose:** typeahead for the assignee picker and "raise on behalf of" requester picker.
+- **Purpose:** typeahead for the assignee picker and "raise on behalf of" requester picker, and the M3 Technician filter (`role=AGENT`, the same people the web's technician list holds; G2).
 - **Auth:** `agentOrAdmin`: **ADMIN, AGENT only.** L2_MANAGER and END_USER get `403 "Forbidden: insufficient role"`.
 - **Query:**
   - `q`: if shorter than 2 characters the response is `200 []`.
@@ -741,6 +755,7 @@ Mounted at `/api/v1/users` (`app.ts:126`).
   - **Ignore the nested `children` arrays.**
   - Sort each level by `name.localeCompare`, as the web does.
   - Cache for 10 minutes.
+  - M3 Category filter (G2): the top-level rows only, sorted by name, as the web's list filter (TKT-1).
 - **Source:** `categories.router.ts:10`, `categories.controller.ts:20-40`.
 
 ### LKP-2 `GET /api/v1/teams` — MVP (staff)
@@ -754,7 +769,7 @@ Mounted at `/api/v1/users` (`app.ts:126`).
     slaPolicy: { id, name } | null }
   ```
 - **Mobile:**
-  - Filter out teams with `isActive: false`.
+  - Filter out teams with `isActive: false`, except in the M3 Group filter (G2), which lists every team, inactive ones marked, as the web's list filter does: an inactive group can still own tickets.
   - Use `members` directly. The web's extra `GET /teams/:id` per team (N+1) is unnecessary.
 - **Source:** `teams.router.ts:8`, `teams.controller.ts:17-28`.
 
@@ -790,7 +805,7 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 - **Auth:** ADMIN, AGENT only. Others get 403.
 - **200:** `[{ id, impact, urgency, priority }]`, ordered impact desc, then urgency desc.
 - **⚠ Writes on GET:** if the table is empty, it seeds 9 default rows (`priorityMatrix.controller.ts:21-39`). The defaults don't cover impact `MINIMAL` or urgency `URGENT`, so a missing pair means "server keeps the sent or default priority".
-- **Mobile:** preview only. The server's value always wins (TKT-2/TKT-4).
+- **Mobile:** the server's value always wins (TKT-2/TKT-4). On M4, ADMIN and AGENT see the preview before Save and, as the web does, send the matching row's `priority` with the impact/urgency change (TKT-4, G2).
 - **Source:** `priorityMatrix.router.ts:8`, `priorityMatrix.controller.ts:21-39`.
 
 ### LKP-7 `GET /api/v1/canned-responses` — P2 (staff)
