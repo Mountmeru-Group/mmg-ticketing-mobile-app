@@ -31,14 +31,22 @@ export function useChangeStatus() {
       requireOnline();
       assertStatusChange(requireRole(role), from, body); // on the device: nothing is sent if this fails
       await assertStatusUnchanged(ticketId, from); // against the server's current status (one GET)
-      if (files && files.length > 0) {
+      const uploaded: readonly UploadFile[] = files && files.length > 0 ? files : [];
+      if (uploaded.length > 0) {
         try {
-          await uploadAttachments(ticketId, files);
+          await uploadAttachments(ticketId, uploaded);
         } catch (error) {
           throw afterPartialSuccess('The files could not be uploaded, so the status was NOT changed.', error);
         }
       }
-      const ticket = await changeTicketStatus(ticketId, body);
+      let ticket: Ticket;
+      try {
+        ticket = await changeTicketStatus(ticketId, body);
+      } catch (error) {
+        // The files are on the ticket already (ATT-2 has no rollback): say so, and let the form drop them before a retry.
+        if (uploaded.length === 0) throw error;
+        throw afterPartialSuccess('Your files were uploaded to the ticket, but the status was NOT changed.', error, uploaded);
+      }
       checkFields('TKT-6', ticket, TICKET_SPEC);
       return ticket;
     },

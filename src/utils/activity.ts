@@ -1,6 +1,7 @@
 // History (TKT-7 audit entries) → human sentences, and who may see private notes. Pure functions.
 import type { ActivityAuditItem, Comment, UserRole } from '@/types';
 import { formatDisplayName } from './format';
+import { isAgentOrAdmin } from './roles';
 
 /**
  * PRIVATE comments (internal notes) are shown to ADMIN and AGENT only (04 M4, 05 §A.3).
@@ -8,7 +9,7 @@ import { formatDisplayName } from './format';
  * never assumes the server filtered. This is display hygiene mirroring the web UI, not a security fix (05 §C).
  */
 export function canSeePrivateNotes(role: UserRole): boolean {
-  return role === 'ADMIN' || role === 'AGENT';
+  return isAgentOrAdmin(role); // the one definition of the server's agentOrAdmin guard (roles.ts)
 }
 
 export function visibleComments<T extends Pick<Comment, 'type'>>(comments: readonly T[], role: UserRole): T[] {

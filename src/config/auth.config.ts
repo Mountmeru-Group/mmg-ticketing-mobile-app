@@ -7,7 +7,6 @@
 //     2. set EXPO_PUBLIC_AZURE_CLIENT_ID / EXPO_PUBLIC_AZURE_TENANT_ID in a local `.env` (names in .env.example).
 //        Read once at bundle time; restart `npx expo start` after a change.
 //   Until both are real GUIDs, the app refuses to open Microsoft sign-in and says why (isMicrosoftSignInConfigured).
-import { makeRedirectUri } from 'expo-auth-session';
 
 // Must stay direct `process.env.EXPO_PUBLIC_*` accesses so Expo inlines them at build time (no destructuring).
 /** Entra "Application (client) ID" of the mobile (public-client) app registration. */
@@ -30,17 +29,15 @@ export const AZURE_ENDPOINTS = {
  */
 export const AZURE_SCOPES: readonly string[] = ['openid', 'profile', 'email', 'offline_access'];
 
-/** Registered in Entra as `com.mountmeru.servicedesk://auth`; listed under `scheme` in app.json. */
+/** URL scheme of the redirect URI below; listed under `scheme` in app.json so Android hands the return URL to the app. */
 export const AUTH_REDIRECT_SCHEME = 'msauth';
-const AUTH_REDIRECT_PATH = 'auth';
 
 /**
- * The redirect URI this build sends to Microsoft, from expo-auth-session's own helper:
- * - EAS / standalone build (preview APK) or a dev-client build: `com.mountmeru.servicedesk://auth`, the registered one.
- * - Expo Go: `exp://<LAN IP>:8081/--/auth`. Expo Go cannot receive a custom scheme, so this URI differs per machine
- *   and network, and it is NOT registered. Microsoft refuses it (AADSTS50011) unless that exact URI is also added
- *   to the registration under "Mobile and desktop applications". The Login screen shows it in __DEV__ builds.
- * A function, not a constant: it reads the app manifest, which must not throw while modules load.
+ * The redirect URI this build sends to Microsoft: the one registered in Entra under the "Android" platform for package
+ * com.mountmeru.servicedesk, in Microsoft's fixed `msauth://<package>/<Base64 signature hash>` form (RELEASE.md §3.2).
+ * One value for every build signed with the EAS key; it is NOT built with expo-auth-session's makeRedirectUri, and
+ * Expo Go cannot receive it (02-AUTH §7.2's `exp://` text is out of date — see 11-SSO-VERIFY §4.2).
+ * Kept as a function so the Login screen, the sign-in flow and the tests read it the same way.
  */
 export function getAuthRedirectUri(): string {
   return 'msauth://com.mountmeru.servicedesk/tlz9kcLBCrCtaVd%2FAvzUpkcOfgo%3D';

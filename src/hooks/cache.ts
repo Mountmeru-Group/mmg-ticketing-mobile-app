@@ -1,7 +1,8 @@
 // Narrow cache updates after a write (Phase 3b). Never queryClient.clear() — that is reserved for sign-out.
 //
 // After a successful write:
-// - the affected ticket's detail and its open tabs refetch (05 B.18: some fields change after the response);
+// - the server's returned Ticket is merged into the cached detail at once, then the detail and its open tabs refetch
+//   (05 B.18: some fields change after the response) — the screen never shows the old status after the success toast;
 // - the ticket's row in every loaded list is replaced with the server's returned Ticket (not optimistic — this is
 //   the server's answer), and lists are marked stale WITHOUT refetching; pull-to-refresh brings the order and
 //   filter membership up to date;
@@ -19,9 +20,14 @@ function looksLikeTicket(value: unknown): value is Ticket {
   return typeof value === 'object' && value !== null && typeof (value as Ticket).id === 'string';
 }
 
-/** Replace a ticket's row in every cached list with the server's returned copy, then mark lists stale. */
+/** Replace a ticket's row in every cached list (and merge it into the cached detail) with the server's returned copy. */
 export function patchTicketInLists(queryClient: QueryClient, ticket: unknown): void {
   if (looksLikeTicket(ticket)) {
+    // Merge onto an existing detail entry only: a write response lacks TKT-3's embedded fields, so it must not seed one.
+    // Without this the detail screen keeps the old status until refreshTicket()'s refetch lands — or for good if it fails.
+    queryClient.setQueryData<Ticket>(queryKeys.tickets.detail(ticket.id), (prev) =>
+      prev ? { ...prev, ...ticket, lastRequesterReplyAt: ticket.lastRequesterReplyAt ?? prev.lastRequesterReplyAt } : prev,
+    );
     queryClient.setQueriesData<ListData>({ queryKey: queryKeys.tickets.lists() }, (data) => {
       if (!data) return data;
       return {

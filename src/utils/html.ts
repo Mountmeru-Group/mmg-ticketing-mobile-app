@@ -34,6 +34,16 @@ export const BLOCKED_TAGS = [
   'noscript', 'template', 'title', 'head', 'meta', 'link', 'base', 'dialog',
 ] as const;
 
+/**
+ * Compiled once, not per body: two patterns per blocked tag — the element with its content, then any stray open or
+ * close tag. They carry the `g` flag, so they are used only with String.replace (which resets lastIndex), never
+ * with .test() or .exec().
+ */
+const BLOCKED_TAG_PATTERNS: readonly RegExp[] = BLOCKED_TAGS.flatMap((tag) => [
+  new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'),
+  new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi'),
+]);
+
 /** Inline images the renderer may show: base64 raster data only. SVG (scriptable) and remote URLs are not. */
 const SAFE_IMAGE_SRC = /^\s*data:image\/(png|jpe?g|gif|webp|bmp);base64,/i;
 
@@ -47,10 +57,7 @@ const SAFE_IMAGE_SRC = /^\s*data:image\/(png|jpe?g|gif|webp|bmp);base64,/i;
  */
 export function sanitizeForRender(html: string): string {
   let clean = sanitizeHtml(html);
-  for (const tag of BLOCKED_TAGS) {
-    clean = clean.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'), '');
-    clean = clean.replace(new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi'), '');
-  }
+  for (const pattern of BLOCKED_TAG_PATTERNS) clean = clean.replace(pattern, '');
   clean = clean.replace(/<img\b[^>]*>/gi, (img) => {
     const src = /\ssrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(img)?.[2] ?? '';
     if (!SAFE_IMAGE_SRC.test(src)) return '<span>[image]</span>';

@@ -9,7 +9,7 @@
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 
-import { ApiClientError, describeWriteError } from '@/api/errors';
+import { ApiClientError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import { BULK_ACTION_LIMIT } from '@/utils/ticket-rules';
 import { markTicketStale, refreshListsFirstPage } from './cache';
 
@@ -46,7 +46,8 @@ export interface BulkProgress {
 /** Errors after which no further ticket is sent. Ticket-specific 400/403/404 just fail that ticket. */
 export function stopReasonFor(error: unknown): string | null {
   if (!(error instanceof ApiClientError)) return 'An unexpected error occurred.';
-  if (error.status === 401) return 'Your session ended.';
+  // A non-JSON 401 (proxy or captive-portal page) keeps the session but still stops the batch: every later call would hit it too.
+  if (error.status === 401) return isSessionEndedError(error) ? 'Your session ended.' : 'The Service Desk sent a sign-in page instead of data.';
   if (error.status === 429) return 'The server is limiting requests (429).';
   if (error.status !== null && error.status >= 500) return 'The server reported an error.';
   if (error.kind === 'network' || error.kind === 'timeout') return "The Service Desk couldn't be reached.";
