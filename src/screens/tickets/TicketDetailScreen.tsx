@@ -26,13 +26,17 @@
 //     confirmed by name, then ATT-5 (permanent); "Submit for approval…" in More options for ADMIN and AGENT, in any
 //     status, opening ./SubmitApprovalScreen.tsx.
 //
-// PERFORMANCE (Phase P, docs/PERFORMANCE.md): the screen is ONE FlatList. Everything above the tab rows is its header;
-// the open tab's replies, history entries, files or tasks are its rows, memoised, laid out as they scroll into view
-// instead of all at once (a long email thread is the most expensive thing the app renders). "Show more" on a reply and
-// a file's details are held here, not in the row, so a row that scrolls far away and back keeps them.
+// PERFORMANCE (Phase P, docs/PERFORMANCE.md): the screen is ONE list (FlashList since Phase P2). Everything above the
+// tab rows is its header; the open tab's replies, history entries, files or tasks are its rows, memoised, laid out as
+// they scroll into view instead of all at once (a long email thread is the most expensive thing the app renders), and
+// their cells are recycled by kind. "Show more" on a reply and a file's details are held here, not in the row, so a
+// row that scrolls far away and back keeps them.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { memo, useCallback, useMemo, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
+import {
+  memo, startTransition, useCallback, useMemo, useState, type ComponentProps, type ReactElement, type ReactNode,
+} from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openAttachmentExternally } from '@/api/attachmentDownload';
@@ -40,9 +44,9 @@ import { getAttachmentViewRequest, type UploadFile } from '@/api/attachments.api
 import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, Notice, OfflineBanner,
-  OfflineState, OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge, SubmitButton, TaskRow,
-  type SheetOption,
+  AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice,
+  OfflineBanner, OfflineState, OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge,
+  SubmitButton, TaskRow, type SheetOption,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
@@ -100,10 +104,10 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const [tab, setTab] = useState<DetailTab>('conversation');
   // A tab's query stays enabled once visited, so switching back never triggers an automatic refetch.
   const [visited, setVisited] = useState<ReadonlySet<DetailTab>>(() => new Set<DetailTab>(['conversation']));
-  const selectTab = (next: DetailTab) => {
+  const selectTab = useCallback((next: DetailTab) => {
     setTab(next);
     setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
-  };
+  }, []);
 
   const comments = useTicketComments(ticketId, { enabled: ready && visited.has('conversation') });
   const history = useTicketHistory(ticketId, { enabled: ready && visited.has('history') });
@@ -245,10 +249,17 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const openTask = useStableCallback((task: TicketTaskEmbedded) => navigation.navigate('TaskDetail', { ticketId, taskId: task.id }));
   const toggleTaskDone = useStableCallback((task: TicketTaskEmbedded) => void once(() => onToggleTask(task)));
   const contentStyle = useMemo(() => ({ paddingTop: 12, paddingBottom: insets.bottom + 24 }), [insets.bottom]);
+  const transitionStatus = useStableCallback((t: StatusTransition) => void once(() => onTransition(t)));
+
+  // Every role-gated element below reads these two objects (utils/permissions.ts, pinned per role by tests/rbac).
+  // Pure functions of the user and the ticket, memoised (Phase P2) so the memoised header cards skip the renders that
+  // only a sheet, a refresh flag or a tab's data caused.
+  const can = useMemo(() => (ticket ? ticketDetailPermissions(user, ticket) : null), [user, ticket]);
+  const fields = useMemo(() => (ticket ? ticketFieldPermissions(user, ticket) : null), [user, ticket]);
 
   const title = ticket ? `Ticket #${ticket.ticketNumber}` : 'Ticket';
 
-  if (!ticket) {
+  if (!ticket || !can || !fields) {
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title={title} variant="back" />
@@ -264,9 +275,6 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     );
   }
 
-  // Every role-gated element below reads these two objects (utils/permissions.ts, pinned per role by tests/rbac).
-  const can = ticketDetailPermissions(user, ticket);
-  const fields = ticketFieldPermissions(user, ticket);
   const moreActions: SheetOption<MoreAction>[] = can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] }));
   const onMore = (action: MoreAction) => {
     if (action === 'pickup') void once(pickUp);
@@ -379,7 +387,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
   const listHeader = (
     <>
       <HeaderCard ticket={ticket} can={can} />
-      <StatusActionBar can={can} busy={writing} onTransition={(t) => void once(() => onTransition(t))} />
+      <StatusActionBar can={can} busy={writing} onTransition={transitionStatus} />
 
       <Card title="Description">
         <HtmlText html={ticket.description} emptyText="No description" />
@@ -392,12 +400,10 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       <TabBar
         tab={tab}
         onSelect={selectTab}
-        counts={{
-          // `_count.comments` includes private notes, so it is not shown; the loaded, filtered count is.
-          conversation: comments.data?.length,
-          attachments: ticket._count?.attachments,
-          tasks: Array.isArray(ticket.tasks) ? ticket.tasks.length : undefined,
-        }}
+        // `_count.comments` includes private notes, so it is not shown; the loaded, filtered count is.
+        conversationCount={comments.data?.length}
+        attachmentCount={ticket._count?.attachments}
+        taskCount={Array.isArray(ticket.tasks) ? ticket.tasks.length : undefined}
       />
 
       {tab === 'conversation' ? (
@@ -488,17 +494,17 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
       />
       <OfflineBanner />
       <QueryBanner error={ticketQuery.error} hasData onRetry={() => void onRefresh()} />
-      <FlatList
+      <FlashList
         data={rows}
         keyExtractor={detailRowKey}
+        // Replies, history entries, files and tasks look nothing alike: each kind recycles only its own cells.
+        getItemType={detailRowType}
         renderItem={renderRow}
+        // The header (ticket, properties, tabs, with their text inputs) is rendered once, never recycled; only the rows
+        // that near the screen are laid out.
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
-        // The header (ticket, properties, tabs) usually fills the first screen: a few rows are enough for the first
-        // paint, and the rest are laid out in idle batches as they near the screen.
-        initialNumToRender={6}
-        // Was a ScrollView: keep its native handling of the header's text inputs (FlatList clips by default on Android).
-        removeClippedSubviews={false}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
@@ -526,7 +532,8 @@ function ActionChip({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyp
 
 // ── Header ───────────────────────────────────────────────────
 
-function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
+// Header cards are memoised (Phase P2): a sheet opening, a refresh or a tab's data arriving does not redraw them.
+const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPermissions }) {
   // "Auto" pill when the server computed priority from impact × urgency (05 §A.3, staff).
   const autoPriority = can.classification && !!ticket.impact && !!ticket.urgency;
   const attachmentCount = ticket._count?.attachments ?? 0;
@@ -557,14 +564,14 @@ function HeaderCard({ ticket, can }: { ticket: TicketDetail; can: TicketDetailPe
       </View>
     </Card>
   );
-}
+});
 
 /**
  * Status bar (05 §A.1): only the transition map for this role and status. Hidden for END_USER; empty for AGENT on
  * CLOSED/CANCELED. All buttons disabled while a write is in flight. Closure targets open M6; others confirm, then
  * post TKT-6 (never PUT).
  */
-function StatusActionBar({
+const StatusActionBar = memo(function StatusActionBar({
   can, busy, onTransition,
 }: {
   can: TicketDetailPermissions;
@@ -601,7 +608,7 @@ function StatusActionBar({
       {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} /> : null}
     </Card>
   );
-}
+});
 
 // ── Properties ───────────────────────────────────────────────
 
@@ -637,7 +644,7 @@ function PropertiesCard({
   );
 }
 
-function RequesterCard({ ticket }: { ticket: TicketDetail }) {
+const RequesterCard = memo(function RequesterCard({ ticket }: { ticket: TicketDetail }) {
   const r = ticket.requester;
   const name = formatDisplayName(r?.displayName) || 'Unknown requester';
   return (
@@ -655,7 +662,7 @@ function RequesterCard({ ticket }: { ticket: TicketDetail }) {
       </View>
     </Card>
   );
-}
+});
 
 // ── Tabs ─────────────────────────────────────────────────────
 
@@ -666,27 +673,48 @@ const TAB_LABELS: Record<DetailTab, string> = {
   tasks: 'Tasks',
 };
 
-function TabBar({
-  tab, onSelect, counts,
+/**
+ * Memoised, and its highlight moves on the tap itself (Phase P2): the tab's content is swapped in a transition, which
+ * React can interrupt, so a heavy tab (a long conversation) never holds back the tap's feedback.
+ */
+const TabBar = memo(function TabBar({
+  tab, onSelect, conversationCount, attachmentCount, taskCount,
 }: {
   tab: DetailTab;
   onSelect: (tab: DetailTab) => void;
-  counts: Partial<Record<DetailTab, number | undefined>>;
+  conversationCount: number | undefined;
+  attachmentCount: number | undefined;
+  taskCount: number | undefined;
 }) {
+  const [pending, setPending] = useState<DetailTab | null>(null);
+  // The screen has caught up with the tap: drop the local highlight (adjusting state during render, as React advises).
+  if (pending !== null && pending === tab) setPending(null);
+  const highlighted = pending ?? tab;
+  const counts: Record<DetailTab, number | undefined> = {
+    conversation: conversationCount,
+    history: undefined,
+    attachments: attachmentCount,
+    tasks: taskCount,
+  };
+  const select = (t: DetailTab) => {
+    if (t === highlighted) return;
+    setPending(t);
+    startTransition(() => onSelect(t));
+  };
   // Segmented control (UI-STANDARDS S5): 44 dp tabs on a grey track; the active tab is white. Labels shrink a little,
   // then wrap to a second line, so nothing is cut off at 360 dp or with large text.
   return (
     <View className="mx-4 mb-3 flex-row rounded-xl bg-gray-200 p-1" accessibilityRole="tablist">
       {(Object.keys(TAB_LABELS) as DetailTab[]).map((t) => {
-        const active = t === tab;
+        const active = t === highlighted;
         const count = counts[t];
         return (
           <Pressable
             key={t}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            onPress={() => onSelect(t)}
-            className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${active ? 'bg-white' : ''}`}
+            onPress={() => select(t)}
+            className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${active ? 'bg-white' : 'active:bg-white/60'}`}
           >
             <Text
               className={`text-center text-xs ${active ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}
@@ -702,7 +730,7 @@ function TabBar({
       })}
     </View>
   );
-}
+});
 
 interface TabQueryState {
   data: unknown;
@@ -764,6 +792,7 @@ type DetailRow =
   | { kind: 'task'; key: string; task: TicketTaskEmbedded; first: boolean; last: boolean };
 
 const detailRowKey = (row: DetailRow) => row.key;
+const detailRowType = (row: DetailRow) => row.kind;
 
 function toggledSet(prev: ReadonlySet<string>, id: string): ReadonlySet<string> {
   const next = new Set(prev);
@@ -939,7 +968,7 @@ const AttachmentRow = memo(function AttachmentRow({
           <Row label="Type">{attachment.mimeType || 'Unknown'}</Row>
           <Row label="Size">{formatBytes(attachment.sizeBytes)}</Row>
           <Row label="Added with">{attachment.commentId ? 'A reply' : 'The ticket'}</Row>
-          <Pressable accessibilityRole="button" disabled={opening} onPress={() => onOpen(attachment)} className="mt-1 min-h-11 justify-center self-start">
+          <Pressable accessibilityRole="button" disabled={opening} onPress={() => onOpen(attachment)} className="mt-1 min-h-11 justify-center self-start active:opacity-60">
             <Text className="text-sm font-medium text-blue-700">Download and share</Text>
           </Pressable>
         </View>

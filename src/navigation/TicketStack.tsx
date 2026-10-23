@@ -17,9 +17,12 @@ import type { TicketStackParamList } from '@/types';
 
 const Stack = createNativeStackNavigator<TicketStackParamList>();
 
+// freezeOnBlur (Phase P2): a screen that is not on show stops re-rendering until it is shown again.
+const SCREEN_OPTIONS = { headerShown: false, freezeOnBlur: true } as const;
+
 export function TicketStack() {
   return (
-    <Stack.Navigator initialRouteName="TicketList" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="TicketList" screenOptions={SCREEN_OPTIONS}>
       <Stack.Screen name="TicketList" component={TicketListScreen} />
       <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
       <Stack.Screen name="CreateTicket" component={CreateTicketScreen} />

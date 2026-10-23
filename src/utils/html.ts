@@ -3,6 +3,7 @@
 // - sanitizeForRender(): input to react-native-render-html (HtmlText). Native views only — no WebView, no
 //   script execution. Only inline base64 raster images survive; remote images are never fetched (05 §A.6).
 // - htmlToDisplayText(): plain-text fallback, used when the renderer fails.
+// - prepareHtmlBody(): both of the above for one body, from one sanitiser pass, with recent results cached.
 
 /** Web sanitiser, verbatim minimum from FE:TicketDetailPage.tsx:2685-2718 (05 §A.6). */
 export function sanitizeHtml(html: string): string {
@@ -34,6 +35,14 @@ export const BLOCKED_TAGS = [
   'noscript', 'template', 'title', 'head', 'meta', 'link', 'base', 'dialog',
 ] as const;
 
+/**
+ * The two patterns per blocked tag, compiled once (Phase P2). Building them inside sanitizeForRender() compiled 64
+ * regular expressions for every body rendered. `replace` with a global pattern always starts at 0, so sharing is safe.
+ */
+const BLOCKED_TAG_PATTERNS = BLOCKED_TAGS.map(
+  (tag) => [new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'), new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi')] as const,
+);
+
 /** Inline images the renderer may show: base64 raster data only. SVG (scriptable) and remote URLs are not. */
 const SAFE_IMAGE_SRC = /^\s*data:image\/(png|jpe?g|gif|webp|bmp);base64,/i;
 
@@ -46,10 +55,15 @@ const SAFE_IMAGE_SRC = /^\s*data:image\/(png|jpe?g|gif|webp|bmp);base64,/i;
  * Links stay as markup; HtmlText opens only http(s) and mailto links, in the system browser.
  */
 export function sanitizeForRender(html: string): string {
-  let clean = sanitizeHtml(html);
-  for (const tag of BLOCKED_TAGS) {
-    clean = clean.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'), '');
-    clean = clean.replace(new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi'), '');
+  return renderSafeFromSanitized(sanitizeHtml(html));
+}
+
+/** sanitizeForRender() after its sanitizeHtml() step, so one sanitised string can feed both outputs (prepareHtmlBody). */
+function renderSafeFromSanitized(sanitized: string): string {
+  let clean = sanitized;
+  for (const [element, tag] of BLOCKED_TAG_PATTERNS) {
+    clean = clean.replace(element, '');
+    clean = clean.replace(tag, '');
   }
   clean = clean.replace(/<img\b[^>]*>/gi, (img) => {
     const src = /\ssrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(img)?.[2] ?? '';
@@ -87,8 +101,12 @@ function decodeEntities(text: string): string {
 export function htmlToDisplayText(input: string | null | undefined): string {
   if (!input) return '';
   if (!looksLikeHtml(input)) return input.replace(/\r\n?/g, '\n').trim();
+  return displayTextFromSanitized(sanitizeHtml(input));
+}
 
-  let text = sanitizeHtml(input);
+/** htmlToDisplayText() after its sanitizeHtml() step (see renderSafeFromSanitized). */
+function displayTextFromSanitized(sanitized: string): string {
+  let text = sanitized;
   text = text.replace(/<(noscript|template|svg|iframe|object|title)[\s\S]*?<\/\1>/gi, '');
   text = text.replace(/<img[^>]*src=["']data:[^>]*>/gi, ' [image] ');
   text = text.replace(/<img[^>]*>/gi, ' [image] ');
@@ -105,4 +123,61 @@ export function htmlToDisplayText(input: string | null | undefined): string {
   text = text.replace(/[  ]{2,}/g, ' ');
   text = text.replace(/\n{3,}/g, '\n\n');
   return text.trim();
+}
+
+// ── One body, prepared for HtmlText (Phase P2: moved here from HtmlText, and cached) ──
+
+/** What HtmlText shows for a body: nothing, plain text, or sanitised HTML with its plain-text fallback. */
+export type PreparedHtml =
+  | { kind: 'empty' }
+  | { kind: 'text'; text: string }
+  | { kind: 'html'; html: string; fallbackText: string };
+
+function prepareUncached(input: string | null | undefined): PreparedHtml {
+  if (!input || !input.trim()) return { kind: 'empty' };
+  if (!looksLikeHtml(input)) return { kind: 'text', text: input.replace(/\r\n?/g, '\n').trim() };
+  // One sanitizeHtml() pass feeds both: the same strings as sanitizeForRender(input) and htmlToDisplayText(input).
+  const sanitized = sanitizeHtml(input);
+  const html = renderSafeFromSanitized(sanitized);
+  const fallbackText = displayTextFromSanitized(sanitized);
+  if (!fallbackText && !/<img\b/i.test(html)) return { kind: 'empty' };
+  return { kind: 'html', html, fallbackText };
+}
+
+/**
+ * Recently prepared bodies. Preparing one is about a hundred regex scans of it, and the same body is prepared again
+ * whenever its list cell is recycled or its ticket reopened. Bounded by the characters held (about 2 MB as UTF-16,
+ * keys included); a body over 200 000 characters (an inline screenshot) is never kept. HtmlText clears it at sign-out.
+ */
+const PREPARED_BUDGET_CHARS = 1_000_000;
+const PREPARED_MAX_INPUT_CHARS = 200_000;
+const prepared = new Map<string, PreparedHtml>();
+let preparedChars = 0;
+
+const charsHeld = (input: string, p: PreparedHtml) =>
+  input.length + (p.kind === 'html' ? p.html.length + p.fallbackText.length : p.kind === 'text' ? p.text.length : 0);
+
+export function prepareHtmlBody(input: string | null | undefined): PreparedHtml {
+  if (!input || input.length > PREPARED_MAX_INPUT_CHARS) return prepareUncached(input);
+  const hit = prepared.get(input);
+  if (hit) {
+    prepared.delete(input); // the most recently used goes last; the oldest is evicted first
+    prepared.set(input, hit);
+    return hit;
+  }
+  const result = prepareUncached(input);
+  prepared.set(input, result);
+  preparedChars += charsHeld(input, result);
+  for (const [key, value] of prepared) {
+    if (preparedChars <= PREPARED_BUDGET_CHARS) break;
+    prepared.delete(key);
+    preparedChars -= charsHeld(key, value);
+  }
+  return result;
+}
+
+/** Drops every prepared body (sign-out: they are ticket content). */
+export function clearPreparedHtml(): void {
+  prepared.clear();
+  preparedChars = 0;
 }

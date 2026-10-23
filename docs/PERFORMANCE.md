@@ -1,4 +1,7 @@
-# Performance on low-end Android (Phase P, 2026-10-22)
+# Performance on low-end Android (Phase P, 2026-10-22; Phase P2, 2026-10-23)
+
+> **Phase P2** applied the approved items of §4 and §5 (ticket list cap, inline requires, `freezeOnBlur`, FlashList,
+> expo-image) and a transition-smoothness pass. §9 records it; §1–§8 are the Phase P baseline, kept as written.
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -224,8 +227,8 @@ Every change is performance-only. The 533 tests pass unchanged, and no test was 
 
 | # | What | Why not now | Proposal |
 |---|---|---|---|
-| 1 | **Cap the ticket list's rows** (Part 3) | A cap stops the user scrolling past it, and the brief forbids changing what the user can do. Dropping old pages instead (TanStack's `maxPages`) would re-request them when scrolling back up: more traffic on production hardware | If Ronit approves: stop loading at **500 tickets (25 pages)** with a footer "Showing the first 500 — search or filter to narrow" (the footer already says "Showing n of N"). Same for notifications at 500 |
-| 2 | Inline HTML images decoded at full size | Needs a custom `img` renderer for `react-native-render-html` | Next candidate: a renderer passing `resizeMethod="resize"`. No visible change; more code to own |
+| 1 | **Cap the ticket list's rows** (Part 3) — **done in P2, §9.1** | A cap stops the user scrolling past it, and the brief forbids changing what the user can do. Dropping old pages instead (TanStack's `maxPages`) would re-request them when scrolling back up: more traffic on production hardware | If Ronit approves: stop loading at **500 tickets (25 pages)** with a footer "Showing the first 500 — search or filter to narrow" (the footer already says "Showing n of N"). Same for notifications at 500 |
+| 2 | Inline HTML images decoded at full size — **done in P2 (expo-image), §9.1** | Needs a custom `img` renderer for `react-native-render-html` | Next candidate: a renderer passing `resizeMethod="resize"`. No visible change; more code to own |
 | 3 | The HTML stack is about 340 KB of the bundle | Replacing it changes how every description and reply renders | None |
 | 4 | Reanimated is 738 KB | The drawer needs it; another drawer is a different UI | None |
 | 5 | Approvals inbox reads up to 10 tickets for its cards | Fewer reads means cards without subject or requester | None (already capped) |
@@ -242,12 +245,12 @@ Neither is needed for this phase's fixes.
 
 ## 5. Recommended, but needs a device run first
 
-1. **Metro `inlineRequires: true`** (`metro.config.js`, `transformer.getTransformOptions`). Modules then run on first use, not all at launch.
+1. **Metro `inlineRequires: true`** — **applied in P2 (§9.1); the device run below still decides whether it stays.** (`metro.config.js`, `transformer.getTransformOptions`). Modules then run on first use, not all at launch.
    - This is React Native's own default, and the largest start-up lever left.
    - **Estimate:** 200–600 ms off a cold start on a 2016 phone.
    - It is not applied because a wrong module order shows up only at runtime, on a device.
    - Test the cold start, sign-in, the drawer, a ticket and the catalogue before keeping it.
-2. **`freezeOnBlur: true`** on the stacks, tabs and drawer (react-native-screens). Hidden screens stop re-rendering when the shared cache changes, such as the ticket list under an open ticket after a write. Same reason to test first.
+2. **`freezeOnBlur: true`** — **applied in P2 (§9.1).** on the stacks, tabs and drawer (react-native-screens). Hidden screens stop re-rendering when the shared cache changes, such as the ticket list under an open ticket after a write. Same reason to test first.
 3. **The HTML engine at the root.** `HtmlRenderProvider` builds the render engine on the first render, even on the sign-in screen. Measure its cost with a Hermes profile before moving it.
 
 ---
@@ -271,7 +274,8 @@ Neither is needed for this phase's fixes.
 
 ## 7. Patterns to follow so this does not regress
 
-- **Server data goes in a `FlatList` or `SectionList`, never in `.map()` inside a `ScrollView`.** The only exception is a list hard-bounded at about 20 rows or fewer, and the code says so.
+- **Server data goes in a `FlashList` (Phase P2), never in `.map()` inside a `ScrollView`.** The only exception is a list hard-bounded at about 20 rows or fewer, and the code says so. Bottom sheets with auto height keep `FlatList` (§9.1).
+- **Every FlashList** sets `maintainVisibleContentPosition={NO_SCROLL_ANCHOR}` and, when its rows differ in kind, `getItemType`. State inside a row resets per item with `useRecyclingState` (a recycled cell gets another item); state that must survive scrolling lives in the screen.
 - **Every list:**
   - a module-level `keyExtractor` on a stable id;
   - `renderItem` through `useCallback`;
@@ -295,3 +299,382 @@ Neither is needed for this phase's fixes.
 - Release bundle built twice with the method above: §1.4 and §2.1.
 - No EAS build. No network call. The web repo was not opened in this phase.
 - Branch `dev`, nothing committed.
+
+---
+
+## 9. Phase P2 (2026-10-23)
+
+Approved by Ronit:
+- the ticket list cap;
+- Metro `inlineRequires` and `freezeOnBlur`;
+- `@shopify/flash-list` and `expo-image`;
+- the expo patch updates.
+
+Not approved: transition animations, which are unchanged.
+
+Rules kept from Phase P:
+- no polling and no shorter `staleTime`;
+- no behaviour or permission change;
+- auth flow, `auth.config.ts` and the dev-token screen untouched;
+- no EAS build, nothing committed.
+
+**Not run on a device:** every timing below is an estimate. §9.8 lists what to measure.
+
+### 9.1 The approved items, and how each was verified
+
+**Patch versions**
+- **Change:** `expo` 57.0.30 → 57.0.31 and `expo-sharing` 57.0.23 → 57.0.24 (`npx expo install --fix`).
+- **Verified:** `npx expo install --check` reports "Dependencies are up to date".
+- **app.json:** the installer also added `expo-sharing` and `expo-image` to the `app.json` plugins. Both were removed again, because with no options neither does anything on Android:
+  - `expo-sharing`'s plugin only adds share-intent filters when `android.enabled` is set;
+  - `expo-image`'s plugin only writes an iOS Podfile property.
+- `app.json` is byte-identical to `acc04fc`.
+
+**Ticket list cap**
+- **Change:** `useTickets` stops at **500 tickets (25 pages)**. The footer reads "Showing the first N of T — search or filter to narrow".
+- **Verified:**
+  - `getNextPageParam` returns nothing after 25 pages.
+  - Each filter, search, sort and country is its own query key, so a filtered list loads normally up to its own 500.
+  - Pull-to-refresh still trims to page 1.
+- **Side effect:** the task feed reads the same query (`useTaskFeed` → `useTickets`), so "Load 20 more tickets" also stops at 500. Its footer now says so, instead of "All your tickets are loaded".
+
+**`inlineRequires`**
+- **Change:** `metro.config.js` wraps Expo's `getTransformOptions` and turns on only `inlineRequires`. NativeWind wraps it and returns its result.
+- **Verified:** in the release bundle, requires moved to their use sites.
+  - Example: `SwitchRouter` reads `_r(d[0]).BaseRouter` instead of a module-top binding.
+  - Require call sites across the bundle went from 5,535 to 11,658.
+  - The same code built with the flag off is in §9.3.
+
+**`freezeOnBlur`**
+- **Change:** set in `screenOptions` on the drawer, the tabs, the Tickets stack and the four module stacks. The Auth stack is not touched.
+- **Verified:**
+  - Each navigator passes the option to react-native-screens' `Screen`. That freezes only inactive screens (`activityState === 0`), and its global default is off.
+  - The release bundle holds 4 `freezeOnBlur:!0` (baseline: 0).
+
+**FlashList**
+- **Change:** 11 lists:
+  - ticket list and ticket detail;
+  - notifications (sections flattened into heading items; the headings were never sticky);
+  - approvals;
+  - knowledge base ×2;
+  - task list;
+  - announcements;
+  - service catalogue ×3.
+- **Verified:** `tsc` and the 533 tests.
+- **Scroll anchoring:**
+  - Every list sets `maintainVisibleContentPosition={NO_SCROLL_ANCHOR}` (`components/listDefaults.ts`).
+  - FlashList v2 anchors the visible row by default; FlatList never did.
+  - So a refresh that adds rows at the top still shows them.
+- **Recycling:**
+  - `getItemType` is set on the mixed lists (ticket detail rows, alert headings).
+  - `HtmlText` resets its measured height, "Show more" and renderer-failure state when a recycled cell gets another body (`useRecyclingState`, keyed on the HTML).
+- **Left on FlatList:** `OptionSheet`, `PersonPickerSheet` and `TemplatePickerSheet`. They are short lists in auto-height bottom sheets, where FlashList's `flex: 1` container would collapse to zero.
+
+**expo-image**
+- **Change:** `BrandLogo`, `ImageViewerModal`, and inline HTML images through a custom `img` renderer. The renderer keeps the library's own sizing, loading and error states; only the success view changed.
+- **Verified:** `tsc`. expo-image decodes at the view's size by default, which replaces `resizeMethod="resize"` and closes §4 item 2.
+- **New:** expo-image's memory and disk caches hold opened attachments. They are cleared when the session ends, through an auth-store subscription in `HtmlText.tsx`. The auth flow itself is untouched.
+
+### 9.2 Page-to-page smoothness: what blocked, what changed
+
+**1. HTML bodies** (`components/HtmlText.tsx`, `utils/html.ts`)
+- **Why it blocked:**
+  - Every body mount ran about 110 full-string regex scans.
+  - It **compiled 64 regular expressions** each time.
+  - It sanitised twice: once for the renderer, once for the fallback text.
+  - This hit every ticket description, reply, KB article and announcement in the first render.
+- **Change:**
+  - Patterns are compiled once.
+  - One sanitiser pass feeds both outputs.
+  - Recent results are cached (`prepareHtmlBody`), cleared at sign-out. The cache is bounded at 1,000,000 characters (≈ 2 MB), and bodies over 200,000 characters are never kept.
+- **Output proven identical:** 3,058 inputs (hand cases plus 3,000 generated documents), 18,948 comparisons against the original module, 0 differences.
+
+**2. Ticket detail tab bar** (`TicketDetailScreen.tsx`)
+- **Why it blocked:**
+  - A tab tap re-rendered the whole screen (≈ 100 header nodes plus the row swap) before the highlight moved.
+  - The tabs had no pressed state.
+- **Change:**
+  - The highlight moves on the tap.
+  - The content swap runs in `startTransition`, which React can interrupt.
+  - A pressed state was added.
+
+**3. Ticket detail header** (`TicketDetailScreen.tsx`)
+- **Why it blocked:** `can` and `fields` were new objects on every render. So every render redrew every header card: a sheet opening, the refresh flag, a tab's data arriving, any write in flight.
+- **Change:**
+  - `can` and `fields` are memoised on the user and the ticket.
+  - `HeaderCard`, `StatusActionBar`, `RequesterCard` and `TabBar` are memoised, with stable handlers.
+
+**4. Every long list**
+- **Why it blocked:** FlatList created a new cell for every row that scrolled in.
+- **Change:** FlashList recycles cells and draws only what is near the screen (§9.1).
+
+**5. Hidden screens**
+- **Why it blocked:** the ticket list under an open ticket, the other tabs and the drawer modules re-rendered on every cache write.
+- **Change:** `freezeOnBlur` (§9.1).
+
+**6. Ticket list selection** (`TicketListScreen.tsx`)
+- **Why it blocked:**
+  - The selection reset wrote a new empty set on mount, and again after every filter, sort or search change.
+  - The selection is the list's `extraData`, so every visible card redrew.
+- **Change:** the same empty set is kept when nothing is selected.
+
+**7. Home announcement banner** (`AnnouncementCard.tsx`)
+- **Why it blocked:** about 30 regex passes on every Home render, and Home renders about five times while its queries settle.
+- **Change:** the preview is memoised on the body.
+
+**8. Service request form** (`ServiceRequestFormScreen.tsx`, `ServiceFormFieldInput.tsx`)
+- **Why it blocked:** each field had an inline `onChange`, so each keystroke redrew every field of the form.
+- **Change:** the field component is memoised, with one stable setter per field.
+
+**9. Controls with no pressed state** (38, listed in §9.6)
+- **Why it blocked:** a tap gave no feedback until the next screen drew.
+- **Change:** `active:` feedback, either opacity or a tint on bordered, dark or red surfaces.
+
+**Found, not changed** (each needs a decision or a larger change):
+- **`KbArticleScreen`:** a cached article lays out its whole body during the push. Mounting it after `transitionEnd` would show the skeleton for about 300 ms, which is a visible change.
+- **`CreateTicketScreen`:** a keystroke re-renders the whole form, its closed sheets and their option lists. This is controlled-input state, and fixing it means splitting the form state.
+- **`PropertiesCard` / `ResolutionSection`:**
+  - They still redraw with the screen, because `usePropertyEditing` returns a new object each render.
+  - `TicketPropertyEditors.tsx` is pinned by the rbac tests, so memoising it is a medium-risk change.
+- **`TicketLinkScreen`:** its spinner shows "Looking up ticket #n…". It is a resolver, not a data screen, so the text stays.
+- **Home:** the KPI tiles and recent rows are not memoised. They are cheap next to item 7.
+- **`initial: false` navigations to a ticket:** on the Tickets tab's first visit, they also mount the ticket list underneath. Changing that would change how back works.
+
+Every screen already showed its skeleton on the first render; this was checked branch by branch. Nothing waits on a timer.
+
+### 9.3 Bundle (measured, `acc04fc` → this change)
+
+Same method as §1.4: a release `export:embed`, then `hermesc -O`, with bytes attributed from the source map.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Release JS, minified | 3,463.2 KB | 3,597.3 KB | **+134.1 KB (+3.9 %)** |
+| gzip | 820.2 KB | 838.8 KB | +18.6 KB |
+| Hermes bytecode | 4,988.0 KB | 5,283.3 KB | **+295.3 KB (+5.9 %)** |
+| Modules | 2,229 | 2,293 | +64 |
+| Bundled assets | 24 files, 405.2 KB | 24 files, 405.2 KB | none |
+
+**Where the change comes from:**
+- **Approved libraries:** `@shopify/flash-list` +80.0 KB, its `tslib` +10.8 KB, `expo-image` +11.1 KB. That is +101.9 KB of the JS growth.
+- **App code:** +21.8 KB (screens 15.3, components 3.3, hooks 1.8, utils 0.8, api 0.6).
+- **`inlineRequires`, isolated** (the same code built with the flag off):
+
+| | Flag off | Flag on | Change |
+|---|---|---|---|
+| Release JS | 3,573.2 KB | 3,597.3 KB | +24.1 KB |
+| gzip | 850.4 KB | 838.8 KB | −11.6 KB |
+| **Hermes bytecode** | 5,155.1 KB | 5,283.3 KB | **+128.2 KB** |
+
+- The extra bytecode is the cost of calling `require` at each use site.
+- It buys a cold start that no longer evaluates every module.
+- Keep it only if the §6 cold-start test shows the gain.
+
+**Largest packages after** (KB of minified JS):
+
+| Package | KB | | Package | KB |
+|---|---|---|---|---|
+| react-native-reanimated | 741.5 | | @react-navigation/core | 85.9 |
+| react-native | 568.0 | | @shopify/flash-list | 80.0 |
+| the app (`src/`) | 427.2 | | axios | 51.1 |
+| **react-native-render-html stack** | **388.5** | | @tanstack/query-core | 50.4 |
+| react-native-gesture-handler | 104.6 | | @react-native/virtualized-lists | 48.6 |
+| expo | 91.4 | | react-native-css-interop | 46.2 |
+| react-native-worklets | 90.9 | | react-native-screens | 43.8 |
+
+**react-native-render-html** costs **388.5 KB** of minified JS, 10.8 % of the bundle. That counts the package plus every dependency nothing else uses, worked out from the dependency graph:
+
+| Part | KB |
+|---|---|
+| `entities` | 86.3 |
+| `ramda` | 77.6 |
+| the renderer itself | 49.0 |
+| `urijs` | 41.4 |
+| `@native-html/transient-render-engine` | 35.2 |
+| `@native-html/css-processor` | 26.4 |
+| `htmlparser2` | 23.1 |
+| `domutils`, `css-to-react-native`, `domhandler`, `@jsamr/*`, `dom-serializer` and smaller | 49.5 |
+
+Proportionally, that is about 570 KB of the Hermes file (estimate).
+
+**Replacing it** (not done in this phase) would involve:
+- **A small renderer of our own:** `htmlparser2` and `domhandler` (≈ 32 KB) are kept. They map the sanitised element set to nested `Text` and `View`:
+  - p, br, b/strong, i/em, u, a;
+  - ul/ol/li with numbering;
+  - blockquote, h1–h4, pre/code;
+  - tables, which email replies use;
+  - base64 `img`.
+- **Keeping what HtmlText does today:**
+  - link routing (ticket deep links, http(s) and mailto only);
+  - selectable text;
+  - the inline-style allowlist;
+  - image sizing;
+  - the "Show more" measurement;
+  - the plain-text fallback.
+- **Regression testing** against real UAT emails. A WebView is not an option (05 §A.6: native views only).
+- **Estimate:** 2–4 days. It would save about 350 KB of JS, and the CSS-processing step of every first render.
+
+**Reductions found, not applied** (each needs a decision):
+- **The Ionicons font** (380.6 KB, the largest asset):
+  - About 60 of its ~1,300 glyphs are used.
+  - A subset font through `createIconSet` would be about 25 KB (estimate).
+  - This needs a font-subsetting tool, which is not installed.
+- **axios → `fetch`** (51.1 KB): React Native already ships `fetch`, so this is duplicate functionality. The change means rewriting the API client.
+- **react-native-reanimated** (741.5 KB): the drawer needs it.
+- **Unused code:**
+  - `makeRedirectUri` and `AUTH_REDIRECT_PATH` are unused in `auth.config.ts`, which is off-limits.
+  - Removing them would save nothing, because `expo-auth-session` is needed for sign-in.
+  - Nothing else is unused (`tsc --noUnusedLocals`).
+- **Whole-library imports:** none cost anything. The 7 `import * as` imports are small single-purpose expo modules, and Metro bundles the same code either way.
+- **`assets/brand/meru-mark.png`** (566 × 346, 17.4 KB): expo-image now decodes it at its 44–64 dp display size. A smaller file would save about 6 KB.
+
+**The release-bundle check (`npm run verify:release-bundle`) fails, before and after this phase alike.**
+- The developer-token strings are 0 in release, as required. The failure comes from the forbidden-marker and UUID checks.
+- **`client_secret` and `clientSecret`:** all 28 occurrences are parameter names inside `expo-auth-session` (`AuthRequest.js`, `TokenRequest.js`). They are code, not a value.
+- **UUID-v4 literals:**
+  - Two come from `src/config/auth.config.ts`, which holds the Entra tenant and client IDs. These are public identifiers.
+  - Two more cannot be attributed through the source map.
+- **The counts are identical** in the `acc04fc` baseline. The check has failed since SSO added these; it is not a P2 change.
+- **Ronit decides** whether the guard should allow these. RELEASE.md §5 requires the check to pass.
+
+### 9.4 Bounded memory
+
+**Ticket list, and the task feed that reads it**
+- **Before:** every page scrolled through was kept, until pull-to-refresh.
+- **Now:** at most 500 tickets per filter combination.
+
+**Ticket history pages**
+- **Before:** each page cached the whole conversation again (05 B.12), HTML bodies included. Five pages of a 60-reply ticket held five copies.
+- **Now:** only the audit entries are kept. Paging reads `page`/`auditPages`, never the items.
+
+**Prepared HTML bodies**
+- **Before:** recomputed on every mount.
+- **Now:** cached, at most about 2 MB, cleared at sign-out.
+
+**Images**
+- **Before:** the attachment viewer downsampled, but inline HTML images and the logo were decoded at full size.
+- **Now:** all three go through expo-image and are decoded at view size. Its caches are cleared at sign-out.
+
+**Row views**
+- **Before:** FlatList windows.
+- **Now:** FlashList recycles a small pool of cells.
+
+**Still unbounded:**
+- Notifications (20 per page), knowledge-base articles (20 per page) and My Requests (50 per page) keep every page scrolled through.
+- My Requests' pull-to-refresh re-requests **every** loaded page (`ServiceCatalogScreen.tsx`, `list.refetch()`). Every other list refreshes page 1 only.
+- Each fix changes what the user sees after scrolling or refreshing, so each needs approval. Proposed: the same 500-row cap, and first-page refresh for My Requests.
+- Drawer and tab screens never unmount, so their queries are never garbage-collected. That is by design: `freezeOnBlur` stops their renders, not their data.
+
+### 9.5 Modularity and code health
+
+Reported only. The only changes made are ones that improve performance or remove duplication.
+
+**Changed:**
+- **`prepare()` moved from `HtmlText` to `utils/html.ts`**, as `prepareHtmlBody`. This removes the second sanitiser pass, shares the cache, and lets the sign-out wipe reach it.
+- **One `NO_SCROLL_ANCHOR`** constant for every list.
+- **One `SCREEN_OPTIONS`** object per stack file.
+
+**Not touched** (tidiness only, pinned by tests, or a behaviour decision):
+- **Large files:**
+  - `TicketDetailScreen.tsx` (≈ 1,000 lines): data and writes, tab rows, the header, and eleven presentational components. The rbac tests read its source.
+  - `TicketListScreen.tsx` (≈ 700): multi-select, inline status, bulk pick-up, filters, empty and footer states.
+  - `permissions.ts` (483): also holds row de-duplication and request validation. The rbac tests pin it.
+  - `service-catalog.ts` (432): filtering, form definition, validation, priority and answers.
+  - `TicketPropertyEditors.tsx` (697) does one job, so it is not a candidate.
+- **Duplicated:**
+  - paged-list de-duplication with first-page refresh (4 hooks);
+  - `getNextPageParam` (5 hooks);
+  - the load-more guard (3 screens);
+  - list footers (4 screens);
+  - the pull-to-refresh handler (≈ 12 places);
+  - bulk target building (Status and Assign);
+  - date-string parsing (tasks and catalogue, with deliberately different year ranges).
+- **Inconsistent:**
+  - `utils/dialogs.ts` versus raw `Alert.alert` (ticket detail, ticket list, `AttachmentPicker`);
+  - `KeyboardAvoidingView style={{…}}` versus `className` for the screen background (6 screens);
+  - whole-store `useUiStore()` reads (ticket list, Filters sheet);
+  - `?? 'END_USER'` repeated 22 times;
+  - first-page versus all-page refresh (§9.4).
+
+### 9.6 Press feedback added (38 controls)
+
+**Text links and retry rows** (opacity 60 %):
+- "Show more", "Show it again", "Download and share";
+- "Use this device's timezone", "Choose a different status";
+- "Back to all categories", "Clear all filters…";
+- the list footers' "Tap to retry", the banner Retry, and LookupError Retry.
+
+**Chips and the banner** (opacity 70 %):
+- the e-mail and approver chips;
+- the ticket card's status chip;
+- the KB categories retry chip;
+- the reply-all retry box;
+- the Home banner.
+
+**Bordered fields** (gray-50 tint):
+- `SelectField`;
+- the profile country field;
+- the catalogue's date field.
+
+**Icon buttons:**
+- search and date clear, the task checkbox and the attachment remove button: opacity 60 %;
+- the image viewer's Close and Share, and the selection bar's Clear: white 20 %.
+
+**Other:**
+- Bulk progress: Stop (red-50) and Done (opacity 80 %).
+- Reply-mode tabs: white 60 % when not selected.
+
+**Left without feedback:**
+- the three sheet backdrops, because a tap outside closes the sheet;
+- the dev-only developer-token button on Login, which is part of the auth flow.
+
+### 9.7 Found on the way: a ticket screen can be reused for another ticket (bug, not fixed)
+
+**The cause:**
+- React Navigation 7 reuses the **current** route when you navigate to the same route name. In `routers/src/StackRouter.tsx`, NAVIGATE: "If the route matches the current one, then navigate to it".
+- The app sets no `getId`.
+
+**The effect:**
+- Ticket A's detail can be the top of the Tickets stack while ticket B is opened from Alerts, Home, an approval or a task. B then shows in **A's screen instance**.
+- A's local state carries over:
+  - the open tab;
+  - expanded replies;
+  - **files staged for upload**, which would then upload to B.
+
+**The fix:**
+- `getId={({ params }) => params.ticketId}` on `TicketDetail`, and the same with `taskId` on `TaskDetail`.
+- That pushes a new screen instead, which is a navigation behaviour change, so it needs Ronit's OK.
+
+### 9.8 Measure on a real device (§6 still applies)
+
+**Cold start with and without `inlineRequires`**
+- It costs 128 KB of bytecode. Keep it only if start-up is faster and nothing breaks.
+- Walk:
+  - sign-in;
+  - the drawer and every module;
+  - a ticket and its tabs;
+  - the catalogue;
+  - Microsoft sign-in returning to the app.
+
+**FlashList**
+- Scroll the ticket list and a ticket with 40+ replies (gfxinfo jank %).
+- Pull to refresh the ticket list and Alerts: new rows must appear at the top.
+- Scroll a long reply away and back: "Show more" must stay correct.
+- The catalogue's empty states must still be centred.
+
+**`freezeOnBlur`**
+- After a write on ticket detail, going back must show the ticket list updated.
+
+**Tab switching**
+- On a long ticket, the highlight must move at once.
+
+**expo-image**
+- The attachment viewer.
+- An inline screenshot in a reply.
+- Sign out, sign in as someone else, and reopen an attachment: it must load again, not come from cache.
+
+**The task feed**
+- At more than 500 tickets: check the footer text.
+
+**Memory** (`dumpsys meminfo`)
+- After scrolling 25 pages of tickets.
+- After opening five pages of the History tab.

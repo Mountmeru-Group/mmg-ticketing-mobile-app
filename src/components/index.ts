@@ -13,6 +13,7 @@ export { FilterChip, SearchField } from './Filters';
 export { FieldLabel, FormCard, InlineError, LookupError, Notice, OutlineButton, SelectField, SubmitButton } from './Form';
 export { HtmlRenderProvider, HtmlText } from './HtmlText';
 export { ImageViewerModal } from './ImageViewerModal';
+export { NO_SCROLL_ANCHOR } from './listDefaults';
 export { LoadingSkeleton, Skeleton } from './LoadingSkeleton';
 export { OptionSheet, type SheetOption } from './OptionSheet';
 export { PersonPickerSheet, type Person } from './PersonPickerSheet';

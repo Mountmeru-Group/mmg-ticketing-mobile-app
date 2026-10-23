@@ -58,7 +58,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
             disabled={disabled}
             onPress={() => onChangeChips(chips.filter((c) => c !== email))}
             hitSlop={6}
-            className="m-0.5 h-8 flex-row items-center rounded-full bg-blue-100 px-2.5"
+            className="m-0.5 h-8 flex-row items-center rounded-full bg-blue-100 px-2.5 active:opacity-70"
           >
             <Text className="text-xs text-blue-900">{email}</Text>
             <Ionicons name="close" size={14} color={palette.blue[900]} style={{ marginLeft: 4 }} />

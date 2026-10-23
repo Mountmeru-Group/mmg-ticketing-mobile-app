@@ -7,14 +7,15 @@
 //   opens its detail, which the web does not have; other people's rows are not links, as on the web.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, BackHandler, FlatList, Pressable, RefreshControl, Text, View, type ListRenderItem } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
-  SearchField, StatusBadge,
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
+  ScreenHeader, SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -121,7 +122,7 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
                     setSearch('');
                   }}
                   hitSlop={8}
-                  className="min-h-11 flex-row items-center"
+                  className="min-h-11 flex-row items-center active:opacity-60"
                 >
                   <Ionicons name="home-outline" size={18} color={palette.blue[700]} />
                   <Text className="ml-1 text-sm font-medium text-blue-700">Home</Text>
@@ -219,9 +220,10 @@ function CatalogView({
     return (
       <>
         {banner}
-        <FlatList
+        <FlashList
           data={list}
           keyExtractor={rowKey}
+          maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             list.length > 0 ? (
@@ -245,9 +247,10 @@ function CatalogView({
   return (
     <>
       {banner}
-      <FlatList
+      <FlashList
         data={shown}
         keyExtractor={rowKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View className="mx-4 mb-2 flex-row items-center">
@@ -398,9 +401,10 @@ function MyRequestsView({
   return (
     <>
       <QueryBanner error={isFetchNextPageError ? null : list.error} hasData onRetry={() => void onRefresh()} />
-      <FlatList
+      <FlashList
         data={requests}
         keyExtractor={rowKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         renderItem={renderRequest}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
@@ -432,7 +436,7 @@ function MyRequestsView({
           ) : isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
           ) : isFetchNextPageError ? (
-            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4">
+            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4 active:opacity-60">
               <Text className="text-sm text-red-700">Couldn't load older requests.</Text>
               <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
             </Pressable>

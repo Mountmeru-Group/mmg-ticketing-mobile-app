@@ -147,7 +147,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
                 accessibilityState={{ selected: m === mode, disabled: post.isPending }}
                 disabled={post.isPending}
                 onPress={() => setMode(m)}
-                className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${m === mode ? (m === 'note' ? 'bg-amber-100' : 'bg-white') : ''}`}
+                className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${m === mode ? (m === 'note' ? 'bg-amber-100' : 'bg-white') : 'active:bg-white/60'}`}
               >
                 <Text className={`text-center text-sm ${m === mode ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>{MODE_LABELS[m]}</Text>
               </Pressable>
@@ -160,7 +160,7 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
             <>
               {mode === 'replyAll' && recipients.isFetching ? <Text className="mb-1 text-xs text-gray-500">Loading thread recipients…</Text> : null}
               {mode === 'replyAll' && recipients.isError && !recipients.isFetching ? (
-                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-3 min-h-11 justify-center rounded-lg bg-amber-50 p-3">
+                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-3 min-h-11 justify-center rounded-lg bg-amber-50 p-3 active:opacity-70">
                   <Text className="text-xs text-amber-900">
                     Couldn't load the thread's recipients ({describeError(recipients.error)}). To is set to the requester only.{' '}
                     <Text className="font-semibold">Tap to retry.</Text>

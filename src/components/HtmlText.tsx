@@ -5,17 +5,30 @@
 //   (…/ticket/<n>, …/tickets/<uuid or n>), which opens the ticket in the app (deep-link resolver, 05 §A.11).
 // - If the renderer throws, the body falls back to plain text (htmlToDisplayText), never to a blank card.
 // One renderer for every server HTML body: ticket descriptions, comments, KB articles, announcements.
-import { Component, memo, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
+import { Image } from 'expo-image';
+import { Component, memo, useMemo, type ComponentProps, type ReactNode } from 'react';
 import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import {
-  RenderHTMLConfigProvider, RenderHTMLSource, TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts,
-  type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
+  IMGElementContainer, IMGElementContentError, IMGElementContentLoading, RenderHTMLConfigProvider, RenderHTMLSource,
+  TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts, useIMGElementProps, useIMGElementState,
+  type CustomBlockRenderer, type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
 } from 'react-native-render-html';
 
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
+import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import { parseTicketLink } from '@/utils/deep-links';
-import { BLOCKED_TAGS, htmlToDisplayText, looksLikeHtml, sanitizeForRender } from '@/utils/html';
+import { BLOCKED_TAGS, clearPreparedHtml, prepareHtmlBody } from '@/utils/html';
+
+// Prepared bodies (utils/html.ts) and expo-image's caches (inline images, attachments opened in ImageViewerModal) are
+// ticket content: drop them when the session ends, as the query cache is dropped.
+useAuthStore.subscribe((state, previous) => {
+  if (!previous.isAuthenticated || state.isAuthenticated) return;
+  clearPreparedHtml();
+  Image.clearMemoryCache().catch(() => undefined);
+  Image.clearDiskCache().catch(() => undefined);
+});
 
 // ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
 
@@ -55,6 +68,39 @@ function openLink(_event: GestureResponderEvent, href: string) {
 const RENDERERS_PROPS: Partial<RenderersProps> = { a: { onPress: openLink } };
 
 /**
+ * Inline images (base64 rasters only: the sanitiser drops every other image) through expo-image (Phase P2), which
+ * decodes at the size shown instead of the picture's full size (docs/PERFORMANCE.md §4 item 2). Everything else is the
+ * library's own IMGElement: the same sizing, loading and error states; its success view was <Image> with
+ * `resizeMode: 'cover'`.
+ */
+const ImgRenderer: CustomBlockRenderer = (props) => {
+  const imgProps = useIMGElementProps(props);
+  const state = useIMGElementState(imgProps);
+  let content: ReactNode;
+  if (state.type === 'success') {
+    content = (
+      <Image
+        source={state.source}
+        contentFit="cover"
+        style={[state.dimensions, state.imageStyle]}
+        onError={(e) => state.onError(new Error(e.error))}
+      />
+    );
+  } else if (state.type === 'loading') {
+    content = <IMGElementContentLoading {...state} />;
+  } else {
+    content = <IMGElementContentError {...state} />;
+  }
+  return (
+    <IMGElementContainer {...imgProps.containerProps} onPress={imgProps.onPress} style={state.containerStyle}>
+      {content}
+    </IMGElementContainer>
+  );
+};
+
+const RENDERERS = { img: ImgRenderer };
+
+/**
  * Wrap the app once (App.tsx). Every TRenderEngineProvider option is passed explicitly: react-native-render-html
  * 6.3.4 declares these defaults through `defaultProps` on a function component, which React 19 ignores.
  * Values not customised here are the library's own defaults (TRenderEngineProvider.tsx).
@@ -78,6 +124,7 @@ export function HtmlRenderProvider({ children }: { children: ReactNode }) {
     >
       <RenderHTMLConfigProvider
         defaultTextProps={{ selectable: true }}
+        renderers={RENDERERS}
         renderersProps={RENDERERS_PROPS}
         enableExperimentalBRCollapsing
         enableExperimentalGhostLinesPrevention
@@ -88,11 +135,22 @@ export function HtmlRenderProvider({ children }: { children: ReactNode }) {
   );
 }
 
-class RendererBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+interface BoundaryProps {
+  fallback: ReactNode;
+  /** The body shown. A recycled list cell gets another body, and a failure belongs to the body it happened on. */
+  resetKey: string;
+  children: ReactNode;
+}
+
+class RendererBoundary extends Component<BoundaryProps, { failed: boolean; resetKey: string }> {
+  state = { failed: false, resetKey: this.props.resetKey };
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  static getDerivedStateFromProps(props: BoundaryProps, state: { failed: boolean; resetKey: string }) {
+    return props.resetKey === state.resetKey ? null : { failed: false, resetKey: props.resetKey };
   }
 
   componentDidCatch(error: Error) {
@@ -106,20 +164,6 @@ class RendererBoundary extends Component<{ fallback: ReactNode; children: ReactN
 }
 
 // ── One snippet ──────────────────────────────────────────────
-
-type Prepared =
-  | { kind: 'empty' }
-  | { kind: 'text'; text: string }
-  | { kind: 'html'; html: string; fallbackText: string };
-
-function prepare(input: string | null | undefined): Prepared {
-  if (!input || !input.trim()) return { kind: 'empty' };
-  if (!looksLikeHtml(input)) return { kind: 'text', text: input.replace(/\r\n?/g, '\n').trim() };
-  const html = sanitizeForRender(input);
-  const fallbackText = htmlToDisplayText(input);
-  if (!fallbackText && !/<img\b/i.test(html)) return { kind: 'empty' };
-  return { kind: 'html', html, fallbackText };
-}
 
 interface HtmlTextProps {
   html: string | null | undefined;
@@ -140,11 +184,14 @@ interface HtmlTextProps {
 function HtmlTextImpl({
   html, collapsedHeight = 280, horizontalInset = 66, emptyText = 'No text', expanded: expandedProp, onToggleExpanded,
 }: HtmlTextProps) {
-  const prepared = useMemo(() => prepare(html), [html]);
+  // Cached (Phase P2): a recycled cell or a reopened ticket does not redo the sanitiser for a body it has seen.
+  const prepared = useMemo(() => prepareHtmlBody(html), [html]);
   const source = useMemo(() => (prepared.kind === 'html' ? { html: prepared.html } : null), [prepared]);
   const { width } = useWindowDimensions();
-  const [expandedState, setExpandedState] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
+  // Both reset when the body changes (Phase P2): FlashList hands a recycled cell another reply or announcement, which
+  // must start collapsed and unmeasured, as a newly mounted one did.
+  const [expandedState, setExpandedState] = useRecyclingState(false, [html]);
+  const [contentHeight, setContentHeight] = useRecyclingState(0, [html]);
   const expanded = expandedProp ?? expandedState;
   const toggle = onToggleExpanded ?? (() => setExpandedState((v) => !v));
 
@@ -159,7 +206,7 @@ function HtmlTextImpl({
     prepared.kind === 'text' ? (
       plain(prepared.text)
     ) : (
-      <RendererBoundary fallback={plain(prepared.fallbackText)}>
+      <RendererBoundary fallback={plain(prepared.fallbackText)} resetKey={prepared.html}>
         <RenderHTMLSource source={source ?? { html: prepared.html }} contentWidth={Math.max(width - horizontalInset, 120)} />
       </RendererBoundary>
     );
@@ -177,7 +224,7 @@ function HtmlTextImpl({
         <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>{body}</View>
       </View>
       {collapsible ? (
-        <Pressable accessibilityRole="button" onPress={toggle} className="min-h-11 justify-center self-start">
+        <Pressable accessibilityRole="button" onPress={toggle} className="min-h-11 justify-center self-start active:opacity-60">
           <Text className="text-sm font-medium text-blue-700">{expanded ? 'Show less' : 'Show more'}</Text>
         </Pressable>
       ) : null}

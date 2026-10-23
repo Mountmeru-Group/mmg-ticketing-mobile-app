@@ -10,7 +10,7 @@
 // - "Add Request" sends at once (the web asks nothing), through useSubmitServiceRequest only. On success: the web's
 //   toast, then back to the catalogue's Home view, as the web returns to /service-catalog.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -70,7 +70,12 @@ export function ServiceRequestFormScreen({ navigation, route }: CatalogStackScre
   const dirty = Object.values(values).some((v) => v !== '') || notes !== '' || impact !== null || urgency !== null;
   const { leave } = useDiscardGuard({ dirty, busy, what: 'request' });
 
-  const setValue = (name: string, value: string) => setValues((v) => ({ ...v, [name]: value }));
+  const setValue = useCallback((name: string, value: string) => setValues((v) => ({ ...v, [name]: value })), []);
+  // One stable handler per field (Phase P2), so a keystroke redraws only the field it went to (ServiceFormFieldInput).
+  const fieldSetters = useMemo(
+    () => new Map(form.fields.map((f) => [f.name, (v: string) => setValue(f.name, v)] as const)),
+    [form.fields, setValue],
+  );
 
   // "Reset" (the web's :237-242): every field, notes and the request properties back to empty.
   const reset = () => {
@@ -211,7 +216,7 @@ export function ServiceRequestFormScreen({ navigation, route }: CatalogStackScre
                     field={field}
                     value={values[field.name] ?? ''}
                     error={errors[field.name] ?? null}
-                    onChange={(v) => setValue(field.name, v)}
+                    onChange={fieldSetters.get(field.name) ?? ((v) => setValue(field.name, v))}
                     disabled={busy}
                   />
                 ))}
@@ -232,7 +237,7 @@ export function ServiceRequestFormScreen({ navigation, route }: CatalogStackScre
                 accessibilityState={{ expanded: notesOpen }}
                 accessibilityLabel="Resolution: notes for the person handling your request"
                 onPress={() => setNotesOpen((o) => !o)}
-                className="-my-2 min-h-11 flex-row items-center"
+                className="-my-2 min-h-11 flex-row items-center active:opacity-60"
               >
                 <Ionicons name={notesOpen ? 'chevron-down' : 'chevron-forward'} size={18} color={colors.text.body} />
                 <View className="ml-2 flex-1">

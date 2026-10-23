@@ -2,13 +2,15 @@
 // scope. The server's order is kept (pinned first, then type, then newest; 01 ANN-1). Bodies are server HTML and go
 // through the same safe renderer as ticket comments (HtmlText). Dismissing on Home hides one from the Home banner for
 // this session only; it stays listed here, with a way to show it on Home again.
+import { FlashList } from '@shopify/flash-list';
 import { useState } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementCard, EmptyState, ErrorState, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
+  AnnouncementCard, EmptyState, ErrorState, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
+  ScreenHeader,
 } from '@/components';
 import { useAnnouncements } from '@/hooks';
 import { useUiStore } from '@/store/ui.store';
@@ -43,9 +45,10 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
     content = <LoadingSkeleton variant="announcements" rows={3} />;
   } else {
     content = (
-      <FlatList
+      <FlashList
         data={query.data}
         keyExtractor={announcementKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         renderItem={({ item }) => <AnnouncementCard announcement={item} hiddenOnHome={dismissed.includes(item.id)} onShowOnHome={restore} />}
         ListEmptyComponent={
           <EmptyState icon="megaphone-outline" title="No announcements" message="Service Desk announcements for your role will appear here." />

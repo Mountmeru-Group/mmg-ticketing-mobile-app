@@ -95,7 +95,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
               accessibilityRole="button"
               accessibilityLabel="Clear all filters, search and sort"
               onPress={clearTicketFilters}
-              className="h-11 justify-center px-3"
+              className="h-11 justify-center px-3 active:opacity-60"
             >
               <Text className="text-sm font-medium text-blue-700">Clear all</Text>
             </Pressable>
@@ -263,7 +263,7 @@ function DayField({ label, day, onPress, onClear }: { label: string; day: string
           accessibilityRole="button"
           accessibilityLabel={`Clear the ${label.toLowerCase()} date`}
           onPress={onClear}
-          className="h-11 w-11 items-center justify-center"
+          className="h-11 w-11 items-center justify-center active:opacity-60"
         >
           <Ionicons name="close-circle" size={18} color={colors.text.muted} />
         </Pressable>

@@ -9,13 +9,16 @@
 // - No live updates (SSE is broken, 05 B.3) and no push (05 B.4); this phase also forbids polling. The screen says so,
 //   and pull-to-refresh reloads the newest page and the badge. Details: hooks/useNotifications.ts.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
-import { EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader } from '@/components';
+import {
+  EmptyState, ErrorState, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
+} from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
   useUnreadCount,
@@ -36,11 +39,13 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   MENTION: 'at-outline',
 };
 
-interface Section {
-  key: 'unread' | 'read';
-  title: string;
-  data: Notification[];
-}
+/**
+ * One list item (Phase P2: FlashList has no sections). The "Unread" and "Earlier" headings are items of their own, in
+ * the places SectionList drew them; headings were never sticky (stickySectionHeadersEnabled was false).
+ */
+type AlertItem =
+  | { kind: 'heading'; key: 'unread' | 'read'; title: string }
+  | { kind: 'row'; notification: Notification };
 
 export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTab'>) {
   const insets = useSafeAreaInsets();
@@ -56,12 +61,18 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = list;
   const hasData = list.data !== undefined;
 
-  const sections = useMemo<Section[]>(() => {
+  const items = useMemo<AlertItem[]>(() => {
     const unreadRows = list.items.filter((n) => !n.isRead);
     const readRows = list.items.filter((n) => n.isRead);
-    const out: Section[] = [];
-    if (unreadRows.length > 0) out.push({ key: 'unread', title: 'Unread', data: unreadRows });
-    if (readRows.length > 0) out.push({ key: 'read', title: 'Earlier', data: readRows });
+    const out: AlertItem[] = [];
+    if (unreadRows.length > 0) {
+      out.push({ kind: 'heading', key: 'unread', title: 'Unread' });
+      for (const n of unreadRows) out.push({ kind: 'row', notification: n });
+    }
+    if (readRows.length > 0) {
+      out.push({ kind: 'heading', key: 'read', title: 'Earlier' });
+      for (const n of readRows) out.push({ kind: 'row', notification: n });
+    }
     return out;
   }, [list.items]);
 
@@ -89,8 +100,8 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
     navigation.navigate('TicketsTab', { screen: 'TicketDetail', params: { ticketId: n.ticketId }, initial: false });
   };
 
-  // Stable identities (Phase P): they are props of every memoised row, and SectionList re-renders all its rows on each
-  // render of this screen, so a new function per render would redo every row (and its HTML-to-text body).
+  // Stable identities (Phase P): they are props of every memoised row, so a new function per render would redo every
+  // visible row (and its HTML-to-text body).
   const onPressRow = useStableCallback((n: Notification) => {
     // Marking read is part of opening it; a failure (e.g. offline) never blocks opening the ticket, but it is always
     // reported (the row stays unread). The per-call promise reports every tap, even when several overlap.
@@ -110,6 +121,25 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         reportWriteError("Couldn't mark it read", e);
       }
     }),
+  );
+
+  const unreadTotal = unread.data;
+  const markingId = markRead.isPending ? markRead.variables : undefined;
+  const renderItem = useCallback<ListRenderItem<AlertItem>>(
+    ({ item }) =>
+      item.kind === 'heading' ? (
+        <Text className="mx-4 mb-2 mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {item.key === 'unread' && unreadTotal !== undefined ? `Unread · ${unreadTotal}` : item.title}
+        </Text>
+      ) : (
+        <NotificationRow
+          notification={item.notification}
+          onPress={onPressRow}
+          onMarkRead={onMarkOne}
+          marking={markingId === item.notification.id}
+        />
+      ),
+    [unreadTotal, onPressRow, onMarkOne, markingId],
   );
 
   const unreadCount = unread.data ?? 0;
@@ -154,23 +184,12 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
     content = <LoadingSkeleton variant="notifications" rows={5} />;
   } else {
     content = (
-      <SectionList
-        sections={sections}
-        keyExtractor={notificationKey}
-        stickySectionHeadersEnabled={false}
-        renderSectionHeader={({ section }) => (
-          <Text className="mx-4 mb-2 mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {section.key === 'unread' && unread.data !== undefined ? `Unread · ${unread.data}` : section.title}
-          </Text>
-        )}
-        renderItem={({ item }) => (
-          <NotificationRow
-            notification={item}
-            onPress={onPressRow}
-            onMarkRead={onMarkOne}
-            marking={markRead.isPending && markRead.variables === item.id}
-          />
-        )}
+      <FlashList
+        data={items}
+        keyExtractor={alertItemKey}
+        getItemType={alertItemType}
+        renderItem={renderItem}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         ListHeaderComponent={
           <View className="mx-4">
             <Notice>
@@ -208,7 +227,8 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   );
 }
 
-const notificationKey = (n: Notification) => n.id;
+const alertItemKey = (item: AlertItem) => (item.kind === 'heading' ? `heading:${item.key}` : item.notification.id);
+const alertItemType = (item: AlertItem) => item.kind;
 
 /** Memoised (Phase P). The mark-read button shows only on an unread row, as before. */
 const NotificationRow = memo(function NotificationRow({
@@ -290,7 +310,7 @@ function Footer({
   if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />;
   if (failed) {
     return (
-      <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4">
+      <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4 active:opacity-60">
         <Text className="text-sm text-red-700">Couldn't load more notifications.</Text>
         <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
       </Pressable>

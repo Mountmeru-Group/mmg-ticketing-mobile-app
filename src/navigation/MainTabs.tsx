@@ -35,7 +35,8 @@ export function MainTabs() {
       // Android back on a non-Home tab root returns to Home (08 §3.1).
       backBehavior="initialRoute"
       tabBar={(props) => <MainTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      // freezeOnBlur (Phase P2): a tab not on show stops re-rendering until it is shown again.
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >
       {mainTabs(role).map(({ name }) => (
         <Tab.Screen key={name} name={name} component={TAB_SCREENS[name]} />

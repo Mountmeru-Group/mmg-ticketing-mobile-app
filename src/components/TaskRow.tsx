@@ -47,7 +47,7 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
       disabled={toggling}
       onPress={onToggle}
       hitSlop={10}
-      className="mr-3 h-6 w-6 items-center justify-center"
+      className="mr-3 h-6 w-6 items-center justify-center active:opacity-60"
     >
       {toggling ? (
         <ActivityIndicator size="small" color={colors.primary} />

@@ -3,7 +3,7 @@
 // know arrive here as `text`, as on the web. The field only edits its text; the rules live in utils/service-catalog.ts.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Pressable, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { FieldLabel, OptionSheet, SelectField, type SheetOption } from '@/components';
@@ -33,7 +33,7 @@ interface Props {
   disabled: boolean;
 }
 
-export function ServiceFormFieldInput({ field, value, error, onChange, disabled }: Props) {
+function ServiceFormFieldInputImpl({ field, value, error, onChange, disabled }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const border = error ? 'border-red-600' : 'border-gray-300';
   const a11yLabel = `${field.label}${field.required ? ', required' : ''}`;
@@ -93,7 +93,7 @@ export function ServiceFormFieldInput({ field, value, error, onChange, disabled 
             accessibilityState={{ disabled }}
             disabled={disabled}
             onPress={open}
-            className={`flex-1 flex-row items-center ${INPUT_CLASS} ${border} ${disabled ? 'bg-gray-100' : ''}`}
+            className={`flex-1 flex-row items-center ${INPUT_CLASS} ${border} ${disabled ? 'bg-gray-100' : ''} active:bg-gray-50`}
           >
             <Ionicons name="calendar-outline" size={18} color={colors.text.secondary} />
             <Text className={`ml-2 flex-1 text-base ${day ? 'text-gray-900' : 'text-gray-500'}`}>{day ? formatDate(day) : 'Pick a date'}</Text>
@@ -103,7 +103,7 @@ export function ServiceFormFieldInput({ field, value, error, onChange, disabled 
               accessibilityRole="button"
               accessibilityLabel={`Clear ${field.label}`}
               onPress={() => onChange('')}
-              className="ml-1 h-11 w-11 items-center justify-center"
+              className="ml-1 h-11 w-11 items-center justify-center active:opacity-60"
             >
               <Ionicons name="close-circle" size={18} color={colors.text.muted} />
             </Pressable>
@@ -164,3 +164,6 @@ function FieldError({ message }: { message: string | null }) {
     </View>
   );
 }
+
+/** Memoised (Phase P2): typing in one field no longer redraws every other field of the form. */
+export const ServiceFormFieldInput = memo(ServiceFormFieldInputImpl);

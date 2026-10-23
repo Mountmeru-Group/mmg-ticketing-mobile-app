@@ -189,7 +189,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
               editable={!update.isPending}
             />
             {tz && tz !== form.timezone ? (
-              <Pressable accessibilityRole="button" onPress={() => set('timezone')(tz)} className="-mt-3 mb-2 min-h-11 justify-center self-start">
+              <Pressable accessibilityRole="button" onPress={() => set('timezone')(tz)} className="-mt-3 mb-2 min-h-11 justify-center self-start active:opacity-60">
                 <Text className="text-sm font-medium text-blue-700">Use this device's timezone ({tz})</Text>
               </Pressable>
             ) : null}
@@ -205,7 +205,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                   setError(null);
                   if (profile.data) setForm(formFrom(profile.data));
                 }}
-                className="mt-2 min-h-11 items-center justify-center"
+                className="mt-2 min-h-11 items-center justify-center active:opacity-60"
               >
                 <Text className="text-sm font-medium text-blue-700">Discard changes</Text>
               </Pressable>
@@ -221,7 +221,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
                   accessibilityRole="button"
                   accessibilityLabel={`Country: ${countryLabel}`}
                   onPress={() => setCountrySheet(true)}
-                  className="min-h-11 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2"
+                  className="min-h-11 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2 active:bg-gray-50"
                 >
                   <Ionicons name="globe-outline" size={18} color={colors.text.body} />
                   <Text className="ml-2 flex-1 text-base text-gray-900">{countryLabel}</Text>

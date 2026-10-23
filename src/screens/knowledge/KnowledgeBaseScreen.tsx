@@ -4,14 +4,16 @@
 //   rows that are not published AND public are not shown.
 // - Search: KB-3 only (KB-2 ignores `search`, 01 §0.6 #10), from 2 characters, debounced; published + public, max 20.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View, type ListRenderItem } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader, SearchField,
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
+  ScreenHeader, SearchField,
 } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
 import { colors, palette } from '@/theme';
@@ -67,9 +69,10 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
       content = <LoadingSkeleton variant="articles" rows={3} />;
     } else {
       content = (
-        <FlatList
+        <FlashList
           data={search.data}
           keyExtractor={rowKey}
+          maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
           renderItem={renderSearchRow}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
@@ -99,9 +102,10 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
     content = <LoadingSkeleton variant="articles" rows={4} />;
   } else {
     content = (
-      <FlatList
+      <FlashList
         data={articles.articles}
         keyExtractor={rowKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         renderItem={renderArticleRow}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
@@ -125,7 +129,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
           ) : isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
           ) : isFetchNextPageError ? (
-            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4">
+            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4 active:opacity-60">
               <Text className="text-sm text-red-700">Couldn't load more articles.</Text>
               <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
             </Pressable>
@@ -176,7 +180,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
                 accessibilityLabel={`Categories didn't load. ${describeError(categories.error)} Tap to retry.`}
                 onPress={() => void categories.refetch()}
                 hitSlop={4}
-                className="h-9 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3"
+                className="h-9 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3 active:opacity-70"
               >
                 <Ionicons name="refresh" size={14} color={palette.red[700]} />
                 <Text className="ml-1 text-sm text-red-800">Categories didn't load · Retry</Text>

@@ -1,6 +1,7 @@
 // M4 History — TKT-7 GET /tickets/:id/activity, audit entries only (the conversation comes from CMT-1).
 // - Page size 20 (the server default is 50; this phase never asks for more than 20).
-// - Every page repeats ALL comments (05 B.12); they are dropped here, and pages are merged by `_type` + `id`.
+// - Every page repeats ALL comments (05 B.12); they are dropped as each page arrives (not cached), and pages are
+//   merged by `_type` + `id`.
 // - Newest first, with "Load older history"; the web sorts one 50-row page oldest-first instead, which does not
 //   page coherently on a phone.
 // ⚠ No server access check on TKT-7 for any role (05 C.1): the caller passes `enabled` only after TKT-3 succeeded.
@@ -34,7 +35,10 @@ export function useTicketHistory(ticketId: string, { enabled }: { enabled: boole
       }
       checkFields('TKT-7', res, ACTIVITY_PAGE_SPEC);
       checkFields('TKT-7', res.items.find((i) => i?._type === 'audit'), AUDIT_ITEM_SPEC, 'items[audit].');
-      return res;
+      // Only the audit entries are kept (Phase P2). Every page repeats the whole conversation, HTML bodies included
+      // (05 B.12), and nothing here shows it: the conversation comes from CMT-1. Paging reads `page`/`auditPages`,
+      // never the items, so five pages of a long ticket no longer cache five copies of its replies.
+      return { ...res, items: res.items.filter((i) => i?._type === 'audit') };
     },
     initialPageParam: 1,
     getNextPageParam: (last) => (normalisePage(last).hasNext ? last.page + 1 : undefined),

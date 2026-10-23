@@ -38,17 +38,18 @@
 //   No bulk delete or merge: those endpoints don't exist (08 §4.2).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, FlatList, Pressable, RefreshControl, ScrollView, StatusBar, Text, View,
+  ActivityIndicator, Alert, BackHandler, Pressable, RefreshControl, ScrollView, StatusBar, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import { assignTicket } from '@/api/tickets.api';
 import {
-  BulkProgressModal, EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, OptionSheet,
-  OutlineButton, QueryBanner, ScreenHeader, SearchField, TicketCard, type SheetOption,
+  BulkProgressModal, EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState,
+  OptionSheet, OutlineButton, QueryBanner, ScreenHeader, SearchField, TicketCard, type SheetOption,
 } from '@/components';
 import {
   assertAssignment, countryName, fetchCurrentStatus, useBulkRunner, useChangeStatus, useCountryOptions, useSingleFlight,
@@ -138,7 +139,8 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     }
   }, [offline, refreshFirstPage]);
 
-  // Guarded: FlatList can fire onEndReached repeatedly, and a failed page must wait for an explicit retry.
+  // Guarded: the list can fire onEndReached repeatedly, and a failed page must wait for an explicit retry. The 500-ticket
+  // cap (useTickets) ends hasNextPage, so nothing loads past it.
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
@@ -177,7 +179,9 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   const canSelect = bulk.length > 0;
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const selectionMode = selected.size > 0;
-  const clearSelection = useCallback(() => setSelected(new Set()), []);
+  // Keeps the same empty set when nothing is selected (Phase P2): the reset below runs on mount and on every filter,
+  // sort or search change, and a new empty set redrew every visible card (it is the list's extraData).
+  const clearSelection = useCallback(() => setSelected((prev) => (prev.size === 0 ? prev : new Set())), []);
   // One identity for the screen's lifetime (Phase P): it is every card's onLongPress, so a new one per selection change
   // re-rendered every visible card on each tap. Now only the tapped card does.
   const toggle = useStableCallback((ticketId: string) => {
@@ -315,16 +319,14 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     content = <ErrorState error={list.error} title="Couldn't load tickets" onRetry={() => void list.refetch()} />;
   } else {
     content = (
-      <FlatList
+      <FlashList
         data={list.tickets}
         extraData={selected}
         keyExtractor={ticketKey}
         renderItem={renderItem}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
-        initialNumToRender={8}
-        windowSize={7}
-        removeClippedSubviews
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
@@ -344,6 +346,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
           <ListFooter
             count={list.tickets.length}
             total={list.total}
+            capped={list.capped}
             loading={isFetchingNextPage}
             failed={isFetchNextPageError && !offline}
             hasMore={!!hasNextPage}
@@ -362,7 +365,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         <View style={{ paddingTop: insets.top }} className="bg-primary">
           <StatusBar barStyle="light-content" />
           <View className="h-14 flex-row items-center px-1">
-            <Pressable accessibilityRole="button" accessibilityLabel="Clear selection" onPress={clearSelection} className="h-11 w-11 items-center justify-center rounded-full">
+            <Pressable accessibilityRole="button" accessibilityLabel="Clear selection" onPress={clearSelection} className="h-11 w-11 items-center justify-center rounded-full active:bg-white/20">
               <Ionicons name="close" size={24} color={colors.primaryForeground} />
             </Pressable>
             <Text className="ml-2 flex-1 text-lg font-semibold text-primary-foreground" accessibilityRole="header">
@@ -478,7 +481,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
               accessibilityRole="button"
               accessibilityLabel={`Filtered by ${activeLabels.join(', ')}. Open filters`}
               onPress={openFilters}
-              className="min-h-11 flex-1 flex-row items-center"
+              className="min-h-11 flex-1 flex-row items-center active:opacity-60"
             >
               <Ionicons name="funnel-outline" size={14} color={colors.text.secondary} />
               <Text className="ml-1.5 flex-1 text-xs text-gray-700" numberOfLines={1}>
@@ -489,7 +492,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
               accessibilityRole="button"
               accessibilityLabel="Clear all filters, search and sort"
               onPress={clearTicketFilters}
-              className="min-h-11 justify-center pl-3"
+              className="min-h-11 justify-center pl-3 active:opacity-60"
             >
               <Text className="text-sm font-medium text-blue-700">Clear all</Text>
             </Pressable>
@@ -644,10 +647,12 @@ function ListEmpty({
 }
 
 function ListFooter({
-  count, total, loading, failed, hasMore, offline, onRetry,
+  count, total, capped, loading, failed, hasMore, offline, onRetry,
 }: {
   count: number;
   total: number | undefined;
+  /** The 500-ticket memory cap stopped the list before the server's end (useTickets). */
+  capped: boolean;
   loading: boolean;
   failed: boolean;
   hasMore: boolean;
@@ -667,10 +672,17 @@ function ListFooter({
   }
   if (failed) {
     return (
-      <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4">
+      <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4 active:opacity-60">
         <Text className="text-sm text-red-700">Couldn't load more tickets.</Text>
         <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
       </Pressable>
+    );
+  }
+  if (capped) {
+    return (
+      <Text className="px-4 py-4 text-center text-xs text-gray-500">
+        {`Showing the first ${count}${total !== undefined ? ` of ${total}` : ''} — search or filter to narrow`}
+      </Text>
     );
   }
   if (!hasMore && count > 0) {
