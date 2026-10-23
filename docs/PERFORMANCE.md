@@ -627,22 +627,46 @@ Reported only. The only changes made are ones that improve performance or remove
 - the three sheet backdrops, because a tap outside closes the sheet;
 - the dev-only developer-token button on Login, which is part of the auth flow.
 
-### 9.7 Found on the way: a ticket screen can be reused for another ticket (bug, not fixed)
+### 9.7 A ticket screen could be reused for another ticket (bug, **fixed 2026-10-23**)
 
 **The cause:**
 - React Navigation 7 reuses the **current** route when you navigate to the same route name. In `routers/src/StackRouter.tsx`, NAVIGATE: "If the route matches the current one, then navigate to it".
-- The app sets no `getId`.
+- The app set no `getId`.
 
 **The effect:**
-- Ticket A's detail can be the top of the Tickets stack while ticket B is opened from Alerts, Home, an approval or a task. B then shows in **A's screen instance**.
-- A's local state carries over:
+- Ticket A's detail could be the top of the Tickets stack while ticket B was opened from Alerts, Home, an approval or a task. B then showed in **A's screen instance**.
+- A's local state carried over:
   - the open tab;
   - expanded replies;
+  - unsaved impact/urgency;
   - **files staged for upload**, which would then upload to B.
 
 **The fix:**
-- `getId={({ params }) => params.ticketId}` on `TicketDetail`, and the same with `taskId` on `TaskDetail`.
-- That pushes a new screen instead, which is a navigation behaviour change, so it needs Ronit's OK.
+- `getId={({ params }) => params.ticketId}` on `TicketDetail` (`TicketStack.tsx`).
+- `getId={({ params }) => params.taskId}` on `TaskDetail`, in both stacks.
+- A different ticket now always gets its own screen.
+- Opening a ticket already in the stack brings that screen, with its own state, to the top, instead of stacking a second copy. The task screen's "view ticket" already went back when its ticket was underneath.
+
+**Verified** on the installed `StackRouter`, with the app's routes and `getId` functions:
+- **The reported case:** A open, then B opened from another tab.
+  - Without `getId`, A's route key showed B.
+  - With it, A keeps its screen and B gets a new one.
+- **Randomised check:** 2,000 runs of 40 actions each (navigate, navigate with `pop`, replace, the composer, back, back to the list).
+  - Without `getId`: a screen's ticket changed 110 times.
+  - With it: 0 times.
+- **Inside the screen:**
+  - Staged files exist only in that screen's state (`newFiles`), and the picker is controlled by it.
+  - Upload sends them to that screen's own `route.params.ticketId`.
+  - Nothing calls `setParams`.
+- So a staged upload cannot reach another ticket.
+- `tsc` is clean; 533/533 tests pass.
+
+**Same bug, not fixed** (outside the requested change): `ApprovalDetail`.
+- Alerts opens it cross-tab (`NotificationsScreen.tsx`, `screen: 'ApprovalDetail'`). With approval A on top of the Approvals stack, opening B reuses A's screen.
+- The typed decision comment, A's snapshot and a finished result carry over.
+- The screen shows `found ?? snapshot`. So if B is not in the cached pending list, it keeps showing **A**, and Approve or Reject acts on A.
+- **The fix is the same one line:** `getId={({ params }) => params.approvalId}` in `ModuleStacks.tsx`.
+- `KbArticle` and `ServiceRequestDetail` are opened only from their own lists, so they are not exposed.
 
 ### 9.8 Measure on a real device (§6 still applies)
 

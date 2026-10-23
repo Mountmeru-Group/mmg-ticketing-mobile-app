@@ -35,7 +35,8 @@ export function TasksStack() {
   return (
     <Tasks.Navigator initialRouteName="TaskList" screenOptions={SCREEN_OPTIONS}>
       <Tasks.Screen name="TaskList" component={TaskListScreen} />
-      <Tasks.Screen name="TaskDetail" component={TaskDetailScreen} />
+      {/* One screen per task (getId, docs/PERFORMANCE.md §9.7): another task never reuses this one's screen. */}
+      <Tasks.Screen name="TaskDetail" component={TaskDetailScreen} getId={({ params }) => params.taskId} />
       <Tasks.Group screenOptions={{ presentation: 'modal' }}>
         <Tasks.Screen name="TaskEditor" component={TaskEditorScreen} />
       </Tasks.Group>
