@@ -627,13 +627,13 @@ Reported only. The only changes made are ones that improve performance or remove
 - the three sheet backdrops, because a tap outside closes the sheet;
 - the dev-only developer-token button on Login, which is part of the auth flow.
 
-### 9.7 A ticket screen could be reused for another ticket (bug, **fixed 2026-10-23**)
+### 9.7 A detail screen could be reused for another record (bug, **fixed 2026-10-23**)
 
 **The cause:**
 - React Navigation 7 reuses the **current** route when you navigate to the same route name. In `routers/src/StackRouter.tsx`, NAVIGATE: "If the route matches the current one, then navigate to it".
 - The app set no `getId`.
 
-**The effect:**
+**Effect on tickets:**
 - Ticket A's detail could be the top of the Tickets stack while ticket B was opened from Alerts, Home, an approval or a task. B then showed in **A's screen instance**.
 - A's local state carried over:
   - the open tab;
@@ -641,32 +641,63 @@ Reported only. The only changes made are ones that improve performance or remove
   - unsaved impact/urgency;
   - **files staged for upload**, which would then upload to B.
 
-**The fix:**
-- `getId={({ params }) => params.ticketId}` on `TicketDetail` (`TicketStack.tsx`).
-- `getId={({ params }) => params.taskId}` on `TaskDetail`, in both stacks.
-- A different ticket now always gets its own screen.
-- Opening a ticket already in the stack brings that screen, with its own state, to the top, instead of stacking a second copy. The task screen's "view ticket" already went back when its ticket was underneath.
+**Effect on approvals:** Alerts opens `ApprovalDetail` from any tab.
+- With approval A on top of the Approvals stack, opening B reused A's screen.
+- **A's typed comment** went into B's decision.
+- The screen shows `found ?? snapshot`. So when B was not in the cached pending list, it kept showing **A**, and Approve or Reject acted on A.
 
-**Verified** on the installed `StackRouter`, with the app's routes and `getId` functions:
-- **The reported case:** A open, then B opened from another tab.
-  - Without `getId`, A's route key showed B.
+**The fix:** one screen per record, through `getId` on every detail screen that takes an id.
+
+| Screen | Stack | `getId` | Reachable by reuse before the fix? |
+|---|---|---|---|
+| `TicketDetail` | Tickets | `ticketId` | **Yes** (Alerts, Home, approval, task) |
+| `TaskDetail` | Tickets, Tasks | `taskId` | Yes in principle (a task above a task); state is small |
+| `ApprovalDetail` | Approvals (the only stack that registers it) | `approvalId` | **Yes** (Alerts) |
+| `KbArticle` | Knowledge | `slug` | No: opened only from the article list. Added for consistency |
+| `ServiceRequestForm` | Catalog | `itemId` | No: opened only from the catalogue. Added: if it were ever reached, it carries answers into same-named fields of another item (`initialFormValues` + `pickExisting`) |
+| `ServiceRequestDetail` | Catalog | `requestId` | No: opened only from My Requests. Added for consistency |
+
+What `getId` changes:
+- A different record always gets its own screen.
+- Opening a record already in the stack brings that screen, with its own state, to the top, instead of stacking a second copy.
+- The task screen's "view ticket" already went back when its ticket was underneath.
+
+**Id-taking screens left without `getId`, on purpose:**
+- **The ticket sheets:** `ReplyComposer`, `StatusClosure`, `AssignPicker`, `SubmitApproval` and `TaskEditor` (in both stacks).
+  - Each is opened only from the screen beneath it, and nothing navigates to a sheet's name from elsewhere.
+  - So none is ever the current route when it is opened again.
+- **`TicketLink`:**
+  - It is reachable while current: it stays on screen in its error and not-found states, and any HTML ticket link opens it.
+  - But it holds no local state: everything comes from `route.params.link` (`useMemo`) and a query keyed by the ticket number.
+  - So a reused resolver resolves the new link correctly.
+
+**Verified** on the installed `StackRouter`, with the app's routes and the same `getId` functions:
+- **The reported cases:**
+  - Without `getId`, opening ticket B or approval B over A put B into **A's route key**.
   - With it, A keeps its screen and B gets a new one.
-- **Randomised check:** 2,000 runs of 40 actions each (navigate, navigate with `pop`, replace, the composer, back, back to the list).
-  - Without `getId`: a screen's ticket changed 110 times.
-  - With it: 0 times.
-- **Inside the screen:**
-  - Staged files exist only in that screen's state (`newFiles`), and the picker is controlled by it.
-  - Upload sends them to that screen's own `route.params.ticketId`.
-  - Nothing calls `setParams`.
-- So a staged upload cannot reach another ticket.
-- `tsc` is clean; 533/533 tests pass.
+- **Randomised check:** 2,000 runs of 40 actions per stack (navigate, navigate with `pop`, replace, back; Tickets also the composer and back to the list). It counted how often a detail screen's id changed after it was first shown.
 
-**Same bug, not fixed** (outside the requested change): `ApprovalDetail`.
-- Alerts opens it cross-tab (`NotificationsScreen.tsx`, `screen: 'ApprovalDetail'`). With approval A on top of the Approvals stack, opening B reuses A's screen.
-- The typed decision comment, A's snapshot and a finished result carry over.
-- The screen shows `found ?? snapshot`. So if B is not in the cached pending list, it keeps showing **A**, and Approve or Reject acts on A.
-- **The fix is the same one line:** `getId={({ params }) => params.approvalId}` in `ModuleStacks.tsx`.
-- `KbArticle` and `ServiceRequestDetail` are opened only from their own lists, so they are not exposed.
+| Stack | Without `getId` | With `getId` |
+|---|---|---|
+| Tickets | 49,339 | **0** |
+| Approvals | 39,271 | **0** |
+| Tasks | 39,271 | **0** |
+| Knowledge | 39,271 | **0** |
+| Catalog (both screens) | 77,570 | **0** |
+
+- **About these numbers:**
+  - Every choice was drawn evenly: each id about 20,000 times, each action about 8,900 or 13,300 times, each catalogue screen about 40,000 times.
+  - An earlier run, which put "110 vs 0" in this section, used a random generator whose low bits were not random. It barely varied its choices, so its counts were too low. The conclusion (0 with `getId`) was the same.
+  - Approvals, Tasks and Knowledge each have one detail screen and share a seed, so their action sequences, and counts, are identical.
+- **Inside the screens:**
+  - Nothing calls `setParams`, so a screen's id is fixed for its lifetime.
+  - **Tickets:** staged files are that screen's state (`newFiles`), and upload sends them to that screen's `route.params.ticketId`.
+  - **Approvals:** `snapshot` is set only from the approval matching the screen's `approvalId`, and the comment is that screen's state. The decision sends that screen's approval with that screen's comment.
+- **Therefore:**
+  - a staged upload cannot reach another ticket;
+  - a typed comment cannot reach another approval;
+  - Approve or Reject cannot act on a different approval from the one the screen shows.
+- `tsc` is clean; 533/533 tests pass.
 
 ### 9.8 Measure on a real device (§6 still applies)
 

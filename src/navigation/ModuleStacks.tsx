@@ -23,7 +23,12 @@ export function ApprovalsStack() {
   return (
     <Approvals.Navigator initialRouteName="ApprovalsInbox" screenOptions={SCREEN_OPTIONS}>
       <Approvals.Screen name="ApprovalsInbox" component={ApprovalsInboxScreen} />
-      <Approvals.Screen name="ApprovalDetail" component={ApprovalDetailScreen} />
+      {/*
+        One screen per approval (getId, docs/PERFORMANCE.md §9.7). Without it, opening approval B from Alerts while
+        approval A's detail is on top reused A's screen with B's id: A's typed comment came along into B's decision, and
+        when B was not in the cached pending list the screen kept showing A, so Approve or Reject acted on A.
+      */}
+      <Approvals.Screen name="ApprovalDetail" component={ApprovalDetailScreen} getId={({ params }) => params.approvalId} />
     </Approvals.Navigator>
   );
 }
@@ -51,7 +56,8 @@ export function KnowledgeStack() {
   return (
     <Knowledge.Navigator initialRouteName="KnowledgeBase" screenOptions={SCREEN_OPTIONS}>
       <Knowledge.Screen name="KnowledgeBase" component={KnowledgeBaseScreen} />
-      <Knowledge.Screen name="KbArticle" component={KbArticleScreen} />
+      {/* One screen per article (getId, docs/PERFORMANCE.md §9.7): another article never reuses this one's screen. */}
+      <Knowledge.Screen name="KbArticle" component={KbArticleScreen} getId={({ params }) => params.slug} />
     </Knowledge.Navigator>
   );
 }
@@ -63,8 +69,10 @@ export function CatalogStack() {
   return (
     <Catalog.Navigator initialRouteName="ServiceCatalog" screenOptions={SCREEN_OPTIONS}>
       <Catalog.Screen name="ServiceCatalog" component={ServiceCatalogScreen} />
-      <Catalog.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} />
-      <Catalog.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
+      {/* One screen per item and per request (getId, docs/PERFORMANCE.md §9.7): a request form never carries another
+          item's answers, and another request never reuses this one's screen. */}
+      <Catalog.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} getId={({ params }) => params.itemId} />
+      <Catalog.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} getId={({ params }) => params.requestId} />
     </Catalog.Navigator>
   );
 }
