@@ -58,7 +58,7 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
 
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title="Announcements" variant="drawer" />
+      <ScreenHeader title="Announcements" variant="back" />
       <OfflineBanner />
       <QueryBanner error={query.error} hasData={hasData} onRetry={() => void onRefresh()} />
       {content}

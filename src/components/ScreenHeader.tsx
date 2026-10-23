@@ -9,8 +9,9 @@ import { colors } from '@/theme';
 interface ScreenHeaderProps {
   title: string;
   /**
-   * - `drawer`: root screens — ☰ on the left opens the drawer (08 §3.1).
-   * - `back`:   pushed screens — back arrow.
+   * - `drawer`: the three tab roots (Home, Tickets, Alerts) — ☰ on the left opens the drawer (08 §3.1).
+   * - `back`:   every other screen, the drawer modules' first screens included — back arrow. It is `goBack()`, the
+   *             same action as Android back, so both return to where the user came from.
    * - `close`:  modal sheets — ✕.
    */
   variant?: 'drawer' | 'back' | 'close';

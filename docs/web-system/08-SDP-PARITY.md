@@ -168,16 +168,22 @@ Some SDP features were split into separately buildable parts, e.g. sort (1.16 / 
 | 2 | **My Tickets** | **Tickets** | M3 | — |
 | 3 | Alerts | Alerts | M9 | unread count (NTF-2) |
 
-**Every root screen**
+**The bar stays on every signed-in screen** (2026-10-23): the tab screens, everything opened from them, and every drawer screen, always in the same place. On a drawer screen no tab is highlighted; tapping a tab opens it as it was left.
+
+**Every tab root** (Home, Tickets, Alerts)
 - **Header:** ☰ on the left opens the drawer. The title sits in the middle. Right: a search icon (Tickets) or "Mark all read" (Alerts).
-- **Gestures:** an edge-swipe from the left also opens the drawer.
+- **Gestures:** an edge-swipe from the left also opens the drawer, on every screen.
 - **"+" FAB** on Home and Tickets → Create ticket (M8), all roles.
+
+**Every other screen**, including the first screen of each drawer module (Approvals, Tasks, Knowledge base, Service Request, Announcements, Settings): a back arrow on the left. It does exactly what Android back does.
 
 **Android back button**
 1. If the drawer is open, close it.
 2. If a sheet or modal is open, close it.
-3. On a non-Home tab root, go to Home.
-4. On Home, exit.
+3. On a pushed screen, go back down its stack.
+4. On a drawer screen, go back to the screen the user came from: a tab, or another drawer screen.
+5. On a non-Home tab root, go to Home.
+6. On Home, go back to the drawer screen the user came from, if there is one; otherwise exit.
 
 ### 3.2 Drawer contents by role
 

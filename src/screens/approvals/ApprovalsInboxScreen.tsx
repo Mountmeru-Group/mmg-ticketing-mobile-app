@@ -101,7 +101,7 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
 
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title="Approvals" variant="drawer" />
+      <ScreenHeader title="Approvals" variant="back" />
       <OfflineBanner />
       <View className="border-b border-border bg-white px-4 py-2">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 py-1">

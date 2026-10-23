@@ -138,7 +138,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
 
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title="Tasks" variant="drawer" />
+      <ScreenHeader title="Tasks" variant="back" />
       <OfflineBanner />
       <View className="border-b border-border bg-white px-4 py-2">
         <SearchField
