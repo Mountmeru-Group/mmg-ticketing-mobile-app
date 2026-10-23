@@ -74,7 +74,7 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
   if (!can.browse) {
     return (
       <View className="flex-1 bg-gray-50">
-        <ScreenHeader title="Service Request" variant="drawer" />
+        <ScreenHeader title="Service Request" variant="back" />
         <EmptyState icon="lock-closed-outline" title="Not available for your role" />
       </View>
     );
@@ -82,7 +82,7 @@ export function ServiceCatalogScreen({ navigation, route }: CatalogStackScreenPr
 
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title="Service Request" variant="drawer" />
+      <ScreenHeader title="Service Request" variant="back" />
       <OfflineBanner />
       <View className="border-b border-border bg-white px-4 py-2">
         {/* The web's two buttons, "Catalog" and "My Requests" (ServiceCatalogPage.tsx:174-187). */}

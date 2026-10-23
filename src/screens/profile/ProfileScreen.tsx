@@ -124,7 +124,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
 
   return (
     <KeyboardAvoidingView behavior="height" className="flex-1 bg-gray-50">
-      <ScreenHeader title="Profile & settings" variant="drawer" />
+      <ScreenHeader title="Profile & settings" variant="back" />
       <OfflineBanner />
       <QueryBanner error={profile.error} hasData={!!profile.data} onRetry={() => void onRefresh()} />
       <ScrollView

@@ -122,7 +122,8 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 - Offline: the banner directly under the header on every screen, and on Login at the top; OfflineState for a first load.
 
 **S12 Chrome.**
-- Tab bar: white with a `border-border` top line. Active red, idle gray-500, 24 dp icons (filled when active), and a red unread badge.
+- Tab bar (`src/navigation/AppTabBar.tsx`): on every signed-in screen, in the same place (§7). White with a `border-border` top line. Active red, idle gray-500, 24 dp icons (filled when active), and a red unread badge. On a drawer screen no tab is active, so none is highlighted; the drawer's red row shows the module.
+- Header left button: ☰ only on the three tab roots (Home, Tickets, Alerts). Every other screen, including the first screen of each drawer module, has the back arrow (44 dp button, 24 dp icon), which does exactly what Android back does. Sheets have ✕.
 - Drawer, top to bottom, as in the web sidebar:
   - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
   - Nav rows (Approvals when shown, Tasks, Knowledge base, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls.
@@ -292,3 +293,81 @@ Left as they were, on purpose:
 - In-app text that says "the Service Desk" means the backend system or the IT team, not the app. Examples:
   "Can't reach the Service Desk", "contact the Service Desk", "Open the Service Desk on the web".
 - "Mount Meru" as the organisation: "Sign in with your Mount Meru work account" and the logo's accessibility label.
+
+## 7. Tab bar on every screen, back arrow on every non-root screen (2026-10-23)
+
+Found on a device: the bottom bar disappeared on the drawer screens (Approvals, Tasks, Knowledge base, Service
+Request, Announcements, Settings), and those screens had no back button. Navigation chrome only: no screen's content,
+API call, query or permission changed. **Not run on a device:** there was no build.
+
+### 7.1 Structure
+
+- **The navigator tree did not change:** Root → Drawer → (MainTabs: Home · Tickets · Alerts | Approvals | Tasks |
+  Knowledge | Catalog | Announcements | Profile). No screen moved, and none is registered twice.
+- **The bar moved instead.** `AppTabBar` is the one bar component, with two hosts:
+  - MainTabs passes it to the tab navigator as `tabBar`. A press there is the navigator's own: it emits `tabPress`
+    (a second press on Tickets pops its stack to the list) and switches tab.
+  - The drawer's `screenLayout` puts it under every other drawer screen.
+  - Both hosts draw it at the bottom of the full screen area, so it never moves between screens.
+- **Why not hidden tabs.** The textbook fix moves the drawer modules into the tab navigator as hidden tabs. That
+  changes who registers each module, and `tests/rbac/service-catalog.test.mjs` pins the drawer registration
+  (`<Drawer.Screen name="Catalog" …>` and the drawer's `navigate('Catalog', …)`). Moving the bar keeps every route,
+  and its gating, exactly where the tests expect it.
+- **Size:** React Navigation's default bar, which the app used until now: 49 dp plus the bottom inset, a hairline
+  top line, elevation 8, a 24 dp icon over a 12 dp label. The unread badge reads the cached NTF-2 count; MainTabs
+  still owns the only fetch.
+- **On a drawer screen** no tab is active, so none is highlighted. The drawer's red row shows the module. Tapping a
+  tab opens it with its stack as it was left.
+
+### 7.2 Back
+
+- **Drawer screens use the back arrow** (`ScreenHeader variant="back"`), the same `goBack()` that Android back
+  dispatches. The ☰ stays on the three tab roots only. The drawer still opens from every screen by the left-edge
+  swipe, as on pushed screens before.
+- **The drawer's `backBehavior` is `fullHistory`** (it was `initialRoute`). Back from a drawer screen returns to
+  where the user came from. The tabs are the history's first entry, so back always ends on Home, then exits.
+- Checked by replaying the app's actions on the installed routers (`@react-navigation/routers` 7.6.5):
+
+| Path | Before (`initialRoute`) | `history` (rejected) | Now (`fullHistory`) |
+|---|---|---|---|
+| Tickets → Approvals, back ×3 | Tickets, Home, exit | same | Tickets, Home, exit |
+| Approvals → Knowledge, back ×3 | **Home** (skips Approvals), exit | Approvals, Home, exit | Approvals, Home, exit |
+| Approvals → Home (tab bar), back ×3 | — (no bar there) | Approvals, **exit** | Approvals, Home, exit |
+| Approvals → Tickets (tab bar), back ×4 | — | Home, Approvals, **exit** | Home, Approvals, Home, exit |
+| Alerts, back ×2 (tab rule) | Home, exit | same | Home, exit |
+
+- **Unchanged:** a non-Home tab root still goes back to Home first (08 §3.1).
+- **Known effect of `fullHistory`:** going back to an older visit restores that visit's navigation params, as a
+  browser does. For example, back to a MainTabs visit that a drawer-screen tab press opened on Tickets lands on
+  Tickets, even if the user had switched tabs after that press.
+
+### 7.3 Every route checked (25)
+
+| Host of the bar | Routes | Header left |
+|---|---|---|
+| Tab navigator (`tabBar`) | HomeTab, AlertsTab, TicketList | ☰ |
+| Tab navigator (`tabBar`) | TicketDetail, CreateTicket, TaskDetail, TicketLink | back |
+| Tab navigator (`tabBar`) | ReplyComposer, StatusClosure, AssignPicker, SubmitApproval, TaskEditor, TicketFilters (sheets) | ✕ |
+| Drawer (`screenLayout`) | ApprovalsInbox, TaskList, KnowledgeBase, ServiceCatalog, Announcements, Profile | back (was ☰) |
+| Drawer (`screenLayout`) | ApprovalDetail, TaskDetail, KbArticle, ServiceRequestForm, ServiceRequestDetail | back |
+| Drawer (`screenLayout`) | TaskEditor (sheet) | ✕ |
+
+- **Nothing can sit behind the bar.** It is laid out below each screen, not over it, so every screen's area ends at
+  the bar's top edge.
+  - Every scrollable keeps its own bottom padding (inset + 24, or inset + 96 under a FAB).
+  - The only pinned elements are the Home FAB, and the Tickets FAB and bulk bar. They are inside their own screen,
+    above the bar, as before.
+  - Sheets are `presentation: 'modal'` stack screens, drawn inside the stack on Android, so the bar stays under them,
+    as it already did under the ticket composer.
+- **Keyboard.** Of the keyboard-avoiding screens, ApprovalDetail, Profile, TaskEditor and ServiceRequestForm are new
+  above a bar. `KeyboardAvoidingView` measures its own frame, so the bar below it only reduces the padding needed,
+  as for the ticket composer.
+- **Safe area.** The bar pads the bottom inset (gesture or button bar), as before. Screens did not change, so their
+  bottom gap is inset + 24 on drawer screens too, as on the tab screens. Bottom sheets (`OptionSheet`, pickers) are
+  window-level modals over the bar and keep their own inset padding.
+- **To check on the next build:**
+  - on each drawer screen: the bar in the same place as on the tabs, and none highlighted;
+  - back from a drawer screen opened from each tab;
+  - the left-edge swipe opening the drawer on a gesture-navigation phone, where Android may claim that edge for
+    back (the ☰ is then one tab tap away);
+  - ServiceRequestForm and ApprovalDetail with the keyboard open.

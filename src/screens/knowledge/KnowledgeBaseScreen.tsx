@@ -141,7 +141,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
 
   return (
     <View className="flex-1 bg-gray-50">
-      <ScreenHeader title="Knowledge base" variant="drawer" />
+      <ScreenHeader title="Knowledge base" variant="back" />
       <OfflineBanner />
       <View className="border-b border-border bg-white px-4 py-2">
         <SearchField
