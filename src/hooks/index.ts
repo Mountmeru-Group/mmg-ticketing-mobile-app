@@ -13,6 +13,7 @@ export {
 export { useDebouncedValue } from './useDebouncedValue';
 export { useDiscardGuard } from './useDiscardGuard';
 export { useSingleFlight } from './useSingleFlight';
+export { useStableCallback } from './useStableCallback';
 export { findCachedTicket } from './cache';
 
 // Phase 4 reads

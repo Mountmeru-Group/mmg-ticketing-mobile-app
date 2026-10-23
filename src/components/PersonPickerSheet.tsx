@@ -1,10 +1,10 @@
 // Searchable people picker: a local list (group members), plus USR-3 search when `searchRoles` is given.
 // USR-3 is ADMIN/AGENT only (useUserSearch enforces it). Picking a person writes nothing — the caller confirms.
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, Text, View, type ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useDebouncedValue, useUserSearch } from '@/hooks';
+import { useDebouncedValue, useStableCallback, useUserSearch } from '@/hooks';
 import { colors } from '@/theme';
 import type { UserRole } from '@/types';
 import { formatDisplayName } from '@/utils/format';
@@ -34,11 +34,13 @@ interface PersonPickerSheetProps {
   onClose: () => void;
 }
 
-/** Module-level so the default keeps its identity between renders (it is a memo dependency). */
+/** Module-level so the defaults keep their identity between renders (they are memo dependencies). */
 const NO_ONE: readonly string[] = [];
+const NO_PEOPLE: readonly Person[] = [];
+const NO_EXTRAS: NonNullable<PersonPickerSheetProps['extraOptions']> = [];
 
 export function PersonPickerSheet({
-  visible, title, people = [], searchRoles, extraOptions = [], excludeIds = NO_ONE, onPick, onClose,
+  visible, title, people = NO_PEOPLE, searchRoles, extraOptions = NO_EXTRAS, excludeIds = NO_ONE, onPick, onClose,
 }: PersonPickerSheetProps) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
@@ -53,25 +55,44 @@ export function PersonPickerSheet({
       ),
     [people, q, excludeIds],
   );
-  const remoteOnly = (remote.data ?? []).filter((r) => !local.some((p) => p.id === r.id) && !excludeIds.includes(r.id));
+  const remoteOnly = useMemo(
+    () => (remote.data ?? []).filter((r) => !local.some((p) => p.id === r.id) && !excludeIds.includes(r.id)),
+    [remote.data, local, excludeIds],
+  );
 
   const close = () => {
     setQuery('');
     onClose();
   };
-  const pick = (p: Person) => {
+  // Stable (Phase P): the rows are memoised and the sheet re-renders on every keystroke.
+  const pick = useStableCallback((p: Person) => {
     setQuery('');
     onPick(p);
-  };
+  });
 
-  const row = (p: Person) => (
-    <Pressable key={p.id} accessibilityRole="button" onPress={() => pick(p)} className="min-h-12 border-b border-gray-100 px-4 py-3 active:bg-gray-50">
-      <Text className="text-base text-gray-900">{formatDisplayName(p.displayName) || p.email}</Text>
-      <Text className="text-xs text-gray-500">
-        {p.email}
-        {p.note ? ` · ${p.note}` : ''}
-      </Text>
-    </Pressable>
+  // Phase P: one virtualised list — the extra options, then the people (local first, then search results).
+  const rows = useMemo<PickerRow[]>(
+    () => [
+      ...extraOptions.map((o): PickerRow => ({ kind: 'extra', key: `x:${o.key}`, label: o.label, onPress: o.onPress })),
+      ...local.map((p): PickerRow => ({ kind: 'person', key: `p:${p.id}`, person: p })),
+      ...remoteOnly.map((r): PickerRow => ({
+        kind: 'person',
+        key: `p:${r.id}`,
+        person: { id: r.id, displayName: r.displayName, email: r.email },
+      })),
+    ],
+    [extraOptions, local, remoteOnly],
+  );
+  const renderRow = useCallback<ListRenderItem<PickerRow>>(
+    ({ item }) =>
+      item.kind === 'extra' ? (
+        <Pressable accessibilityRole="button" onPress={item.onPress} className="min-h-12 justify-center border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+          <Text className="text-base font-medium text-blue-700">{item.label}</Text>
+        </Pressable>
+      ) : (
+        <PersonRow person={item.person} onPick={pick} />
+      ),
+    [pick],
   );
 
   // Same sheet frame as OptionSheet: grab handle, title, then the list.
@@ -90,26 +111,48 @@ export function PersonPickerSheet({
             accessibilityLabel={searchRoles !== undefined ? 'Search people by name or email' : 'Filter people by name or email'}
           />
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled">
-          {extraOptions.map((o) => (
-            <Pressable key={o.key} accessibilityRole="button" onPress={o.onPress} className="min-h-12 justify-center border-b border-gray-100 px-4 py-3 active:bg-gray-50">
-              <Text className="text-base font-medium text-blue-700">{o.label}</Text>
-            </Pressable>
-          ))}
-          {local.map(row)}
-          {remoteOnly.map((r) => row({ id: r.id, displayName: r.displayName, email: r.email }))}
-          {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.primary} /> : null}
-          {/* A failed search is said as such, never shown as "No one matches". */}
-          <View className="mx-4 mt-2">
-            <LookupError query={remote} what="people" />
-          </View>
-          {!remote.isFetching && !(remote.isError && !remote.data) && local.length === 0 && remoteOnly.length === 0 ? (
-            <Text className="px-4 py-6 text-center text-sm text-gray-500">
-              {searchRoles !== undefined && q.length < 2 ? 'Type at least 2 letters to search.' : 'No one matches.'}
-            </Text>
-          ) : null}
-        </ScrollView>
+        <FlatList
+          data={rows}
+          keyExtractor={pickerRowKey}
+          renderItem={renderRow}
+          initialNumToRender={20}
+          removeClippedSubviews={false}
+          keyboardShouldPersistTaps="handled"
+          ListFooterComponent={
+            <>
+              {remote.isFetching ? <ActivityIndicator style={{ marginVertical: 12 }} color={colors.primary} /> : null}
+              {/* A failed search is said as such, never shown as "No one matches". */}
+              <View className="mx-4 mt-2">
+                <LookupError query={remote} what="people" />
+              </View>
+              {!remote.isFetching && !(remote.isError && !remote.data) && local.length === 0 && remoteOnly.length === 0 ? (
+                <Text className="px-4 py-6 text-center text-sm text-gray-500">
+                  {searchRoles !== undefined && q.length < 2 ? 'Type at least 2 letters to search.' : 'No one matches.'}
+                </Text>
+              ) : null}
+            </>
+          }
+        />
       </View>
     </Modal>
   );
 }
+
+type PickerRow =
+  | { kind: 'extra'; key: string; label: string; onPress: () => void }
+  | { kind: 'person'; key: string; person: Person };
+
+const pickerRowKey = (row: PickerRow) => row.key;
+
+/** Memoised (Phase P): typing filters the list, and only rows that change are redrawn. */
+const PersonRow = memo(function PersonRow({ person: p, onPick }: { person: Person; onPick: (person: Person) => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={() => onPick(p)} className="min-h-12 border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+      <Text className="text-base text-gray-900">{formatDisplayName(p.displayName) || p.email}</Text>
+      <Text className="text-xs text-gray-500">
+        {p.email}
+        {p.note ? ` · ${p.note}` : ''}
+      </Text>
+    </Pressable>
+  );
+});

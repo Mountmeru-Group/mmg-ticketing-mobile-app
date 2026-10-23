@@ -4,8 +4,8 @@
 //   rows that are not published AND public are not shown.
 // - Search: KB-3 only (KB-2 ignores `search`, 01 §0.6 #10), from 2 characters, debounced; published + public, max 20.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { memo, useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View, type ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeError } from '@/api/errors';
@@ -34,6 +34,9 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = articles;
 
   const openArticle = useCallback((slug: string) => navigation.navigate('KbArticle', { slug }), [navigation]);
+  // Stable renderers and memoised rows (Phase P): this screen re-renders on every keystroke in the search box.
+  const renderSearchRow = useCallback<ListRenderItem<KBSearchResult>>(({ item }) => <SearchRow result={item} onPress={openArticle} />, [openArticle]);
+  const renderArticleRow = useCallback<ListRenderItem<KBArticleListItem>>(({ item }) => <ArticleRow article={item} onPress={openArticle} />, [openArticle]);
 
   const onRefresh = async () => {
     if (offline) return;
@@ -66,8 +69,8 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
       content = (
         <FlatList
           data={search.data}
-          keyExtractor={(r) => r.id}
-          renderItem={({ item }) => <SearchRow result={item} onPress={() => openArticle(item.slug)} />}
+          keyExtractor={rowKey}
+          renderItem={renderSearchRow}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <Text className="mx-4 mb-2 text-xs text-gray-500">
@@ -98,8 +101,8 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
     content = (
       <FlatList
         data={articles.articles}
-        keyExtractor={(a) => a.id}
-        renderItem={({ item }) => <ArticleRow article={item} onPress={() => openArticle(item.slug)} />}
+        keyExtractor={rowKey}
+        renderItem={renderArticleRow}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         keyboardShouldPersistTaps="handled"
@@ -207,9 +210,11 @@ function Tags({ tags }: { tags: readonly string[] | undefined }) {
   );
 }
 
-function ArticleRow({ article, onPress }: { article: KBArticleListItem; onPress: () => void }) {
+const rowKey = (row: { id: string }) => row.id;
+
+const ArticleRow = memo(function ArticleRow({ article, onPress }: { article: KBArticleListItem; onPress: (slug: string) => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
+    <Pressable accessibilityRole="button" onPress={() => onPress(article.slug)} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
       {article.category?.name ? <Text className="mb-0.5 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {article.title || 'Untitled article'}
@@ -226,11 +231,11 @@ function ArticleRow({ article, onPress }: { article: KBArticleListItem; onPress:
       </Text>
     </Pressable>
   );
-}
+});
 
-function SearchRow({ result, onPress }: { result: KBSearchResult; onPress: () => void }) {
+const SearchRow = memo(function SearchRow({ result, onPress }: { result: KBSearchResult; onPress: (slug: string) => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
+    <Pressable accessibilityRole="button" onPress={() => onPress(result.slug)} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {result.title || 'Untitled article'}
       </Text>
@@ -242,4 +247,4 @@ function SearchRow({ result, onPress }: { result: KBSearchResult; onPress: () =>
       <Tags tags={result.tags} />
     </Pressable>
   );
-}
+});

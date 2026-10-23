@@ -1,4 +1,4 @@
-# Release guide — MMG Service Desk (Android)
+# Release guide — Setu (Android)
 
 Written in Phase 5 (2026-10-16). Covers building each EAS profile, getting the Android signing hash for IT (ask A2),
 handing an APK to testers, and the checklist that must be complete before any production build.
@@ -7,10 +7,10 @@ handing an APK to testers, and the checklist that must be complete before any pr
 
 | Item | State |
 |---|---|
-| App identity | `Mount Meru Service Desk` (renamed in Phase B, 2026-10-20), package `com.mountmeru.servicedesk`, version `0.1.0`, versionCode `1` (`app.json`) |
+| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version `0.1.0`, versionCode `1` (`app.json`) |
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24. Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin. Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
-| Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Mount Meru Service Desk" on white, and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
+| Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
 | `preview` APK | Ready to build with your Expo account (§2). It points at **UAT** |
 | Signing in on a `preview` APK | **Not possible yet.** The developer-token screen exists only in `__DEV__` builds, and `preview` is a release build. Sign-in arrives with SSO (A2). The first APK is for checking install, icon and launch, and for producing the signing hash IT needs |
 | `production` AAB | **Placeholder, refused by design** (§1, §5) |
@@ -167,7 +167,7 @@ All must be true. The build guard enforces the first item; the rest are on the p
   - [ ] **A14**: rate limit keyed on the Bearer token, not the IP.
 - [ ] **Version bumped**: `version` and `android.versionCode` in `app.json`, versionCode higher than anything ever distributed.
 - [x] **Splash wired** (`expo-splash-screen` installed and configured in Phase C, §7).
-- [ ] Icon and splash approved by brand, rebuilt from a high-resolution master (§7 Resolution).
+- [ ] Icon, the app name "Setu" and the splash approved by brand, rebuilt from a high-resolution master (§7 Resolution).
 - [ ] `npx tsc --noEmit` passes, and `npm run verify:release-bundle` passes with the production host added to its allow-list.
 - [ ] If distributing through Google Play:
   - [ ] Play App Signing SHA-1 sent to IT (§3.3, last paragraph);
@@ -216,14 +216,14 @@ Phase B (2026-10-20) replaced the Phase 5 placeholder artwork with the official 
 | `icon.png` | 1024×1024, opaque | Logo 640 px wide, centred on white | `expo.icon`: legacy launcher icon (Android 7.x) and store listing source |
 | `adaptive-icon.png` | 1024×1024, transparent | Logo 512 px wide, centred | `android.adaptiveIcon.foregroundImage`, and `monochromeImage` (Android 13 themed icons use its alpha) |
 | `adaptive-icon-background.png` | 1024×1024, flat white | — | `android.adaptiveIcon.backgroundImage` (`backgroundColor` is the same `#FFFFFF`) |
-| `splash-icon.png` | 1024×1024, transparent | Logo 640 px wide, then "Mount Meru" / "Service Desk" on two centred lines (Segoe UI Bold, 102 px, `colors.text.primary` #111827). Replaced in Phase C | `expo-splash-screen` image (`app.json` plugins: `imageWidth` 192, white background) |
+| `splash-icon.png` | 1024×1024, transparent | Logo 640 px wide, then "Setu" on one centred line (Segoe UI Bold, 102 px, `colors.text.primary` #111827). Replaced in Phase C; regenerated with the new name on 2026-10-23 | `expo-splash-screen` image (`app.json` plugins: `imageWidth` 192, white background) |
 | `brand/meru-mark.png` | 566×346, transparent | The logo trimmed to its content | In-app logo (`src/components/BrandLogo.tsx`): login card (64 dp tall) and drawer header (44 dp tall, 72 dp wide) |
 | `brand/meru-logo.png` | 689×478, RGB | The source, untouched | — |
 
 Splash geometry (Phase C):
 - The plugin fits the square image into `imageWidth` (192 dp), centred in its 288 dp canvas.
 - Android 12+ shows only the centred 192 dp circle of that canvas. Core-splashscreen uses the same composition on Android 11 and older.
-- So everything drawn must fit in the circle inscribed in the 1024 px square. The logo-and-text block is 640 × 679 px, a diagonal of 933 px (8 % margin).
+- So everything drawn must fit in the circle inscribed in the 1024 px square. The logo-and-text block is 640 × 559 px, a diagonal of 850 px (17 % margin); the farthest drawn pixel is 379 px from the centre, inside the 512 px radius. With the old two-line name it was 640 × 679 px.
 - On screen this is a logo of 120 × 73 dp and text of 19 dp.
 - The splash stays until `RootNavigator` has read the stored session and navigation is ready (`src/navigation/splash.ts`); the crash screen also hides it.
 - The text is part of the image because the native splash can only show an image.
@@ -235,6 +235,16 @@ How they were made (Pillow; the script is not in the repo, the steps are):
    anti-aliased edges clean on any background. The drop's white highlight and the white gap between drop and "m"
    become transparent.
 3. Scale with one factor (aspect ratio 1.636 kept, LANCZOS) and centre on each canvas.
+
+The rename to "Setu" (2026-10-23) changed only the splash text; the script is again not in the repo:
+1. The logo is not redrawn. Its rows (168–558) are copied byte for byte from the Phase C splash, shifted 64 px down.
+2. The text uses the Phase C recipe, recovered from the image: Pillow's basic layout (no kerning), Segoe UI Bold
+   102 px, #111827, `anchor='ma'` at x = 512, the line's origin 447 px below the logo's top. Proof: drawn this way,
+   "Mount Meru" / "Service Desk" reproduce the Phase C text area byte for byte.
+3. The block, 559 px tall (logo top to the text's last row), is re-centred: rows 232–790 of 1024.
+4. Checked: Windows OCR (`Windows.Media.Ocr`) reads the image, flattened on white, as "meru" / "Setu", and reads the
+   Phase C image as "meru" / "Mount Meru" / "Service Desk" (the control). The logo rows compare identical to the
+   Phase C image, and the text is the single colour #111827.
 
 Why white behind the logo:
 - The mark is red `#D51B28` and yellow `#FECB03`. On a red background the "m" disappears, and on a yellow one the

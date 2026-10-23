@@ -332,7 +332,15 @@ function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loadi
         >
           {t.label}
         </Text>
-        {t.hint && t.value !== undefined ? <Text className="text-xs text-gray-500">{t.hint}</Text> : null}
+        {t.hint && t.value !== undefined ? (
+          <Text className="text-xs text-gray-500">{t.hint}</Text>
+        ) : t.hint && loading ? (
+          // Phase P: the hint's line is kept (invisible, hidden from screen readers) while the count loads, so the row
+          // does not grow and push the screen down when the number arrives.
+          <Text className="text-xs text-gray-500" style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {t.hint}
+          </Text>
+        ) : null}
       </View>
       {t.value !== undefined ? (
         <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>

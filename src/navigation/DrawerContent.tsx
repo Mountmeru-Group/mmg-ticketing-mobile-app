@@ -99,10 +99,9 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
       {/* Header band: logo left, vertically centred, at a fixed 44 dp; the app name beside it. */}
       <View className="h-[72px] flex-row items-center border-b border-border bg-white px-4">
         <BrandLogo height={44} />
-        <View className="ml-3 flex-1" accessibilityRole="header" accessibilityLabel="Mount Meru Service Desk">
-          <Text className="text-sm font-bold leading-5 text-gray-900" numberOfLines={1}>Mount Meru</Text>
-          <Text className="text-sm font-bold leading-5 text-gray-900" numberOfLines={1}>Service Desk</Text>
-        </View>
+        <Text accessibilityRole="header" className="ml-3 flex-1 text-lg font-bold text-gray-900" numberOfLines={1}>
+          Setu
+        </Text>
       </View>
 
       {/* Only the rows scroll, so the account card stays pinned to the bottom however many rows there are. */}

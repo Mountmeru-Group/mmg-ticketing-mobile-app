@@ -1,9 +1,10 @@
-# UI standards — MMG Service Desk mobile (Phase C, 2026-10-20; Phase C2 fixes the same day)
+# UI standards — Setu (Phase C, 2026-10-20; Phase C2 fixes the same day; app name 2026-10-23)
 
 Phase C polished the 16 MVP screens (M1–M16, `docs/RELEASE.md` §9) plus the task list and task detail on the Phase B
 token foundation (`docs/brand/WEB-TOKENS.md`, `src/theme/`). This file has the consistency audit that came first (§1),
 the one standard chosen for each finding (§2), the contrast report (§3) and the layout checks (§4). Phase C2 fixed two
-defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match.
+defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match. On
+2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -123,7 +124,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 **S12 Chrome.**
 - Tab bar: white with a `border-border` top line. Active red, idle gray-500, 24 dp icons (filled when active), and a red unread badge.
 - Drawer, top to bottom, as in the web sidebar:
-  - Header band: white, 72 dp tall, the logo left at 44 dp, "Mount Meru / Service Desk" beside it. Fixed; it does not scroll.
+  - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
   - Nav rows (Approvals when shown, Tasks, Knowledge base, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls.
   - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
     - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
@@ -191,9 +192,9 @@ This was checked by layout arithmetic on every row that holds more than one cont
   - the ticket-detail tab labels at 130 %;
   - the splash on Android 12+ (icon circle) and Android 11 or older;
   - the Home KPI tiles and the drawer at 360 dp, at 130 % and at 200 % (§5);
-  - two pre-existing drawer items at 200 % text, unchanged in Phase C2:
-    - the header band is a fixed 72 dp, but its two 20 dp-leading lines become 80 dp and may clip;
-    - "Announcements" (about 233 dp) is wider than the 224 dp row label and may split mid-word.
+  - a pre-existing drawer item at 200 % text, unchanged in Phase C2: "Announcements" (about 233 dp) is wider than
+    the 224 dp row label and may split mid-word. (The header band's clipping risk at 200 %, listed here until
+    2026-10-23, is gone: the name is now one line, §6.)
 
 ## 5. Phase C2 — device fixes (2026-10-20)
 
@@ -255,3 +256,39 @@ At 360 dp the drawer is 304 dp wide. The account card's name column is 192 dp, a
 | Pinned block (separator + card + version line) | 168 dp | 186 dp | 276 dp (the name wraps to 2 lines) |
 | Nav list, ADMIN (5 rows) | 256 dp | 256 dp | about 300 dp |
 | Room for the nav list on a 360 × 640 phone (568 dp drawer − 72 header − pinned block) | 328 dp: no scroll | 310 dp: no scroll | 220 dp: the list scrolls, the card stays pinned |
+
+## 6. App name: "Setu" (2026-10-23)
+
+The display name changed from "Mount Meru Service Desk" to "Setu". Only the name text changed. The logo, the icons,
+navigation, behaviour, and the package identity (`android.package`, `slug`, `scheme`, `version`, `versionCode`, EAS
+`projectId`) did not.
+
+| Where | Before | Now |
+|---|---|---|
+| Launcher (`app.json` `name`) | Mount Meru Service Desk | Setu |
+| Splash image (`assets/splash-icon.png`) | logo + two lines | logo + one line; regenerated, see `docs/RELEASE.md` §7 |
+| Login card heading (`text-2xl font-bold`) | Mount Meru Service Desk | Setu |
+| Drawer header (`DrawerContent.tsx`) | "Mount Meru" / "Service Desk", two `text-sm font-bold leading-5` lines | "Setu", one `text-lg font-bold` line; TalkBack reads it as the header |
+
+Layout, checked by arithmetic at 360 dp. The widths use Segoe UI Bold advance widths as a stand-in for Roboto.
+**Not run on a device:** there was no build.
+- **Login card.** The heading has 294 dp. The old name was about 295 dp, right at the limit, so it could break onto
+  two lines; at 130 % it always did. "Setu" is about 50 dp at 100 % and 100 dp at 200 %, so it takes one line at
+  every size. Where the old name wrapped, the card is now one line (32 dp) shorter. It stays centred by the scroll
+  view's `justify-center`. No size or spacing changed: `text-2xl font-bold` is the web login title's size
+  (`WEB-TOKENS.md` §1.9).
+- **Drawer header.** The name column is 188 dp beside the 44 dp logo.
+  - A single `text-sm` line would be a 20 dp line next to a 44 dp logo, leaving the band looking empty. The old two
+    lines made a 40 dp block.
+  - `text-lg` (18 dp on a 28 dp line) is S3's title step and the closest single line. It stays bold, like the old
+    name and the web sidebar's name.
+  - "Setu" is about 38 dp wide, and 76 dp at 200 %.
+  - The line is 28 dp at 100 %, 36 dp at 130 % and 56 dp at 200 %. All of these fit the fixed 72 dp band, so the
+    200 % clipping risk in §4 is gone.
+- **Splash.** The block is 559 px tall instead of 679 and is re-centred. Logo and text sizes are unchanged on screen
+  (a 120 × 73 dp logo and 19 dp text).
+
+Left as they were, on purpose:
+- In-app text that says "the Service Desk" means the backend system or the IT team, not the app. Examples:
+  "Can't reach the Service Desk", "contact the Service Desk", "Open the Service Desk on the web".
+- "Mount Meru" as the organisation: "Sign in with your Mount Meru work account" and the logo's accessibility label.

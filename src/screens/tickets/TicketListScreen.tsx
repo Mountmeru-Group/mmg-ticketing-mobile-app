@@ -51,8 +51,8 @@ import {
   OutlineButton, QueryBanner, ScreenHeader, SearchField, TicketCard, type SheetOption,
 } from '@/components';
 import {
-  assertAssignment, countryName, fetchCurrentStatus, useBulkRunner, useChangeStatus, useCountryOptions, useSingleFlight, useTickets,
-  type BulkTarget,
+  assertAssignment, countryName, fetchCurrentStatus, useBulkRunner, useChangeStatus, useCountryOptions, useSingleFlight,
+  useStableCallback, useTickets, type BulkTarget,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
@@ -78,6 +78,7 @@ const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
 ];
 
 const ALL_COUNTRIES = '__ALL__';
+const ticketKey = (t: Ticket) => t.id;
 
 export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'TicketList'>) {
   const user = useAuthStore((s) => s.user);
@@ -177,20 +178,19 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const selectionMode = selected.size > 0;
   const clearSelection = useCallback(() => setSelected(new Set()), []);
-  const toggle = useCallback(
-    (ticketId: string) => {
-      if (selected.has(ticketId)) {
-        const next = new Set(selected);
-        next.delete(ticketId);
-        setSelected(next);
-      } else if (selected.size >= BULK_ACTION_LIMIT) {
-        Alert.alert('Selection limit', `You can act on up to ${BULK_ACTION_LIMIT} tickets at a time`);
-      } else {
-        setSelected(new Set(selected).add(ticketId));
-      }
-    },
-    [selected],
-  );
+  // One identity for the screen's lifetime (Phase P): it is every card's onLongPress, so a new one per selection change
+  // re-rendered every visible card on each tap. Now only the tapped card does.
+  const toggle = useStableCallback((ticketId: string) => {
+    if (selected.has(ticketId)) {
+      const next = new Set(selected);
+      next.delete(ticketId);
+      setSelected(next);
+    } else if (selected.size >= BULK_ACTION_LIMIT) {
+      Alert.alert('Selection limit', `You can act on up to ${BULK_ACTION_LIMIT} tickets at a time`);
+    } else {
+      setSelected(new Set(selected).add(ticketId));
+    }
+  });
   const onCardPress = useCallback((ticketId: string) => (selectionMode ? toggle(ticketId) : openTicket(ticketId)), [selectionMode, toggle, openTicket]);
   // Rows can vanish when the query changes; start over rather than act on tickets no longer shown.
   useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, ticketAdvanced, clearSelection]);
@@ -304,6 +304,8 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
   );
 
+  const contentStyle = useMemo(() => ({ paddingTop: 12, paddingBottom: insets.bottom + 96, flexGrow: 1 }), [insets.bottom]);
+
   let content: ReactNode;
   if (!hasData && list.fetchStatus === 'paused') {
     content = <OfflineState what="Tickets" />;
@@ -316,7 +318,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
       <FlatList
         data={list.tickets}
         extraData={selected}
-        keyExtractor={(t) => t.id}
+        keyExtractor={ticketKey}
         renderItem={renderItem}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
@@ -324,7 +326,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         windowSize={7}
         removeClippedSubviews
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 96, flexGrow: 1 }}
+        contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         ListEmptyComponent={
           <ListEmpty

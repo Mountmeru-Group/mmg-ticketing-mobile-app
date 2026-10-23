@@ -5,8 +5,8 @@
 // The status chips, "Assigned to me" and the search box filter the tickets loaded so far, on the device; "Load 20 more
 // tickets" is an explicit tap (never automatic, so an empty filter can't page through everything). The screen says so.
 // Tap a task → task detail (read for everyone; done / edit / remove for staff).
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View, type ListRenderItem } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
@@ -19,7 +19,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors } from '@/theme';
 import type { TasksStackScreenProps } from '@/types';
 import { isStaff } from '@/utils/roles';
-import { TASK_FILTER_LABELS, type TaskFeedFilter, type TaskStatusFilter } from '@/utils/tasks';
+import { TASK_FILTER_LABELS, type FeedTask, type TaskFeedFilter, type TaskStatusFilter } from '@/utils/tasks';
 
 const STATUS_FILTERS: readonly TaskStatusFilter[] = ['ACTIVE', 'ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
@@ -38,6 +38,16 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
     [status, mine, user, searchText],
   );
   const feed = useTaskFeed(filter);
+  // Stable renderer and memoised rows (Phase P): the search box filters on every keystroke.
+  const openTask = useCallback(
+    (row: FeedTask) => navigation.navigate('TaskDetail', { ticketId: row.ticket.id, taskId: row.task.id }),
+    [navigation],
+  );
+  const lastIndex = feed.items.length - 1;
+  const renderTask = useCallback<ListRenderItem<FeedTask>>(
+    ({ item, index }) => <TaskListRow row={item} first={index === 0} last={index === lastIndex} onOpen={openTask} />,
+    [lastIndex, openTask],
+  );
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = feed;
   const hasData = feed.data !== undefined;
 
@@ -77,24 +87,8 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
     content = (
       <FlatList
         data={feed.items}
-        keyExtractor={(row) => row.task.id}
-        // The rows form one card (Card.tsx `flush`): the first and last row carry its top and bottom edge.
-        renderItem={({ item, index }) => {
-          const first = index === 0;
-          const last = index === feed.items.length - 1;
-          return (
-            <View
-              className={`mx-4 border-x border-border bg-white px-4 ${first ? 'rounded-t-xl border-t' : ''} ${last ? 'mb-3 rounded-b-xl border-b' : ''}`}
-            >
-              <TaskRow
-                task={item.task}
-                parent={item.ticket}
-                last={last}
-                onPress={() => navigation.navigate('TaskDetail', { ticketId: item.ticket.id, taskId: item.task.id })}
-              />
-            </View>
-          );
-        }}
+        keyExtractor={taskKey}
+        renderItem={renderTask}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           scopeLine || filtered ? (
@@ -174,3 +168,23 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
     </View>
   );
 }
+
+const taskKey = (row: FeedTask) => row.task.id;
+
+/** The rows form one card (Card.tsx `flush`): the first and last row carry its top and bottom edge. Memoised (Phase P). */
+const TaskListRow = memo(function TaskListRow({
+  row, first, last, onOpen,
+}: {
+  row: FeedTask;
+  first: boolean;
+  last: boolean;
+  onOpen: (row: FeedTask) => void;
+}) {
+  return (
+    <View
+      className={`mx-4 border-x border-border bg-white px-4 ${first ? 'rounded-t-xl border-t' : ''} ${last ? 'mb-3 rounded-b-xl border-b' : ''}`}
+    >
+      <TaskRow task={row.task} parent={row.ticket} last={last} onPress={() => onOpen(row)} />
+    </View>
+  );
+});
