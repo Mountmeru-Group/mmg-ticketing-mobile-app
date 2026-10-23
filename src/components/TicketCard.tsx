@@ -88,7 +88,7 @@ function TicketCardImpl({
             hitSlop={12}
             className="flex-row items-center active:opacity-70"
           >
-            <StatusBadge status={ticket.status} />
+            <StatusBadge status={ticket.status} recordId={ticket.id} />
             {statusBusy ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
             ) : (
@@ -96,7 +96,7 @@ function TicketCardImpl({
             )}
           </Pressable>
         ) : (
-          <StatusBadge status={ticket.status} />
+          <StatusBadge status={ticket.status} recordId={ticket.id} />
         )}
         <PriorityBadge priority={ticket.priority} />
         <SlaBadge ticket={ticket} />

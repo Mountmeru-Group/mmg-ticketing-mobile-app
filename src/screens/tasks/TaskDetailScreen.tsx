@@ -153,7 +153,7 @@ export function TaskDetailScreen({ navigation, route }: TaskScreenProps<'TaskDet
             {ticket.title || '(no subject)'}
           </Text>
           <View className="mt-2">
-            <StatusBadge status={ticket.status} />
+            <StatusBadge status={ticket.status} recordId={ticket.id} />
           </View>
           <View className="mt-3">
             <OutlineButton icon="ticket-outline" label="View parent ticket" onPress={viewParent} />

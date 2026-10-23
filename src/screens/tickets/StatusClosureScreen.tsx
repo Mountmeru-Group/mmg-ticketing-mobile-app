@@ -220,7 +220,7 @@ function SingleStatus({ navigation, route }: Props) {
           </Text>
           <View className="mt-2 flex-row flex-wrap items-center gap-2">
             <Text className="text-sm text-gray-700">Current status</Text>
-            <StatusBadge status={ticket.status} />
+            <StatusBadge status={ticket.status} recordId={ticket.id} />
           </View>
         </FormCard>
 

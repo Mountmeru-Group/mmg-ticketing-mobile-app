@@ -48,8 +48,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsOffline } from '@/api/network';
 import { assignTicket } from '@/api/tickets.api';
 import {
-  BulkProgressModal, EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState,
-  OptionSheet, OutlineButton, QueryBanner, ScreenHeader, SearchField, TicketCard, type SheetOption,
+  BulkProgressModal, EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
+  OfflineBanner, OfflineState, OptionSheet, OutlineButton, QueryBanner, ScreenHeader, SearchField, TicketCard,
+  type SheetOption,
 } from '@/components';
 import {
   assertAssignment, countryName, fetchCurrentStatus, useBulkRunner, useChangeStatus, useCountryOptions, useSingleFlight,
@@ -290,19 +291,21 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   };
 
   const renderItem = useCallback(
-    ({ item }: { item: Ticket }) => {
+    ({ item, index }: { item: Ticket; index: number }) => {
       const interactive = inlineStatusTransitions(role, item.status).length > 0;
       return (
-        <TicketCard
-          ticket={item}
-          role={role}
-          onPress={onCardPress}
-          onLongPress={canSelect ? toggle : undefined}
-          selectionMode={selectionMode}
-          selected={selected.has(item.id)}
-          onStatusPress={interactive ? onStatusPress : undefined}
-          statusBusy={statusBusyId === item.id}
-        />
+        <ListEntry index={index}>
+          <TicketCard
+            ticket={item}
+            role={role}
+            onPress={onCardPress}
+            onLongPress={canSelect ? toggle : undefined}
+            selectionMode={selectionMode}
+            selected={selected.has(item.id)}
+            onStatusPress={interactive ? onStatusPress : undefined}
+            statusBusy={statusBusyId === item.id}
+          />
+        </ListEntry>
       );
     },
     [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
@@ -506,7 +509,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         onRetry={() => void onRefresh()}
       />
 
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
 
       {selectionMode ? (
         // Selection action bar (08 §4.2): exactly the buttons bulkActions() returns.
@@ -599,7 +602,7 @@ function ListEmpty({
   if (moreFilters > 0) {
     return (
       <EmptyState
-        icon="funnel-outline"
+        illustration="empty"
         title="No tickets match these filters"
         message="Every filter applies at once. Try fewer filters or a wider date range. Pull down to refresh."
         actionLabel="Clear all filters"
@@ -610,7 +613,7 @@ function ListEmpty({
   if (search) {
     return (
       <EmptyState
-        icon="search-outline"
+        illustration="empty"
         title={`No tickets match “${search}”`}
         message="Search covers the ticket number, subject, requester and technician."
         actionLabel="Clear search"
@@ -621,7 +624,7 @@ function ListEmpty({
   if (filter !== 'ALL') {
     return (
       <EmptyState
-        icon="funnel-outline"
+        illustration="empty"
         title={`No tickets in “${TICKET_FILTER_LABELS[filter]}”`}
         message="Tickets that match this filter will appear here. Pull down to refresh."
         actionLabel="Show all tickets"
@@ -631,7 +634,7 @@ function ListEmpty({
   }
   return !isStaff(role) ? (
     <EmptyState
-      icon="ticket-outline"
+      illustration="empty"
       title="You haven't raised any tickets yet"
       message="Tickets you raise will appear here. Pull down to refresh."
       actionLabel="Raise a ticket"
@@ -639,7 +642,7 @@ function ListEmpty({
     />
   ) : (
     <EmptyState
-      icon="ticket-outline"
+      illustration="empty"
       title="No tickets in your queue"
       message="Tickets assigned to you or your groups will appear here. Pull down to refresh."
     />

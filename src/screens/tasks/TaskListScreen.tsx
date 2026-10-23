@@ -12,8 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, OutlineButton,
-  QueryBanner, ScreenHeader, SearchField, TaskRow,
+  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
+  OfflineState, OutlineButton, QueryBanner, ScreenHeader, SearchField, TaskRow,
 } from '@/components';
 import { useTaskFeed } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -46,7 +46,11 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
   );
   const lastIndex = feed.items.length - 1;
   const renderTask = useCallback<ListRenderItem<FeedTask>>(
-    ({ item, index }) => <TaskListRow row={item} first={index === 0} last={index === lastIndex} onOpen={openTask} />,
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        <TaskListRow row={item} first={index === 0} last={index === lastIndex} onOpen={openTask} />
+      </ListEntry>
+    ),
     [lastIndex, openTask],
   );
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = feed;
@@ -102,7 +106,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
         }
         ListEmptyComponent={
           <EmptyState
-            icon="checkbox-outline"
+            illustration="empty"
             title={feed.loadedTaskCount === 0 ? 'No tasks on these tickets' : 'No tasks match'}
             message={
               hasNextPage
@@ -171,7 +175,7 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
         </ScrollView>
       </View>
       <QueryBanner error={isFetchNextPageError ? null : feed.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }

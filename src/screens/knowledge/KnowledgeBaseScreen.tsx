@@ -12,8 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
-  ScreenHeader, SearchField,
+  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
+  OfflineState, QueryBanner, ScreenHeader, SearchField,
 } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
 import { colors, palette } from '@/theme';
@@ -37,8 +37,22 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
 
   const openArticle = useCallback((slug: string) => navigation.navigate('KbArticle', { slug }), [navigation]);
   // Stable renderers and memoised rows (Phase P): this screen re-renders on every keystroke in the search box.
-  const renderSearchRow = useCallback<ListRenderItem<KBSearchResult>>(({ item }) => <SearchRow result={item} onPress={openArticle} />, [openArticle]);
-  const renderArticleRow = useCallback<ListRenderItem<KBArticleListItem>>(({ item }) => <ArticleRow article={item} onPress={openArticle} />, [openArticle]);
+  const renderSearchRow = useCallback<ListRenderItem<KBSearchResult>>(
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        <SearchRow result={item} onPress={openArticle} />
+      </ListEntry>
+    ),
+    [openArticle],
+  );
+  const renderArticleRow = useCallback<ListRenderItem<KBArticleListItem>>(
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        <ArticleRow article={item} onPress={openArticle} />
+      </ListEntry>
+    ),
+    [openArticle],
+  );
 
   const onRefresh = async () => {
     if (offline) return;
@@ -82,7 +96,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
           }
           ListEmptyComponent={
             <EmptyState
-              icon="search-outline"
+              illustration="empty"
               title={`No articles match “${term}”`}
               message="Search covers titles, article text and tags."
               actionLabel="Clear search"
@@ -113,14 +127,14 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
         ListEmptyComponent={
           categoryId ? (
             <EmptyState
-              icon="book-outline"
+              illustration="empty"
               title="No articles in this category yet"
               message="Published articles in this category will appear here."
               actionLabel="Show all articles"
               onAction={() => setCategoryId(null)}
             />
           ) : (
-            <EmptyState icon="book-outline" title="No articles here yet" message="Published articles will appear here." />
+            <EmptyState illustration="empty" title="No articles here yet" message="Published articles will appear here." />
           )
         }
         ListFooterComponent={
@@ -194,7 +208,7 @@ export function KnowledgeBaseScreen({ navigation }: KnowledgeStackScreenProps<'K
         hasData={searching ? !!search.data : !!articles.data}
         onRetry={() => void onRefresh()}
       />
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }

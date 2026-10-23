@@ -149,7 +149,7 @@ function SubmitApprovalForm({ navigation, route }: Props) {
           <Text className="text-sm text-gray-500" numberOfLines={2}>#{ticket.ticketNumber} · {ticket.title}</Text>
           <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
             <Text className="text-sm text-gray-700">Current status</Text>
-            <StatusBadge status={ticket.status} />
+            <StatusBadge status={ticket.status} recordId={ticket.id} />
           </View>
         </FormCard>
 

@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementCard, EmptyState, ErrorState, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
-  ScreenHeader,
+  AnnouncementCard, EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
+  OfflineState, QueryBanner, ScreenHeader,
 } from '@/components';
 import { useAnnouncements } from '@/hooks';
 import { useUiStore } from '@/store/ui.store';
@@ -49,9 +49,13 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
         data={query.data}
         keyExtractor={announcementKey}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
-        renderItem={({ item }) => <AnnouncementCard announcement={item} hiddenOnHome={dismissed.includes(item.id)} onShowOnHome={restore} />}
+        renderItem={({ item, index }) => (
+          <ListEntry index={index}>
+            <AnnouncementCard announcement={item} hiddenOnHome={dismissed.includes(item.id)} onShowOnHome={restore} />
+          </ListEntry>
+        )}
         ListEmptyComponent={
-          <EmptyState icon="megaphone-outline" title="No announcements" message="Service Desk announcements for your role will appear here." />
+          <EmptyState illustration="empty" title="No announcements" message="Service Desk announcements for your role will appear here." />
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
@@ -64,7 +68,7 @@ export function AnnouncementsScreen(_props: AppDrawerScreenProps<'Announcements'
       <ScreenHeader title="Announcements" variant="back" />
       <OfflineBanner />
       <QueryBanner error={query.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }

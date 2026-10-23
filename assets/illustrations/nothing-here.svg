@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120">
+  <!-- Setu empty state "nothing here" (Phase A1). Flat, no gradients or shadows. Every colour is a src/theme/colors.ts
+       token: #f3f4f6 gray-100, #e5e7eb gray-200, #d1d5db gray-300, #ffffff white, #ffcc00 secondary (brand yellow),
+       #d21121 primary (brand red). -->
+  <circle cx="80" cy="64" r="52" fill="#f3f4f6"/>
+  <path d="M40 76 L54 52 H106 L120 76 V94 A6 6 0 0 1 114 100 H46 A6 6 0 0 1 40 94 Z" fill="#ffffff" stroke="#d1d5db" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M40 76 H62 L66 84 H94 L98 76 H120 V94 A6 6 0 0 1 114 100 H46 A6 6 0 0 1 40 94 Z" fill="#e5e7eb" stroke="#d1d5db" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M80 12 C80 12 68 26 68 36 A12 12 0 0 0 92 36 C92 26 80 12 80 12 Z" fill="#ffcc00"/>
+  <path d="M73.5 36 C73.5 31.5 75.5 27 78 23.5 C77 28 76.5 32 76.5 36 C76.5 38 73.5 38 73.5 36 Z" fill="#ffffff"/>
+  <circle cx="44" cy="40" r="3" fill="#d21121"/>
+  <circle cx="118" cy="34" r="2.5" fill="#ffcc00"/>
+  <circle cx="124" cy="56" r="2" fill="#d1d5db"/>
+</svg>

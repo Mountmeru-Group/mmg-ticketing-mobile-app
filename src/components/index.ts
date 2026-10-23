@@ -14,6 +14,7 @@ export { FieldLabel, FormCard, InlineError, LookupError, Notice, OutlineButton, 
 export { HtmlRenderProvider, HtmlText } from './HtmlText';
 export { ImageViewerModal } from './ImageViewerModal';
 export { NO_SCROLL_ANCHOR } from './listDefaults';
+export { ListEntry, ListEntryScope } from './ListEntry';
 export { LoadingSkeleton, Skeleton } from './LoadingSkeleton';
 export { OptionSheet, type SheetOption } from './OptionSheet';
 export { PersonPickerSheet, type Person } from './PersonPickerSheet';

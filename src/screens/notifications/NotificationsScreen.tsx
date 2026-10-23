@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
+  EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState,
+  QueryBanner, ScreenHeader,
 } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
@@ -126,19 +127,22 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
   const unreadTotal = unread.data;
   const markingId = markRead.isPending ? markRead.variables : undefined;
   const renderItem = useCallback<ListRenderItem<AlertItem>>(
-    ({ item }) =>
-      item.kind === 'heading' ? (
-        <Text className="mx-4 mb-2 mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          {item.key === 'unread' && unreadTotal !== undefined ? `Unread · ${unreadTotal}` : item.title}
-        </Text>
-      ) : (
-        <NotificationRow
-          notification={item.notification}
-          onPress={onPressRow}
-          onMarkRead={onMarkOne}
-          marking={markingId === item.notification.id}
-        />
-      ),
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        {item.kind === 'heading' ? (
+          <Text className="mx-4 mb-2 mt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {item.key === 'unread' && unreadTotal !== undefined ? `Unread · ${unreadTotal}` : item.title}
+          </Text>
+        ) : (
+          <NotificationRow
+            notification={item.notification}
+            onPress={onPressRow}
+            onMarkRead={onMarkOne}
+            marking={markingId === item.notification.id}
+          />
+        )}
+      </ListEntry>
+    ),
     [unreadTotal, onPressRow, onMarkOne, markingId],
   );
 
@@ -198,7 +202,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
           </View>
         }
         ListEmptyComponent={
-          <EmptyState icon="notifications-outline" title="No notifications" message="Updates on your tickets will appear here. Pull down to refresh." />
+          <EmptyState illustration="clear" title="No notifications" message="Updates on your tickets will appear here. Pull down to refresh." />
         }
         ListFooterComponent={
           <Footer
@@ -222,7 +226,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
       <ScreenHeader title="Notifications" variant="drawer" right={headerRight} />
       <OfflineBanner />
       <QueryBanner error={isFetchNextPageError ? null : list.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }

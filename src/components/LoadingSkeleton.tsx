@@ -1,7 +1,9 @@
 // First-load placeholders. Each variant mirrors the layout it stands in for — same cards, gutters and line positions
-// (docs/brand/UI-STANDARDS.md, S11) — so nothing jumps when the data arrives.
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, View } from 'react-native';
+// (docs/brand/UI-STANDARDS.md, S11) — so nothing jumps when the data arrives. Every one shimmers (./Shimmer.tsx).
+import type { ReactNode } from 'react';
+import { View } from 'react-native';
+
+import { Shimmer } from './Shimmer';
 
 interface LoadingSkeletonProps {
   /**
@@ -35,21 +37,6 @@ interface LoadingSkeletonProps {
 
 const INLINE = new Set<NonNullable<LoadingSkeletonProps['variant']>>(['rows', 'form', 'lines', 'chips']);
 
-function usePulse() {
-  const opacity = useRef(new Animated.Value(0.5)).current;
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [opacity]);
-  return opacity;
-}
-
 function Bar({ className }: { className: string }) {
   return <View className={`rounded bg-gray-200 ${className}`} />;
 }
@@ -59,13 +46,12 @@ function Card({ flush = false, children }: { flush?: boolean; children: ReactNod
   return <View className={`mx-4 mb-3 rounded-xl border border-border bg-white ${flush ? 'px-4' : 'p-4'}`}>{children}</View>;
 }
 
-/** One pulsing placeholder bar, for a single value inside real layout (e.g. a tile's count). */
+/** One shimmering placeholder bar, for a single value inside real layout (e.g. a tile's count). */
 export function Skeleton({ className }: { className: string }) {
-  const opacity = usePulse();
   return (
-    <Animated.View style={{ opacity }} accessibilityLabel="Loading" accessibilityRole="progressbar">
+    <Shimmer>
       <Bar className={className} />
-    </Animated.View>
+    </Shimmer>
   );
 }
 
@@ -284,16 +270,6 @@ function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: numbe
 }
 
 export function LoadingSkeleton({ variant = 'list', rows = 4, topGap = true }: LoadingSkeletonProps) {
-  const opacity = usePulse();
-  return (
-    // Animated.View takes no className under NativeWind without cssInterop, so its own styles are inline. Full-width
-    // layouts start 12 dp below the bars above them, like the lists they stand in for.
-    <Animated.View
-      style={{ opacity, paddingTop: INLINE.has(variant) || !topGap ? 0 : 12 }}
-      accessibilityLabel="Loading"
-      accessibilityRole="progressbar"
-    >
-      {body(variant, rows)}
-    </Animated.View>
-  );
+  // Full-width layouts start 12 dp below the bars above them, like the lists they stand in for.
+  return <Shimmer paddingTop={INLINE.has(variant) || !topGap ? 0 : 12}>{body(variant, rows)}</Shimmer>;
 }

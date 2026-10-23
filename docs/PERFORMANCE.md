@@ -1,7 +1,11 @@
-# Performance on low-end Android (Phase P, 2026-10-22; Phase P2, 2026-10-23)
+# Performance on low-end Android (Phase P, 2026-10-22; Phase P2 and Phase A1, 2026-10-23)
 
 > **Phase P2** applied the approved items of §4 and §5 (ticket list cap, inline requires, `freezeOnBlur`, FlashList,
 > expo-image) and a transition-smoothness pass. §9 records it; §1–§8 are the Phase P baseline, kept as written.
+>
+> **Phase A1** added motion: four of the five approved animations, and two empty-state illustrations. §10 records
+> what was built, what was skipped, the bundle cost and what to watch on a device. §3's line on the skeleton pulse is
+> the Phase P state; §10 replaces it.
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -733,3 +737,239 @@ What `getId` changes:
 **Memory** (`dumpsys meminfo`)
 - After scrolling 25 pages of tickets.
 - After opening five pages of the History tab.
+
+---
+
+## 10. Phase A1 — motion (2026-10-23)
+
+Approved by Ronit: five animations and two illustrations, built only if each runs on the native driver, animates only
+transform and opacity, never blocks a press, respects "reduce motion" and adds no library.
+
+| # | Item | Result |
+|---|---|---|
+| 1 | Skeleton shimmer | **Built** (§10.2) |
+| 2 | Staggered list entry | **Built, as a stagger** (§10.3). It does not fight FlashList's recycling, so the single-fade fallback was not needed |
+| 3 | Status change feedback | **Built** (§10.4) |
+| 4 | Pull-to-refresh droplet | **Skipped**: Android's refresh control cannot show a custom indicator (§10.5). The default brand-red spinner stays |
+| 5 | Empty-state illustrations | **Built**: two flat SVGs (§10.6) |
+
+Rules kept:
+- No library added. `react-native-svg` is not installed, so the SVGs are drawn by `expo-image` (approved in P2).
+- No behaviour, permission, business rule, API call or navigation change.
+- Screen transitions unchanged.
+- Auth flow, `auth.config.ts` and the dev-token screen untouched.
+- No EAS build; nothing committed.
+
+**Not run on a device:** there was no build in this phase. Frame rates are not measured; §10.9 says what to check.
+
+### 10.1 The rules, and how each was verified
+
+All motion values are in **`src/theme/motion.ts`**: durations, distances, the scale peak, the band width and opacities,
+row limits and curves. No component holds a motion number of its own.
+
+| Animation | File | Driver | What is animated | JS per frame | Stops |
+|---|---|---|---|---|---|
+| Skeleton shimmer | `components/Shimmer.tsx` | native, one looping timing per skeleton | the band's `translateX` | none | when the skeleton unmounts |
+| List entry | `components/ListEntry.tsx` | native, **one** timing per list appearance | each animated row's `opacity` and `translateY` | none, and no timers | when the list's scope unmounts |
+| Status change | `components/StatusBadge.tsx` | native, one timing per change | the badge's `scale`, the old pill's `opacity` | none | on unmount, or when a recycled cell gets another record |
+
+**Native driver.**
+- Source: `src/` has exactly three `Animated.timing` calls (`Shimmer.tsx:24`, `ListEntry.tsx:57`, `StatusBadge.tsx:55`), each with `useNativeDriver: true`.
+- Release bundle: each `useNativeDriver` literal was traced to its source through the source map.
+  - Before: the app's two were the old pulse (`LoadingSkeleton.tsx`).
+  - After: the app's three are the files above, all `true`.
+  - The only `false` literals are two React Native defaults (`AnimatedImplementation.js:442`, `AnimatedEvent.js:160`), unchanged.
+- No `LayoutAnimation`, no Reanimated import, no JS-driven animation anywhere in `src/`.
+
+**Transform and opacity only.**
+- Every value bound to an animated node is `opacity` or a `transform` (`translateX`, `translateY`, `scale`), read file by file.
+- The animated views' other styles are static, from `StyleSheet`: the band's absolute position and width, the old pill's absolute position, the badge's `alignSelf`.
+- React Native's native driver also checks this at run time: it rejects any style it cannot animate natively.
+
+**No JavaScript per frame.**
+- A native-driven timing sends its frames to native once, at start.
+- `Animated.loop` of a single native timing hands the whole loop to native (`AnimatedImplementation.js:488-489`), so the shimmer never returns to JS.
+- The old pulse was `loop(sequence(…))`. A sequence cannot loop natively (`:357-358`), so JS restarted it every 1.4 s. That is gone.
+- The list stagger uses no `delay`: Animated's `delay` is a JS `setTimeout` (`TimingAnimation.js:136-137`), which a busy JS thread fires late. The stagger is in each row's interpolation ranges on one shared timeline instead.
+- Native interpolation cannot take an easing function (`NativeAnimatedValidation.js:22-30`), so the entry curve is 8 straight segments sampled from it, at row mount.
+
+**Never blocks a press.**
+- No handler waits for an animation, and no `pointerEvents` change gates a touch.
+- An entering row can be tapped while it fades in.
+- The shimmer band is `pointerEvents="none"`.
+- The badge's animation runs after the status has already changed.
+
+**Reduce motion** (`hooks/useReduceMotion.ts`):
+- React Native reports Android's "Remove animations" (or animator scale 0) as reduce motion. The app holds one listener for its lifetime.
+- Shimmer: no band; the grey bars are the end state. It reacts to a change while showing.
+- List entry: rows render without a wrapper, at full opacity.
+- Status badge: the new pill shows at once.
+- Until the first answer (a few ms after start-up), motion counts as allowed.
+
+**Cleanup.** Every timing is stopped in an effect cleanup. The list scope stops every timing it started when it unmounts.
+
+### 10.2 Skeleton shimmer
+
+- **One shared component, `Shimmer`,** used by `LoadingSkeleton` (every variant, so every skeleton in the app) and by `Skeleton` (Home's tile counts). No screen changed for it.
+- **How it looks:**
+  - A 96 dp band of five white strips (opacity 0.12 → 0.45 → 0.12) sweeps from off the left edge to off the right edge in 1.4 s, then repeats.
+  - It is drawn once, over the whole skeleton. On the white cards it is invisible, so it shows only where it crosses the grey bars. The bars are static grey; the old opacity pulse is removed.
+- **Cost per skeleton:**
+  - One looping native animation, as before.
+  - One band view with five strip views (+6 views).
+  - The travel distance is the window width (`useWindowDimensions`), so no layout measurement is needed.
+- **A skeleton on a hidden screen** (frozen by `freezeOnBlur`) keeps its native loop running until the data arrives, as the pulse did. It costs one transform update per frame, and no JavaScript.
+
+### 10.3 Staggered list entry
+
+- **Where:** the ten data lists:
+  - tickets, Alerts, approvals;
+  - knowledge base (articles and search);
+  - tasks, announcements;
+  - the catalogue's categories, services and My Requests.
+- **Not used:** ticket detail's tabs, Home's recent tickets, the bottom sheets.
+- **How it looks:**
+  - When a list first shows its data, rows 0–7 fade in (opacity 0 → 1) and rise 10 dp, in 340 ms each, starting 70 ms apart.
+  - The last animated row is in place 830 ms after the first starts.
+  - Rows 8 and later, rows from the next page (index 20 or later), and rows added later by a refresh or a search appear at once.
+- **How:**
+  - Each screen wraps its content in `ListEntryScope` (no view) and each row in `ListEntry`.
+  - The first row to mount starts one native timing for the list. Every animated row is two native interpolations of it.
+  - When the scope has no rows left (the list made way for a skeleton, an error or an empty state), the next rows to mount are a new appearance and enter again. For example: a new filter that loads, or a new search term.
+
+**FlashList recycling, checked against its source** (`recyclerview/RenderStackManager.js`):
+- FlashList v2 recycles a cell by re-rendering the same component with another item, and keeps a cell on the same item across data changes (by `keyExtractor`).
+- `ListEntry` decides once, when its cell first mounts, whether to animate. That decision never changes for the cell's life.
+- So:
+  - a recycled cell never replays the entry: its values are already at the end;
+  - a cell's element type never changes, so recycling never remounts a row. Cells that do not animate get no wrapper at all;
+  - a cell recycled during the first 830 ms finishes its entry with the new item. This happens only on a fling in that window, and is at worst a short fade.
+
+**Cost:**
+- During the entry: at most 8 wrapper views and one native timing per list.
+- After it: nothing runs. A finished wrapper is a plain view, at opacity 1.
+- No timers: the timing starts from the first row's mount effect, straight after the list's first commit. Until then
+  the first rows sit at opacity 0, so a JS thread still busy with that commit is the only thing that can delay them.
+
+### 10.4 Status change feedback
+
+- `StatusBadge` takes the record's id (`recordId`). All ten call sites pass the ticket's or request's id.
+- **When the same record's status changes:**
+  - the badge scales 1 → 1.14 → 1;
+  - the old pill fades out over the new one, so the colour crossfades.
+  - Both run on one native timing of 280 ms.
+- **Never animates:**
+  - on first render;
+  - on a re-render with the same status;
+  - without `recordId`;
+  - when a FlashList cell is recycled for another ticket (the id changes; any change in flight is dropped).
+- **At rest the pill is the same plain view as before.** The animated layers exist only during the 280 ms, so the ticket list's cards cost nothing extra.
+- **Seen on:**
+  - the ticket list after an inline status change or a refresh;
+  - the ticket header when returning from the status sheet;
+  - Home's recent tickets, task detail, approval detail;
+  - the catalogue's requests.
+- **During the 280 ms** the old pill sits over the new one at its own width, so a longer old label briefly overlaps the next badge while it fades.
+
+### 10.5 Pull-to-refresh droplet: skipped
+
+- **Why:** React Native's Android `RefreshControl` is the platform's `SwipeRefreshLayout`.
+  - Its props are only `enabled`, `colors`, `progressBackgroundColor`, `size`, `refreshing` and `progressViewOffset` (`SwipeRefreshLayoutManager.kt:44-105`).
+  - It cannot show a custom view.
+  - It does not report how far the user has pulled.
+- **The two ways round it, both rejected:**
+  - **Hide the spinner and overlay a droplet** only while refreshing. The pull itself would show nothing, which feels broken, and the spinner's elevated circle may still show its shadow (not checked on a device).
+  - **Build our own pull gesture.** That means a pan gesture over every list, competing with FlashList's scrolling and the drawer's edge swipe, and moving the list content. That is the kind of JS-thread gesture work this phase must not add.
+- **Kept:** the default spinner in brand red, unchanged on every refresh surface.
+
+### 10.6 Empty-state illustrations
+
+- **Two flat SVGs**, 160 × 120 in `assets/illustrations/`, about 1.1 KB each, shown at 128 × 96 dp:
+  - **`empty`** (`nothing-here.svg`): an empty tray under the yellow Meru drop. Used on empty or no-match lists:
+    - tickets (all five empty states);
+    - tasks, knowledge base (×3), announcements;
+    - catalogue categories and services, My Requests.
+  - **`clear`** (`all-clear.svg`): the Meru drop with a tick. Used on Approvals ("Nothing waiting for you", "Nothing of this type") and Alerts ("No notifications").
+- **Colours:** only `src/theme/colors.ts` tokens, listed in each file's comment:
+  - gray-100, gray-200, gray-300, white;
+  - brand yellow (`secondary`), brand red (`primary`), `secondaryForeground`.
+- **Style:** no gradient, no shadow, no animation.
+- **Text unchanged:** headlines, messages and actions are exactly as they were. `EmptyState` takes `illustration` in place of `icon`.
+- **Kept their icon:** offline, no access, not found, "Keep typing", "Too many tickets", ticket-detail tabs and Home's recent tickets. These are not empty list screens.
+- **How they draw:**
+  - expo-image's Android side decodes SVG (AndroidSVG, on Glide's background thread) into a `PictureDrawable`, a vector recording drawn at the view's size.
+  - It holds no bitmap, and no SVG library is bundled.
+  - It loads asynchronously, so on a slow phone the art may appear a frame or two after the text. Its box is fixed, so nothing moves when it does.
+- **In a release build** each SVG ships as a raw resource (`raw/assets_illustrations_*.svg`). expo-image resolves raw resources by name (`ResourceIdHelper.kt`).
+
+### 10.7 Bundle (measured, `4d3784b` → this change)
+
+Same method as §1.4 and §9.3: a release `export:embed`, then `hermesc -O`, with bytes attributed through the source map.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Release JS, minified | 3,597.6 KB | 3,605.1 KB | **+7.5 KB (+0.21 %)** |
+| gzip | 838.9 KB | 841.0 KB | +2.1 KB |
+| Hermes bytecode | 5,284.0 KB | 5,296.7 KB | **+12.8 KB (+0.24 %)** (13,074 bytes) |
+| Modules | 2,293 | 2,299 | +6 (4 source files, 2 SVG asset entries) |
+| Bundled assets | 24 files, 405.2 KB | 26 files, 407.4 KB | +2 SVGs (2.1 KB), and 73 bytes in the resource keep list |
+
+- **No library code changed.** Every byte of growth is app code (+6.1 KB mapped to source) or module wrappers (about 1.5 KB):
+  - `ListEntry` 1.4 KB;
+  - `StatusBadge` +1.1 KB;
+  - `Shimmer` 1.0 KB;
+  - `useReduceMotion` 0.4 KB, `motion.ts` 0.4 KB;
+  - the two SVG asset entries 0.4 KB;
+  - the screens' wrappers and `recordId` props about 1.0 KB;
+  - the three index files 0.5 KB, `EmptyState` 0.2 KB;
+  - `LoadingSkeleton` −0.5 KB (the pulse removed).
+- **Verdict:** not meaningful weight. The cost of this phase, if any, is at run time, on the GPU, during the animations themselves (§10.9).
+
+### 10.8 Patterns to follow
+
+- **Motion values go in `src/theme/motion.ts`,** never in a component.
+- **`Animated` with `useNativeDriver: true`,** and only `opacity` and `transform`. Never `width`, `height`, `margin`, `padding`, `top`, `left` or `LayoutAnimation`.
+- **No `delay`:** it is a JS timer. Put the offset in the interpolation or the easing.
+- **No `Animated.sequence` or `parallel` inside a loop:** they cannot loop natively. Loop a single timing and shape it with an interpolation.
+- **Check `useReduceMotion()` or `reduceMotionEnabled()`** and show the end state when it is on.
+- **Stop every animation in an effect cleanup.**
+- **In a FlashList row:**
+  - decide on any animation once per cell mount;
+  - key anything that compares old and new values on the record's id, because a recycled cell gets another record.
+- **New loading states use `LoadingSkeleton` or `Skeleton`** (they shimmer). New empty lists use `EmptyState illustration`.
+
+### 10.9 What Ronit should watch on a real low-end phone
+
+Use the same phone and method as §6. Turn on Developer options → **Profile HWUI rendering → On screen as bars**, or
+use `dumpsys gfxinfo`.
+
+1. **Shimmer.** Open Tickets, Alerts and the knowledge base on a slow network.
+   - The band should glide, with no stepping. The bars stay under the 16 ms line.
+   - It is a 96 dp translucent band moving over the skeleton: pure GPU blending, and the first thing to drop frames if the GPU is weak.
+   - **If it stutters:** set `motion.shimmer.bandOpacities` to three strips, or narrow `bandWidth`.
+2. **List entry on the first load** of the ticket list and Alerts.
+   - Rows should cascade in under a second. The first row must start moving as the skeleton disappears, with no blank pause.
+   - Fling straight away: nothing should look held back.
+   - **If it feels slow:** lower `motion.listEntry.stagger` or `maxRows`. Raise `maxRows` if, on a tall phone, row 9 appears before row 8 has finished.
+   - **On the task list,** rows share one card. During the entry the card's rows separate by up to 10 dp for a moment. Check that this reads as intended.
+3. **Status change.** Change a status from the ticket list's chip, and from the ticket screen.
+   - The badge should pulse once, crossfade, and settle.
+   - Scroll the list fast afterwards: no badge may pulse while scrolling.
+4. **Scrolling.** `gfxinfo` jank % on the ticket list, against the P2 build.
+   - Rows past the first screen carry no animation, so the numbers should match.
+5. **Remove animations.** Settings → Accessibility → Remove animations (or animator scale off) → reopen the app.
+   - No band, no row entry, no badge pulse. Every end state must show at once.
+6. **Illustrations.** Empty Approvals, empty Alerts, a ticket search with no match.
+   - The art should be sharp at the phone's density, not blurry.
+   - **It must appear in a release build:** raw-resource SVG loading has not been run on a device.
+   - If it is missing, the text and action still show.
+7. **Battery while waiting.** A skeleton left on screen (offline first load shows the offline state, not a skeleton, so use a very slow network). Its loop runs only while it shows, as the pulse did.
+
+### 10.10 Verification
+
+- `npx tsc --noEmit`: clean. With `--noUnusedLocals --noUnusedParameters`, nothing reported in any file this phase touched.
+- `npm test`: **533 / 533** passing. The count is unchanged and no test was edited. The source lines the rbac tests pin are unchanged.
+- Release bundle built twice with the method above (§10.7). The native-driver trace is in §10.1.
+- The two illustrations were rendered in a desktop browser at 2× to check the drawing. That is not the phone's renderer: see §10.9 item 6.
+- No EAS build. No network call to the backend. The web repo was not opened.
+- Branch `dev`, nothing committed.
