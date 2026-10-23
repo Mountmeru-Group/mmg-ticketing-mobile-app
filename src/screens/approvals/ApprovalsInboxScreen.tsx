@@ -15,8 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
-  ScreenHeader,
+  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
+  OfflineState, QueryBanner, ScreenHeader,
 } from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
 import { colors } from '@/theme';
@@ -76,9 +76,13 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
         data={rows}
         keyExtractor={approvalKey}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const lookup = item.entityType === 'ticket' ? tickets.get(item.entityId) : undefined;
-          return <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />;
+          return (
+            <ListEntry index={index}>
+              <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />
+            </ListEntry>
+          );
         }}
         ListHeaderComponent={
           ticketApprovalCount > MAX_CARD_TICKET_LOOKUPS ? (
@@ -89,7 +93,7 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
         }
         ListEmptyComponent={
           <EmptyState
-            icon="checkmark-done-outline"
+            illustration="clear"
             title={filter === 'ALL' ? 'Nothing waiting for you' : 'Nothing of this type'}
             message="Approvals assigned to you appear here. Pull down to refresh."
             actionLabel={filter === 'ALL' ? undefined : 'Show all approvals'}
@@ -119,7 +123,7 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
         </ScrollView>
       </View>
       <QueryBanner error={query.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      {content}
+      <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120">
+  <!-- Setu empty state "nothing waiting for you" (Phase A1): the Meru drop with a tick. Flat, no gradients or shadows.
+       Every colour is a src/theme/colors.ts token: #f3f4f6 gray-100, #d1d5db gray-300, #ffffff white, #ffcc00 secondary
+       (brand yellow), #1a1a1a secondaryForeground (text on brand yellow), #d21121 primary (brand red). -->
+  <circle cx="80" cy="64" r="52" fill="#f3f4f6"/>
+  <path d="M80 14 C80 14 52 50 52 76 A28 28 0 0 0 108 76 C108 50 80 14 80 14 Z" fill="#ffcc00"/>
+  <path d="M60.5 70 C60.5 61 65 51 71 42.5 C68.5 51.5 66.5 60 66.5 70 C66.5 73.5 60.5 73.5 60.5 70 Z" fill="#ffffff"/>
+  <path d="M68 78 L76.5 86.5 L93 69" fill="none" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="40" cy="44" r="3" fill="#d21121"/>
+  <circle cx="122" cy="40" r="4" fill="#ffcc00"/>
+  <circle cx="128" cy="66" r="2" fill="#d21121"/>
+  <circle cx="116" cy="94" r="2.5" fill="#d1d5db"/>
+</svg>

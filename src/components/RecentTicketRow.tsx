@@ -45,7 +45,7 @@ export function RecentTicketRow({ ticket, showRequester, onPress, last = false }
           {ticket.title || '(no subject)'}
         </Text>
         <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-          <StatusBadge status={ticket.status} />
+          <StatusBadge status={ticket.status} recordId={ticket.id} />
           <PriorityBadge priority={ticket.priority} />
           <SlaBadge ticket={ticket} />
         </View>

@@ -24,9 +24,16 @@ export function TicketStack() {
   return (
     <Stack.Navigator initialRouteName="TicketList" screenOptions={SCREEN_OPTIONS}>
       <Stack.Screen name="TicketList" component={TicketListScreen} />
-      <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
+      {/*
+        One screen per ticket (getId, docs/PERFORMANCE.md §9.7). Without it, opening ticket B while ticket A's detail is
+        on top reused A's screen with B's id, and A's state came along: the open tab, expanded replies and files staged
+        for upload, which would then have gone to B. Now a different ticket always gets its own screen; opening a ticket
+        already in the stack brings that screen, with its own state, to the top.
+      */}
+      <Stack.Screen name="TicketDetail" component={TicketDetailScreen} getId={({ params }) => params.ticketId} />
       <Stack.Screen name="CreateTicket" component={CreateTicketScreen} />
-      <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+      {/* One screen per task, for the same reason (registered here and in the Tasks stack). */}
+      <Stack.Screen name="TaskDetail" component={TaskDetailScreen} getId={({ params }) => params.taskId} />
       <Stack.Screen name="TicketLink" component={TicketLinkScreen} />
       {/* Sheets opened from M3/M4. Android back closes them first (08 §3.1). */}
       <Stack.Group screenOptions={{ presentation: 'modal' }}>

@@ -99,7 +99,7 @@ export function ServiceRequestDetailScreen({ route }: CatalogStackScreenProps<'S
           <Text className="text-xs font-semibold text-gray-500">{requestRef(request.requestNumber)}</Text>
           <Text className="text-lg font-bold text-gray-900">{request.serviceItem?.name || 'Service request'}</Text>
           <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-            <StatusBadge status={request.status} />
+            <StatusBadge status={request.status} recordId={request.id} />
             <PriorityBadge priority={request.priority} />
           </View>
           <Text className="mt-2 text-xs text-gray-500">Requested {formatDateTime(request.createdAt)}</Text>

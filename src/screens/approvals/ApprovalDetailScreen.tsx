@@ -238,7 +238,7 @@ function TicketContext({
         {t.title || '(no subject)'}
       </Text>
       <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-        <StatusBadge status={t.status} />
+        <StatusBadge status={t.status} recordId={t.id} />
         <PriorityBadge priority={t.priority} />
       </View>
       <View className="mt-2">

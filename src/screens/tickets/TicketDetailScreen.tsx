@@ -549,7 +549,7 @@ const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDet
         {ticket.title || '(no subject)'}
       </Text>
       <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-        <StatusBadge status={ticket.status} />
+        <StatusBadge status={ticket.status} recordId={ticket.id} />
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
       </View>

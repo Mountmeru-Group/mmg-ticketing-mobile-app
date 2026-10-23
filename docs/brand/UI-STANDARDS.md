@@ -4,7 +4,8 @@ Phase C polished the 16 MVP screens (M1–M16, `docs/RELEASE.md` §9) plus the t
 token foundation (`docs/brand/WEB-TOKENS.md`, `src/theme/`). This file has the consistency audit that came first (§1),
 the one standard chosen for each finding (§2), the contrast report (§3) and the layout checks (§4). Phase C2 fixed two
 defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match. On
-2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4.
+2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4. Phase A1 (2026-10-23) added
+motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10).
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -105,6 +106,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 | Buttons, inputs, banners, chevrons | 18 |
 | Chips and beside `text-xs` | 12–14 |
 | Empty, error and crash states | 40 |
+| Empty list illustration (S11) | 128 × 96 |
 
 **S8 Touch targets.** Every control is at least 44 dp: either by size (`h-11`, `min-h-11`, `min-h-12`) or, where a small visual is intended (badge, chip, checkbox, ✕), with a `hitSlop` that makes up the 44 dp.
 
@@ -116,8 +118,13 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 **S10 Callouts.** Notice, InlineError, LookupError and the Login failure box are `rounded-lg p-3`. Errors use an 18 dp icon with `text-sm`; information uses a 16 dp icon with `text-xs`.
 
 **S11 States.**
-- Loading: a pulsing skeleton that mirrors the layout. Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
+- Loading: a skeleton that mirrors the layout, with a white band sweeping across it (Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
 - Empty: a 40 dp icon, a title, what would appear here, and an action where one helps. Examples: "Raise a ticket", "Show all tickets", "Clear search", "Show all articles", "Show all approvals", "Show all tasks".
+  - An empty list screen shows an illustration instead of the icon (Phase A1, `EmptyState illustration`), 128 × 96 dp, flat, in brand tokens only (`assets/illustrations/`):
+    - `empty` (an empty tray under the Meru drop): nothing here yet, or nothing matches. Tickets, tasks, knowledge base, announcements, the catalogue and My Requests.
+    - `clear` (the Meru drop with a tick): nothing waiting for you. Approvals and Alerts.
+  - Everything else keeps its icon: offline, no access, not found, "Keep typing", the ticket-detail tabs and Home's recent tickets (sections inside a screen, not a screen).
+- Motion: tokens in `src/theme/motion.ts`, rules in `docs/PERFORMANCE.md` §10. Rows of a list enter with a short stagger the first time it shows; a status badge pulses when its own record's status changes.
 - Error: the `describeError()` message plus an outline **Retry** button.
 - Offline: the banner directly under the header on every screen, and on Login at the top; OfflineState for a first load.
 

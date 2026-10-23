@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
-  ScreenHeader, SearchField, StatusBadge,
+  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
+  OfflineState, QueryBanner, ScreenHeader, SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -186,10 +186,21 @@ function CatalogView({
     return byCategory;
   }, [categories.data, allItems]);
   const renderCategory = useCallback<ListRenderItem<ServiceCategory>>(
-    ({ item }) => <CategoryRow category={item} count={counts.get(item.id) ?? 0} onOpen={onOpenCategory} />,
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        <CategoryRow category={item} count={counts.get(item.id) ?? 0} onOpen={onOpenCategory} />
+      </ListEntry>
+    ),
     [counts, onOpenCategory],
   );
-  const renderService = useCallback<ListRenderItem<ServiceItem>>(({ item }) => <ServiceRow item={item} onOpen={onOpenItem} />, [onOpenItem]);
+  const renderService = useCallback<ListRenderItem<ServiceItem>>(
+    ({ item, index }) => (
+      <ListEntry index={index}>
+        <ServiceRow item={item} onOpen={onOpenItem} />
+      </ListEntry>
+    ),
+    [onOpenItem],
+  );
 
   const onRefresh = async () => {
     if (offline) return;
@@ -218,7 +229,7 @@ function CatalogView({
   if (home) {
     const list = categories.data ?? [];
     return (
-      <>
+      <ListEntryScope>
         {banner}
         <FlashList
           data={list}
@@ -234,18 +245,18 @@ function CatalogView({
           }
           renderItem={renderCategory}
           ListEmptyComponent={
-            <EmptyState icon="file-tray-outline" title="No service categories yet" message="Services you can request will appear here." />
+            <EmptyState illustration="empty" title="No service categories yet" message="Services you can request will appear here." />
           }
           contentContainerStyle={contentStyle}
           refreshControl={refreshControl}
         />
-      </>
+      </ListEntryScope>
     );
   }
 
   const heading = search.trim() ? `Search: ${search}` : (category?.name ?? '');
   return (
-    <>
+    <ListEntryScope>
       {banner}
       <FlashList
         data={shown}
@@ -263,7 +274,7 @@ function CatalogView({
         renderItem={renderService}
         ListEmptyComponent={
           <EmptyState
-            icon="search-outline"
+            illustration="empty"
             title="No matching service templates"
             message={search.trim() ? 'Search covers service names and descriptions, in every category.' : 'This category has no services yet.'}
             actionLabel="Show all categories"
@@ -273,7 +284,7 @@ function CatalogView({
         contentContainerStyle={contentStyle}
         refreshControl={refreshControl}
       />
-    </>
+    </ListEntryScope>
   );
 }
 
@@ -372,9 +383,13 @@ function MyRequestsView({
   const { requests, hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = list;
   // Stable while this view re-renders on its own (paging, refresh), so loaded rows are not redone (Phase P).
   const renderRequest = useCallback<ListRenderItem<ServiceRequest>>(
-    ({ item }) => {
+    ({ item, index }) => {
       const own = canOpen(item);
-      return <RequestRow request={item} own={own} onPress={own ? () => onOpen(item) : undefined} />;
+      return (
+        <ListEntry index={index}>
+          <RequestRow request={item} own={own} onPress={own ? () => onOpen(item) : undefined} />
+        </ListEntry>
+      );
     },
     [canOpen, onOpen],
   );
@@ -399,7 +414,7 @@ function MyRequestsView({
   }
 
   return (
-    <>
+    <ListEntryScope>
       <QueryBanner error={isFetchNextPageError ? null : list.error} hasData onRetry={() => void onRefresh()} />
       <FlashList
         data={requests}
@@ -422,7 +437,7 @@ function MyRequestsView({
             <LoadingSkeleton variant="list" rows={2} topGap={false} />
           ) : (
             <EmptyState
-              icon="send-outline"
+              illustration="empty"
               title="No service requests yet"
               message="Requests you send from the catalogue appear here."
               actionLabel="Browse the catalogue"
@@ -445,7 +460,7 @@ function MyRequestsView({
         contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       />
-    </>
+    </ListEntryScope>
   );
 }
 
@@ -464,7 +479,7 @@ const RequestRow = memo(function RequestRow({ request, own, onPress }: { request
         {request.serviceItem?.name || '—'}
       </Text>
       <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-        <StatusBadge status={request.status} />
+        <StatusBadge status={request.status} recordId={request.id} />
       </View>
       <Text className="mt-2 text-xs text-gray-500">
         Requested {own ? 'by you, ' : ''}{formatDateTime(request.createdAt)}
