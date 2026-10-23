@@ -153,6 +153,7 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             <Text className="text-xs text-gray-500">{formatBytes(f.size)}</Text>
           </View>
           <Pressable
+            className="active:opacity-60"
             accessibilityRole="button"
             accessibilityLabel={`Remove ${f.name}`}
             disabled={disabled}

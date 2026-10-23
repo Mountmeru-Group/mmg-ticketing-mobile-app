@@ -265,7 +265,7 @@ function SingleStatus({ navigation, route }: Props) {
                 tone={saveTone(closure.target)}
               />
               {!change.isPending ? (
-                <Pressable accessibilityRole="button" onPress={() => setClosure(null)} className="mt-2 min-h-11 items-center justify-center">
+                <Pressable accessibilityRole="button" onPress={() => setClosure(null)} className="mt-2 min-h-11 items-center justify-center active:opacity-60">
                   <Text className="text-sm font-medium text-blue-700">Choose a different status</Text>
                 </Pressable>
               ) : null}

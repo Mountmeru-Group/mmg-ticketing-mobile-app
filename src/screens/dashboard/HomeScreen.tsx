@@ -248,7 +248,7 @@ function Section({
           {caption ? <Text className="mt-0.5 text-xs text-gray-500">{caption}</Text> : null}
         </View>
         {action ? (
-          <Pressable accessibilityRole="button" onPress={action.onPress} hitSlop={10} className="ml-3 py-0.5">
+          <Pressable accessibilityRole="button" onPress={action.onPress} hitSlop={10} className="ml-3 py-0.5 active:opacity-60">
             <Text className="text-sm font-medium text-blue-700">{action.label}</Text>
           </Pressable>
         ) : null}

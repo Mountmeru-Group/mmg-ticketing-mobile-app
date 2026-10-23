@@ -34,7 +34,7 @@ export function SearchField({
         className="ml-2 flex-1 text-base text-gray-900"
       />
       {value ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={onClear} className="h-11 w-11 items-center justify-center">
+        <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={onClear} className="h-11 w-11 items-center justify-center active:opacity-60">
           <Ionicons name="close-circle" size={18} color={colors.text.muted} />
         </Pressable>
       ) : (

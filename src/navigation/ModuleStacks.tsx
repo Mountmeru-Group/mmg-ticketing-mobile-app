@@ -13,12 +13,15 @@ import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { TaskListScreen } from '@/screens/tasks/TaskListScreen';
 import type { ApprovalsStackParamList, CatalogStackParamList, KnowledgeStackParamList, TasksStackParamList } from '@/types';
 
+// freezeOnBlur (Phase P2): a screen that is not on show stops re-rendering until it is shown again.
+const SCREEN_OPTIONS = { headerShown: false, freezeOnBlur: true } as const;
+
 const Approvals = createNativeStackNavigator<ApprovalsStackParamList>();
 
 /** M12 → M13 */
 export function ApprovalsStack() {
   return (
-    <Approvals.Navigator initialRouteName="ApprovalsInbox" screenOptions={{ headerShown: false }}>
+    <Approvals.Navigator initialRouteName="ApprovalsInbox" screenOptions={SCREEN_OPTIONS}>
       <Approvals.Screen name="ApprovalsInbox" component={ApprovalsInboxScreen} />
       <Approvals.Screen name="ApprovalDetail" component={ApprovalDetailScreen} />
     </Approvals.Navigator>
@@ -30,7 +33,7 @@ const Tasks = createNativeStackNavigator<TasksStackParamList>();
 /** Standalone tasks: list → detail → editor (sheet). Detail and editor are shared with the Tickets stack. */
 export function TasksStack() {
   return (
-    <Tasks.Navigator initialRouteName="TaskList" screenOptions={{ headerShown: false }}>
+    <Tasks.Navigator initialRouteName="TaskList" screenOptions={SCREEN_OPTIONS}>
       <Tasks.Screen name="TaskList" component={TaskListScreen} />
       <Tasks.Screen name="TaskDetail" component={TaskDetailScreen} />
       <Tasks.Group screenOptions={{ presentation: 'modal' }}>
@@ -45,7 +48,7 @@ const Knowledge = createNativeStackNavigator<KnowledgeStackParamList>();
 /** M14 → M15 */
 export function KnowledgeStack() {
   return (
-    <Knowledge.Navigator initialRouteName="KnowledgeBase" screenOptions={{ headerShown: false }}>
+    <Knowledge.Navigator initialRouteName="KnowledgeBase" screenOptions={SCREEN_OPTIONS}>
       <Knowledge.Screen name="KnowledgeBase" component={KnowledgeBaseScreen} />
       <Knowledge.Screen name="KbArticle" component={KbArticleScreen} />
     </Knowledge.Navigator>
@@ -57,7 +60,7 @@ const Catalog = createNativeStackNavigator<CatalogStackParamList>();
 /** Service catalogue (Phase G4): catalogue and My Requests → an item's request form, or one of my requests. */
 export function CatalogStack() {
   return (
-    <Catalog.Navigator initialRouteName="ServiceCatalog" screenOptions={{ headerShown: false }}>
+    <Catalog.Navigator initialRouteName="ServiceCatalog" screenOptions={SCREEN_OPTIONS}>
       <Catalog.Screen name="ServiceCatalog" component={ServiceCatalogScreen} />
       <Catalog.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} />
       <Catalog.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />

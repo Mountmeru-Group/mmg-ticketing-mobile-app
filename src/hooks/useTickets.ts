@@ -14,6 +14,13 @@ import {
 } from '@/utils/ticket-filters';
 import { queryKeys, type TicketListKeyParams } from './queryKeys';
 
+/**
+ * Memory cap for low-end phones (docs/PERFORMANCE.md §4 item 1, approved in Phase P2): the list stops loading after
+ * 500 tickets (25 pages). Each filter, search and sort is its own query, so each one loads normally up to the cap.
+ */
+export const TICKET_LIST_CAP = 500;
+const TICKET_LIST_MAX_PAGES = Math.ceil(TICKET_LIST_CAP / TICKET_PAGE_SIZE);
+
 export interface UseTicketsOptions {
   filter: TicketNamedFilter;
   sort: TicketSortOption;
@@ -46,7 +53,8 @@ export function useTickets({ filter, sort, search, countryId, advanced }: UseTic
       return res;
     },
     initialPageParam: 1,
-    getNextPageParam: (last) => (normalisePage(last).hasNext ? last.page + 1 : undefined),
+    getNextPageParam: (last, pages) =>
+      normalisePage(last).hasNext && pages.length < TICKET_LIST_MAX_PAGES ? last.page + 1 : undefined,
     enabled: params !== null,
   });
 
@@ -65,6 +73,9 @@ export function useTickets({ filter, sort, search, countryId, advanced }: UseTic
   }, [query.data]);
 
   const total = query.data?.pages[0]?.total;
+  // The server has more, but the cap stopped the list; the footer says so.
+  const pages = query.data?.pages;
+  const capped = !!pages && pages.length >= TICKET_LIST_MAX_PAGES && normalisePage(pages[pages.length - 1]).hasNext;
 
   /**
    * Pull-to-refresh: drop every page but the first, then refetch — ONE request, instead of v5's default of
@@ -77,5 +88,5 @@ export function useTickets({ filter, sort, search, countryId, advanced }: UseTic
     await query.refetch();
   }, [queryClient, queryKey, query.refetch]);
 
-  return { ...query, tickets, total, refreshFirstPage };
+  return { ...query, tickets, total, capped, refreshFirstPage };
 }

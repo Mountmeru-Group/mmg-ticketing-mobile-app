@@ -1,7 +1,7 @@
 // ANN-1 announcements: the type chip, the Home banner and the full card (M16). Bodies are server HTML and go through
 // the one safe renderer (HtmlText).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { colors, palette } from '@/theme';
@@ -42,13 +42,14 @@ export function AnnouncementBanner({
   onDismiss: () => void;
 }) {
   const s = styleFor(announcement.type);
-  const preview = htmlToDisplayText(announcement.body).replace(/\s+/g, ' ').trim();
+  // Memoised (Phase P2): Home renders several times while its queries settle; this is about thirty regex passes.
+  const preview = useMemo(() => htmlToDisplayText(announcement.body).replace(/\s+/g, ' ').trim(), [announcement.body]);
   // The standard card's shape (Card.tsx), tinted by announcement type.
   return (
     <View accessibilityRole="summary" className={`mx-4 mb-3 rounded-xl border p-4 ${s.banner}`}>
       <View className="flex-row items-start">
         <Ionicons name={s.icon} size={20} color={s.color} />
-        <Pressable accessibilityRole="button" accessibilityHint="Opens announcements" onPress={onOpen} className="ml-2 flex-1">
+        <Pressable accessibilityRole="button" accessibilityHint="Opens announcements" onPress={onOpen} className="ml-2 flex-1 active:opacity-70">
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={2}>
             {announcement.title || 'Announcement'}
           </Text>
@@ -108,7 +109,7 @@ export const AnnouncementCard = memo(function AnnouncementCard({
       </Text>
       <HtmlText html={announcement.body} collapsedHeight={160} emptyText="No details" />
       {hiddenOnHome ? (
-        <Pressable accessibilityRole="button" onPress={() => onShowOnHome(announcement.id)} className="mt-1 min-h-11 justify-center self-start">
+        <Pressable accessibilityRole="button" onPress={() => onShowOnHome(announcement.id)} className="mt-1 min-h-11 justify-center self-start active:opacity-60">
           <Text className="text-sm font-medium text-blue-700">Hidden from Home for this session · Show it again</Text>
         </Pressable>
       ) : null}

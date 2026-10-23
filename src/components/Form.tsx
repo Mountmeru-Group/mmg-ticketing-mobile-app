@@ -47,7 +47,7 @@ export function SelectField({
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={onPress}
-        className={`min-h-11 flex-row items-center rounded-lg border border-gray-300 px-3 py-2 ${disabled ? 'bg-gray-100' : 'bg-white'}`}
+        className={`min-h-11 flex-row items-center rounded-lg border border-gray-300 px-3 py-2 ${disabled ? 'bg-gray-100' : 'bg-white'} active:bg-gray-50`}
       >
         <Text className={`flex-1 text-base ${value ? 'text-gray-900' : 'text-gray-500'}`} numberOfLines={2}>
           {value ?? placeholder}
@@ -92,7 +92,7 @@ export function LookupError({ query, what }: { query: LookupQuery; what: string 
         accessibilityRole="button"
         accessibilityLabel={`Retry loading ${what}`}
         onPress={() => void query.refetch()}
-        className="min-h-11 justify-center px-3"
+        className="min-h-11 justify-center px-3 active:opacity-60"
       >
         <Text className="text-sm font-semibold text-red-800">Retry</Text>
       </Pressable>

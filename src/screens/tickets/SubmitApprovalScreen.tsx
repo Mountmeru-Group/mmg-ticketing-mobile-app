@@ -165,7 +165,7 @@ function SubmitApprovalForm({ navigation, route }: Props) {
                   disabled={busy}
                   onPress={() => setApprovers((prev) => prev.filter((x) => x.id !== p.id))}
                   hitSlop={6}
-                  className="m-0.5 h-8 flex-row items-center rounded-full bg-primary/10 px-2.5"
+                  className="m-0.5 h-8 flex-row items-center rounded-full bg-primary/10 px-2.5 active:opacity-70"
                 >
                   <Text className="text-xs font-medium text-primary">{names[i]}</Text>
                   <Ionicons name="close" size={14} color={colors.primary} style={{ marginLeft: 4 }} />

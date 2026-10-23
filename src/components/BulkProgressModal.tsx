@@ -60,12 +60,12 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
                 accessibilityRole="button"
                 disabled={stopRequested}
                 onPress={onStop}
-                className={`h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''}`}
+                className={`h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''} active:bg-red-50`}
               >
                 <Text className="text-base font-semibold text-red-700">{stopRequested ? 'Stopping…' : 'Stop'}</Text>
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" onPress={onClose} className="h-12 items-center justify-center rounded-lg bg-primary">
+              <Pressable accessibilityRole="button" onPress={onClose} className="h-12 items-center justify-center rounded-lg bg-primary active:opacity-80">
                 <Text className="text-base font-semibold text-primary-foreground">Close</Text>
               </Pressable>
             )}

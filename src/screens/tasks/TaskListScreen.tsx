@@ -5,14 +5,15 @@
 // The status chips, "Assigned to me" and the search box filter the tickets loaded so far, on the device; "Load 20 more
 // tickets" is an explicit tap (never automatic, so an empty filter can't page through everything). The screen says so.
 // Tap a task → task detail (read for everyone; done / edit / remove for staff).
+import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View, type ListRenderItem } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, OutlineButton, QueryBanner,
-  ScreenHeader, SearchField, TaskRow,
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, OutlineButton,
+  QueryBanner, ScreenHeader, SearchField, TaskRow,
 } from '@/components';
 import { useTaskFeed } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -85,9 +86,10 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
     content = <LoadingSkeleton variant="tasks" rows={5} />;
   } else {
     content = (
-      <FlatList
+      <FlashList
         data={feed.items}
         keyExtractor={taskKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         renderItem={renderTask}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
@@ -125,6 +127,11 @@ export function TaskListScreen({ navigation }: TasksStackScreenProps<'TaskList'>
               />
             ) : isFetchingNextPage ? (
               <ActivityIndicator color={colors.primary} />
+            ) : feed.capped ? (
+              // The feed reads the Tickets tab's list, so the 500-ticket memory cap (useTickets) stops it too.
+              <Text className="text-center text-xs text-gray-500">
+                {`Tasks from your ${feed.ticketsLoaded} most recently updated tickets are shown.`}
+              </Text>
             ) : feed.ticketsLoaded > 0 ? (
               <Text className="text-xs text-gray-500">All your tickets are loaded.</Text>
             ) : null}

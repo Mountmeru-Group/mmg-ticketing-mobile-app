@@ -8,13 +8,15 @@
 // - No delegation: the backend has none (A26). Never the unscoped GET /approvals (05 C.16).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from '@react-navigation/native';
+import { FlashList } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LoadingSkeleton, OfflineBanner, OfflineState, QueryBanner, ScreenHeader,
+  EmptyState, ErrorState, FilterChip, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, QueryBanner,
+  ScreenHeader,
 } from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
 import { colors } from '@/theme';
@@ -70,9 +72,10 @@ export function ApprovalsInboxScreen({ navigation }: ApprovalsStackScreenProps<'
     content = <LoadingSkeleton variant="approvals" rows={3} />;
   } else {
     content = (
-      <FlatList
+      <FlashList
         data={rows}
         keyExtractor={approvalKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         renderItem={({ item }) => {
           const lookup = item.entityType === 'ticket' ? tickets.get(item.entityId) : undefined;
           return <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />;

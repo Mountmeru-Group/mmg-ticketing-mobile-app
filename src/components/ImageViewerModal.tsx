@@ -2,8 +2,9 @@
 // the token never goes in the URL). Only for image/* other than SVG; the native Image decoder cannot execute
 // anything, and a non-image response simply fails to decode. "Share" downloads the file (ATT-4) for the share sheet.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StatusBar, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StatusBar, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { AuthenticatedRequest } from '@/api/attachments.api';
@@ -28,7 +29,7 @@ export function ImageViewerModal({
         {/* Light status-bar icons on the black viewer; unmounting restores the app's dark ones. */}
         {request !== null ? <StatusBar barStyle="light-content" /> : null}
         <View className="h-14 flex-row items-center px-1">
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} className="h-11 w-11 items-center justify-center rounded-full">
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} className="h-11 w-11 items-center justify-center rounded-full active:bg-white/20">
             <Ionicons name="close" size={24} color={colors.text.inverse} />
           </Pressable>
           <Text className="ml-2 flex-1 text-base text-white" numberOfLines={1}>{title}</Text>
@@ -39,7 +40,7 @@ export function ImageViewerModal({
               accessibilityState={{ busy: sharing }}
               disabled={sharing}
               onPress={onShare}
-              className="h-11 w-11 items-center justify-center rounded-full"
+              className="h-11 w-11 items-center justify-center rounded-full active:bg-white/20"
             >
               {sharing ? <ActivityIndicator color={colors.text.inverse} /> : <Ionicons name="share-social-outline" size={22} color={colors.text.inverse} />}
             </Pressable>
@@ -49,11 +50,11 @@ export function ImageViewerModal({
           {request ? (
             <Image
               source={{ uri: request.uri, headers: request.headers }}
-              resizeMode="contain"
-              // Phase P: decode at the view's size, not the photo's. Android's default ('auto') only downsamples LOCAL
-              // files, so a 12-megapixel attachment was decoded whole (~48 MB of bitmap) on a 1 GB phone. The viewer
-              // has no zoom, so the picture on screen is the same.
-              resizeMethod="resize"
+              contentFit="contain"
+              // Decoded at the view's size, not the photo's: expo-image downscales by default (Phase P2), as
+              // resizeMethod="resize" did on React Native's Image (Phase P). A 12-megapixel attachment is not decoded
+              // whole (~48 MB of bitmap) on a 1 GB phone. The viewer has no zoom, so the picture on screen is the same.
+              // Its caches are cleared when the session ends (HtmlText.tsx).
               style={{ width: '100%', height: '100%' }}
               onLoad={() => setState('ok')}
               onError={() => setState('error')}

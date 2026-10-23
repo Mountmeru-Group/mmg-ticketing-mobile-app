@@ -24,7 +24,8 @@ export function AppDrawer() {
       // Android back, and the header's back arrow (the same action): closes the drawer first, then returns to the
       // screen the user came from, as a browser does (08 §3.1). The tabs are the first entry, so back ends there.
       backBehavior="fullHistory"
-      screenOptions={{ headerShown: false, drawerType: 'front' }}
+      // freezeOnBlur (Phase P2): a drawer screen not on show stops re-rendering until it is shown again.
+      screenOptions={{ headerShown: false, drawerType: 'front', freezeOnBlur: true }}
       screenLayout={({ route, children }) =>
         route.name === 'MainTabs' ? children : <AboveTabBar>{children}</AboveTabBar>
       }

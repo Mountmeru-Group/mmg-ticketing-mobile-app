@@ -86,7 +86,7 @@ function TicketCardImpl({
             disabled={statusBusy}
             onPress={() => onStatusPress?.(ticket)}
             hitSlop={12}
-            className="flex-row items-center"
+            className="flex-row items-center active:opacity-70"
           >
             <StatusBadge status={ticket.status} />
             {statusBusy ? (
