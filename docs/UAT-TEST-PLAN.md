@@ -1,4 +1,4 @@
-# UAT test plan — Mount Meru Service Desk (Android, `preview` APK)
+# UAT test plan — Setu (Android, `preview` APK)
 
 Written in Phase D (2026-10-20) for the first APK since Phase 5. It is also the first build that can prove Microsoft
 sign-in end to end.
@@ -30,8 +30,9 @@ Work top to bottom. Tick each box, and log anything unexpected in **Section F** 
 
 ## Section A — Install
 
-- [ ] **A1. Uninstall the old app first.** Go to Settings → Apps → **MMG Service Desk** (the old name) → Uninstall.
-  - Its icon is a blue square with white mountains and "MMG".
+- [ ] **A1. Uninstall the old app first.** Go to Settings → Apps → **MMG Service Desk** or **Mount Meru Service Desk**
+  (the old names) → Uninstall.
+  - The MMG Service Desk APK's icon is a blue square with white mountains and "MMG".
   - Some launchers keep showing the old icon after an install over the top, which is why you uninstall first.
   - The old APK can never finish Microsoft sign-in anyway: it predates the `msauth` link handler (`7018f85`).
 - [ ] **A2. Install** the new APK. If Android asks, allow "Install unknown apps" for your browser or file manager.
@@ -40,12 +41,10 @@ Work top to bottom. Tick each box, and log anything unexpected in **Section F** 
   square with "MMG".
   - Check the app drawer, the home screen (if you add it there), and the recent-apps screen.
   - With Android 13+ themed icons switched on, a one-colour silhouette of the logo is correct.
-- [ ] **A4. App name** reads **Mount Meru Service Desk**.
-  - A launcher may shorten it under the icon (e.g. "Mount Meru Se…"). That's fine.
-  - Check the full name under Settings → Apps.
-- [ ] **A5. Splash.** Force-stop the app (Settings → Apps → Mount Meru Service Desk → Force stop), then open it.
-  - You should see the Meru logo with "Mount Meru Service Desk" under it, on white. Android 12+ shows it inside a
-    circle.
+- [ ] **A4. App name** reads **Setu**, in full, under the icon.
+  - Check it under Settings → Apps too.
+- [ ] **A5. Splash.** Force-stop the app (Settings → Apps → Setu → Force stop), then open it.
+  - You should see the Meru logo with "Setu" under it, on white. Android 12+ shows it inside a circle.
   - It goes straight to the Login screen, with **no white or blank flash** in between.
 - [ ] **A6. Release-build check (Login screen).**
   - The amber badge reads **`UAT · uat-servicedesk.mountmerugroup.com`**, and does **not** say "development
@@ -84,7 +83,7 @@ Do this first with the **Admin** account.
 - [ ] 9. Repeat steps 1–6 for the **User**, **Technician** and **L2 Manager** accounts.
 - [ ] 10. **Side effect check.** The app registers for every `msauth://` link (`11-SSO-VERIFY.md` §4.2).
   - If another app on this phone signs in to Microsoft through the browser, Android may show an **"Open with"**
-    chooser that lists Mount Meru Service Desk.
+    chooser that lists Setu.
   - If you see that chooser, log it in Section F, with the other app's name.
 
 ### B2. When it fails: what you see, what it means, what to send

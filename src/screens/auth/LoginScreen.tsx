@@ -80,7 +80,7 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
         <View className="mb-4 items-center rounded-xl border border-border bg-white px-4 py-6">
           <BrandLogo height={64} />
           <Text accessibilityRole="header" className="mt-4 text-center text-2xl font-bold text-gray-900">
-            Mount Meru Service Desk
+            Setu
           </Text>
           <Text className="mt-1 text-center text-sm text-gray-500">Sign in with your Mount Meru work account.</Text>
           {/* Which backend this build talks to, always visible to testers (04 M1). */}

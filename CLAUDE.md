@@ -6,7 +6,7 @@
 
 ## What this repo is
 
-- This is the **MMG Ticketing MOBILE app**, the phone client for the Mount Meru Group Service Desk.
+- This is the **MMG Ticketing MOBILE app**, the phone client for the Mount Meru Group Service Desk. Users see it as **Setu** (the display name since 2026-10-23). In-app text that says "the Service Desk" means the backend or the IT team, not the app.
 - Stack:
   - React Native / **Expo SDK 52**, TypeScript
   - React Navigation v6

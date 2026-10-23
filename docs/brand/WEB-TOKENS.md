@@ -369,6 +369,8 @@ There is no visual change in these:
 - Icons replaced (see `docs/RELEASE.md` §7):
   - adaptive-icon `backgroundColor`: `#1D4ED8` → `#FFFFFF`.
 - Unchanged: `slug`, `android.package`, `version`, `versionCode` and `scheme`.
+- Renamed again on 2026-10-23: `Mount Meru Service Desk` → `Setu` (`app.json` `name`, the login heading, the drawer
+  header and the splash image). The same five identity values are still unchanged. Details: `docs/brand/UI-STANDARDS.md` §6.
 
 ## 8. Phase C: where the app now differs from the web, and why
 
@@ -381,4 +383,4 @@ Each value below fails WCAG AA where it was used before. The details are in `doc
 | Hints, captions, placeholders (`text.muted` in Phase B) | gray-400 (web) | gray-500 (`text.secondary`); gray-400 stays for icons only | 2.54 → 4.83 |
 | SubmitButton `success` (Approve) | green-600 (a Phase B mobile choice; the web Button has no success style) | green-700 | 3.30 → 5.02 |
 
-The drawer logo is now 44 dp tall and 72 dp wide, with "Mount Meru / Service Desk" beside it; the Phase B drawer header is in §7.4.
+The drawer logo is now 44 dp tall and 72 dp wide, with the app name beside it ("Mount Meru / Service Desk" until the rename to "Setu", `UI-STANDARDS.md` §6); the Phase B drawer header is in §7.4.

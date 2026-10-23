@@ -183,7 +183,7 @@ It is fixed in `src/config/auth.config.ts` `getAuthRedirectUri()`.
   - **Symptom: you finish signing in at Microsoft, the app comes back, and nothing happens, with no error.** This is the most confusing failure, so watch for it on the first build.
 - **The same symptom can come from a timing race.** That code also gives up as soon as the app becomes active again. If Android reports "app active" before it delivers the URL, the result is the same. It is rare, and only visible on a device.
 - **Side effect worth checking.** `scheme: "msauth"` registers the app for **every** `msauth://` link, not only `msauth://com.mountmeru.servicedesk/…`.
-  - Other Microsoft-library apps on the same phone that sign in through the browser may then show Android's "Open with" chooser with MMG Service Desk in it.
+  - Other Microsoft-library apps on the same phone that sign in through the browser may then show Android's "Open with" chooser with Setu in it.
   - This was not changed: the brief forbids touching the redirect setup.
 - **Expo Go can no longer test sign-in at all.** The redirect is fixed to `msauth://…`, and Expo Go cannot receive it. `02-AUTH.md` §7.2 still says Expo Go uses `exp://…`; that is out of date.
 
