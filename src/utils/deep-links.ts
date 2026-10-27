@@ -9,6 +9,7 @@
 // Only links that reach the app are handled — tapped inside a description, comment, announcement or KB article, or
 // pasted into the Tickets search box. The OS never routes links to the app: that needs ask A18 (out of scope).
 import { API_BASE_URL } from '@/config/env';
+import type { AppTab } from './permissions';
 
 export type TicketLinkTarget = { kind: 'id'; id: string } | { kind: 'number'; ticketNumber: number };
 
@@ -70,4 +71,15 @@ export function parseTicketLink(input: string): TicketLinkParse {
     target = null; // malformed %-escape
   }
   return target ? { ok: true, target } : { ok: false, reason: 'not-a-ticket-link' };
+}
+
+/**
+ * iOS (docs/ios/00-PORT-MANIFEST.md §4.5): where a ticket link tapped in the app opens. The resolver (TicketLink) is
+ * registered in every tab's stack, so it opens in the tab on screen, as a link opens in place in Mail — Android switched
+ * to the Tickets tab. `focusedTab` is null while a sheet or the sign-in screens are on top: nothing opens under them
+ * (the caller leaves the link to the browser, as when signed out). A link that isn't a ticket link here opens nothing.
+ */
+export function ticketLinkDestination(link: string, focusedTab: AppTab | null): { tab: AppTab; link: string } | null {
+  if (focusedTab === null || !parseTicketLink(link).ok) return null;
+  return { tab: focusedTab, link };
 }

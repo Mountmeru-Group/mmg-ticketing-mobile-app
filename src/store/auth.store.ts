@@ -67,7 +67,8 @@ const LOGGED_OUT = {
   isLoading: false,
 } as const;
 
-async function wipeStoredSession(): Promise<void> {
+/** Deletes the three session items from the Keychain. Never throws. Also used by installMarker.ts on a reinstall. */
+export async function wipeStoredSession(): Promise<void> {
   await Promise.all(
     Object.values(KEYS).map((key) => SecureStore.deleteItemAsync(key, STORE_OPTIONS).catch(() => undefined)),
   );

@@ -38,7 +38,10 @@ export function drawerItems(role: UserRole, pendingApprovals: number): DrawerIte
 
 export type MainTab = 'HomeTab' | 'TicketsTab' | 'AlertsTab';
 
-/** Bottom tabs: the same three for every role, in this order (08 §3.1). END_USER's Tickets tab is "My Tickets". */
+/**
+ * Bottom tabs: the same three for every role, in this order (08 §3.1). END_USER's Tickets tab is "My Tickets".
+ * Android's tab bar; the iOS one is appTabs() below. Kept as the source of the shared titles.
+ */
 export function mainTabs(role: UserRole): { name: MainTab; title: string }[] {
   return [
     { name: 'HomeTab', title: 'Home' },
@@ -50,6 +53,92 @@ export function mainTabs(role: UserRole): { name: MainTab; title: string }[] {
 /** Title of the Tickets tab and of the list screen's header. */
 export function ticketsTitle(role: UserRole): string {
   return role === 'END_USER' ? 'My Tickets' : 'Tickets';
+}
+
+// ── iOS: tab bar + More (docs/ios/00-PORT-MANIFEST.md §4.5) ──
+// The drawer becomes a "More" tab. The rules above stay the source: these only arrange their answers for iOS.
+// HIG (Tab bars): "Don't disable or hide tab bar buttons, even when their content is unavailable", so a role's tabs
+// are fixed for the whole session and never follow a count.
+
+export type AppTab = 'HomeTab' | 'TicketsTab' | 'ApprovalsTab' | 'AlertsTab' | 'MoreTab';
+
+/**
+ * No user yet: END_USER's answers. A role the app doesn't know goes through the rules above unchanged, which give it the
+ * least (no catalogue, no Approvals tab). Sign-in and restore refuse such a role anyway.
+ */
+function navRole(role: UserRole | null | undefined): UserRole {
+  return role ?? 'END_USER';
+}
+
+/**
+ * Approvals is a tab only for the roles that ALWAYS have it: drawerItems() with nothing pending, i.e. ADMIN and AGENT,
+ * as in the web nav (AppLayout.tsx:32). END_USER and L2_MANAGER get it as a More row while APR-1 returns ≥ 1 (08 S1).
+ */
+export function hasApprovalsTab(role: UserRole | null | undefined): boolean {
+  return drawerItems(navRole(role), 0).includes('approvals');
+}
+
+/** Tabs, in order: Home · Tickets · Approvals (ADMIN, AGENT) · Alerts · More. Four or five, within the HIG's five. */
+export function appTabs(role: UserRole | null | undefined): { name: AppTab; title: string }[] {
+  const who = navRole(role);
+  const tabs: { name: AppTab; title: string }[] = [
+    { name: 'HomeTab', title: 'Home' },
+    { name: 'TicketsTab', title: ticketsTitle(who) },
+  ];
+  if (hasApprovalsTab(who)) tabs.push({ name: 'ApprovalsTab', title: 'Approvals' });
+  tabs.push({ name: 'AlertsTab', title: 'Alerts' }, { name: 'MoreTab', title: 'More' });
+  return tabs;
+}
+
+/** Rows of the More list. `myRequests` opens the catalogue's My Requests view, its own row on iOS. */
+export type MoreItem = 'approvals' | 'tasks' | 'catalog' | 'myRequests' | 'knowledge' | 'announcements' | 'settings';
+
+export interface MoreSection {
+  key: 'work' | 'information' | 'settings';
+  items: MoreItem[];
+}
+
+/**
+ * The More list, as iOS list sections, top to bottom. Every row is a drawerItems() row that is not a tab; the account
+ * card and Sign out sit under the last section on every role's list, as in the drawer, and are not listed here.
+ */
+export function moreSections(role: UserRole | null | undefined, pendingApprovals: number): MoreSection[] {
+  const who = navRole(role);
+  const rows = drawerItems(who, pendingApprovals);
+  const work: MoreItem[] = [];
+  if (rows.includes('approvals') && !hasApprovalsTab(who)) work.push('approvals');
+  if (rows.includes('tasks')) work.push('tasks');
+  if (rows.includes('catalog')) {
+    work.push('catalog');
+    if (serviceCatalogPermissions({ role: who }).myRequests) work.push('myRequests');
+  }
+  const information = (['knowledge', 'announcements'] as const).filter((item) => rows.includes(item));
+  const settings: MoreItem[] = rows.includes('settings') ? ['settings'] : [];
+  const sections: MoreSection[] = [
+    { key: 'work', items: work },
+    { key: 'information', items: [...information] },
+    { key: 'settings', items: settings },
+  ];
+  return sections.filter((section) => section.items.length > 0);
+}
+
+/**
+ * Tab badges (counts; 0 = no badge). Alerts: the NTF-2 unread count. Approvals: the APR-1 count. More: the APR-1 count
+ * while the Approvals row is in it (END_USER, L2_MANAGER), so a waiting approval is not hidden one level down.
+ */
+export function tabBadges(
+  role: UserRole | null | undefined,
+  counts: { unread: number; pendingApprovals: number },
+): Partial<Record<AppTab, number>> {
+  const badges: Partial<Record<AppTab, number>> = {};
+  if (counts.unread > 0) badges.AlertsTab = counts.unread;
+  if (counts.pendingApprovals > 0) {
+    if (hasApprovalsTab(role)) badges.ApprovalsTab = counts.pendingApprovals;
+    else if (moreSections(role, counts.pendingApprovals).some((s) => s.items.includes('approvals'))) {
+      badges.MoreTab = counts.pendingApprovals;
+    }
+  }
+  return badges;
 }
 
 // ── Home (04 M2, 05 B.20) ────────────────────────────────────
