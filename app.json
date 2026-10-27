@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Setu",
+    "slug": "setu-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "msauth.com.mountmeru.servicedesk",
+    "platforms": [
+      "ios"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.mountmeru.servicedesk",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Setu uses the camera only when you choose to take a photo to attach to a ticket, a reply or a request.",
+        "NSPhotoLibraryUsageDescription": "Setu opens your photos only when you choose some to attach to a ticket, a reply or a request. Only the photos you pick are uploaded.",
+        "NSPhotoLibraryAddUsageDescription": "Setu saves an attachment image to your photo library only when you choose Save Image."
+      }
+    },
+    "plugins": [
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "microphonePermission": false
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 192,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ]
+    ]
+  }
+}
