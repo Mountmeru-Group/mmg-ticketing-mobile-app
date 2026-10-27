@@ -46,13 +46,14 @@ const fieldsFor = (persona, status) => ticketFieldPermissions(persona, { status 
 
 describe('property editors: every field, every persona, by ticket state', () => {
   // OPEN (any live status): AGENT edits impact/urgency/category; L2 only impact/urgency; country per 05 §A.12;
-  // the resolution is not editable yet (web: only while RESOLVED or CLOSED).
-  const STAFF_OPEN = { impact: EDIT, urgency: EDIT, category: EDIT, resolution: RESOLUTION_LOCKED };
+  // the resolution is not editable yet (web: only while RESOLVED or CLOSED). The technician (2026-10-27, TKT-5):
+  // ADMIN and AGENT; L2_MANAGER and END_USER see the value only (tests/rbac/technician-editor.test.mjs has the rest).
+  const STAFF_OPEN = { impact: EDIT, urgency: EDIT, category: EDIT, resolution: RESOLUTION_LOCKED, technician: EDIT };
   const OPEN = {
-    END_USER: { impact: HIDDEN, urgency: HIDDEN, category: VIEW, country: VIEW, resolution: VIEW, priorityPreview: false },
+    END_USER: { impact: HIDDEN, urgency: HIDDEN, category: VIEW, country: VIEW, resolution: VIEW, priorityPreview: false, technician: VIEW },
     AGENT: { ...STAFF_OPEN, country: COUNTRY_LOCKED, priorityPreview: true },
     TRIAGE_AGENT: { ...STAFF_OPEN, country: EDIT, priorityPreview: true },
-    L2_MANAGER: { ...STAFF_OPEN, category: VIEW, country: VIEW, priorityPreview: false },
+    L2_MANAGER: { ...STAFF_OPEN, category: VIEW, country: VIEW, priorityPreview: false, technician: VIEW },
     ADMIN: { ...STAFF_OPEN, country: EDIT, priorityPreview: true },
   };
   forEachPersona('OPEN ticket', OPEN, (p) => fieldsFor(p, 'OPEN'));
@@ -63,12 +64,18 @@ describe('property editors: every field, every persona, by ticket state', () => 
   // RESOLVED: the same, plus the resolution text for staff. END_USER stays read-only (🔒 SAFER, D3).
   forEachPersona('RESOLVED ticket', resolutionEditable(OPEN), (p) => fieldsFor(p, 'RESOLVED'));
 
-  // CLOSED: the AGENT lock takes impact, urgency and category from every AGENT; country and resolution are not
-  // lock-gated on the web (FE:TicketDetailPage.tsx:2199, :1438-1486). ADMIN and L2 are never locked.
+  // CLOSED: the AGENT lock takes impact, urgency, category and the technician from every AGENT; country and resolution
+  // are not lock-gated on the web (FE:TicketDetailPage.tsx:2199, :1438-1486). ADMIN and L2 are never locked.
   const CLOSED = {
     END_USER: OPEN.END_USER,
-    AGENT: { impact: AGENT_LOCKED, urgency: AGENT_LOCKED, category: AGENT_LOCKED, country: COUNTRY_LOCKED, resolution: EDIT, priorityPreview: false },
-    TRIAGE_AGENT: { impact: AGENT_LOCKED, urgency: AGENT_LOCKED, category: AGENT_LOCKED, country: EDIT, resolution: EDIT, priorityPreview: false },
+    AGENT: {
+      impact: AGENT_LOCKED, urgency: AGENT_LOCKED, category: AGENT_LOCKED, country: COUNTRY_LOCKED, resolution: EDIT, priorityPreview: false,
+      technician: AGENT_LOCKED,
+    },
+    TRIAGE_AGENT: {
+      impact: AGENT_LOCKED, urgency: AGENT_LOCKED, category: AGENT_LOCKED, country: EDIT, resolution: EDIT, priorityPreview: false,
+      technician: AGENT_LOCKED,
+    },
     L2_MANAGER: { ...OPEN.L2_MANAGER, resolution: EDIT },
     ADMIN: { ...OPEN.ADMIN, resolution: EDIT },
   };

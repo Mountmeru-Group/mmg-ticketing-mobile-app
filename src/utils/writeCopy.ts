@@ -48,6 +48,11 @@ export function assignMessage(ticketNumber: number, name: string, groupName: str
   return `#${ticketNumber} will be assigned to ${name}${groupName ? ` in ${groupName}` : ''}. ${name} is emailed and notified in the app.`;
 }
 
+/** `current`: the technician's name, '' when unknown. */
+export function unassignMessage(ticketNumber: number, current: string): string {
+  return `#${ticketNumber} will have no technician. ${current || 'The current technician'} is no longer assigned.`;
+}
+
 export function bulkAssignMessage(count: number, name: string, skipped: number): string {
   const parts = [`${plural(count, 'ticket')} will be assigned to ${name}, one at a time. ${name} gets one email per ticket.`];
   if (skipped > 0) parts.push(`${plural(skipped, 'selected ticket is', 'selected tickets are')} skipped.`);

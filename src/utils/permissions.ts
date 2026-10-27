@@ -141,6 +141,17 @@ export function canSubmitForApproval(role: UserRole): boolean {
   return isAgentOrAdmin(role);
 }
 
+/**
+ * Assign, reassign or remove a ticket's technician, or move it to another group (TKT-5): ADMIN and AGENT, the server's
+ * `agentOrAdmin` (tickets.router.ts:20). The web also shows L2_MANAGER these controls, which always get 403, so they are
+ * hidden (WEB-VS-MOBILE-ROLES.md §5). The AGENT lock applies on top (web :1778, :1890). ONE rule for every way in:
+ * Pick up and Assign in More options, the Technician editor on M4, bulk Pick up / Assign, the M7 screen and the write
+ * guard (assertAssignment).
+ */
+export function canAssignTickets(role: UserRole): boolean {
+  return KNOWN_ROLES.has(role) && isAgentOrAdmin(role);
+}
+
 export type MoreAction = 'pickup' | 'assign' | 'close' | 'approval';
 
 export interface TicketDetailPermissions {
@@ -180,7 +191,7 @@ export function ticketDetailPermissions(
   const transitions = getAvailableTransitions(role, ticket.status);
 
   const moreActions: MoreAction[] = [];
-  if (isAgentOrAdmin(role) && !locked) {
+  if (canAssignTickets(role) && !locked) {
     if (canAssignToSelf(viewer) && ticket.assignedToId !== viewer?.id) moreActions.push('pickup');
     moreActions.push('assign');
   }
@@ -220,6 +231,12 @@ export type FieldAccess =
 export interface TicketFieldPermissions extends Record<TicketField, FieldAccess> {
   /** Show, before Save, the priority the server will compute. LKP-6 is ADMIN/AGENT only (403 for L2, as on the web). */
   priorityPreview: boolean;
+  /**
+   * The Technician row's "Change technician" editor (2026-10-27). Not a TKT-4 field: it is written through TKT-5 by
+   * useAssignTicket, the one assignment path (Pick up and M7 use it too), so fieldEditProblem still refuses
+   * `assignedToId`. Edit exactly where More options offers Assign (canAssignTickets, not locked).
+   */
+  technician: FieldAccess;
 }
 
 export const AGENT_LOCK_REASON = 'Closed and canceled tickets are locked for technicians.';
@@ -253,6 +270,8 @@ const lockedBy = (reason: string): FieldAccess => ({ mode: 'locked', reason });
  *   END_USER see the value only. Not lock-gated by status (web :2199). The web lets every AGENT edit (G1 D2); Ronit
  *   decided in G2 to keep it locked (ROLE-MATRIX §8 item 12, RESOLVED).
  * - Resolution: staff while RESOLVED or CLOSED, with no AGENT lock (web :1438-1486). END_USER read-only (D3, 🔒 SAFER).
+ * - Technician: canAssignTickets() (ADMIN, AGENT); the AGENT lock applies (web :1778). L2_MANAGER and END_USER see the
+ *   value only: the web shows L2 the control, which always gets 403 (WEB-VS-MOBILE-ROLES.md §5).
  */
 export function ticketFieldPermissions(
   viewer: Pick<AuthUser, 'role' | 'countryId'> | null,
@@ -268,6 +287,7 @@ export function ticketFieldPermissions(
   const countryMode = viewer ? countrySelectorMode(viewer) : 'hidden';
   const country = countryMode === 'switch' ? EDIT : countryMode === 'locked' ? lockedBy(COUNTRY_LOCK_REASON) : VIEW;
   const resolution = !isStaff(role) ? VIEW : RESOLUTION_EDIT_STATUSES.has(ticket.status) ? EDIT : lockedBy(RESOLUTION_STATE_REASON);
+  const technician = !canAssignTickets(role) ? VIEW : agentLock ? lockedBy(AGENT_LOCK_REASON) : EDIT;
 
   return {
     impact: classification,
@@ -276,6 +296,7 @@ export function ticketFieldPermissions(
     country,
     resolution,
     priorityPreview: isAgentOrAdmin(role) && classification.mode === 'edit',
+    technician,
   };
 }
 
@@ -330,7 +351,7 @@ export function bulkActions(viewer: Pick<AuthUser, 'id' | 'role'> | null): BulkA
   const role: UserRole = viewer?.role ?? 'END_USER';
   if (!isStaff(role)) return [];
   const actions: BulkAction[] = [];
-  if (isAgentOrAdmin(role)) {
+  if (canAssignTickets(role)) {
     if (canAssignToSelf(viewer)) actions.push('pickup');
     actions.push('assign');
   }

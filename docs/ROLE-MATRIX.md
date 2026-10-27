@@ -12,6 +12,8 @@
 
 **Updated for Phase G5, 2026-10-22.** The create form's priority preview is built (CR8, new), and "My Requests" lists every request for staff, as on the web (SC7 is now a MATCH). The full role audit was re-run over every element G1–G4 added; it found two too-permissive cases, both fixed, and one latent one, hardened. §14 has the audit, the fixes and the answers to the brief's four questions. §0, §1.6, §1.9, §2, §6 and §7 are updated.
 
+**Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -258,7 +260,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | T3 | Status `<select>` with all statuses | none | AGENT, L2, ADMIN | **NARROWER**, *decision* D1 (W7) | – |
 | T4 | Close… (closure form) | roles whose map has CLOSED | same | MATCH | perm `moreActions` |
 | T5 | Pick up | ADMIN, AGENT; not locked; not when already yours | AGENT, L2 (403), ADMIN | **NARROWER** for L2, *defect avoided* (D2, §6) | perm `moreActions` |
-| T6 | Assign / Reassign / Remove | ADMIN, AGENT; not locked (M7) | AGENT, L2 (403), ADMIN | **NARROWER** for L2, *defect avoided* | perm `moreActions`; `AssignPickerScreen.tsx:47` |
+| T6 | Assign / Reassign / Remove | ADMIN, AGENT; not locked. Two places, one path: More options › Assign… (M7), and **since 2026-10-27 also inline**: "Change technician" on the Technician row (a locked AGENT sees the reason; L2 and END_USER see the value only) | AGENT, L2 (403), ADMIN; the web's own Technician panel in Properties (`:1776-1888`) and the toolbar's Assign modal (`:2363-2419`) | **NARROWER** for L2, *defect avoided*. Unchanged by the inline editor: same roles, same lock, same hook, guard and call (§15) | perm `canAssignTickets` → `moreActions`, `ticketFieldPermissions().technician`; `AssignPickerScreen.tsx`; `TicketPropertyEditors.tsx` `TechnicianSection` |
 | T7 | Group & Site | ADMIN, AGENT (M7 "Move to group") | AGENT, L2 (403), ADMIN | **NARROWER** for L2, *defect avoided* | M7 |
 | T8 | Category edit (3-level cascade) | ADMIN, AGENT (not locked); a locked AGENT sees the reason; L2 and END_USER read-only | ADMIN, AGENT (not locked) | MATCH (G1) | `src/screens/tickets/TicketPropertyEditors.tsx` `CategorySection` → perm `ticketFieldPermissions` |
 | T9 | Impact / urgency edit | AGENT (not locked), L2, ADMIN; a locked AGENT sees the reason | AGENT (not locked), L2, ADMIN | MATCH (G1) | `TicketPropertyEditors.tsx` `ClassificationSection` → perm `ticketFieldPermissions` |
@@ -292,7 +294,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | C5 | Attach files to a reply or note | all, no lock | all, no lock | MATCH. Note files leak (§5) → §8 item 1 | `ReplyComposerScreen.tsx:173` |
 | C6 | A PRIVATE post from END_USER or L2 | refused on the device, nothing sent | sent; the server makes it a PUBLIC email | stricter, correct | `src/api/comments.api.ts:25`; `src/hooks/usePostComment.ts:36` |
 | S1 | Status sheet | AGENT, L2, ADMIN; map; locked reason | = T1, T2 | MATCH | `src/screens/tickets/StatusClosureScreen.tsx:203, :231-233` |
-| A1 | Assign picker | ADMIN, AGENT; others see "Not available"; locked reason | = T6 | MATCH (L2 per T6) | `src/screens/tickets/AssignPickerScreen.tsx:47, :156` |
+| A1 | Assign picker | ADMIN, AGENT; others see "Not available"; locked reason. Its lists and group rule are shared with the inline Technician editor (`src/utils/assignment.ts`, 2026-10-27) | = T6 | MATCH (L2 per T6) | `src/screens/tickets/AssignPickerScreen.tsx` (`canAssignTickets`) |
 
 ### 2.6 Create ticket (M8)
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -385,6 +387,8 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | G3: "Submit (n)" | – | disabled until one approver is chosen, and while sending; the chips and "Add an approver" disabled while sending ✅ |
 | G4: a retired service (SCR-3 still returns it) | – (not built) | the form says the service is no longer offered and has no "Add Request" ✅ |
 | G4: "Add Request", "Reset" | – | disabled while sending; the field messages appear after the first try and follow each change, as on the web ✅ |
+| 2026-10-27: the Technician row for a locked AGENT | – (not built) | the saved technician, with "Closed and canceled tickets are locked for technicians." ✅ (as impact/urgency and category) |
+| 2026-10-27: the Technician editor's Save | – | disabled until another technician (or Unassigned) is chosen, and while saving; the picker and Cancel disabled while saving ✅ |
 
 **Role-never elements, checked against rule 1:** all hidden ✅.
 - Note (END_USER, L2)
@@ -401,6 +405,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - G3: the delete button (END_USER): not on any file row. "Submit for approval…" (END_USER, L2): not in More options; the screen itself shows "Not available for your role"; the guard and the API function refuse it before sending
 - G4: the request properties (END_USER): not on the form, and a `priority` from END_USER is refused before sending. Another person's request (any role): its detail shows "Not one of your requests". G5: staff see it listed in My Requests, as on the web, but the row is not a link
 - G5: on the create form, the priority preview (L2, END_USER), group and technician (L2, END_USER), requester (L2, END_USER) and impact/urgency (END_USER): not rendered, from `createTicketPermissions()`; the API allow-list drops `teamId`, `assignedToId` and `requesterId` for L2 as well
+- 2026-10-27: "Change technician" (L2, END_USER): the Technician row shows the value, with no link and no reason (`ticketFieldPermissions().technician` is `view`); the row itself is never hidden
 
 **G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
@@ -486,7 +491,7 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 
 | Server rejection | Who | Mobile | Source (server → app) |
 |---|---|---|---|
-| `POST /tickets/:id/assign` is `agentOrAdmin` → 403 | L2, END_USER | Pick up, Assign, Reassign, Remove and Move to group are hidden. Bulk Pick up / Assign are hidden. The M7 screen refuses. `assertAssignment` refuses before sending | `BE:tickets.router.ts:20` → perm `moreActions`, `bulkActions`; `src/hooks/writeGuards.ts:76` |
+| `POST /tickets/:id/assign` is `agentOrAdmin` → 403 | L2, END_USER | Pick up, Assign, Reassign, Remove and Move to group are hidden. Bulk Pick up / Assign are hidden. The M7 screen refuses. "Change technician" (2026-10-27) is not offered. `assertAssignment` refuses before sending (tested through `sendAssignment` in every status: nothing sent, not even the status read) | `BE:tickets.router.ts:20` → perm `canAssignTickets` (`moreActions`, `bulkActions`, `ticketFieldPermissions().technician`); `src/hooks/writeGuards.ts` `assertAssignment` |
 | `GET /teams`, `GET /users/search` are `agentOrAdmin` → 403 | L2, END_USER | Create's Group and Assign to, M7, the task technician picker, recipient suggestions and (G2) the M3 Technician and Group filters are all hidden. The queries are disabled for those roles | `BE:teams.router.ts:8`, `BE:users.router.ts:15` → `src/hooks/useLookups.ts` `useTeams`, `useUserSearch`; perm `ticketListFilters` |
 | `POST /approvals` is `agentOrAdmin` → 403 | L2, END_USER | G3: Submit for approval is offered to ADMIN and AGENT only. For L2 and END_USER it is not in More options, `SubmitApprovalScreen` refuses, and `assertCanSubmitForApproval` and `submitTicketForApproval` refuse before sending (tested: nothing sent) | `BE:approvals.router.ts:8` → perm `canSubmitForApproval`; `src/hooks/writeGuards.ts`; `src/api/approvals.api.ts` |
 | `DELETE /attachments/:id` → 403 | END_USER | G3: Delete is offered to ADMIN, AGENT and L2 only. For END_USER there is no button, and `assertCanDeleteAttachment` and `deleteAttachment` refuse before sending (tested: nothing sent) | `BE:attachments.controller.ts:149` → perm `canDeleteAttachments`; `src/hooks/writeGuards.ts`; `src/api/attachments.api.ts` |
@@ -629,6 +634,28 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - an unknown role may delete files
   - the AGENT lock dropped from category on closed tickets
   - One first-draft mutation survived: the create screen *naming* `previewPriority` without calling it. The wiring check was tightened so the screen may not reference the rule or the matrix data at all. It, and a realistic variant that looks the matrix up itself, are now caught.
+
+**Technician editor (2026-10-27): 593 tests in all (533 before).** Per file: `role-gating` 129, `service-catalog` 108, `g3-features` 83, `list-filters` 65, `technician-editor` 60, `property-editing` 59, `g5-audit` 55, `tests/auth/mobile-sso` 34.
+- **`tests/rbac/technician-editor.test.mjs`, 60 tests (new).**
+  - **The link:** the Technician row's full answer for each persona on OPEN, RESOLVED, CLOSED and CANCELED, and the states each persona gets the link in (END_USER and L2: none; AGENT and triage AGENT: OPEN and RESOLVED, with the lock reason on CLOSED and CANCELED; ADMIN: all four). L2 and END_USER get the value only in all 11 statuses. No session or an unknown role: the value only.
+  - **One rule:** for every persona × status × assignee, the link shows exactly where More options offers Assign, and the write guard refuses exactly where it does not. Bulk Assign follows `canAssignTickets`. TKT-4 refuses `assignedToId` and `teamId` for everyone.
+  - **The call, with the UI bypassed:** `sendAssignment` (the hook's own write) for L2 and END_USER in all 11 statuses, to assign or remove: refused on the device, and **no request at all**, not even the status read. A locked AGENT likewise; an AGENT whose ticket was closed meanwhile sends the status read only. AGENT, triage AGENT and ADMIN send the read, then `POST /tickets/:id/assign`.
+  - **The body (01 TKT-5):** `{ assignedToId, teamId }` for a member of the ticket's group, `{ assignedToId }` for anyone else or a ticket with no group, `{ assignedToId: null }` to remove; only those two keys; `teamId` never null or empty; the API layer drops any other key; never PUT, never `/status`.
+  - **The list:** search roles, members by name, recommended people in an active group first, and the editor's order (recommended, then the group's members, each once, the current technician marked); M7's toast wording, shared.
+  - **One implementation:** one TKT-5 function and the only `/assign` request in `src/`; `useAssignTicket()` used by M4 (Pick up), M7 and the editor only; `assignTicket()` called only by that hook and the two bulk loops, each after the guard on the screen's status and on the server's; the editor never calls the API, the guard or TKT-4 for it; one "Change technician" link; M4 renders the row only through `TechnicianSection`; M7 gates with `canAssignTickets`.
+- **`property-editing.test.mjs`, 59 tests (unchanged count):** the per-persona answers now include `technician`, spelled out per state.
+- **`role-gating.test.mjs`, 129 tests (unchanged count):** the editors' wiring check also requires `useAssignTicket(` and forbids calling `assignTicket(`, `sendAssignment(` or `canAssignTickets(` from the editors.
+- **Proof the tests bite.** Ten mutations were each applied alone, tested and restored by script. Every one made the suite fail (1–19 failures each), and all 180 files under `src/` and `tests/` were verified byte-identical afterwards by SHA-1:
+  - L2_MANAGER may assign (`canAssignTickets` on `isStaff`)
+  - the editor ignores the AGENT lock
+  - the editor offered to every staff role while More options is unchanged
+  - END_USER gets the editor
+  - the hook skips the guard on the screen's status
+  - the write guard lets L2 through
+  - a group is sent for someone outside it
+  - the editor calls the API directly
+  - M4 drops the editor for a plain Technician row
+  - M7 gates with its own role check again
 
 ---
 
@@ -927,3 +954,73 @@ So the restriction was not justified, and it was removed:
 - The auth flow, `auth.config.ts`, the dev-token screen.
 - No library, no EAS build, nothing committed.
 - The web repo: byte-for-byte unchanged (file list, sizes and modification times of all 840 files, and SHA-1 of every file under `frontend/src` and `backend/src`, before and after).
+
+---
+
+## 15. The technician, inline on M4 (2026-10-27, uncommitted)
+
+**What Ronit asked for:** the Technician row in Properties showed the value ("Unassigned") with no way to change it there. Impact/urgency, category and country each have a "Change …" link that opens an inline editor with Save and Cancel; the technician should work the same way. **Placement, not a new capability:** assignment already existed (Pick up and More options › Assign… → M7, both TKT-5).
+
+### 15.1 The web's technician picker (read-only, HEAD `d7f3887`)
+
+`TDP` = `FE:pages/tickets/TicketDetailPage.tsx`; `TC` = `BE:modules/tickets/tickets.controller.ts`.
+
+| Question | The web | Source |
+|---|---|---|
+| Where, and for whom | A Technician panel in Properties: "+ Assign", "↔ Reassign" or "✕ Cancel" opens a list under the name. Shown when `role !== 'END_USER' && !isResolvedLocked`, so to L2_MANAGER too (every pick then gets 403). The toolbar also has an "Assign" search modal | `TDP:1776-1801`; lock `:619-622`; modal `:673, :2363-2419`; `BE:tickets.router.ts:20` |
+| How the list is built | 1. **"🌍 Recommended for {country}"**: TKT-10, fetched when the panel opens, shown only when not empty. 2. **The members of the ticket's own group**: LKP-2, plus one `GET /teams/:id` per group. 3. **Only when that group has no members**: a search box, USR-3 with `role=AGENT,ADMIN`, 2+ characters | `TDP:332-336, :1809-1827`; `:337-355, :1805-1806, :1828-1851`; `:287-291, :1852-1873` |
+| Scoped by | **Group** for the members (the ticket's saved group, not a group chosen in the panel). **Category and country** for the recommended list. Search: no scope beyond the two roles | `TDP:1805`; `TC:503-529`; `users.controller.ts:68-92` |
+| Order | Recommended: the server's (no `orderBy`, de-duplicated). Members: the server's (no `orderBy` on `GET /teams/:id`). Search: up to 20 active users, unordered | `TC:520-528`; `teams.controller.ts:30-40`; `users.controller.ts:80-91` |
+| Is "Unassigned" selectable? | **Yes.** "Remove assignment" in the members header while the ticket is assigned, and "Unassign" in the toolbar modal; both send `{ assignedToId: null }` | `TDP:1832-1837`; `:2401-2414` |
+| Does changing the group change the technicians offered? | **Yes, indirectly.** The group is a separate "Group & Site" select that saves at once (TKT-5 `{ assignedToId: current, teamId }`); the panel lists the members of the ticket's saved group, so after the refetch it lists the new group's members. The panel itself has no group choice | `TDP:1889-1895`; `:1805` |
+| What a pick sends | `{ assignedToId }` alone, at once (no Save, no confirmation). With no `teamId` the server moves the ticket to the assignee's first group (05 B.14) | `TDP:1818, :1842, :1865`; `TC:793-802` |
+| After success | Refetch the ticket and its activity, close the panel, toast **"Ticket assigned"** (also after a removal) | `TDP:462-471` |
+| On error | Toast **"Failed to assign ticket"**; the server's message is not shown | `TDP:472` |
+| "Recommended" basis | `categoryCountryAssignee` rows for the ticket's category or any ancestor, in the ticket's country (exact match only; "All Sites" rows are not included). `[]` when the ticket has no country or category. Inactive users are not filtered out (05 B.30) | `TC:503-529` |
+| The current technician | Highlighted with "✓ Current" | `TDP:1820-1822, :1844-1846` |
+
+**The mobile assign picker (M7) already did this**, with its documented differences: it also lets you choose another group, sends `teamId` when the person is a member of the group chosen (05 B.14), sorts members by name, lists recommended people who are in no active group last with a warning (05 B.30), and confirms each assignment. So nothing was re-derived. Its pieces were moved into `src/utils/assignment.ts` and reused.
+
+### 15.2 What was built
+
+- **The link:** "Change technician" under the Technician row, through the same `FieldAction` as "Change impact and urgency", "Change category" and "Change country". It is shown when `ticketFieldPermissions().technician` is `edit`. A locked AGENT gets the lock reason instead; L2_MANAGER and END_USER get the value only. The row is never hidden.
+- **The editor:** the same frame as the country editor. A "Technician" field opens the people picker that M7 uses (`PersonPickerSheet`), then come Save and Cancel (`EditorActions`). The list: "Unassigned", then the recommended people (TKT-10), then the members of the ticket's group (LKP-2), each person once, the current technician marked. When the group has no members, the picker also searches USR-3 (AGENT, ADMIN), as M7 and the web do. The list filters as you type.
+- **Saving:** only on Save; nothing is saved on selection or on leaving (the discard prompt applies). Save is disabled until someone else (or Unassigned) is chosen, and every control is disabled while the save is in flight. Before Save, a notice gives M7's confirmation text: who is assigned and emailed, or that the ticket will have no technician.
+- **The write:** `edit.assign` → `useAssignTicket` → `sendAssignment` → `assignTicket` (TKT-5). The body is `{ assignedToId, teamId? }`, with the ticket's group sent only for one of its members (M7's rule, `assignmentTeamId`). On success, M7's toast ("Assigned to …" or "Assignment removed"). The hook now also writes the server's answer into the ticket's cached detail (as TKT-4 saves do), so the Technician and Group rows, Pick up and the priority note change at once. The refetch follows.
+- **On failure:** the server's message; a 403 says "Your role can't change the technician on this ticket. Nothing was saved." The editor closes and the row shows the saved technician. Nothing is optimistic.
+- **Differences from the web**, all inherited from M7 or the editor pattern: an explicit Save (the web saves on click); the group sent for a member (the web sends none and the server moves the ticket); the server's message on error; members by name; inactive recommended people last with a warning; M7's toasts; L2_MANAGER not offered it (the web's always fail).
+
+### 15.3 One assignment implementation, and how it was checked
+
+- **Who:** `canAssignTickets(role)` in `src/utils/permissions.ts` (ADMIN, AGENT) is now the one rule behind More options' Pick up and Assign, the Technician editor (`ticketFieldPermissions().technician`, plus the AGENT lock), bulk Pick up and Assign, M7's screen guard, and the write guard `assertAssignment`. Before, each of these called `isAgentOrAdmin` itself. The answers are unchanged for every role.
+- **How:** one API function, `assignTicket` (TKT-5), holding the only `/assign` request in `src/`. One single-ticket hook, `useAssignTicket`, used by Pick up (M4), M7 and the editor. Its write is `sendAssignment`: online, the guard on the status on screen, the guard on the server's status (one TKT-3 read), then TKT-5. The two bulk loops, bulk Pick up on M3 and bulk Assign on M7, predate this change. They call the same guard twice and the same `assignTicket` inside the bulk runner, which cannot use a hook per ticket.
+- **Evidence:** `tests/rbac/technician-editor.test.mjs` §6 reads every file under `src/` and pins all of the above. It checks one `assignTicket` definition and one `/assign` URL. It checks that exactly four files mention `useAssignTicket()` (the hook and its three users). It checks that exactly three files call `assignTicket(`, each after `assertAssignment(…)` on the screen's status and on `await fetchCurrentStatus(…)`. It checks that the editor calls none of the API, the guard, `canAssignTickets` or TKT-4 for the technician, and that there is one "Change technician" link. TKT-4 still refuses `assignedToId` and `teamId` from everyone (`fieldEditProblem`), so the editor cannot reach a second path.
+
+### 15.4 Web defects seen (report only, R3)
+
+- The web toasts "Ticket assigned" after **removing** a technician (`TDP:470`).
+- The web's assign error hides the server's message (`TDP:472`).
+- Already recorded: the panel is shown to L2_MANAGER, whose picks all get 403 (§1.8 W5); a pick without `teamId` moves the ticket to the assignee's first group (05 B.14).
+
+### 15.5 What changed (uncommitted)
+
+**Created**
+- `src/utils/assignment.ts`: the lists and the group rule, out of M7.
+- `tests/rbac/technician-editor.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`: `canAssignTickets` (new); `ticketFieldPermissions().technician` (new); `ticketDetailPermissions` and `bulkActions` read `canAssignTickets`.
+- `src/hooks/writeGuards.ts`: `assertAssignment` reads `canAssignTickets`.
+- `src/hooks/useAssignTicket.ts`: the write is `sendAssignment` (exported for the tests, same steps); the success also patches the cached detail. `src/hooks/cache.ts`: comment.
+- `src/screens/tickets/TicketPropertyEditors.tsx`: `TechnicianSection`, `TechnicianForm`, and `usePropertyEditing().assign`.
+- `src/screens/tickets/TicketDetailScreen.tsx`: the Technician row is `TechnicianSection`.
+- `src/screens/tickets/AssignPickerScreen.tsx`: `canAssignTickets`, and its lists, group rule and wording from `utils/assignment.ts` and `writeCopy.ts`; same behaviour.
+- `src/utils/writeCopy.ts`: `unassignMessage`, M7's wording moved.
+- Tests: `property-editing.test.mjs` (the `technician` answers), `role-gating.test.mjs` (the editors' wiring check).
+- Docs: this file; `WEB-VS-MOBILE-ROLES.md` (the assignment row; parity unchanged); `docs/brand/UI-STANDARDS.md` (§8, the inline editor pattern).
+
+**Not touched**
+- Who may assign, and the AGENT lock on CLOSED and CANCELED: the same answers for every role and status.
+- The status flow: TKT-6 POST only; `PUT /tickets/:id` never carries a status.
+- The auth flow, `auth.config.ts`, the dev-token screen; navigation; no library; no EAS build; nothing committed.
+- The web repo: byte-for-byte unchanged (SHA-1 of all 840 files outside `node_modules` and `.git`, before and after).

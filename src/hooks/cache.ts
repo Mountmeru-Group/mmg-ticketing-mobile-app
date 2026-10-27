@@ -43,9 +43,10 @@ export function patchTicketInLists(queryClient: QueryClient, ticket: unknown): v
 }
 
 /**
- * Put the server's answer to a TKT-4 field edit into the ticket's cached detail, so the saved values show at once
- * instead of the old ones until the refetch lands. Not optimistic: called on success. `slaPolicy` is kept, because
- * TKT-4 returns a reference where TKT-3 has the full row; refreshTicket() brings the rest up to date.
+ * Put the server's answer to a TKT-4 field edit or a TKT-5 assignment into the ticket's cached detail, so the saved
+ * values show at once instead of the old ones until the refetch lands. Not optimistic: called on success. `slaPolicy`
+ * is kept, because TKT-4 and TKT-5 return a reference where TKT-3 has the full row; refreshTicket() brings the rest up
+ * to date.
  */
 export function patchTicketDetail(queryClient: QueryClient, ticket: unknown): void {
   if (!looksLikeTicket(ticket)) return;

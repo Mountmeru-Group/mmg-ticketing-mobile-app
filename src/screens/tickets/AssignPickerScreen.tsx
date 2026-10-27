@@ -7,6 +7,8 @@
 // - Every assignment is TKT-5 POST /tickets/:id/assign with `teamId` when known (05 B.14, 08 S5); `teamId: null` is
 //   never sent (it can't clear a team). Each one asks for confirmation (the assignee is emailed).
 // - Bulk mode (2–20 tickets from M3): pick group + person, sequential, stop on 429/5xx, per-ticket results.
+// - Who may assign: canAssignTickets() (utils/permissions.ts). The people listed and the `teamId` sent come from
+//   utils/assignment.ts, which the Technician editor on M4 (./TicketPropertyEditors.tsx) shares.
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -22,29 +24,22 @@ import {
   useTicket, type BulkTarget,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import type { Team, TicketDetail, TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
+import type { TicketDetail, TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
+import {
+  INACTIVE_TECHNICIAN_NOTE, TECHNICIAN_ROLES, assignmentDoneMessage, assignmentTeamId, recommendedTechnicians, teamMembers,
+} from '@/utils/assignment';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
-import { isAgentOrAdmin } from '@/utils/roles';
+import { canAssignTickets } from '@/utils/permissions';
 import { canAssignToSelf } from '@/utils/session';
 import { BULK_ACTION_LIMIT, isResolvedLocked } from '@/utils/ticket-rules';
-import { assignMessage, bulkAssignMessage } from '@/utils/writeCopy';
+import { assignMessage, bulkAssignMessage, unassignMessage } from '@/utils/writeCopy';
 
 type Props = TicketStackScreenProps<'AssignPicker'>;
 
-const TECHNICIAN_ROLES: readonly UserRole[] = ['AGENT', 'ADMIN'];
-
-function membersOf(team: Team | undefined): Person[] {
-  return (team?.members ?? [])
-    .map((m) => m.user)
-    .filter((u): u is NonNullable<typeof u> => !!u && typeof u.id === 'string')
-    .map((u) => ({ id: u.id, displayName: u.displayName, email: u.email }))
-    .sort((a, b) => formatDisplayName(a.displayName).localeCompare(formatDisplayName(b.displayName)));
-}
-
 export function AssignPickerScreen(props: Props) {
   const role: UserRole = useAuthStore((s) => s.user?.role) ?? 'END_USER';
-  if (!isAgentOrAdmin(role)) {
+  if (!canAssignTickets(role)) {
     return (
       <View className="flex-1 bg-gray-50">
         <ScreenHeader title="Assign" variant="close" />
@@ -87,13 +82,9 @@ function SingleAssign({ navigation, route }: Props) {
   const [sheet, setSheet] = useState<'group' | 'people' | null>(null);
   const { leave } = useDiscardGuard({ dirty: false, busy: assign.isPending, what: 'assignment' });
 
-  const members = useMemo(() => membersOf(group.team), [group.team]);
+  const members: Person[] = useMemo(() => teamMembers(group.team), [group.team]);
   // 05 B.30: recommended users may be inactive. Those found in an active group come first; the rest last, flagged.
-  const recommended = useMemo(() => {
-    const inActiveGroup = new Set((group.teams.data ?? []).flatMap((t) => (t.members ?? []).map((m) => m.user?.id)));
-    const people = (suggested.data ?? []).map((u) => ({ id: u.id, displayName: u.displayName, email: u.email, active: inActiveGroup.has(u.id) }));
-    return [...people.filter((p) => p.active), ...people.filter((p) => !p.active)];
-  }, [suggested.data, group.teams.data]);
+  const recommended = useMemo(() => recommendedTechnicians(suggested.data, group.teams.data), [suggested.data, group.teams.data]);
 
   // Every assignment path goes through the single-flight guard (no double sends from a double-tap).
   const doAssign = (...args: Parameters<typeof doAssignNow>) => once(() => doAssignNow(...args));
@@ -107,7 +98,7 @@ function SingleAssign({ navigation, route }: Props) {
     if (!ok) return;
     try {
       await assign.mutateAsync({ ticketId, status: ticket.status, assignedToId: person ? person.id : null, teamId });
-      notify(confirm.done ?? (person ? `Assigned to ${formatDisplayName(person.displayName)}` : 'Assignment removed'));
+      notify(confirm.done ?? assignmentDoneMessage(person ? formatDisplayName(person.displayName) : null));
       leave(() => navigation.goBack());
     } catch (e) {
       reportWriteError('Failed to assign', e);
@@ -117,8 +108,8 @@ function SingleAssign({ navigation, route }: Props) {
   function pickPerson(person: Person, ticketNow: TicketDetail) {
     setSheet(null);
     // Send the selected group only when the person belongs to it; otherwise let the server keep/choose (web parity).
-    const inGroup = members.some((m) => m.id === person.id);
-    const teamId = inGroup ? (group.teamId ?? undefined) : undefined;
+    const teamId = assignmentTeamId(person.id, members, group.teamId);
+    const inGroup = teamId !== undefined;
     const name = formatDisplayName(person.displayName) || person.email;
     void doAssign(person, teamId, {
       title: `Assign to ${name}?`,
@@ -191,7 +182,7 @@ function SingleAssign({ navigation, route }: Props) {
                 onPress={() =>
                   void doAssign(null, undefined, {
                     title: 'Remove assignment?',
-                    message: `#${ticket.ticketNumber} will have no technician. ${current || 'The current technician'} is no longer assigned.`,
+                    message: unassignMessage(ticket.ticketNumber, current),
                     label: 'Remove',
                   })
                 }
@@ -250,7 +241,7 @@ function SingleAssign({ navigation, route }: Props) {
                 <Text className="text-base text-gray-900">{formatDisplayName(p.displayName)}</Text>
                 <Text className="text-xs text-gray-500">
                   {p.email}
-                  {p.active ? '' : ' · Not in any active group — may be inactive'}
+                  {p.active ? '' : ` · ${INACTIVE_TECHNICIAN_NOTE}`}
                 </Text>
               </Pressable>
             ))}
@@ -297,7 +288,7 @@ function BulkAssign({ navigation, route }: Props) {
   const once = useSingleFlight();
   const group = useGroupSelection(null);
   const [sheet, setSheet] = useState<'group' | 'people' | null>(null);
-  const members = useMemo(() => membersOf(group.team), [group.team]);
+  const members: Person[] = useMemo(() => teamMembers(group.team), [group.team]);
   const running = bulk.progress?.running ?? false;
   const { leave } = useDiscardGuard({ dirty: false, busy: running, what: 'bulk assignment' });
 
@@ -319,8 +310,7 @@ function BulkAssign({ navigation, route }: Props) {
   async function pick(person: Person) {
     setSheet(null);
     const name = formatDisplayName(person.displayName) || person.email;
-    const inGroup = members.some((m) => m.id === person.id);
-    const teamId = inGroup ? (group.teamId ?? undefined) : undefined;
+    const teamId = assignmentTeamId(person.id, members, group.teamId);
     const ok = await confirmAction({
       title: `Assign ${eligible.length} ${eligible.length === 1 ? 'ticket' : 'tickets'} to ${name}?`,
       message: bulkAssignMessage(eligible.length, name, skipped.length),
