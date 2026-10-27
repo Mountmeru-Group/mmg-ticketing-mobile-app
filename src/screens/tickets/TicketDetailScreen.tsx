@@ -22,6 +22,8 @@
 //   Properties (Phase G1, ./TicketPropertyEditors.tsx): impact and urgency with the priority preview, category,
 //     country, and the resolution text — each from ticketFieldPermissions(), saved only on an explicit Save via
 //     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
+//     The technician (2026-10-27): the same inline editor, saved through useAssignTicket (TKT-5), the hook Pick up and
+//     Assign… (M7) use; offered exactly where More options offers Assign.
 //   Phase G3 (docs/G3-WEB-BEHAVIOUR.md): a delete button on each file for ADMIN, AGENT and L2_MANAGER, in any status,
 //     confirmed by name, then ATT-5 (permanent); "Submit for approval…" in More options for ADMIN and AGENT, in any
 //     status, opening ./SubmitApprovalScreen.tsx.
@@ -67,7 +69,8 @@ import {
 import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
 import { deleteAttachmentMessage, statusChangeMessage } from '@/utils/writeCopy';
 import {
-  CategorySection, ClassificationSection, CountrySection, ResolutionSection, Row, usePropertyEditing, type PropertyEditing,
+  CategorySection, ClassificationSection, CountrySection, ResolutionSection, Row, TechnicianSection, usePropertyEditing,
+  type PropertyEditing,
 } from './TicketPropertyEditors';
 
 type DetailTab = 'conversation' | 'history' | 'attachments' | 'tasks';
@@ -613,8 +616,8 @@ const StatusActionBar = memo(function StatusActionBar({
 // ── Properties ───────────────────────────────────────────────
 
 /**
- * Impact / urgency (hidden for END_USER, 05 §A.3), category and country each come with their editor or lock reason
- * from ticketFieldPermissions(); group and technician change through Assign (M7), so they are read-only here.
+ * Impact / urgency (hidden for END_USER, 05 §A.3), category, technician and country each come with their editor or lock
+ * reason from ticketFieldPermissions(). The group changes through Assign (M7) only, so it is read-only here.
  */
 function PropertiesCard({
   ticket, can, fields, edit, busy,
@@ -626,14 +629,13 @@ function PropertiesCard({
   busy: boolean;
 }) {
   const resolveBy = effectiveResolveDue(ticket);
-  const technician = formatDisplayName(ticket.assignedTo?.displayName);
   const section = { ticket, can: fields, edit, busy };
   return (
     <Card title="Properties">
       <ClassificationSection {...section} />
       <CategorySection {...section} />
       <Row label="Group">{ticket.team?.name ?? 'Not set'}</Row>
-      <Row label="Technician">{technician || 'Unassigned'}</Row>
+      <TechnicianSection {...section} />
       <CountrySection {...section} />
       <Row label="Resolve by">{resolveBy ? formatDateTime(resolveBy) : 'No SLA'}</Row>
       {ticket.slaHoldStartedAt ? <Row label="SLA paused">{`Since ${formatDateTime(ticket.slaHoldStartedAt)}`}</Row> : null}

@@ -524,10 +524,11 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       forbid: /mode:\s*'(reply|replyAll|note)'|isResolvedLocked\(|deleteAttachment\(|apiClient/,
     },
     {
-      // G1 property editors: who/when only from ticketFieldPermissions(); writes only through useUpdateTicket.
+      // G1 property editors: who/when only from ticketFieldPermissions(); writes only through useUpdateTicket, and the
+      // technician (2026-10-27) only through useAssignTicket, never the TKT-5 API or its guard directly.
       file: 'src/screens/tickets/TicketPropertyEditors.tsx',
-      uses: ['ticketFieldPermissions(', 'useUpdateTicket('],
-      forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s/,
+      uses: ['ticketFieldPermissions(', 'useUpdateTicket(', 'useAssignTicket('],
+      forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s|(?<![\w.])assignTicket\(|sendAssignment\(|canAssignTickets\(/,
     },
     {
       // G5: every role decision on the create form from createTicketPermissions(); the preview is the G1 component.

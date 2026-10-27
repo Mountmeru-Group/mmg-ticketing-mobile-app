@@ -5,7 +5,8 @@ token foundation (`docs/brand/WEB-TOKENS.md`, `src/theme/`). This file has the c
 the one standard chosen for each finding (§2), the contrast report (§3) and the layout checks (§4). Phase C2 fixed two
 defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match. On
 2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4. Phase A1 (2026-10-23) added
-motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10).
+motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
+property-editor pattern on the ticket, now that the technician has one too.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -378,3 +379,34 @@ API call, query or permission changed. **Not run on a device:** there was no bui
   - the left-edge swipe opening the drawer on a gesture-navigation phone, where Android may claim that edge for
     back (the ☰ is then one tab tap away);
   - ServiceRequestForm and ApprovalDetail with the keyboard open.
+
+## 8. Inline property editors on the ticket (restated 2026-10-27)
+
+The ticket's Properties card has four inline editors. Each follows one pattern, from
+`src/screens/tickets/TicketPropertyEditors.tsx`: "Change impact and urgency", "Change category", "Change technician"
+(added 2026-10-27) and "Change country". "Edit resolution", in the Resolution card, follows it too. A new editor uses
+the same pieces and adds no new styles.
+
+- **Closed, the field's rows come first**, as key/value rows (S6). The action goes under them, in `FieldAction`:
+  - **Editable:** a text link (S5) at least 44 dp tall, with an 18 dp `create-outline` icon and a `text-sm
+    font-medium text-blue-700` label "Change …". It sits on its own row with the gray-100 separator.
+  - **Blocked by the ticket's state** (e.g. the AGENT lock): a 14 dp lock icon and the reason in `text-xs
+    text-gray-500`, in the same place.
+  - **The role never edits it:** nothing under the value. The value always shows; the row is never hidden.
+  - While another editor is open or a write is in flight, the link is at 50 % opacity and disabled. Its hint says to
+    finish or cancel the open change first.
+- **Open, the editor replaces the rows**, in a `py-3` block with the gray-100 separator below:
+  - Each choice is a `SelectField` that opens a bottom sheet (`OptionSheet`, or `PersonPickerSheet` for people). A
+    choice is only staged in the field.
+  - A first load shows a small brand-red spinner beside "Loading …". A failed lookup shows `LookupError`.
+  - The consequences of saving go in a `Notice` (info, or warning for a removal), shown only once something has
+    changed.
+  - **Save** (`SubmitButton`, the one primary action) and **Cancel** (`OutlineButton`, 8 dp below) come last.
+- **Behaviour:**
+  - Nothing saves on selection, blur or navigation. Leaving with a staged change asks first.
+  - Save stays disabled until something has changed. While saving, Save shows its spinner, and Cancel and the fields
+    are disabled.
+  - One editor is open at a time.
+  - Success: a toast, the editor closes and the row shows the server's value.
+  - Failure: the server's message (a 403 says the role can't change that field), the editor closes and the row shows
+    the saved value. Nothing is optimistic.

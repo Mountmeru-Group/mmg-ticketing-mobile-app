@@ -1,5 +1,6 @@
 // M4 property editors (Phase G1): impact and urgency with the priority preview, the category cascade, the ticket's
 // country, and the resolution text. The web's behaviour, field by field with sources: docs/G1-WEB-BEHAVIOUR.md.
+// The technician (2026-10-27): the same editor pattern on the Technician row; the web's picker: ROLE-MATRIX.md §15.
 //
 // - WHO and WHEN come from ticketFieldPermissions() (utils/permissions.ts) alone: `edit` shows a "Change …" link,
 //   `locked` shows the saved value with the reason, `view` shows the value only, `hidden` shows nothing.
@@ -9,41 +10,63 @@
 //   matrix value, exactly as the web sends it (G2). Controls are disabled while it is in flight.
 //   Success: a toast, and the editor closes on the server's values. Failure: the server's message (a 403 says the role
 //   can't change that field), and the editor closes so the field shows the saved value again.
+// - The technician saves through useAssignTicket (TKT-5), the hook Pick up and the assign picker (M7) use, with the
+//   same guards, lists and `teamId` rule (utils/assignment.ts). It is not a second assignment path.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
 import {
-  Card, FieldLabel, HtmlText, LookupError, Notice, OptionSheet, OutlineButton, PriorityBadge, SelectField, SubmitButton,
-  type SheetOption,
+  Card, FieldLabel, HtmlText, LookupError, Notice, OptionSheet, OutlineButton, PersonPickerSheet, PriorityBadge, SelectField,
+  SubmitButton, type SheetOption,
 } from '@/components';
-import { useCategories, useCountryOptions, useDiscardGuard, usePriorityMatrix, useSingleFlight, useUpdateTicket } from '@/hooks';
+import {
+  useAssignTicket, useCategories, useCountryOptions, useDiscardGuard, usePriorityMatrix, useSingleFlight, useSuggestedAssignees,
+  useTeams, useUpdateTicket,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import {
   TICKET_IMPACTS, TICKET_URGENCIES, type TicketDetail, type TicketImpact, type TicketPriority, type TicketUrgency,
   type UpdateTicketBody,
 } from '@/types';
+import {
+  TECHNICIAN_ROLES, assignmentDoneMessage, assignmentTeamId, recommendedTechnicians, teamMembers, technicianName,
+  technicianOptions, type Technician,
+} from '@/utils/assignment';
 import { notify, reportFieldWriteError } from '@/utils/dialogs';
-import { IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, categoryCascade, formatDateTime } from '@/utils/format';
+import { IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, categoryCascade, formatDateTime, formatDisplayName } from '@/utils/format';
 import { ticketFieldPermissions, type FieldAccess, type TicketFieldPermissions } from '@/utils/permissions';
 import {
   categoryChoices, categoryIdToSave, categorySavedMessage, categorySelectionOf, classificationChanges, newTicketPriority,
   previewPriority, selectCategoryLevel, type CategoryChoice, type CategoryLevel, type Classification, type PriorityPreview,
 } from '@/utils/ticket-properties';
+import { assignMessage, unassignMessage } from '@/utils/writeCopy';
 
-export type EditorKey = 'classification' | 'category' | 'country' | 'resolution';
+export type EditorKey = 'classification' | 'category' | 'country' | 'resolution' | 'technician';
+/** The editors that save through TKT-4. The technician saves through TKT-5 (`assign`). */
+type FieldEditorKey = Exclude<EditorKey, 'technician'>;
 
-/** Wording per editor. Titles and success toasts are the web's (G1 §1, §3–§5); the field names the 403 message. */
+/**
+ * Wording per editor. Titles and success toasts are the web's (G1 §1, §3–§5); the field names the 403 message.
+ * The technician's toast is M7's, naming the person (assignmentDoneMessage), so it has no fixed `saved`.
+ */
 const COPY: Record<EditorKey, { field: string; failed: string; saved: string }> = {
   classification: { field: 'the impact and urgency', failed: 'Failed to update', saved: 'Updated' },
   category: { field: 'the category', failed: 'Failed to update category', saved: 'Category updated' },
   country: { field: 'the country', failed: 'Failed to update country', saved: 'Country updated' },
   resolution: { field: 'the resolution', failed: 'Failed to update resolution', saved: 'Resolution updated' },
+  technician: { field: 'the technician', failed: 'Failed to assign', saved: '' },
 };
 
 function accessFor(can: TicketFieldPermissions, key: EditorKey): FieldAccess {
   return key === 'classification' ? can.impact : can[key];
+}
+
+/** What the Technician editor saves: a person, or null to remove the assignment, and the group to send with it. */
+export interface TechnicianChoice {
+  person: Technician | null;
+  teamId?: string;
 }
 
 // ── Coordination (one per screen) ────────────────────────────
@@ -55,37 +78,41 @@ export interface PropertyEditing {
   open: (key: EditorKey) => void;
   cancel: () => void;
   setDirty: (dirty: boolean) => void;
-  save: (key: EditorKey, input: UpdateTicketBody) => void;
+  save: (key: FieldEditorKey, input: UpdateTicketBody) => void;
+  /** The Technician editor's Save: TKT-5 through useAssignTicket, the one assignment path. */
+  assign: (choice: TechnicianChoice) => void;
 }
 
 /** Call once on M4, before any early return (it uses hooks). `ticket` is undefined until TKT-3 has answered. */
 export function usePropertyEditing(ticket: TicketDetail | undefined): PropertyEditing {
   const user = useAuthStore((s) => s.user);
   const update = useUpdateTicket();
+  const assignment = useAssignTicket();
   const once = useSingleFlight();
   const [editing, setEditing] = useState<EditorKey | null>(null);
   const [dirty, setDirty] = useState(false);
+  const saving = update.isPending || assignment.isPending;
   // Leaving never saves: unsaved changes ask first, and leaving is blocked while a save is in flight.
-  useDiscardGuard({ dirty: editing !== null && dirty, busy: update.isPending, what: 'change' });
+  useDiscardGuard({ dirty: editing !== null && dirty, busy: saving, what: 'change' });
 
   // The ticket changed under an open editor (refresh, status change) and the field is no longer editable: close it.
   const stillEditable = !editing || !ticket || accessFor(ticketFieldPermissions(user, ticket), editing).mode === 'edit';
   useEffect(() => {
-    if (stillEditable || update.isPending) return;
+    if (stillEditable || saving) return;
     setEditing(null);
     setDirty(false);
-  }, [stillEditable, update.isPending]);
+  }, [stillEditable, saving]);
 
   const close = () => {
     setEditing(null);
     setDirty(false);
   };
 
-  async function run(key: EditorKey, input: UpdateTicketBody) {
+  /** `write` sends the change and returns the success toast. */
+  async function run(key: EditorKey, write: (ticket: TicketDetail) => Promise<string>) {
     if (!ticket) return;
     try {
-      const saved = await update.mutateAsync({ ticketId: ticket.id, status: ticket.status, input });
-      notify(key === 'category' ? categorySavedMessage(ticket, saved) : COPY[key].saved);
+      notify(await write(ticket));
     } catch (e) {
       reportFieldWriteError(COPY[key].failed, COPY[key].field, e);
     } finally {
@@ -95,14 +122,27 @@ export function usePropertyEditing(ticket: TicketDetail | undefined): PropertyEd
 
   return {
     editing,
-    saving: update.isPending,
+    saving,
     open: (key) => {
       setDirty(false);
       setEditing(key);
     },
     cancel: close,
     setDirty,
-    save: (key, input) => void once(() => run(key, input)),
+    save: (key, input) =>
+      void once(() =>
+        run(key, async (t) => {
+          const saved = await update.mutateAsync({ ticketId: t.id, status: t.status, input });
+          return key === 'category' ? categorySavedMessage(t, saved) : COPY[key].saved;
+        }),
+      ),
+    assign: ({ person, teamId }) =>
+      void once(() =>
+        run('technician', async (t) => {
+          await assignment.mutateAsync({ ticketId: t.id, status: t.status, assignedToId: person ? person.id : null, teamId });
+          return assignmentDoneMessage(person ? technicianName(person) : null);
+        }),
+      ),
   };
 }
 
@@ -542,6 +582,113 @@ function CategoryForm({
           onClose={() => setSheet(null)}
         />
       ) : null}
+    </View>
+  );
+}
+
+// ── Technician (TKT-5; the web's picker, ROLE-MATRIX.md §15) ──
+
+/**
+ * The Technician row and its "Change technician" editor. ADMIN and AGENT (not locked) edit, exactly where More options
+ * offers Assign; a locked AGENT sees the reason; L2_MANAGER and END_USER see the value only (ticketFieldPermissions).
+ */
+export function TechnicianSection(props: SectionProps) {
+  const { ticket, edit } = props;
+  const { access, open, blocked } = sectionState('technician', props);
+  if (open) {
+    return (
+      <TechnicianForm
+        ticket={ticket}
+        saving={edit.saving}
+        onCancel={edit.cancel}
+        onDirtyChange={edit.setDirty}
+        onSave={edit.assign}
+      />
+    );
+  }
+  return (
+    <>
+      <Row label="Technician">{formatDisplayName(ticket.assignedTo?.displayName) || 'Unassigned'}</Row>
+      <FieldAction access={access} label="Change technician" onPress={() => edit.open('technician')} blocked={blocked} />
+    </>
+  );
+}
+
+function TechnicianForm({
+  ticket, saving, onCancel, onDirtyChange, onSave,
+}: {
+  ticket: TicketDetail;
+  saving: boolean;
+  onCancel: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onSave: (choice: TechnicianChoice) => void;
+}) {
+  // The assign picker's sources (M7), as the web's (05 §A.4): TKT-10 recommended for the ticket's category and country,
+  // then the members of the ticket's group (LKP-2); USR-3 search when the group has no members.
+  const teams = useTeams({ enabled: true });
+  const suggested = useSuggestedAssignees(ticket.id, { enabled: true });
+  // Keyed on the id, so Save starts disabled even if TKT-3 left out the `assignedTo` object.
+  const current: Technician | null = ticket.assignedToId
+    ? { id: ticket.assignedToId, displayName: ticket.assignedTo?.displayName ?? '', email: ticket.assignedTo?.email ?? '' }
+    : null;
+  const [chosen, setChosen] = useState<Technician | null>(current);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const dirty = (chosen?.id ?? null) !== (ticket.assignedToId ?? null);
+  useReportDirty(dirty, onDirtyChange);
+
+  const team = teams.data?.find((t) => t.id === ticket.teamId);
+  const members = useMemo(() => teamMembers(team), [team]);
+  const recommended = useMemo(() => recommendedTechnicians(suggested.data, teams.data), [suggested.data, teams.data]);
+  const people = useMemo(
+    () =>
+      technicianOptions({
+        recommended,
+        members,
+        currentId: ticket.assignedToId ?? null,
+        countryName: ticket.country ? ticket.country.displayName || ticket.country.name : null,
+        groupName: team?.name ?? null,
+      }),
+    [recommended, members, ticket.assignedToId, ticket.country, team?.name],
+  );
+  const loading = teams.isLoading || suggested.isLoading;
+  const teamId = assignmentTeamId(chosen?.id ?? null, members, ticket.teamId);
+  const currentName = current ? technicianName(current) : '';
+
+  return (
+    <View className="border-b border-gray-100 py-3">
+      {loading ? (
+        <View className="mb-3 min-h-11 flex-row items-center">
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text className="ml-2 text-sm text-gray-700">Loading technicians…</Text>
+        </View>
+      ) : (
+        <SelectField
+          label="Technician"
+          value={chosen ? technicianName(chosen) || 'Current technician' : null}
+          placeholder="Unassigned"
+          onPress={() => setSheetOpen(true)}
+          disabled={saving}
+          hint={members.length > 0 ? `Recommended technicians and the members of ${team?.name ?? 'the group'}` : 'Recommended technicians, or search by name'}
+        />
+      )}
+      <LookupError query={suggested} what="recommendations" />
+      <LookupError query={teams} what="groups" />
+      {dirty && chosen ? <Notice>{assignMessage(ticket.ticketNumber, technicianName(chosen), teamId ? (team?.name ?? null) : null)}</Notice> : null}
+      {dirty && !chosen ? <Notice tone="warning">{unassignMessage(ticket.ticketNumber, currentName)}</Notice> : null}
+      <EditorActions canSave={dirty} saving={saving} onSave={() => onSave({ person: chosen, teamId })} onCancel={onCancel} />
+
+      <PersonPickerSheet
+        visible={sheetOpen}
+        title="Technician"
+        people={people}
+        searchRoles={members.length === 0 ? TECHNICIAN_ROLES : undefined}
+        extraOptions={[{ key: 'none', label: 'Unassigned', onPress: () => { setChosen(null); setSheetOpen(false); } }]}
+        onPick={(p) => {
+          setChosen({ id: p.id, displayName: p.displayName, email: p.email });
+          setSheetOpen(false);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
     </View>
   );
 }
