@@ -15,6 +15,10 @@
 // listed once that screen is ported (3b: CreateTicket, ReplyComposer, SubmitApproval; 3c: the catalogue and Profile).
 // iOS-3b restored those three rows with Android's `forbid` unchanged, and added two Android did not have: StatusClosure
 // and AssignPicker, so every write sheet takes its role decisions from permissions.ts.
+// iOS-3c restored Android's last four rows (the three catalogue screens and Profile), byte-identical, and added five
+// Android did not have: the three task screens, whose role answers moved from inline isStaff / isAgentOrAdmin calls to
+// taskPermissions() (pinned per role in "tasks" below, equal to Android's answers), and the two approval screens (APR-1
+// only, decisions only through their hook).
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -30,8 +34,9 @@ import { TICKET_STATUSES } from '../../src/types/index.ts';
 import { visibleAuditItems, visibleComments } from '../../src/utils/activity.ts';
 import {
   bulkActions, composerPermissions, drawerItems, homeTiles, homeVariant, inlineStatusTransitions, isCommentVisible,
-  mainTabs, showApprovalsShortcut, ticketDetailPermissions, ticketsTitle,
+  mainTabs, showApprovalsShortcut, taskPermissions, ticketDetailPermissions, ticketsTitle,
 } from '../../src/utils/permissions.ts';
+import { isAgentOrAdmin, isStaff } from '../../src/utils/roles.ts';
 import {
   availableTicketFilters, countrySelectorMode, isTicketFilterAllowed, listCountryParam, roleDefaultTicketQuery,
 } from '../../src/utils/ticket-filters.ts';
@@ -498,6 +503,41 @@ describe('country selector', () => {
 
 // ── Wiring: the screens use these decisions instead of making their own ──
 
+describe('tasks: who may act on a task (iOS-3c: taskPermissions(), Android\'s task screens\' own answers)', () => {
+  // END_USER is read-only (05 §A.3, D4; a 🔒 SAFER row: the task routes check no role, 05 C.3). The technician is picked
+  // through USR-3, a 403 for L2_MANAGER, so only ADMIN and AGENT get the picker.
+  forEachPersona(
+    'taskPermissions',
+    {
+      END_USER: { edit: false, pickTechnician: false, mineFilter: false },
+      AGENT: { edit: true, pickTechnician: true, mineFilter: true },
+      TRIAGE_AGENT: { edit: true, pickTechnician: true, mineFilter: true },
+      L2_MANAGER: { edit: true, pickTechnician: false, mineFilter: true },
+      ADMIN: { edit: true, pickTechnician: true, mineFilter: true },
+    },
+    (p) => taskPermissions(p.role),
+  );
+
+  test('the same answers Android\'s screens computed inline, for every role, no session and an unknown role', () => {
+    for (const role of ['END_USER', 'AGENT', 'L2_MANAGER', 'ADMIN', 'GUEST']) {
+      const android = { edit: isStaff(role), pickTechnician: isAgentOrAdmin(role), mineFilter: isStaff(role) };
+      assert.deepEqual(taskPermissions(role), android, role);
+    }
+    // Android: `role ?? 'END_USER'` (detail, editor) and `!!user && isStaff(user.role)` (list): nothing without a user.
+    assert.deepEqual(taskPermissions(undefined), { edit: false, pickTechnician: false, mineFilter: false });
+    assert.deepEqual(taskPermissions(null), { edit: false, pickTechnician: false, mineFilter: false });
+  });
+
+  test('M4\'s task controls and the task screens agree for every role and status', () => {
+    for (const name of NAMES) {
+      for (const status of TICKET_STATUSES) {
+        const viewer = PERSONAS[name];
+        assert.equal(ticketDetailPermissions(viewer, { status, assignedToId: null }).editTasks, taskPermissions(viewer.role).edit, `${name} ${status}`);
+      }
+    }
+  });
+});
+
 describe('wiring: screens take role decisions from utils/permissions.ts', () => {
   const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
   /** Low-level role gates a gated screen must not call directly (it would bypass the tested decision). */
@@ -582,17 +622,68 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       uses: ['ticketListFilters(', 'useTickets('],
       forbid: /listTickets\(|apiClient|searchUsers\(|listTeams\(/,
     },
-    // iOS-3c adds back, with their screens: ServiceCatalogScreen, ServiceRequestFormScreen, ServiceRequestDetailScreen
-    // (serviceCatalogPermissions() and their hooks) and ProfileScreen (countrySelectorMode()), each with its Android
-    // `forbid` unchanged.
+    {
+      // G4: the catalogue's views only from serviceCatalogPermissions(); the lists only through the hooks.
+      file: 'src/screens/catalog/ServiceCatalogScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'useMyServiceRequests(', 'can.myRequests'],
+      forbid: /listServiceRequests\(|listServiceItems\(|listServiceCategories\(|apiClient/,
+    },
+    {
+      // G4: request properties only from serviceCatalogPermissions(); the write only through useSubmitServiceRequest.
+      file: 'src/screens/catalog/ServiceRequestFormScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'useSubmitServiceRequest(', 'can.requestProperties'],
+      forbid: /createServiceRequest\(|apiClient|AttachmentPicker|confirmAction\(/,
+    },
+    {
+      // G4: a request is shown only when it is the person's own.
+      file: 'src/screens/catalog/ServiceRequestDetailScreen.tsx',
+      uses: ['serviceCatalogPermissions(', 'isOwnServiceRequest('],
+      forbid: /getServiceRequest\(|apiClient/,
+    },
     { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
+    { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },
+    {
+      // iOS-3c (not in Android's list): "Assigned to me" only from taskPermissions(); the list only through useTaskFeed.
+      file: 'src/screens/tasks/TaskListScreen.tsx',
+      uses: ['taskPermissions(', 'can.mineFilter', 'useTaskFeed('],
+      forbid: /listTickets\(|listTasks\(|apiClient/,
+    },
+    {
+      // iOS-3c (not in Android's list): done / edit / remove only from taskPermissions(); writes only through the hooks.
+      file: 'src/screens/tasks/TaskDetailScreen.tsx',
+      uses: ['taskPermissions(', 'useToggleTask(', 'useDeleteTask('],
+      forbid: /\bupdateTask\(|\bdeleteTask\(|apiClient/,
+    },
+    {
+      // iOS-3c (not in Android's list): editing and the technician picker only from taskPermissions(); the save only
+      // through useSaveTask. Its one other gate, canAssignToSelf (the developer-token placeholder), is checked below.
+      file: 'src/screens/tasks/TaskEditorScreen.tsx',
+      uses: ['taskPermissions(', 'can.edit', 'can.pickTechnician', 'useSaveTask(', 'TASK_ASSIGNEE_ROLES'],
+      forbid: /\bcreateTask\(|\bupdateTask\(|apiClient/,
+    },
+    {
+      // iOS-3c (not in Android's list): my pending approvals only (APR-1), never the unscoped GET /approvals (05 C.16).
+      file: 'src/screens/approvals/ApprovalsInboxScreen.tsx',
+      uses: ['usePendingApprovals('],
+      forbid: /listPendingApprovals\(|apiClient|['"`]\/approvals/,
+    },
+    {
+      // iOS-3c (not in Android's list): the approval acted on is approvalOnScreen()'s; the decision only through its hook.
+      file: 'src/screens/approvals/ApprovalDetailScreen.tsx',
+      uses: ['usePendingApprovals(', 'approvalOnScreen(', 'useDecideApproval('],
+      forbid: /approveApproval\(|rejectApproval\(|listPendingApprovals\(|apiClient|['"`]\/approvals/,
+    },
   ];
 
   for (const { file, uses, forbid } of GATED) {
     test(path.basename(file), () => {
       const src = read(file);
       for (const call of uses) assert.ok(src.includes(call), `${file} must call ${call}…)`);
-      const exempt = file.endsWith('ProfileScreen.tsx') || file.endsWith('TicketListScreen.tsx') || file.endsWith('AssignPickerScreen.tsx');
+      const exempt =
+        file.endsWith('ProfileScreen.tsx') ||
+        file.endsWith('TicketListScreen.tsx') ||
+        file.endsWith('AssignPickerScreen.tsx') ||
+        file.endsWith('TaskEditorScreen.tsx');
       if (!exempt) assert.doesNotMatch(src, RAW_GATE, `${file} must not call a role gate directly`);
       if (forbid) assert.doesNotMatch(src, forbid, `${file} hard-codes a role-gated element`);
     });
@@ -605,6 +696,11 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
 
   test('AssignPickerScreen calls no role gate except canAssignToSelf, for "Assign to me" (iOS-3b)', () => {
     const src = read('src/screens/tickets/AssignPickerScreen.tsx').replace(/canAssignToSelf\(/g, '');
+    assert.doesNotMatch(src, RAW_GATE);
+  });
+
+  test('TaskEditorScreen calls no role gate except canAssignToSelf, for "Assign to me" (iOS-3c, as Android)', () => {
+    const src = read('src/screens/tasks/TaskEditorScreen.tsx').replace(/canAssignToSelf\(/g, '');
     assert.doesNotMatch(src, RAW_GATE);
   });
 });

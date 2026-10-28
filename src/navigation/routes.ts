@@ -83,12 +83,14 @@ export const RECORD_ID_PARAM = {
  * The write sheets (iOS-3b): one sheet per ticket, or per batch of tickets, for the same reason. React Navigation 7
  * reuses the sheet on top when the same route is opened again with other params; without getId, a typed reply, staged
  * files or a closure form would then belong to another ticket. A batch's id is its ticket ids, joined in order.
+ * iOS-3c: the task editor too, one sheet per task: its id is the ticket's, then the task's ("new" while creating).
  */
 export const SHEET_ID_PARAM = {
   ReplyComposer: 'ticketId',
   StatusClosure: 'ticketIds',
   AssignPicker: 'ticketIds',
   SubmitApproval: 'ticketId',
+  TaskEditor: 'ticketId',
 } as const satisfies Partial<Record<SheetRoute, string>>;
 
 /**
@@ -99,7 +101,6 @@ export const WITHOUT_GET_ID: Partial<Record<StackRoute | SheetRoute, string>> = 
   TicketLink: 'Holds no state of its own: everything comes from `link`, so a reused resolver resolves the new link.',
   TicketList: 'The list root; a filter from Home replaces the one shown, as on Android (`pop: true`).',
   ServiceCatalog: 'The catalogue root; `view` and `resetAt` switch what it shows, as on Android.',
-  TaskEditor: 'A sheet that opens only from the screen beneath it and covers everything; still the DEV placeholder until iOS-3c, which ports it.',
 };
 
 type GetId = (options: { params: Readonly<object | undefined> }) => string | undefined;
@@ -109,12 +110,19 @@ export function getIdFor(name: string): GetId | undefined {
   const key = ({ ...RECORD_ID_PARAM, ...SHEET_ID_PARAM } as Record<string, string>)[name];
   if (!key) return undefined;
   return ({ params }) => {
-    const value = (params as Record<string, unknown> | undefined)?.[key];
-    if (typeof value === 'string') return value;
-    // A batch (ticketIds): its ids in order. An empty or malformed list names no record.
-    if (Array.isArray(value) && value.length > 0 && value.every((id) => typeof id === 'string')) return value.join(',');
-    return undefined;
+    const values = params as Record<string, unknown> | undefined;
+    const id = recordId(values?.[key]);
+    if (id === undefined || name !== 'TaskEditor') return id;
+    // One editor per task (iOS-3c): the ticket, then the task, or "new" while creating one.
+    return `${id}/${typeof values?.taskId === 'string' ? values.taskId : 'new'}`;
   };
+}
+
+function recordId(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  // A batch (ticketIds): its ids in order. An empty or malformed list names no record.
+  if (Array.isArray(value) && value.length > 0 && value.every((id) => typeof id === 'string')) return value.join(',');
+  return undefined;
 }
 
 export function isStackRoot(tab: AppTab, name: string): boolean {
@@ -124,9 +132,10 @@ export function isStackRoot(tab: AppTab, name: string): boolean {
 /**
  * Tab roots whose title stays standard. react-native-screens collapses a large title only against the scroll view on
  * the screen's first-subview chain, so a bar pinned above the list would leave it large for good. The ticket list keeps
- * its search and filters pinned, as on Android (iOS-3a); iOS-4 can move the search into the navigation bar.
+ * its search and filters pinned, as on Android (iOS-3a), and so does the approvals inbox its type chips (iOS-3c); iOS-4
+ * can move them into the navigation bar.
  */
-const PINNED_BAR_ROOTS: ReadonlySet<string> = new Set(['TicketList']);
+const PINNED_BAR_ROOTS: ReadonlySet<string> = new Set(['TicketList', 'ApprovalsInbox']);
 
 /** Tab roots get the iOS large title, unless a bar is pinned above their list; pushed screens a standard one (HIG). */
 export function hasLargeTitle(tab: AppTab, name: string): boolean {

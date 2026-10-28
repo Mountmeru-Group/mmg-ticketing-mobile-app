@@ -1,5 +1,6 @@
 // Phase 1 scaffold layout. Since M1 Login was built against A2 it is used ONLY by the __DEV__ token screen, which is
-// deleted in Phase 8 together with this file. iOS: the signed-in routes' placeholders are DevPlaceholderScreen instead.
+// deleted in Phase 8 together with this file. iOS: it is not a route placeholder; every signed-in route has its screen
+// since iOS-3c, and this layout goes with the developer-token screen (compliance K1).
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

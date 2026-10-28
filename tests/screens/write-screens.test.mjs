@@ -593,7 +593,8 @@ describe("rule: bulk actions — at most 20, one at a time, Android's stop rule,
 describe('rule: one sheet per ticket — typed text and staged files never carry from ticket A to ticket B', () => {
   test('the write sheets and the ticket screen have getId by ticket (tests/navigation/get-id runs the router)', () => {
     assert.equal(RECORD_ID_PARAM.TicketDetail, 'ticketId'); // M4's staged uploads and open property editor
-    assert.deepEqual(Object.keys(SHEET_ID_PARAM).sort(), ['AssignPicker', 'ReplyComposer', 'StatusClosure', 'SubmitApproval']);
+    // iOS-3c: the task editor joins them, one sheet per task (get-id.test.mjs).
+    assert.deepEqual(Object.keys(SHEET_ID_PARAM).sort(), ['AssignPicker', 'ReplyComposer', 'StatusClosure', 'SubmitApproval', 'TaskEditor']);
     assert.equal(getIdFor('ReplyComposer')({ params: { ticketId: 'A', mode: 'reply' } }), 'A');
     assert.notEqual(getIdFor('ReplyComposer')({ params: { ticketId: 'B', mode: 'reply' } }), 'A');
     assert.equal(getIdFor('StatusClosure')({ params: { ticketIds: ['A', 'B'] } }), 'A,B');
@@ -735,10 +736,10 @@ describe('the write sheets on iOS', () => {
     assert.match(src, /validateUploadFiles\(\[\.\.\.files, \.\.\.next\]\)/, 'still checked on the device before staging');
   });
 
-  test('"Add task" (staff) opens TaskEditor, which stays the DEV placeholder until iOS-3c', () => {
+  test('"Add task" (staff) opens TaskEditor, the real task editor since iOS-3c', () => {
     assert.match(read(DETAIL), /tab === 'tasks' && can\.editTasks \? \([\s\S]{0,300}navigation\.navigate\('TaskEditor', \{ ticketId \}\)/);
     const root = read('src/navigation/RootNavigator.tsx');
-    assert.doesNotMatch(root.slice(root.indexOf('const SHEETS'), root.indexOf('};', root.indexOf('const SHEETS'))), /TaskEditor/);
+    assert.match(root.slice(root.indexOf('const SHEETS'), root.indexOf('};', root.indexOf('const SHEETS'))), /^\s+TaskEditor: TaskEditorScreen,$/m);
   });
 
   test('no date field on the write sheets, and no Android-only control anywhere on the write path', () => {
