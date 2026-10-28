@@ -2,7 +2,7 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b and iOS-2 with what each phase actually built (§4.1–§4.5).
+> Updated in iOS-1b, iOS-2, iOS-3a and iOS-6 with what each phase actually built (§4.1–§4.5, §4.9, §4.10).
 
 ## 0. Port source and fixed facts
 
@@ -37,10 +37,11 @@ Rules used:
   - `src/api/auth.api.ts`, `src/config/auth.config.ts`, `src/store/auth.store.ts`, `src/types/navigation.ts`, `src/utils/dialogs.ts`;
   - `src/utils/deep-links.ts` and `src/utils/permissions.ts` (reclassified KEEP → ADAPT in iOS-2: the tab bar and More);
   - `scripts/verify-release-bundle.js`;
-  - `tests/auth/mobile-sso.test.mjs`, `tests/rbac/role-gating.test.mjs`, `tests/rbac/service-catalog.test.mjs`.
+  - `tests/auth/mobile-sso.test.mjs`, `tests/rbac/role-gating.test.mjs`, `tests/rbac/service-catalog.test.mjs`;
+  - `src/hooks/useProfile.ts`, `tests/support/stubs/expo-auth-session.mjs` and `tests/support/stubs/expo-secure-store.mjs` (reclassified KEEP → ADAPT in iOS-6: sign-out moved into `auth.api.ts`; the stubs record what the iOS tests check).
 - **The pre-SSO test login (§8) is not counted here.** It is a proposal, so the classification below covers only what the port itself needs. §8 lists the files the test login would change if it is approved.
 
-**Totals: KEEP 171 · ADAPT 31 · SKIP 3 · SCREEN 25 = 230.** iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
+**Totals: KEEP 168 · ADAPT 34 · SKIP 3 · SCREEN 25 = 230.** iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
 
 ## 2. Phase map
 
@@ -55,7 +56,7 @@ Rules used:
 | **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read, **iOS-3b** write, **iOS-3c** modules |
 | **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
 | **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
-| **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`) |
+| **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
 | **iOS-9** | **App Store readiness + submit:** metadata, screenshots, privacy labels, demo account, review notes, test login removed, `production` profile |
@@ -148,7 +149,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/api/approvals.api.ts` | KEEP | iOS-1b | — |
 | `src/api/attachmentDownload.ts` | KEEP | iOS-1b | `expo-sharing` opens the iOS share sheet. `dialogTitle` is Android-only and is ignored on iOS |
 | `src/api/attachments.api.ts` | KEEP | iOS-1b | — |
-| `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b. In iOS-6, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5 |
+| `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b. In iOS-6, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5. **iOS-6 (built 2026-10-28):** done, through `AUTH_SESSION_OPTIONS` in `auth.config.ts`. Also: `codeChallengeMethod: S256` is stated, and `signOutAndWipe()` holds the sign-out sequence, moved unchanged out of `useSignOut` so the tests can run it (§4.10) |
 | `src/api/client.ts` | KEEP | iOS-1b | — |
 | `src/api/comments.api.ts` | KEEP | iOS-1b | — |
 | `src/api/dashboard.api.ts` | KEEP | iOS-1b | — |
@@ -206,7 +207,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `src/config/auth.config.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b; nothing calls it on iOS before iOS-6. In iOS-6, `getAuthRedirectUri()` returns `'msauth.com.mountmeru.servicedesk://auth'` instead of the Android `msauth://com.mountmeru.servicedesk/<signature hash>`. `AUTH_REDIRECT_SCHEME` becomes `'msauth.com.mountmeru.servicedesk'`. Drop the unused `makeRedirectUri` import and fix the comments. The client and tenant IDs stay: same Entra registration, so the backend's ID-token audience check is unchanged |
+| `src/config/auth.config.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b; nothing calls it on iOS before iOS-6. In iOS-6, `getAuthRedirectUri()` returns `'msauth.com.mountmeru.servicedesk://auth'` instead of the Android `msauth://com.mountmeru.servicedesk/<signature hash>`. `AUTH_REDIRECT_SCHEME` becomes `'msauth.com.mountmeru.servicedesk'`. Drop the unused `makeRedirectUri` import and fix the comments. The client and tenant IDs stay: same Entra registration, so the backend's ID-token audience check is unchanged. **iOS-6 (built 2026-10-28):** done. `getAuthRedirectUri()` returns `IOS_AUTH_REDIRECT_URI` on iOS and throws elsewhere; `isMicrosoftSignInConfigured()` is false off iOS. `AUTH_SESSION_OPTIONS` holds D5 |
 | `src/config/env.ts` | KEEP | iOS-1b | UAT only; PROD placeholder unchanged |
 
 ### 3.8 `src/hooks/` (31)
@@ -230,7 +231,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/hooks/useLookups.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useNotifications.ts` | KEEP | iOS-1b | — |
 | `src/hooks/usePostComment.ts` | KEEP | iOS-1b | — |
-| `src/hooks/useProfile.ts` | KEEP | iOS-1b | — |
+| `src/hooks/useProfile.ts` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** `useSignOut` calls `signOutAndWipe()` (`auth.api.ts`) instead of running AUTH-3 and `endSession` itself. Same sequence, same 5 s cap; now testable under Node |
 | `src/hooks/useReduceMotion.ts` | KEEP | iOS-1b | `AccessibilityInfo.isReduceMotionEnabled` reads iOS's Reduce Motion setting. The comment names only Android's equivalent |
 | `src/hooks/useServiceCatalog.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useSingleFlight.ts` | KEEP | iOS-1b | — |
@@ -269,7 +270,7 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/screens/PlaceholderScreen.tsx` | ADAPT | iOS-2 | Copied in iOS-2; the `'drawer'` value is removed from `headerVariant`. It is used only by `DevTokenScreen`. The signed-in routes' placeholders are the new `DevPlaceholderScreen` (§7) |
 | `src/screens/auth/DevTokenScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. `__DEV__` only, as on Android, and absent from the exported release bundle (compliance A2). §8 would change it only if approved |
 | `src/screens/auth/LoginScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. Nothing platform-specific. The `__DEV__` hint shows whichever redirect `auth.config.ts` returns, which is the Android one until iOS-6, so Microsoft sign-in can't finish on iOS before then |
-| `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-6 |
+| `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-6. **iOS-6:** unchanged. `tests/auth/ios-sso.test.mjs` runs the iOS sequences: the sheet (`inactive`), a trip to Authenticator during sign-in (`background`), and Control Centre while idle (`inactive`). None of them clears the banner. On real AppState events in iOS-7 |
 | `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-3c | §6 #14 |
 | `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c | §6 #13 |
 | `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-3c | §6 #20 |
@@ -365,7 +366,7 @@ Several suites read screen or navigator source files as text. Each suite is copi
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `tests/auth/mobile-sso.test.mjs` | ADAPT | iOS-2, then iOS-6 | **Copied as it is in iOS-2**, together with `src/screens/auth/signInAttempt.ts`, which it imports; it passes. In iOS-6 its fixed-redirect assertion (line 152) changes to `msauth.com.mountmeru.servicedesk://auth`, together with `auth.config.ts` |
+| `tests/auth/mobile-sso.test.mjs` | ADAPT | iOS-2, then iOS-6 | **Copied as it is in iOS-2**, together with `src/screens/auth/signInAttempt.ts`, which it imports; it passes. In iOS-6 its fixed-redirect assertion (line 152) changes to `msauth.com.mountmeru.servicedesk://auth`, together with `auth.config.ts`. **iOS-6 (built):** done; it also asserts the sheet options (`AUTH_SESSION_OPTIONS`). All 34 pass |
 | `tests/rbac/g3-features.test.mjs` | KEEP | iOS-3b | Reads the TicketDetail, ReplyComposer and SubmitApproval screens and `TicketStack.tsx` |
 | `tests/rbac/g5-audit.test.mjs` | KEEP | iOS-3b | Reads `CreateTicketScreen` |
 | `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a (copied) | Reads `TicketListScreen` and `TicketFiltersScreen`. Copied unchanged; all pass |
@@ -376,8 +377,8 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b | Reads AssignPicker, TicketDetail and TicketPropertyEditors |
 | `tests/support/loader.mjs` | KEEP | iOS-1b | — |
 | `tests/support/register.mjs` | KEEP | iOS-1b | — |
-| `tests/support/stubs/expo-auth-session.mjs` | KEEP | iOS-1b | The comment says "needs an Android build" (wording only) |
-| `tests/support/stubs/expo-secure-store.mjs` | KEEP | iOS-1b | It ignores the options argument, so the `keychainAccessible` change does not affect it. It already exports `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` |
+| `tests/support/stubs/expo-auth-session.mjs` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** exports `CodeChallengeMethod`; records the options passed to `promptAsync`; the unused `makeRedirectUri` is gone; the comment says "device build" |
+| `tests/support/stubs/expo-secure-store.mjs` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** records each call's options (`__calls()`, never a value), so `tests/auth/ios-sso.test.mjs` can check `keychainAccessible` on every call; also exports the other three accessibility constants |
 
 ## 4. ADAPT details
 
@@ -635,6 +636,7 @@ Unchanged: Home's KPI tiles switch to the Tickets tab with the named filter. The
 - **§7.2:** add the iOS row: `msauth.com.mountmeru.servicedesk://auth` through `ASWebAuthenticationSession`, plus the `preferEphemeralSession` decision (D5).
 - **§5.1:** record that `keychainAccessible` is now in the code (`auth.store.ts`).
 - **§6:** changes only if §8 is approved.
+- **Done in iOS-6 (2026-10-28), differently:** §7.1–§7.6 are left as Android's record, with a pointer at the top of §7. All the iOS content (registration, redirect, the sheet, D5, Keychain, sign-out, bundle proof, device checks) is in a new **§7.7**. The header and §5.1 each gained one iOS line. §6 is unchanged.
 
 ### 4.7 `docs/RELEASE.md` (iOS-7)
 The file name is kept, because code comments cite "docs/RELEASE.md §6".
@@ -711,6 +713,36 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 - `tests/rbac/list-filters.test.mjs`, unchanged.
 - `tests/rbac/role-gating.test.mjs`, moved forward from iOS-3c (§3.15).
 - `tests/screens/read-screens.test.mjs`, new (§7). Its gate, wiring and Reduce Motion checks were each shown to fail when the code under test was broken on purpose.
+
+### 4.10 iOS-6: Microsoft SSO on iOS (built 2026-10-28)
+
+**Approved by Ronit on 2026-10-28** (the iOS-6 plan, with the recommended answers): D5 `preferEphemeralSession: true`; the bundle's client-secret check matches secret values, not the library's option names; this manifest and compliance rows A2, A4, F2, G1, H3, H6 and K1 updated. Pulled forward ahead of iOS-3b–iOS-5. Ronit reports that Entra has the iOS/macOS platform registered.
+
+**What changed** (the details are in `02-AUTH.md` §7.7):
+- `src/config/auth.config.ts`: the redirect `msauth.com.mountmeru.servicedesk://auth` on iOS. Anywhere else, `getAuthRedirectUri()` throws and sign-in shows `not-configured`; there is no Android fallback in this branch. `AUTH_SESSION_OPTIONS` = `{ preferEphemeralSession: true }`.
+- `src/api/auth.api.ts`: passes `AUTH_SESSION_OPTIONS` to `promptAsync`; states `codeChallengeMethod: S256`; adds `signOutAndWipe()`.
+- `src/hooks/useProfile.ts`: `useSignOut` calls `signOutAndWipe()`.
+- Not changed: `app.json` (its `scheme` was already right), `auth.store.ts` (already `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`), `LoginScreen.tsx`, `signInAttempt.ts`, `AuthStack.tsx`, `DevTokenScreen.tsx`, `package.json`. No new package and no `eas` command.
+- `maybeCompleteAuthSession` is not called. It is a no-op on iOS, and calling it would need `expo-web-browser` as a direct dependency.
+
+**Tests:** 399 → 429.
+- `tests/auth/mobile-sso.test.mjs`: line 152 now asserts the iOS URI, and the test also asserts the sheet options.
+- `tests/auth/ios-sso.test.mjs`: new, 30 tests (§7).
+- **Shown to fail when the code was broken on purpose:**
+  - the sheet made non-ephemeral;
+  - an `msauth://` redirect;
+  - the Keychain class changed to `WHEN_UNLOCKED`;
+  - S256 not stated;
+  - the wipe made to wait for a successful logout;
+  - the 5 s cap removed.
+
+**Release bundle** (`npx expo export --platform ios`, Hermes):
+- 0 developer-token strings out of 12 (the dev control has 12/12) and 0 DEV-placeholder strings.
+- The iOS redirect is present; `msauth://` and the Android hash are absent.
+- No client-secret value. `client_secret` and `clientSecret` occur only in `expo-auth-session`.
+- The only host is `uat-servicedesk.mountmerugroup.com`.
+
+**Still to check on a device (iOS-7):** that Entra accepts the redirect, that the sheet returns the code, the real PKCE flow, AUTH-P2 with an iOS ID token, the Keychain across a restart and a reinstall, and the stale banner on real AppState events.
 
 ## 5. SKIP
 
@@ -795,6 +827,7 @@ Android-only parts of ADAPT files, not brought over:
 | `src/utils/phase-gate.ts` | iOS-3a (built); deleted in iOS-3b | The write gate (§4.9): `WRITE_CONTROLS = false` and `readOnlyDetail()`, `readOnlyFields()`, `readOnlyActions()`, which empty the role answers' write parts so the read screens offer no write |
 | `src/theme/shadows.ts` | iOS-3a (built) | `shadows.fab`: shadowColor, shadowOffset, shadowOpacity and shadowRadius from the palette, for the floating "+" button (Android: `shadow-lg` / elevation) |
 | `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built) | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9) |
+| `tests/auth/ios-sso.test.mjs` | iOS-6 (built) | Microsoft sign-in on iOS (§4.10):<br>- the exact redirect and its match with the `app.json` scheme;<br>- no `msauth://` in `src/`, and other platforms refused;<br>- PKCE S256, the scopes, the fixed IDs, and no client secret in `src/` or the requests;<br>- the ephemeral sheet, and every cancel path ending without a banner;<br>- the 401 and 403 copy;<br>- `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` on every Keychain call;<br>- sign-out: AUTH-3, then the Keychain, query cache and UI store wiped, even when logout fails or hangs;<br>- the `name` and `department` lessons, and the `__DEV__` gate on the developer-token screen.<br>`tests/support/stubs/react-native.mjs` gains `Platform.OS` ('ios', with a setter) |
 | `src/store/installMarker.ts` | iOS-2 (built) | **iOS Keychain items survive uninstall.** On the first launch after an install, no marker file exists in the app container yet. In that case, wipe the three `mmg.session.*` keys and write the marker. A reinstalled app then never starts signed in to a session from before it was deleted |
 
 **iOS identity and settings** (the values are in §4.2 and §4.3):
@@ -887,7 +920,7 @@ Any TestFlight test login therefore needs **your written amendment to 02 §6 and
 | D2 | Pre-SSO sign-in (§8) | Ask IT for the iOS redirect now (§8.5). Approve §8.3 only as the fallback |
 | D3 | Pending-approvals badge on the More tab, as well as on its row | **Decided 2026-10-27 (iOS-2 plan #1):** yes, for END_USER and L2_MANAGER, whose Approvals is a More row. ADMIN and AGENT have the Approvals tab and its badge |
 | D4 | Tab bar: keep the custom bar, or switch to the native iOS tab bar (Liquid Glass on iOS 26) | **Decided for v1 on 2026-10-27 (iOS-2 plan #3):** React Navigation's own bar, which supports `freezeOnBlur`. Android's custom bar is not ported. The native bar (`@react-navigation/bottom-tabs/unstable`, already installed) is reconsidered in iOS-4 |
-| D5 | `preferEphemeralSession` for Microsoft sign-in | Yes |
+| D5 | `preferEphemeralSession` for Microsoft sign-in | **Decided 2026-10-28 (iOS-6 plan):** yes. Built in `AUTH_SESSION_OPTIONS`; trade-off in `02-AUTH.md` §7.7 |
 | D6 | Packages: add `expo-updates` and `expo-dev-client`; remove `@react-navigation/drawer`; pin `eas-cli` | Approve all four |
 | D7 | EAS owner for `setu-ios` (`ronitpc`, as for Android?), and the Apple Developer team | Your call |
 | D8–D11 | Distribution route, dark mode, account deletion, App Store name | See `APP-STORE-COMPLIANCE.md` |

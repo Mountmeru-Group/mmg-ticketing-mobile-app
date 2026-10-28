@@ -6,6 +6,7 @@
 > - **Backend:** AUTH-P2 is **deployed to UAT**: `https://uat-servicedesk.mountmerugroup.com/api/v1/auth/microsoft/mobile`. Production is **not confirmed** (`10-A2-STATUS.md` §0).
 > - **The contract is CONFIRMED, not assumed.** The backend team gave the real shape on **2026-10-19**; recorded here 2026-10-20 (§7.5).
 >   - Its `user` has **`name`**, not `displayName`, plus `department` and `phone`. It is **not** the `GET /auth/me` user shape (§7.5).
+> - **iOS (`ios-dev`, iOS-6, 2026-10-28):** redirect `msauth.com.mountmeru.servicedesk://auth` through Apple's sign-in sheet, PKCE S256, Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` (§7.7). Code complete and tested with mocks; **not yet verified on a device** (iOS-7).
 > - `__DEV__` builds keep the developer-token screen as the fallback until SSO works end to end. It is removed in Phase 8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
 
@@ -225,6 +226,7 @@ This is how the mobile app must behave once (a) or (b) exists. There is **no ref
 - **Token and `expiresAt`:** `expo-secure-store` only.
   - Suggested keys: `mmg.session.token`, `mmg.session.expiresAt`.
   - Use `keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` so the token is not restored to another device from backup.
+    - **iOS (`ios-dev`):** in the code since iOS-1b. Every `expo-secure-store` call in `src/store/auth.store.ts` passes it; `tests/auth/ios-sso.test.mjs` pins it (iOS-6). Why this class: §7.7.
   - **Never** use AsyncStorage, MMKV, Zustand-persist, logs, crash reports or analytics.
 - **User profile** (`AuthUser`): a Zustand store. It may be persisted to AsyncStorage for fast startup, since it holds no secret.
   - Refresh it from `GET /auth/me` on every cold start and every foreground after more than 15 minutes.
@@ -303,6 +305,8 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 ---
 
 ## 7. Implemented flow: native Microsoft SSO (A2, Phase 2, 2026-10-19)
+
+> §7.1–§7.6 are the Android record (branch `dev`). Their redirect text is out of date even for Android (`11-SSO-VERIFY.md` §7 item 2). **For iOS, read §7.7.**
 
 ### 7.1 Entra ID app registration (exists)
 - **Type:** public client, platform "Mobile and desktop applications". PKCE. **No client secret.** The app contains no secret, and none is needed.
@@ -478,3 +482,67 @@ Accept: application/json
     - One UUID-v4 literal: the EAS `extra.eas.projectId` in `app.json`. It is bundled because `src/config/env.ts` imports `app.json`. **This predates Phase 2.**
     - Once the real Entra IDs are filled in, those two GUIDs will be flagged the same way.
     - Suggested fix (not applied): match secret **values** instead of the property names, and allow-list the projectId and the two Entra IDs.
+
+### 7.7 iOS (`ios-dev`, iOS-6, 2026-10-28)
+**Status:** code complete and tested with mocks (`tests/auth/ios-sso.test.mjs`, plus the 34 contract tests in `tests/auth/mobile-sso.test.mjs`). **Not yet verified on a device.** The first TestFlight build (iOS-7) does that.
+
+**Entra.** The same registration: client `76c6edf5-…`, tenant `24067079-…`.
+- Ronit reports (2026-10-28) that its **iOS/macOS platform is registered** for bundle ID `com.mountmeru.servicedesk`. Not re-checked from here.
+- No new client ID, so the backend's ID-token audience check is unchanged.
+
+| | iOS |
+|---|---|
+| Redirect URI | `msauth.com.mountmeru.servicedesk://auth`, exactly (`IOS_AUTH_REDIRECT_URI`, `src/config/auth.config.ts`) |
+| How it is chosen | `getAuthRedirectUri()` returns it when `Platform.OS === 'ios'` and throws otherwise. `isMicrosoftSignInConfigured()` is false off iOS, so sign-in shows `not-configured` and never opens Microsoft. Android's signature-hash redirect is not in this branch |
+| `app.json` `scheme` | `msauth.com.mountmeru.servicedesk`. `npx expo config --type introspect` gives `CFBundleURLSchemes` = `msauth.com.mountmeru.servicedesk`, `com.mountmeru.servicedesk` (Expo adds the bundle ID) |
+| Browser | Apple's sign-in sheet, `ASWebAuthenticationSession`, through `expo-auth-session` → `expo-web-browser` `openAuthSessionAsync`. The sheet catches the redirect by its scheme and returns it straight to the app: no deep link, and neither Linking nor navigation is involved |
+| Session | `preferEphemeralSession: true` (`AUTH_SESSION_OPTIONS`, decision D5) |
+| PKCE | `S256`, stated explicitly (`codeChallengeMethod`). The library refuses `plain` |
+| Scopes, secret | Unchanged (§7.1). No client secret |
+| `maybeCompleteAuthSession` | Not called. It exists for web pop-ups; on iOS the native module does not implement it. Calling it would also need `expo-web-browser` as a direct dependency; it is installed only under `expo-auth-session` |
+
+**The ephemeral session (D5)**
+- **With it:** iOS shows no "'Setu' Wants to Use 'microsoftonline.com' to Sign In" prompt. Safari's Microsoft cookies are neither read nor left behind, so a shared phone never carries the previous person's session, and signing out of Setu leaves nothing behind.
+- **The cost:** a full Microsoft sign-in every time (password, and MFA where Conditional Access asks for it), at least once per 8-hour session.
+- **Revisit** if IT deploys Microsoft's Enterprise SSO plug-in (Authenticator or Company Portal).
+
+**Cancel.** These all return to Login with **no error**, as in §7.3 step 2:
+- `cancel`: iOS's answer for Cancel on the sheet, and for any other end of the sheet without the redirect;
+- `dismiss`, and `locked` (a second sheet while one is open);
+- Microsoft's own `access_denied` + `error_subcode=cancel`.
+
+**Keychain (§5.1).** `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` on every call.
+- `THIS_DEVICE_ONLY`: never synced through iCloud Keychain, never restored onto another device from a backup.
+- `AFTER_FIRST_UNLOCK`, not `WHEN_UNLOCKED`: `restoreSession()` treats a failed read as "wipe and sign out". Any Keychain read while the phone is locked (a future push or background task) would then silently sign the person out. The token is an 8-hour session that the server can revoke.
+- No Face ID. Keychain items survive an uninstall, so `installMarker.ts` wipes them on the first launch after a reinstall.
+
+**Sign-out (§5.5).** `signOutAndWipe()` in `src/api/auth.api.ts`, called by `useSignOut` after the confirmation:
+1. `POST /auth/logout` with the Bearer header. The result is ignored, and the wait is at most 5 s.
+2. Then always `endSession(null)`: `queryClient.clear()`, the UI store reset, the three Keychain items deleted.
+- Microsoft itself is not signed out. With the ephemeral sheet there is no Safari session to sign out of.
+
+**Messages:** unchanged (§7.4).
+
+**Release bundle** (2026-10-28, `npx expo export --platform ios`, Hermes bytecode, searched in Latin-1 and UTF-16):
+- 0 developer-token strings out of 12 searched. The `--dev` export, as a control, contains all 12.
+- The iOS redirect is present. `msauth://` and the Android signature hash are absent.
+- No client-secret value: 0 Entra-secret-shaped strings, and no `clientSecret` / `client_secret` given a string literal.
+  - `client_secret` and `clientSecret` occur only as `expo-auth-session`'s own option names (`AuthRequest.js`, `TokenRequest.js`, `AuthRequestHooks.js`), as §7.6 #8 already says. `src/` contains neither (tested).
+
+**What only a device can verify (iOS-7)**
+- Entra accepts the iOS redirect. If it does not, Microsoft shows AADSTS50011 on its own page, and closing the sheet returns to Login with no error.
+- The sheet returns the code to the app.
+- PKCE with the real library.
+- AUTH-P2 accepts an ID token obtained on iOS (same `aud`).
+- The Keychain on a device, including after a restart and after a reinstall.
+- The stale-banner wiring on real AppState events. The sheet leaves the app `inactive`; a trip to Microsoft Authenticator during sign-in is `background`, and neither counts as leaving.
+
+**Optional check with no build** (Ronit's call: it is a real Microsoft sign-in, but it never reaches the Service Desk):
+1. Open this URL in a desktop browser:
+   ```
+   https://login.microsoftonline.com/24067079-ff6a-4c4e-a5de-7c5ac7ddf4d8/oauth2/v2.0/authorize?client_id=76c6edf5-a09c-4d1a-9a48-68f84697678b&response_type=code&redirect_uri=msauth.com.mountmeru.servicedesk%3A%2F%2Fauth&scope=openid%20profile%20email%20offline_access&prompt=select_account&code_challenge=0xfXCd1w3vFqrS5jbJ2HpQAo7heKHZe0aR9sO4lue8M&code_challenge_method=S256
+   ```
+2. Sign in.
+   - **AADSTS50011:** the iOS redirect is not registered as typed. Fix it in Entra before iOS-7.
+   - **No error, and the browser tries to open an `msauth.com.mountmeru.servicedesk://` link:** Microsoft accepts the URI.
+- The PKCE challenge belongs to a verifier that was generated and thrown away, so any code the browser receives is useless.

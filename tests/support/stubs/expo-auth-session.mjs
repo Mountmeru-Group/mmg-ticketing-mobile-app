@@ -1,8 +1,9 @@
-// Stand-in for expo-auth-session: plays Microsoft's part of the sign-in. The real system-browser redirect cannot run
-// under Node (it needs an Android build), so a test decides what Microsoft "returns" and this module records exactly
-// what the app asked for: the AuthRequest settings, the endpoints, and the code-for-token exchange.
+// Stand-in for expo-auth-session: plays Microsoft's part of the sign-in. The real sign-in sheet and its redirect cannot
+// run under Node (they need a device build), so a test decides what Microsoft "returns" and this module records exactly
+// what the app asked for: the AuthRequest settings, the endpoints, the sheet's options and the code-for-token exchange.
 export const ResponseType = { Code: 'code', Token: 'token', IdToken: 'id_token' };
 export const Prompt = { None: 'none', Login: 'login', Consent: 'consent', SelectAccount: 'select_account' };
+export const CodeChallengeMethod = { S256: 'S256', Plain: 'plain' };
 
 export class TokenError extends Error {
   constructor(code, description) {
@@ -12,12 +13,7 @@ export class TokenError extends Error {
   }
 }
 
-/** Not used by the app: getAuthRedirectUri() returns a fixed URI (src/config/auth.config.ts). */
-export function makeRedirectUri() {
-  return 'unused://stub';
-}
-
-const calls = { requests: [], prompts: [], exchanges: [] };
+const calls = { requests: [], prompts: [], promptOptions: [], exchanges: [] };
 let behaviour = null;
 
 /** What Microsoft does next: `promptResult(request)` for the browser step, `exchange(config)` for the token step. */
@@ -33,6 +29,7 @@ export function __calls() {
 export function __reset() {
   calls.requests.length = 0;
   calls.prompts.length = 0;
+  calls.promptOptions.length = 0;
   calls.exchanges.length = 0;
   behaviour = null;
 }
@@ -45,8 +42,9 @@ export class AuthRequest {
     calls.requests.push(this);
   }
 
-  async promptAsync(discovery) {
+  async promptAsync(discovery, options) {
     calls.prompts.push(discovery);
+    calls.promptOptions.push(options);
     return behaviour.promptResult(this);
   }
 }

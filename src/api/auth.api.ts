@@ -1,8 +1,9 @@
 // Auth + health endpoints used by M1 Login and session start-up (01 §1, 02-AUTH.md).
 //
 // ── Native Microsoft sign-in (ask A2, 02-AUTH.md §7) ─────────
-// 1. signInWithMicrosoft() opens Microsoft's sign-in page in the system browser (expo-auth-session): authorization code
-//    + PKCE (S256) against the PUBLIC-client app registration in src/config/auth.config.ts. There is no client secret.
+// 1. signInWithMicrosoft() opens Microsoft's sign-in page in Apple's sign-in sheet (expo-auth-session →
+//    ASWebAuthenticationSession, 02 §7.7): authorization code + PKCE (S256) against the PUBLIC-client app registration
+//    in src/config/auth.config.ts. There is no client secret.
 // 2. The code is redeemed at Microsoft's token endpoint with the PKCE verifier. Only the ID token is kept, in memory,
 //    for one request. Microsoft's access and refresh tokens are dropped unused: there is no refresh in this app (02 §1.1).
 // 3. exchangeMicrosoftIdToken() posts the ID token to AUTH-P2 and reads the MMG session `{ token, expiresAt, user }`
@@ -16,6 +17,7 @@
 import * as AuthSession from 'expo-auth-session';
 
 import {
+  AUTH_SESSION_OPTIONS,
   AZURE_CLIENT_ID,
   AZURE_ENDPOINTS,
   AZURE_SCOPES,
@@ -35,7 +37,7 @@ import {
   type MobileSsoUser,
   type UserRole,
 } from '@/types';
-import { apiClient, type MessageResponse } from './client';
+import { apiClient, endSession, type MessageResponse } from './client';
 import { checkFields } from './drift';
 import { ApiClientError } from './errors';
 import { MOBILE_SSO_OPTIONAL_SPEC } from './responseSpecs';
@@ -83,12 +85,34 @@ export async function logout(): Promise<MessageResponse> {
   return res.data;
 }
 
+export const LOGOUT_WAIT_MS = 5_000;
+
+/**
+ * Sign out (02 §5.5), after the person has confirmed it (useSignOut): AUTH-3 first, while the token is still there to
+ * send. Its result is ignored and it is waited for at most `waitMs`. Then, whatever happened, the local wipe: Keychain
+ * session, the whole query cache and every store (endSession). The app then shows Login.
+ */
+export async function signOutAndWipe(waitMs: number = LOGOUT_WAIT_MS): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      logout().catch(() => undefined),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, waitMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    await endSession(null);
+  }
+}
+
 // ── Microsoft sign-in (ask A2) ───────────────────────────────
 
 /**
  * Why Microsoft sign-in failed. The Login screen shows a different message for each.
  * Before the Service Desk is called:
- * - `not-configured`      — this build still has the placeholder client/tenant IDs (src/config/auth.config.ts).
+ * - `not-configured`      — not iOS, or this build still has placeholder client/tenant IDs (src/config/auth.config.ts).
  * - `microsoft`           — Microsoft returned an error, or no ID token. The Service Desk was never called.
  * From AUTH-P2. Its confirmed statuses are 400, 401, 403 and 500, each with a JSON `{ error }` (02-AUTH.md §7.5):
  * - `bad-request`         — 400: the server could not read the request. An app-side problem; a retry won't help.
@@ -141,8 +165,8 @@ export async function signInWithMicrosoft(): Promise<MicrosoftSignInResult> {
   if (!isMicrosoftSignInConfigured()) {
     throw new MicrosoftSignInError(
       'not-configured',
-      'The Entra client ID or tenant ID is still a placeholder or not a GUID. Fill them in src/config/auth.config.ts ' +
-        'or set EXPO_PUBLIC_AZURE_CLIENT_ID / EXPO_PUBLIC_AZURE_TENANT_ID.',
+      'Not iOS (the only platform with a registered redirect URI), or the Entra client ID or tenant ID is still a ' +
+        'placeholder or not a GUID (src/config/auth.config.ts, or EXPO_PUBLIC_AZURE_CLIENT_ID / _TENANT_ID).',
     );
   }
   const idToken = await getMicrosoftIdToken();
@@ -174,13 +198,14 @@ async function getMicrosoftIdToken(): Promise<string | null> {
     redirectUri,
     scopes: [...AZURE_SCOPES],
     responseType: AuthSession.ResponseType.Code,
-    usePKCE: true, // S256; the library refuses `plain`
+    usePKCE: true,
+    codeChallengeMethod: AuthSession.CodeChallengeMethod.S256, // the library's default, stated; it refuses `plain`
     prompt: AuthSession.Prompt.SelectAccount, // as the web flow does, so a shared phone can switch account
   });
 
   let result: AuthSession.AuthSessionResult;
   try {
-    result = await request.promptAsync(AZURE_ENDPOINTS);
+    result = await request.promptAsync(AZURE_ENDPOINTS, AUTH_SESSION_OPTIONS);
   } catch (e) {
     throw new MicrosoftSignInError('microsoft', `Could not open the Microsoft sign-in page (${errorName(e)})`);
   }
@@ -195,7 +220,9 @@ async function getMicrosoftIdToken(): Promise<string | null> {
       `Microsoft sign-in returned "${code}"${aadstsCode(result.params.error_description)}`,
     );
   }
-  if (result.type !== 'success') return null; // cancel / dismiss (page closed, Back pressed), locked, opened
+  // iOS answers `cancel` for Cancel on the sheet and for any other way the sheet ends without the redirect. Also
+  // dismiss and locked (a sheet already open).
+  if (result.type !== 'success') return null;
 
   const authorizationCode = result.params.code;
   if (!authorizationCode) {

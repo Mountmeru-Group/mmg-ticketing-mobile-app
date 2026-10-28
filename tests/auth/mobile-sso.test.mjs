@@ -2,7 +2,7 @@
 //
 // What is real: attemptSignIn() (the Login screen's sequence), signInWithMicrosoft(), exchangeMicrosoftIdToken(), the
 // apiClient with its interceptors, axios itself, the auth store, drift logging and the Login screen's messages.
-// What is faked: Microsoft (tests/support/stubs/expo-auth-session.mjs), the phone's Keystore (…/expo-secure-store.mjs)
+// What is faked: Microsoft (tests/support/stubs/expo-auth-session.mjs), the phone's Keychain (…/expo-secure-store.mjs)
 // and the network: axios's transport adapter answers with the documented responses. Nothing calls UAT or Microsoft.
 //
 // All tokens below are fake markers; the last test checks none of them ever reaches a log line or an error.
@@ -15,7 +15,13 @@ import * as secureStore from 'expo-secure-store';
 
 import { exchangeMicrosoftIdToken } from '../../src/api/auth.api.ts';
 import { apiClient } from '../../src/api/client.ts';
-import { AZURE_CLIENT_ID, AZURE_ENDPOINTS, AZURE_SCOPES, getAuthRedirectUri } from '../../src/config/auth.config.ts';
+import {
+  AUTH_SESSION_OPTIONS,
+  AZURE_CLIENT_ID,
+  AZURE_ENDPOINTS,
+  AZURE_SCOPES,
+  getAuthRedirectUri,
+} from '../../src/config/auth.config.ts';
 import { SESSION_TTL_MS, isSessionExpired, useAuthStore } from '../../src/store/auth.store.ts';
 import {
   FAILURE_COPY,
@@ -144,17 +150,18 @@ function assertNothingStored() {
 describe('what the app sends', () => {
   test('Microsoft step: PKCE code flow with the configured client ID, scopes and fixed redirect URI', async () => {
     await signIn();
-    const { requests, prompts, exchanges } = microsoft.__calls();
+    const { requests, prompts, promptOptions, exchanges } = microsoft.__calls();
     assert.equal(requests.length, 1);
     const { config } = requests[0];
     assert.equal(config.clientId, AZURE_CLIENT_ID);
     assert.equal(config.redirectUri, getAuthRedirectUri());
-    assert.equal(config.redirectUri, 'msauth://com.mountmeru.servicedesk/tlz9kcLBCrCtaVd%2FAvzUpkcOfgo%3D');
+    assert.equal(config.redirectUri, 'msauth.com.mountmeru.servicedesk://auth'); // iOS (iOS-6); Android's is on dev
     assert.equal(config.responseType, 'code');
     assert.equal(config.usePKCE, true);
     assert.equal(config.prompt, 'select_account');
     assert.deepEqual(config.scopes, [...AZURE_SCOPES]);
     assert.deepEqual(prompts, [AZURE_ENDPOINTS]);
+    assert.deepEqual(promptOptions, [AUTH_SESSION_OPTIONS]);
     // The code is redeemed with the same redirect URI and the request's own PKCE verifier; no secret.
     assert.equal(exchanges.length, 1);
     assert.equal(exchanges[0].config.code, FAKE.code);
