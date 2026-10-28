@@ -42,7 +42,7 @@ export function ImageViewerModal({
               onPress={onShare}
               className="h-11 w-11 items-center justify-center rounded-full active:bg-white/20"
             >
-              {sharing ? <ActivityIndicator color={colors.text.inverse} /> : <Ionicons name="share-social-outline" size={22} color={colors.text.inverse} />}
+              {sharing ? <ActivityIndicator color={colors.text.inverse} /> : <Ionicons name="share-outline" size={22} color={colors.text.inverse} />}
             </Pressable>
           ) : null}
         </View>

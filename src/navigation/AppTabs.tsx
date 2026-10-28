@@ -4,7 +4,7 @@
 //   (HIG, Tab bars: "Don't disable or hide tab bar buttons, even when their content is unavailable").
 // - React Navigation's own bar: UIKit's 49 pt plus the home-indicator inset, a filled icon over a one-word label
 //   (HIG: "Include tab labels", "Prefer filled symbols"). Android's custom AppTabBar is not ported: it existed only to
-//   sit under the drawer's screens. The native UITabBar (Liquid Glass) is decision D4, revisited in iOS-5.
+//   sit under the drawer's screens. The native UITabBar (Liquid Glass) is decision D4, revisited in iOS-4.
 // - The bar stays on every pushed screen; only the sheets (RootNavigator) cover it.
 // - Badges: the NTF-2 unread count and the APR-1 pending count, from the queries the app already has. They load when the
 //   tabs mount and refresh as on Android: pull-to-refresh, after a mark-read or a decision. No polling (05 B.3/B.4).

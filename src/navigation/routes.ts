@@ -106,12 +106,23 @@ export function getIdFor(name: string): GetId | undefined {
   };
 }
 
-/** Tab roots get the iOS large title; every pushed screen a standard one (HIG, Toolbars). */
 export function isStackRoot(tab: AppTab, name: string): boolean {
   return STACK_ROUTES[tab][0] === name;
 }
 
-/** Header titles, as on Android. Screens that show a record's own title set it themselves (iOS-4). */
+/**
+ * Tab roots whose title stays standard. react-native-screens collapses a large title only against the scroll view on
+ * the screen's first-subview chain, so a bar pinned above the list would leave it large for good. The ticket list keeps
+ * its search and filters pinned, as on Android (iOS-3a); iOS-4 can move the search into the navigation bar.
+ */
+const PINNED_BAR_ROOTS: ReadonlySet<string> = new Set(['TicketList']);
+
+/** Tab roots get the iOS large title, unless a bar is pinned above their list; pushed screens a standard one (HIG). */
+export function hasLargeTitle(tab: AppTab, name: string): boolean {
+  return isStackRoot(tab, name) && !PINNED_BAR_ROOTS.has(name);
+}
+
+/** Header titles, as on Android. Screens that show a record's own title set it themselves (iOS-3). */
 const TITLES: Record<Exclude<StackRoute | SheetRoute, 'TicketList'>, string> = {
   Home: 'Home',
   Announcements: 'Announcements',

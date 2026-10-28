@@ -1,5 +1,5 @@
 // EAS Build profiles for the iOS app (JSON5: comments are allowed in eas.json). No build is run in iOS-1b; the first
-// one is iOS-3 (docs/ios/00-PORT-MANIFEST.md §2).
+// one is iOS-7 (docs/ios/00-PORT-MANIFEST.md §2).
 // Every profile sets EXPO_PUBLIC_APP_ENV, which src/config/env.ts turns into the API base URL. No URL lives here.
 // scripts/eas-build-guard.js runs first on the build server and refuses a production build while the PROD URL in
 // src/config/env.ts is empty, and refuses PROD on any other profile.
@@ -11,7 +11,7 @@
   },
   "build": {
     // TestFlight build for internal testers, pointed at UAT. Store-signed, because TestFlight requires it.
-    // The channel takes effect once expo-updates is added (iOS-3).
+    // The channel takes effect once expo-updates is added (iOS-7).
     "preview": {
       "node": "24.18.0",
       "distribution": "store",

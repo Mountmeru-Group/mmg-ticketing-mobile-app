@@ -5,6 +5,7 @@ export { OfflineBanner, QueryBanner } from './Banners';
 export { BrandLogo } from './BrandLogo';
 export { BulkProgressModal } from './BulkProgressModal';
 export { Card, CardTitle } from './Card';
+export { DatePickerSheet } from './DatePickerSheet';
 export { EmailChipsInput } from './EmailChipsInput';
 export { EmptyState, OfflineState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';

@@ -20,18 +20,18 @@
   - expo-secure-store
   - Axios
 - Bundle ID `com.mountmeru.servicedesk`. iPhone only (`supportsTablet: false`).
-- **Roadmap** (details in the manifest, §2):
+- **Roadmap** (details in the manifest, §2; renumbered 2026-10-28, old→new table there):
   - iOS-1 foundation (1a docs, 1b port)
   - iOS-2 navigation shell (tab bar + More)
-  - iOS-3 first EAS build → TestFlight + EAS Update
-  - iOS-4 screens (4a read, 4b write, 4c modules)
-  - iOS-5 HIG polish
-  - iOS-6 parity + tests
-  - iOS-7 Microsoft SSO
+  - iOS-3 screens (3a read, 3b write, 3c modules)
+  - iOS-4 HIG polish
+  - iOS-5 parity + tests
+  - iOS-6 Microsoft SSO
+  - iOS-7 EAS project + first build → TestFlight (full-system test)
   - iOS-8 testing-team rounds
   - iOS-9 App Store readiness + submit
 - **Auth on iOS:**
-  - Microsoft SSO (AUTH-P2) is live on UAT. On iOS it is wired in iOS-7, once IT has registered the iOS redirect `msauth.com.mountmeru.servicedesk://auth`.
+  - Microsoft SSO (AUTH-P2) is live on UAT. On iOS it is wired in iOS-6, once IT has registered the iOS redirect `msauth.com.mountmeru.servicedesk://auth`.
   - Until then the only way in is the `__DEV__` developer-token screen, which arrives in iOS-2.
   - The TestFlight test login (manifest §8) is a proposal and is **not approved**.
 

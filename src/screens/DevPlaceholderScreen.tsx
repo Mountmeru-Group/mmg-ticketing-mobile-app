@@ -1,5 +1,5 @@
 // ╔════════════════════════════════════════════════════════════════════════════════════╗
-// ║  ⚠  DEV PLACEHOLDER — replaced in iOS-4 (docs/ios/00-PORT-MANIFEST.md §6).  ⚠      ║
+// ║  ⚠  DEV PLACEHOLDER — replaced in iOS-3 (docs/ios/00-PORT-MANIFEST.md §6).  ⚠      ║
 // ║  Loaded only when __DEV__ is true (./placeholders.ts), so release bundles do not   ║
 // ║  contain this module at all (compliance A2, guideline 2.1).                        ║
 // ╚════════════════════════════════════════════════════════════════════════════════════╝
@@ -73,7 +73,7 @@ export function DevPlaceholderScreen() {
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-gray-50" contentContainerClassName="p-4 pb-12">
       <View className="mb-4 rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-        <Text className="text-xs font-semibold uppercase tracking-wide text-amber-900">DEV PLACEHOLDER — replaced in iOS-4</Text>
+        <Text className="text-xs font-semibold uppercase tracking-wide text-amber-900">DEV PLACEHOLDER — replaced in iOS-3</Text>
         <Text className="mt-1 text-xs text-amber-900">Development builds only. Nothing is fetched.</Text>
       </View>
 

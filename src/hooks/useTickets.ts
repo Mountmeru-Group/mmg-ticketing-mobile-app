@@ -21,6 +21,16 @@ import { queryKeys, type TicketListKeyParams } from './queryKeys';
 export const TICKET_LIST_CAP = 500;
 const TICKET_LIST_MAX_PAGES = Math.ceil(TICKET_LIST_CAP / TICKET_PAGE_SIZE);
 
+/** The page to load after `pages` (getNextPageParam): none past the server's last page, or once the cap is reached. */
+export function nextTicketListPage(last: Paginated<Ticket>, pages: readonly Paginated<Ticket>[]): number | undefined {
+  return normalisePage(last).hasNext && pages.length < TICKET_LIST_MAX_PAGES ? last.page + 1 : undefined;
+}
+
+/** The server has more, but the cap stopped the list; the footer says so. */
+export function isTicketListCapped(pages: readonly Paginated<Ticket>[] | undefined): boolean {
+  return !!pages && pages.length >= TICKET_LIST_MAX_PAGES && normalisePage(pages[pages.length - 1]).hasNext;
+}
+
 export interface UseTicketsOptions {
   filter: TicketNamedFilter;
   sort: TicketSortOption;
@@ -53,8 +63,7 @@ export function useTickets({ filter, sort, search, countryId, advanced }: UseTic
       return res;
     },
     initialPageParam: 1,
-    getNextPageParam: (last, pages) =>
-      normalisePage(last).hasNext && pages.length < TICKET_LIST_MAX_PAGES ? last.page + 1 : undefined,
+    getNextPageParam: nextTicketListPage,
     enabled: params !== null,
   });
 
@@ -73,9 +82,7 @@ export function useTickets({ filter, sort, search, countryId, advanced }: UseTic
   }, [query.data]);
 
   const total = query.data?.pages[0]?.total;
-  // The server has more, but the cap stopped the list; the footer says so.
-  const pages = query.data?.pages;
-  const capped = !!pages && pages.length >= TICKET_LIST_MAX_PAGES && normalisePage(pages[pages.length - 1]).hasNext;
+  const capped = isTicketListCapped(query.data?.pages);
 
   /**
    * Pull-to-refresh: drop every page but the first, then refetch — ONE request, instead of v5's default of

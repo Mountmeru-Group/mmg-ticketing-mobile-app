@@ -5,11 +5,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
-import { useEffect } from 'react';
+import { useEffect, type ComponentType } from 'react';
 import { AppState, Pressable, View } from 'react-native';
 
 import { endSession } from '@/api/client';
 import { PlaceholderRoute } from '@/screens/placeholders';
+import { TicketFiltersScreen } from '@/screens/tickets/TicketFiltersScreen';
 import { SESSION_ENDED_MESSAGE, isSessionExpired, useAuthStore } from '@/store/auth.store';
 import { wipeSessionLeftByPreviousInstall } from '@/store/installMarker';
 import { colors } from '@/theme';
@@ -17,11 +18,17 @@ import type { RootStackParamList } from '@/types';
 import { AppTabs } from './AppTabs';
 import { AuthStack } from './AuthStack';
 import { navigationRef } from './navigationRef';
-import { SHEET_ROUTES, routeTitle } from './routes';
+import { SHEET_ROUTES, routeTitle, type SheetRoute } from './routes';
 import { hideSplash } from './splash';
 import { STACK_SCREEN_OPTIONS } from './TabStacks';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/** Built sheets. Every other sheet is still the placeholder; iOS-3b adds the write sheets here. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SHEETS: Partial<Record<SheetRoute, ComponentType<any>>> = {
+  TicketFilters: TicketFiltersScreen,
+};
 
 /** 8-hour hard expiry also applies while the app sits in the background (02 §5.4). */
 function useExpireSessionOnForeground() {
@@ -86,7 +93,12 @@ export function RootNavigator() {
             <Stack.Screen name="App" component={AppTabs} />
             <Stack.Group screenOptions={SHEET_OPTIONS}>
               {SHEET_ROUTES.map((name) => (
-                <Stack.Screen key={name} name={name} component={PlaceholderRoute} options={{ title: routeTitle(name, role) }} />
+                <Stack.Screen
+                  key={name}
+                  name={name}
+                  component={SHEETS[name] ?? PlaceholderRoute}
+                  options={{ title: routeTitle(name, role) }}
+                />
               ))}
             </Stack.Group>
           </>
