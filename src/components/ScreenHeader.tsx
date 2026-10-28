@@ -29,7 +29,7 @@ export function ScreenHeader({ title, variant = 'back', right }: ScreenHeaderPro
     if (navigation.canGoBack()) navigation.goBack();
   };
 
-  // 56 dp bar, 44 dp icon buttons, 24 dp icons (docs/brand/UI-STANDARDS.md, S1; the iOS sizes are an iOS-5 item).
+  // 56 dp bar, 44 dp icon buttons, 24 dp icons (docs/brand/UI-STANDARDS.md, S1; the iOS sizes are an iOS-4 item).
   // White, so the status bar is dark.
   return (
     <View style={{ paddingTop: insets.top }} className="border-b border-border bg-white">

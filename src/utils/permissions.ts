@@ -65,8 +65,9 @@ export type AppTab = 'HomeTab' | 'TicketsTab' | 'ApprovalsTab' | 'AlertsTab' | '
 /**
  * No user yet: END_USER's answers. A role the app doesn't know goes through the rules above unchanged, which give it the
  * least (no catalogue, no Approvals tab). Sign-in and restore refuse such a role anyway.
+ * The screens use it too (iOS-3a), for a moment with no user, such as sign-out, instead of naming a role themselves.
  */
-function navRole(role: UserRole | null | undefined): UserRole {
+export function navRole(role: UserRole | null | undefined): UserRole {
   return role ?? 'END_USER';
 }
 
