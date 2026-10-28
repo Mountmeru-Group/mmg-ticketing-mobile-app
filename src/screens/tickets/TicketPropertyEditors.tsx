@@ -12,6 +12,9 @@
 //   can't change that field), and the editor closes so the field shows the saved value again.
 // - The technician saves through useAssignTicket (TKT-5), the hook Pick up and the assign picker (M7) use, with the
 //   same guards, lists and `teamId` rule (utils/assignment.ts). It is not a second assignment path.
+//
+// iOS (docs/ios/00-PORT-MANIFEST.md §6 #11): copied unchanged in iOS-3a and opened in iOS-3b, when the phase gate went.
+// Impact and urgency are iOS action sheets; the category levels, countries and technicians stay scrollable sheets.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
@@ -30,6 +33,7 @@ import {
   TICKET_IMPACTS, TICKET_URGENCIES, type TicketDetail, type TicketImpact, type TicketPriority, type TicketUrgency,
   type UpdateTicketBody,
 } from '@/types';
+import { chooseFromActionSheet, type SheetChoice } from '@/utils/actionSheet';
 import {
   TECHNICIAN_ROLES, assignmentDoneMessage, assignmentTeamId, recommendedTechnicians, teamMembers, technicianName,
   technicianOptions, type Technician,
@@ -312,7 +316,6 @@ function ClassificationForm({
   onSave: (input: UpdateTicketBody) => void;
 }) {
   const [staged, setStaged] = useState<Classification>({ impact: ticket.impact, urgency: ticket.urgency });
-  const [sheet, setSheet] = useState<'impact' | 'urgency' | null>(null);
   // ADMIN/AGENT only (403 for L2, as on the web). Not loaded yet or failed: saved without a priority, as the web does.
   const matrix = usePriorityMatrix({ enabled: preview });
   const body = classificationChanges(ticket, staged, preview ? matrix.data : undefined);
@@ -320,8 +323,17 @@ function ClassificationForm({
   useReportDirty(dirty, onDirtyChange);
 
   // The web's values, minus its "Not Set", which saves nothing (G1 §1): a value can be changed, never cleared.
-  const impactOptions: SheetOption<TicketImpact>[] = TICKET_IMPACTS.map((v) => ({ value: v, label: IMPACT_LABELS[v] }));
-  const urgencyOptions: SheetOption<TicketUrgency>[] = TICKET_URGENCIES.map((v) => ({ value: v, label: URGENCY_LABELS[v] }));
+  // iOS: short fixed lists, so action sheets (utils/actionSheet.ts); the staged value shows in the field.
+  const impactChoices: SheetChoice<TicketImpact>[] = TICKET_IMPACTS.map((v) => ({ value: v, label: IMPACT_LABELS[v] }));
+  const urgencyChoices: SheetChoice<TicketUrgency>[] = TICKET_URGENCIES.map((v) => ({ value: v, label: URGENCY_LABELS[v] }));
+  async function pickImpact() {
+    const impact = await chooseFromActionSheet({ title: 'Impact', choices: impactChoices });
+    if (impact) setStaged((s) => ({ ...s, impact }));
+  }
+  async function pickUrgency() {
+    const urgency = await chooseFromActionSheet({ title: 'Urgency', choices: urgencyChoices });
+    if (urgency) setStaged((s) => ({ ...s, urgency }));
+  }
 
   return (
     <View className="border-b border-gray-100 py-3">
@@ -329,14 +341,14 @@ function ClassificationForm({
         label="Impact"
         value={staged.impact ? IMPACT_LABELS[staged.impact] : null}
         placeholder="Not set"
-        onPress={() => setSheet('impact')}
+        onPress={() => void pickImpact()}
         disabled={saving}
       />
       <SelectField
         label="Urgency"
         value={staged.urgency ? URGENCY_LABELS[staged.urgency] : null}
         placeholder="Not set"
-        onPress={() => setSheet('urgency')}
+        onPress={() => void pickUrgency()}
         disabled={saving}
       />
       <PriorityPreviewBox
@@ -346,23 +358,6 @@ function ClassificationForm({
         matrix={matrix}
       />
       <EditorActions canSave={dirty} saving={saving} onSave={() => onSave(body)} onCancel={onCancel} />
-
-      <OptionSheet
-        visible={sheet === 'impact'}
-        title="Impact"
-        options={impactOptions}
-        selected={staged.impact}
-        onSelect={(impact) => setStaged((s) => ({ ...s, impact }))}
-        onClose={() => setSheet(null)}
-      />
-      <OptionSheet
-        visible={sheet === 'urgency'}
-        title="Urgency"
-        options={urgencyOptions}
-        selected={staged.urgency}
-        onSelect={(urgency) => setStaged((s) => ({ ...s, urgency }))}
-        onClose={() => setSheet(null)}
-      />
     </View>
   );
 }

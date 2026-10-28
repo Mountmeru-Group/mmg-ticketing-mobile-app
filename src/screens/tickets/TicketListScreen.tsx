@@ -41,8 +41,8 @@
 // title. The search and filter bar stays pinned above the list, as on Android, and a pinned bar stops a large title from
 // collapsing (react-native-screens tracks the first scroll view on the screen); iOS-4 can move the search into the
 // navigation bar. There is no hardware back: while tickets are selected, the navigation bar shows the count and Cancel.
-// iOS-3a ships the list without its writes (utils/phase-gate.ts): no status chip, no selection, no "+" button; they
-// arrive with their sheets in iOS-3b.
+// The status chip opens an iOS action sheet listing exactly inlineStatusTransitions() for that ticket (Canceled in red);
+// a closure target opens the M6 sheet. Bulk Assign and Close open M7 and M6 as root sheets.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
@@ -62,13 +62,13 @@ import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors, shadows } from '@/theme';
 import type { Ticket, TicketStatus, TicketsStackScreenProps, UserRole } from '@/types';
+import { chooseFromActionSheet, transitionChoices } from '@/utils/actionSheet';
 import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
 import {
   bulkActions, inlineStatusTransitions, navRole, ticketListFilters, ticketsTitle, type BulkAction,
 } from '@/utils/permissions';
-import { WRITE_CONTROLS, readOnlyActions } from '@/utils/phase-gate';
 import { isStaff } from '@/utils/roles';
 import {
   TICKET_FILTER_LABELS, TICKET_SORT_LABELS, activeAdvancedFilters, activeFilterLabels, availableTicketFilters,
@@ -87,7 +87,7 @@ const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
 const ALL_COUNTRIES = '__ALL__';
 const ticketKey = (t: Ticket) => t.id;
 /** Room under the last card for the "+" button; the tab bar already takes the home-indicator inset. */
-const LIST_BOTTOM_PADDING = WRITE_CONTROLS ? 96 : 24;
+const LIST_BOTTOM_PADDING = 96;
 
 export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<'TicketList'>) {
   const user = useAuthStore((s) => s.user);
@@ -182,7 +182,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   // ── Multi-select (08 §4.2) ─────────────────────────────────
   // The bar's buttons, and whether a long-press selects at all, come from bulkActions() (utils/permissions.ts, pinned
   // per role by tests/rbac): staff only; Pick up / Assign for ADMIN and AGENT; Close for every role that changes status.
-  const bulk = readOnlyActions(bulkActions(user));
+  const bulk = bulkActions(user);
   const canSelect = bulk.length > 0;
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const selectionMode = selected.size > 0;
@@ -223,9 +223,20 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   // ── Inline status chip (08 §4.1) ───────────────────────────
   const changeStatus = useChangeStatus();
   const once = useSingleFlight();
-  const [statusFor, setStatusFor] = useState<Ticket | null>(null);
   const statusBusyId = changeStatus.isPending ? changeStatus.variables?.ticketId : undefined;
-  const onStatusPress = useCallback((t: Ticket) => setStatusFor(t), []);
+
+  // iOS: the chip opens an action sheet with exactly that ticket's inlineStatusTransitions() (utils/actionSheet.ts);
+  // the whole of it (sheet, confirmation, write) runs single-flight. One identity for the screen's lifetime (Phase P).
+  async function pickStatus(t: Ticket) {
+    const transitions = inlineStatusTransitions(role, t.status);
+    const target = await chooseFromActionSheet({
+      title: `Change status · #${t.ticketNumber}`,
+      message: transitions.some((x) => requiresClosureForm(x.target)) ? 'A closing status opens the closure form first.' : undefined,
+      choices: transitionChoices(transitions),
+    });
+    if (target) await applyTransition(t, target);
+  }
+  const onStatusPress = useStableCallback((t: Ticket) => void once(() => pickStatus(t)));
 
   async function applyTransition(t: Ticket, target: TicketStatus) {
     const transition = inlineStatusTransitions(role, t.status).find((x) => x.target === target);
@@ -300,7 +311,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
 
   const renderItem = useCallback(
     ({ item, index }: { item: Ticket; index: number }) => {
-      const interactive = readOnlyActions(inlineStatusTransitions(role, item.status)).length > 0;
+      const interactive = inlineStatusTransitions(role, item.status).length > 0;
       return (
         <ListEntry index={index}>
           <TicketCard
@@ -350,7 +361,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
             onClearSearch={clearSearch}
             onShowAll={() => setTicketFilter('ALL')}
             onClearAll={clearTicketFilters}
-            onCreate={WRITE_CONTROLS ? () => navigation.navigate('CreateTicket') : undefined}
+            onCreate={() => navigation.navigate('CreateTicket')}
           />
         }
         ListFooterComponent={
@@ -510,7 +521,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
             <BarButton key={action} icon={BULK_BUTTONS[action].icon} label={BULK_BUTTONS[action].label} onPress={onBulk[action]} />
           ))}
         </View>
-      ) : WRITE_CONTROLS ? (
+      ) : (
         // "+" FAB → M8 Create ticket (04 §2.1).
         <Pressable
           accessibilityRole="button"
@@ -521,23 +532,8 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
         >
           <Ionicons name="add" size={28} color={colors.primaryForeground} />
         </Pressable>
-      ) : null}
+      )}
 
-      <OptionSheet
-        visible={statusFor !== null}
-        title={statusFor ? `Change status · #${statusFor.ticketNumber}` : 'Change status'}
-        options={(statusFor ? inlineStatusTransitions(role, statusFor.status) : []).map((t) => ({
-          value: t.target,
-          label: t.label,
-          description: requiresClosureForm(t.target) ? 'Opens the closure form' : undefined,
-        }))}
-        selected={null}
-        onSelect={(target) => {
-          const t = statusFor;
-          if (t) void once(() => applyTransition(t, target));
-        }}
-        onClose={() => setStatusFor(null)}
-      />
       <BulkProgressModal
         progress={runner.progress}
         onStop={runner.stop}
@@ -589,8 +585,7 @@ function ListEmpty({
   onClearSearch: () => void;
   onShowAll: () => void;
   onClearAll: () => void;
-  /** Absent while the create sheet is not built (iOS-3a): EmptyState then shows no button. */
-  onCreate?: () => void;
+  onCreate: () => void;
 }) {
   if (moreFilters > 0) {
     return (

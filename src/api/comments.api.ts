@@ -20,10 +20,15 @@ export async function listComments(ticketId: string): Promise<Comment[]> {
  * Upload files first (ATT-2), then send their ids in `attachmentIds` (05 §A.5).
  * The server SILENTLY turns a PRIVATE note from END_USER or L2_MANAGER into a PUBLIC, emailed reply,
  * so a note from those roles is refused here before it can leak to the requester (05 §A.3, §A.5).
+ * iOS-3b: a PRIVATE note never carries files. The server leaves a note's files ticket-level, where the requester (and
+ * L2_MANAGER) can list, view and download them (05 §C.26, ROLE-MATRIX §5), so they are refused here too.
  */
 export async function createComment(ticketId: string, input: CreateCommentBody, authorRole: UserRole): Promise<Comment> {
   if (input.type === 'PRIVATE' && authorRole !== 'ADMIN' && authorRole !== 'AGENT') {
     throw clientError('Only Admins and Technicians can add internal notes');
+  }
+  if (input.type === 'PRIVATE' && (input.attachmentIds?.length ?? 0) > 0) {
+    throw clientError("Files can't be attached to an internal note: the requester can see them");
   }
   const body = pickDefined(input, ['body', 'type', 'to', 'cc', 'attachmentIds'] as const);
   const res = await apiClient.post<Comment>(`/tickets/${seg(ticketId)}/comments`, body);

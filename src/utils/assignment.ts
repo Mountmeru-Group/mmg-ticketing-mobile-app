@@ -8,6 +8,12 @@ import { formatDisplayName } from './format';
 /** USR-3 roles for "Search technicians" when the group has no members (the web: `role=AGENT,ADMIN`, TDP:289). */
 export const TECHNICIAN_ROLES: readonly UserRole[] = ['AGENT', 'ADMIN'];
 
+/**
+ * USR-3 roles for the create form's "Assign to" search with no group chosen: "END_USERs filtered out" (05 §A.8).
+ * iOS: moved here from CreateTicketScreen, which may not name a role (tests/navigation/shell.test.mjs).
+ */
+export const CREATE_ASSIGNEE_ROLES: readonly UserRole[] = ['ADMIN', 'AGENT', 'L2_MANAGER'];
+
 export interface Technician {
   id: string;
   displayName: string;

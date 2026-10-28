@@ -61,4 +61,13 @@ export const motion = {
     scale: 1.14,
     curve: curve.standard,
   },
+
+  /** iOS: the success notice after a write (components/SuccessNotice.tsx), in place of Android's toast. */
+  successNotice: {
+    /** Fade in, and fade out, ms. */
+    fade: 200,
+    /** How long it stays before it fades out, ms: about Android's Toast.SHORT plus the time to find it. */
+    visible: 3000,
+    curve: curve.standard,
+  },
 } as const;

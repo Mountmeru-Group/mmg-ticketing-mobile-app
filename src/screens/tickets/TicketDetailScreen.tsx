@@ -36,11 +36,10 @@
 //
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #4): a record screen, in every tab's stack, so it opens in the tab the person is
 // in. The native navigation bar carries the title ("Ticket #1234") and More options, with the iOS "more" mark instead
-// of Android's ⋮. iOS-3a shows the ticket read-only (utils/phase-gate.ts): the status card, More options, Reply / Reply
-// all / Note, Add files, a file's delete button, the task checkbox, Add task and every property editor are left out
-// until their sheets arrive in iOS-3b. Reading stays complete: properties, conversation, history, attachments (images
-// open in the viewer; other files download to the share sheet) and tasks. The priority shows as the badge, with its
-// "Auto" pill when impact × urgency set it; the live preview of a new priority belongs to the impact/urgency editor.
+// of Android's ⋮; More options is an iOS action sheet listing exactly ticketDetailPermissions().moreActions. Every write
+// above is Android's, from the same role answers (iOS-3b removed iOS-3a's phase gate). The write sheets (M5, M6, M7,
+// approval, M11) open as root page sheets over the tabs. The list lifts an inline editor above the keyboard
+// (automaticallyAdjustKeyboardInsets) and a drag down puts the keyboard away.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import {
@@ -55,8 +54,7 @@ import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice,
-  OfflineBanner, OfflineState, OptionSheet, OutlineButton, PriorityBadge, QueryBanner, SlaBadge, StatusBadge,
-  SubmitButton, TaskRow, type SheetOption,
+  OfflineBanner, OfflineState, OutlineButton, PriorityBadge, QueryBanner, SlaBadge, StatusBadge, SubmitButton, TaskRow,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
@@ -65,16 +63,16 @@ import {
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { ActivityAuditItem, Attachment, Comment, RecordScreenProps, TicketDetail, TicketTaskEmbedded } from '@/types';
+import { chooseFromActionSheet, moreActionChoices } from '@/utils/actionSheet';
 import { describeAudit } from '@/utils/activity';
 import { confirmAction, notify, reportActionWriteError, reportWriteError } from '@/utils/dialogs';
 import {
   effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
 import {
-  isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type MoreAction,
-  type TicketDetailPermissions, type TicketFieldPermissions,
+  isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type TicketDetailPermissions,
+  type TicketFieldPermissions,
 } from '@/utils/permissions';
-import { readOnlyDetail, readOnlyFields } from '@/utils/phase-gate';
 import { requiresClosureForm, transitionTone, type StatusTransition } from '@/utils/ticket-rules';
 import { deleteAttachmentMessage, statusChangeMessage } from '@/utils/writeCopy';
 import {
@@ -84,13 +82,8 @@ import {
 
 type DetailTab = 'conversation' | 'history' | 'attachments' | 'tasks';
 
-/** Labels for the role-gated buttons; WHICH ones show is decided by ticketDetailPermissions() alone. */
-const MORE_ACTION_LABELS: Record<MoreAction, { label: string; description: string }> = {
-  pickup: { label: 'Pick up', description: 'Assign this ticket to yourself' },
-  assign: { label: 'Assign…', description: 'Choose a group and technician' },
-  close: { label: 'Close…', description: 'Opens the closure form' },
-  approval: { label: 'Submit for approval…', description: 'Choose who approves; the ticket moves to Pending with Management Review' },
-};
+// More options' labels live with the action sheet (utils/actionSheet.ts MORE_ACTION_LABELS); WHICH ones show is decided
+// by ticketDetailPermissions() alone.
 const CONVERSATION_ACTIONS: Record<ComposerMode, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
   reply: { label: 'Reply', icon: 'arrow-undo-outline' },
   replyAll: { label: 'Reply all', icon: 'arrow-undo-circle-outline' },
@@ -146,7 +139,6 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
   const removeFile = useDeleteAttachment();
   const toggleTask = useToggleTask();
   const once = useSingleFlight();
-  const [moreOpen, setMoreOpen] = useState(false);
   const [viewing, setViewing] = useState<Attachment | null>(null);
   // ATT-3 with the Bearer header, built once per opened image so a background refetch doesn't reload it. The token
   // is read from the auth store at this moment and never logged.
@@ -265,9 +257,20 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
 
   // Every role-gated element below reads these two objects (utils/permissions.ts, pinned per role by tests/rbac).
   // Pure functions of the user and the ticket, memoised (Phase P2) so the memoised header cards skip the renders that
-  // only a sheet, a refresh flag or a tab's data caused. iOS-3a: through the phase gate, which leaves out every write.
-  const can = useMemo(() => (ticket ? readOnlyDetail(ticketDetailPermissions(user, ticket)) : null), [user, ticket]);
-  const fields = useMemo(() => (ticket ? readOnlyFields(ticketFieldPermissions(user, ticket)) : null), [user, ticket]);
+  // only a sheet, a refresh flag or a tab's data caused.
+  const can = useMemo(() => (ticket ? ticketDetailPermissions(user, ticket) : null), [user, ticket]);
+  const fields = useMemo(() => (ticket ? ticketFieldPermissions(user, ticket) : null), [user, ticket]);
+
+  // More options: an iOS action sheet with exactly can.moreActions (utils/actionSheet.ts), then that action. The whole
+  // of it (sheet, confirmation, write) runs single-flight from the header button.
+  const openMoreOptions = useStableCallback(async () => {
+    if (!ticket || !can) return;
+    const action = await chooseFromActionSheet({ title: 'More options', choices: moreActionChoices(can.moreActions) });
+    if (action === 'pickup') await pickUp();
+    else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
+    else if (action === 'approval') navigation.navigate('SubmitApproval', { ticketId: ticket.id });
+    else if (action === 'close') navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
+  });
 
   const title = ticket ? `Ticket #${ticket.ticketNumber}` : 'Ticket';
   const hasMoreActions = (can?.moreActions.length ?? 0) > 0;
@@ -284,7 +287,7 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
               accessibilityLabel="More options"
               accessibilityState={{ disabled: writing, busy: assignPending }}
               disabled={writing}
-              onPress={() => setMoreOpen(true)}
+              onPress={() => void once(openMoreOptions)}
               className={`h-11 w-11 items-center justify-center ${writing ? 'opacity-50' : 'active:opacity-60'}`}
             >
               {assignPending ? (
@@ -312,14 +315,6 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
       </View>
     );
   }
-
-  const moreActions: SheetOption<MoreAction>[] = can.moreActions.map((value) => ({ value, ...MORE_ACTION_LABELS[value] }));
-  const onMore = (action: MoreAction) => {
-    if (action === 'pickup') void once(pickUp);
-    else if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [ticket.id] });
-    else if (action === 'approval') navigation.navigate('SubmitApproval', { ticketId: ticket.id });
-    else navigation.navigate('StatusClosure', { ticketIds: [ticket.id], target: 'CLOSED' });
-  };
 
   // ── The open tab: its placeholder or stale-data banner (in the list header) and its rows (virtualised) ──
   const tasks = Array.isArray(ticket.tasks) ? ticket.tasks : [];
@@ -472,10 +467,8 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
           ) : null}
         </Card>
       ) : null}
-      {tab === 'attachments' && can.locked ? (
+      {tab === 'attachments' && !can.addAttachments ? (
         // A state, not a role limit (ROLE-MATRIX.md §3): say why "Add files" is missing instead of dropping it silently.
-        // `locked` is exactly `!addAttachments` in permissions.ts; it is read here so that the phase gate (which leaves
-        // out "Add files" for everyone in iOS-3a) does not show this reason to people who are not locked.
         <View className="mx-4 mb-3">
           <Notice>Closed and canceled tickets are locked for technicians, so files can't be added here.</Notice>
         </View>
@@ -529,11 +522,13 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
         ListFooterComponent={listFooter}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
+        // iOS: an inline editor (the resolution text) stays above the keyboard, and a drag down puts the keyboard away.
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
         contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       />
 
-      <OptionSheet visible={moreOpen} title="More options" options={moreActions} selected={null} onSelect={onMore} onClose={() => setMoreOpen(false)} />
       <ImageViewerModal
         request={viewRequest}
         title={viewing?.fileName ?? ''}

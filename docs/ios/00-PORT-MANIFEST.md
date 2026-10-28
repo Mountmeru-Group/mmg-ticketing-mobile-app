@@ -2,7 +2,7 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b, iOS-2, iOS-3a and iOS-6 with what each phase actually built (§4.1–§4.5, §4.9, §4.10).
+> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6 and iOS-3b with what each phase actually built (§4.1–§4.5, §4.9–§4.11).
 
 ## 0. Port source and fixed facts
 
@@ -38,10 +38,11 @@ Rules used:
   - `src/utils/deep-links.ts` and `src/utils/permissions.ts` (reclassified KEEP → ADAPT in iOS-2: the tab bar and More);
   - `scripts/verify-release-bundle.js`;
   - `tests/auth/mobile-sso.test.mjs`, `tests/rbac/role-gating.test.mjs`, `tests/rbac/service-catalog.test.mjs`;
-  - `src/hooks/useProfile.ts`, `tests/support/stubs/expo-auth-session.mjs` and `tests/support/stubs/expo-secure-store.mjs` (reclassified KEEP → ADAPT in iOS-6: sign-out moved into `auth.api.ts`; the stubs record what the iOS tests check).
+  - `src/hooks/useProfile.ts`, `tests/support/stubs/expo-auth-session.mjs` and `tests/support/stubs/expo-secure-store.mjs` (reclassified KEEP → ADAPT in iOS-6: sign-out moved into `auth.api.ts`; the stubs record what the iOS tests check);
+  - `src/api/comments.api.ts`, `src/hooks/usePostComment.ts`, `src/components/AttachmentPicker.tsx`, `src/utils/assignment.ts`, `src/theme/motion.ts` and `tests/rbac/g3-features.test.mjs` (reclassified KEEP → ADAPT in iOS-3b: no files on a private note, the attachment action sheet, a role list out of a screen, the notice's motion token, one wiring line; §4.11).
 - **The pre-SSO test login (§8) is not counted here.** It is a proposal, so the classification below covers only what the port itself needs. §8 lists the files the test login would change if it is approved.
 
-**Totals: KEEP 168 · ADAPT 34 · SKIP 3 · SCREEN 25 = 230.** iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
+**Totals: KEEP 162 · ADAPT 40 · SKIP 3 · SCREEN 25 = 230.** iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
 
 ## 2. Phase map
 
@@ -53,7 +54,7 @@ Rules used:
 | iOS-1a | These two documents |
 | iOS-1b | Port the non-screen foundation: every KEEP file marked iOS-1b, plus the iOS versions of `app.json`, `eas.json`, `package.json` (scripts only, no dependency changes) and `CLAUDE.md`. Then `npm ci`, `tsc`, the tests that can run, and `expo-doctor` |
 | **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-3, where the screens that use them arrive |
-| **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read, **iOS-3b** write, **iOS-3c** modules |
+| **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read (built 2026-10-28, §4.9), **iOS-3b** write (built 2026-10-28, §4.11), **iOS-3c** modules |
 | **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
 | **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
@@ -151,7 +152,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/api/attachments.api.ts` | KEEP | iOS-1b | — |
 | `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b. In iOS-6, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5. **iOS-6 (built 2026-10-28):** done, through `AUTH_SESSION_OPTIONS` in `auth.config.ts`. Also: `codeChallengeMethod: S256` is stated, and `signOutAndWipe()` holds the sign-out sequence, moved unchanged out of `useSignOut` so the tests can run it (§4.10) |
 | `src/api/client.ts` | KEEP | iOS-1b | — |
-| `src/api/comments.api.ts` | KEEP | iOS-1b | — |
+| `src/api/comments.api.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** `createComment` also refuses a PRIVATE note that carries `attachmentIds` (05 §C.26: a note's files stay visible to the requester), a second layer under `sendComment` (§4.11) |
 | `src/api/dashboard.api.ts` | KEEP | iOS-1b | — |
 | `src/api/drift.ts` | KEEP | iOS-1b | — |
 | `src/api/errors.ts` | KEEP | iOS-1b | — |
@@ -174,7 +175,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 |---|---|---|---|
 | `src/components/AnnouncementCard.tsx` | KEEP | iOS-1b | — |
 | `src/components/ApprovalStatusChip.tsx` | KEEP | iOS-1b | — |
-| `src/components/AttachmentPicker.tsx` | KEEP | iOS-1b | Camera, Photos and Files all work on iOS. The purpose strings live in `app.json` (§4.2). Photos uses the system's out-of-process picker, so iOS asks for no photo-library permission |
+| `src/components/AttachmentPicker.tsx` | ADAPT | iOS-1b, iOS-3b | Camera, Photos and Files all work on iOS. The purpose strings live in `app.json` (§4.2). Photos uses the system's out-of-process picker, so iOS asks for no photo-library permission. **iOS-3b:** Android's three buttons become one "Add attachment" button and an action sheet (Take Photo · Photo Library · Choose File); a refused camera offers "Open Settings". The device checks before staging are unchanged |
 | `src/components/Banners.tsx` | KEEP | iOS-1b | — |
 | `src/components/BrandLogo.tsx` | KEEP | iOS-1b | — |
 | `src/components/BulkProgressModal.tsx` | KEEP | iOS-1b | `statusBarTranslucent` and `onRequestClose` are Android props, ignored on iOS |
@@ -189,7 +190,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/components/ImageViewerModal.tsx` | ADAPT | iOS-1b as-is, iOS-3a | Copied unchanged in iOS-1b. **Done in iOS-3a:** change the share icon from `share-social-outline` (the Android glyph) to `share-outline` (the iOS glyph). The `StatusBar` there works unchanged (verify). Because this shares images, the share sheet offers "Save Image", which needs `NSPhotoLibraryAddUsageDescription` (§4.2) |
 | `src/components/ListEntry.tsx` | KEEP | iOS-1b | — |
 | `src/components/LoadingSkeleton.tsx` | KEEP | iOS-1b | — |
-| `src/components/OptionSheet.tsx` | KEEP | iOS-1b | Android-only Modal props are ignored. Whether this becomes a native iOS sheet is an iOS-4 design question, not a port change |
+| `src/components/OptionSheet.tsx` | KEEP | iOS-1b | Android-only Modal props are ignored. Whether this becomes a native iOS sheet is an iOS-4 design question, not a port change. **iOS-3b:** the short fixed choices moved to iOS action sheets (`utils/actionSheet.ts`); this sheet keeps the long server lists (categories, groups, countries, sort, country filter) |
 | `src/components/PersonPickerSheet.tsx` | KEEP | iOS-1b | Same as `OptionSheet` |
 | `src/components/PriorityBadge.tsx` | KEEP | iOS-1b | — |
 | `src/components/RecentTicketRow.tsx` | KEEP | iOS-1b | — |
@@ -225,12 +226,12 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/hooks/useCreateTicket.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDebouncedValue.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDeleteAttachment.ts` | KEEP | iOS-1b | — |
-| `src/hooks/useDiscardGuard.ts` | KEEP | iOS-1b | Uses `usePreventRemove`. In iOS-3, check on a device that it also stops the iOS swipe-back and the swipe-down that closes a sheet. If it doesn't, the affected screens set `gestureEnabled: false` while there is unsent input |
+| `src/hooks/useDiscardGuard.ts` | KEEP | iOS-1b | Uses `usePreventRemove`. In iOS-3, check on a device that it also stops the iOS swipe-back and the swipe-down that closes a sheet. If it doesn't, the affected screens set `gestureEnabled: false` while there is unsent input. **iOS-3b:** in the installed source, native-stack turns a prevented removal into iOS's `preventNativeDismiss` (`NativeStackView.native.tsx`), so the swipes ask too; pinned by `tests/screens/write-screens.test.mjs`, device check in iOS-7 |
 | `src/hooks/useHome.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useKnowledgeBase.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useLookups.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useNotifications.ts` | KEEP | iOS-1b | — |
-| `src/hooks/usePostComment.ts` | KEEP | iOS-1b | — |
+| `src/hooks/usePostComment.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** the write is the exported `sendComment(role, …)` (as `sendAssignment`), so the tests drive it; it refuses a PRIVATE note with files before anything is uploaded (05 §C.26, §4.11) |
 | `src/hooks/useProfile.ts` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** `useSignOut` calls `signOutAndWipe()` (`auth.api.ts`) instead of running AUTH-3 and `endSession` itself. Same sequence, same 5 s cap; now testable under Node |
 | `src/hooks/useReduceMotion.ts` | KEEP | iOS-1b | `AccessibilityInfo.isReduceMotionEnabled` reads iOS's Reduce Motion setting. The comment names only Android's equivalent |
 | `src/hooks/useServiceCatalog.ts` | KEEP | iOS-1b | — |
@@ -256,7 +257,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/navigation/DrawerContent.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `src/navigation/MoreScreen.tsx`: the same rows, labels, icons, account card, Sign out and version line, as an iOS grouped list from `moreSections()` (§4.5) |
 | `src/navigation/MainTabs.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `AppTabs.tsx` (tabs from `appTabs()`, badges from `tabBadges()`) |
 | `src/navigation/ModuleStacks.tsx` | ADAPT | iOS-2 | Not copied. **Replaced:** the four module stacks are flattened into the More stack (`routes.ts`), so each module's first screen swipes back to More. The `getId` functions moved to `routes.ts` (`RECORD_ID_PARAM`) |
-| `src/navigation/RootNavigator.tsx` | ADAPT | iOS-2 | Written from the Android file: Auth \| App tabs, plus the seven sheets in a root modal group that covers the tab bar. The reinstall check (`installMarker.ts`) runs before `restoreSession()`. The 8-hour foreground check and the splash hand-over are unchanged |
+| `src/navigation/RootNavigator.tsx` | ADAPT | iOS-2, iOS-3b | Written from the Android file: Auth \| App tabs, plus the seven sheets in a root modal group that covers the tab bar. The reinstall check (`installMarker.ts`) runs before `restoreSession()`. The 8-hour foreground check and the splash hand-over are unchanged. **iOS-3b:** registers the five write sheets, gives every sheet `getIdFor(name)`, and mounts `SuccessNoticeHost` above the navigator |
 | `src/navigation/TicketStack.tsx` | ADAPT | iOS-2 | Not copied. **Replaced:** the list is the Tickets tab's stack; the record screens (`TicketDetail`, `TaskDetail`, `TicketLink`, plus `ApprovalDetail`) are in every tab's stack; the six sheets and `CreateTicket` are root sheets (§4.5) |
 | `src/navigation/navigationRef.ts` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `HtmlText` imports it. **iOS-2:** `openTicketLinkInApp` opens the resolver in the tab on screen (`deep-links.ts` `ticketLinkDestination`, `routes.ts` `focusedAppTab`); nothing opens under a sheet |
 | `src/navigation/splash.ts` | KEEP | iOS-1b | `ErrorBoundary` imports it |
@@ -278,7 +279,7 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-3c | §6 #23 |
 | `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-3c | §6 #22 |
 | `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-3c | §6 #24 |
-| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a (built) | §6 #1, §4.9 |
+| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #1, §4.9. **iOS-3b:** "Raise a ticket" and "+" back (§4.11) |
 | `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-3c | §6 #19 |
 | `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-3c | §6 #18 |
 | `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a | §6 #6 |
@@ -286,16 +287,16 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-3c | §6 #16 |
 | `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-3c | §6 #17 |
 | `src/screens/tasks/TaskListScreen.tsx` | SCREEN | iOS-3c | §6 #15 |
-| `src/screens/tickets/AssignPickerScreen.tsx` | SCREEN | iOS-3b | §6 #10 |
-| `src/screens/tickets/CreateTicketScreen.tsx` | SCREEN | iOS-3b | §6 #7 |
-| `src/screens/tickets/ReplyComposerScreen.tsx` | SCREEN | iOS-3b | §6 #8 |
-| `src/screens/tickets/StatusClosureScreen.tsx` | SCREEN | iOS-3b | §6 #9 |
-| `src/screens/tickets/SubmitApprovalScreen.tsx` | SCREEN | iOS-3b | §6 #12 |
-| `src/screens/tickets/TicketDetailScreen.tsx` | SCREEN | iOS-3a (built) | §6 #4, §4.9 |
+| `src/screens/tickets/AssignPickerScreen.tsx` | SCREEN | iOS-3b (built) | §6 #10, §4.11 |
+| `src/screens/tickets/CreateTicketScreen.tsx` | SCREEN | iOS-3b (built) | §6 #7, §4.11 |
+| `src/screens/tickets/ReplyComposerScreen.tsx` | SCREEN | iOS-3b (built) | §6 #8, §4.11 |
+| `src/screens/tickets/StatusClosureScreen.tsx` | SCREEN | iOS-3b (built) | §6 #9, §4.11 |
+| `src/screens/tickets/SubmitApprovalScreen.tsx` | SCREEN | iOS-3b (built) | §6 #12, §4.11 |
+| `src/screens/tickets/TicketDetailScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #4, §4.9. **iOS-3b:** every write back, More options as an action sheet (§4.11) |
 | `src/screens/tickets/TicketFiltersScreen.tsx` | SCREEN | iOS-3a (built) | §6 #3, §4.9 |
 | `src/screens/tickets/TicketLinkScreen.tsx` | SCREEN | iOS-3a (built) | §6 #5, §4.9 |
-| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-3a (built) | §6 #2, §4.9 |
-| `src/screens/tickets/TicketPropertyEditors.tsx` | SCREEN | iOS-3a as-is, iOS-3b | §6 #11. Copied unchanged in iOS-3a, because TicketDetail imports it; its editors can't be opened until iOS-3b (§4.9) |
+| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #2, §4.9. **iOS-3b:** the status chip (action sheet), selection and "+" back (§4.11) |
+| `src/screens/tickets/TicketPropertyEditors.tsx` | SCREEN | iOS-3a as-is, iOS-3b (built) | §6 #11. Copied unchanged in iOS-3a, because TicketDetail imports it; its editors open since iOS-3b, with impact and urgency as action sheets (§4.11) |
 
 ### 3.11 `src/store/` (2)
 
@@ -310,7 +311,7 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 |---|---|---|---|
 | `src/theme/colors.ts` | KEEP | iOS-1b | — |
 | `src/theme/index.ts` | KEEP | iOS-1b | — |
-| `src/theme/motion.ts` | KEEP | iOS-1b | — |
+| `src/theme/motion.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** adds `successNotice` (fade 200 ms, visible 3 s) for `components/SuccessNotice.tsx`; components hold no motion numbers of their own |
 | `src/theme/spacing.ts` | KEEP | iOS-1b | dp values are used as pt on iOS, at the same numbers |
 | `src/theme/typography.ts` | KEEP | iOS-1b | No font is named, so iOS uses its system font, SF Pro. The web's `font-sans` stack also uses the Apple system font on Apple devices. The comment mentions Roboto only |
 
@@ -342,10 +343,10 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 |---|---|---|---|
 | `src/utils/activity.ts` | KEEP | iOS-1b | — |
 | `src/utils/approvals.ts` | KEEP | iOS-1b | — |
-| `src/utils/assignment.ts` | KEEP | iOS-1b | — |
+| `src/utils/assignment.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** receives `CREATE_ASSIGNEE_ROLES` from CreateTicketScreen, which may not name a role (`tests/navigation/shell.test.mjs`). Same list |
 | `src/utils/compose.ts` | KEEP | iOS-1b | — |
 | `src/utils/deep-links.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `ticketLinkDestination()`: a ticket link opens the resolver in the tab on screen, and nothing under a sheet. `parseTicketLink()` is unchanged |
-| `src/utils/dialogs.ts` | ADAPT | iOS-1b as-is, iOS-3 | Copied unchanged in iOS-1b: its `ToastAndroid` call is already behind `Platform.OS === 'android'`. Its change moved from iOS-2 to iOS-3, with `Notice` and the screens that show notices. Today `notify()` uses `ToastAndroid`, and on iOS it falls back to a modal `Alert` for every success notice. The HIG discourages that. In iOS-3 it changes to the non-modal `Notice` (§7), which VoiceOver announces. Drop the `ToastAndroid` and `Platform` imports. `confirmAction` and the error alerts stay as `Alert`, which is the right iOS control for them |
+| `src/utils/dialogs.ts` | ADAPT | iOS-1b as-is, iOS-3 | Copied unchanged in iOS-1b: its `ToastAndroid` call is already behind `Platform.OS === 'android'`. Its change moved from iOS-2 to iOS-3, with `Notice` and the screens that show notices. Today `notify()` uses `ToastAndroid`, and on iOS it falls back to a modal `Alert` for every success notice. The HIG discourages that. In iOS-3 it changes to the non-modal `Notice` (§7), which VoiceOver announces. Drop the `ToastAndroid` and `Platform` imports. `confirmAction` and the error alerts stay as `Alert`, which is the right iOS control for them. **Done in iOS-3b:** `notify()` calls `showSuccessNotice()`; the component is named `SuccessNotice`, not `Notice` (§7) |
 | `src/utils/format.ts` | KEEP | iOS-1b | — |
 | `src/utils/html.ts` | KEEP | iOS-1b | — |
 | `src/utils/kb.ts` | KEEP | iOS-1b | — |
@@ -367,14 +368,14 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `tests/auth/mobile-sso.test.mjs` | ADAPT | iOS-2, then iOS-6 | **Copied as it is in iOS-2**, together with `src/screens/auth/signInAttempt.ts`, which it imports; it passes. In iOS-6 its fixed-redirect assertion (line 152) changes to `msauth.com.mountmeru.servicedesk://auth`, together with `auth.config.ts`. **iOS-6 (built):** done; it also asserts the sheet options (`AUTH_SESSION_OPTIONS`). All 34 pass |
-| `tests/rbac/g3-features.test.mjs` | KEEP | iOS-3b | Reads the TicketDetail, ReplyComposer and SubmitApproval screens and `TicketStack.tsx` |
-| `tests/rbac/g5-audit.test.mjs` | KEEP | iOS-3b | Reads `CreateTicketScreen` |
+| `tests/rbac/g3-features.test.mjs` | ADAPT | iOS-3b (copied) | Reads the TicketDetail, ReplyComposer and SubmitApproval screens and `TicketStack.tsx`. **Copied in iOS-3b** with every expectation unchanged; one wiring line reads `RootNavigator.tsx`'s sheet list instead of `TicketStack.tsx` |
+| `tests/rbac/g5-audit.test.mjs` | KEEP | iOS-3b (copied) | Reads `CreateTicketScreen`. Copied unchanged; all pass |
 | `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a (copied) | Reads `TicketListScreen` and `TicketFiltersScreen`. Copied unchanged; all pass |
 | `tests/rbac/personas.mjs` | KEEP | iOS-1b | — |
 | `tests/rbac/property-editing.test.mjs` | KEEP | iOS-1b | Pure modules only |
-| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged |
+| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass |
 | `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack` |
-| `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b | Reads AssignPicker, TicketDetail and TicketPropertyEditors |
+| `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b (copied) | Reads AssignPicker, TicketDetail and TicketPropertyEditors. Copied unchanged; all pass |
 | `tests/support/loader.mjs` | KEEP | iOS-1b | — |
 | `tests/support/register.mjs` | KEEP | iOS-1b | — |
 | `tests/support/stubs/expo-auth-session.mjs` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** exports `CodeChallengeMethod`; records the options passed to `promptAsync`; the unused `makeRedirectUri` is gone; the comment says "device build" |
@@ -677,7 +678,7 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
   - Attachments: images open in the viewer, and other files download to the share sheet;
   - Tasks.
 - **Priority:** shown as the badge, with its "Auto" pill when impact × urgency set it. The live preview is part of the impact/urgency editor and returns with it in iOS-3b.
-- **iOS-3b:** set `WRITE_CONTROLS` to true, delete the gate and unwrap its calls, then device-check each write.
+- **iOS-3b:** set `WRITE_CONTROLS` to true, delete the gate and unwrap its calls, then device-check each write. **Done in iOS-3b (§4.11):** the gate and its file are gone; the device checks are listed there.
 
 **Read links to screens that arrive in iOS-3c** keep Android's behaviour. In `__DEV__` builds they open the DEV placeholder, as the tabs and More rows have since iOS-2. No release build exists before iOS-7.
 - Home: Pending approvals → `ApprovalsInbox`, and the announcement banner → `Announcements`.
@@ -744,6 +745,128 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 
 **Still to check on a device (iOS-7):** that Entra accepts the redirect, that the sheet returns the code, the real PKCE flow, AUTH-P2 with an iOS ID token, the Keychain across a restart and a reinstall, and the stale banner on real AppState events.
 
+### 4.11 iOS-3b: the write path (built 2026-10-28)
+
+**Approved by Ronit on 2026-10-28** (the iOS-3b plan). The phase rule: behave exactly as the web portal does, with only the interface iOS, except for the 17 🔒 SAFER divergences in `docs/WEB-VS-MOBILE-ROLES.md` §5, plus one more Ronit added: no attachments on a private note (05 §C.26).
+- Q1: bulk exactly as Android `c84d53a`, with no new stop rule.
+- Q2: "Add task" comes back; it opens the TaskEditor DEV placeholder until iOS-3c.
+- Q3: `getId` on the reply, status, submit-for-approval (ticket id) and assign (ticket ids) sheets.
+- Q4: the toast replacement is named `SuccessNotice`.
+
+**What was built:**
+- **The five write sheets,** ported from `c84d53a` (byte-identical first, then adapted): CreateTicket, ReplyComposer, StatusClosure, AssignPicker, SubmitApproval. They are registered as root page sheets in `RootNavigator.tsx`.
+- **TicketPropertyEditors** opens (G1 property editing and the inline technician).
+- **The phase gate (§4.9) is deleted.** TicketDetail, TicketList and Home render Android's write controls from the same role answers:
+  - the status card and More options;
+  - Reply, Reply all and Note;
+  - Add files, and deleting a file;
+  - the task checkbox and Add task;
+  - the five property editors;
+  - the list's status chip, selection and bulk bar;
+  - "Raise a ticket" and "+".
+- **No new package, no `eas` command, no API change, no auth or SSO change.**
+
+**iOS adaptations (interface only):**
+
+| Control | Android | iOS |
+|---|---|---|
+| More options (M4) | OptionSheet | ActionSheetIOS listing exactly `ticketDetailPermissions().moreActions`, Cancel last |
+| A list card's status chip (M3) | OptionSheet | ActionSheetIOS listing exactly `inlineStatusTransitions()`; Canceled in red; a closing status opens M6 |
+| Impact and urgency (M8, G1 editor); the closure code (M6) | OptionSheet | ActionSheetIOS (`utils/actionSheet.ts`). The G1 editor offers the four real values, as before; create keeps "Not set" |
+| Categories, groups, countries, people, approvers | OptionSheet, PersonPickerSheet | Unchanged: long server lists, which an action sheet doesn't suit |
+| Attachment source | Three buttons | One "Add attachment" button → Take Photo · Photo Library · Choose File. A refused camera offers "Open Settings" |
+| Destructive confirmations | Alert | Alert, destructive style:<br>- delete a file;<br>- close or cancel through the closure form;<br>- remove an assignment;<br>- bulk pick up, assign and close;<br>- drop staged files to write a note |
+| Success notice | ToastAndroid | `SuccessNotice` (§7), read out by VoiceOver |
+| Header | `ScreenHeader` | The native sheet bar: ✕, and the title through `setOptions` ("Reply · #1234") |
+| Keyboard | `KeyboardAvoidingView` `padding` | `SheetKeyboardView`: `padding` plus the offset a page sheet needs. In a sheet, a tap outside an input or a drag down puts the keyboard away. M4's list uses `automaticallyAdjustKeyboardInsets` for the inline resolution editor |
+| FCR switch | `thumbColor` white | iOS's own white thumb (`thumbColor` is Android-only) |
+| New ticket | `replace('TicketDetail')` | The sheet closes, and the ticket opens in the tab underneath (`tabUnderSheets()`, `popTo('App', …)`) |
+| `user?.role ?? 'END_USER'` | | `navRole()`; CreateTicket's role list moved to `utils/assignment.ts` (screens name no role) |
+
+**Behaviour that differs from Android:**
+1. **No files on a private note (05 §C.26).**
+   - Android still offers them, with a note saying "Files are added to the ticket, not to this note" (ROLE-MATRIX §8 item 1, open there).
+   - iOS hides the picker in Note mode, and asks before dropping staged files when switching to Note.
+   - `sendComment` and `createComment` both refuse a note with files before anything is sent.
+   - The note's help text now says why.
+2. **One sheet per ticket.** The write sheets have `getId` (Q3). Android's sheets had none; React Navigation 7 reuses the sheet on top when the same route opens with other params.
+3. **StatusClosure takes "may change status", the transitions and the lock from `permissions.ts`.** Android read them from `ticket-rules.ts`. The answers are the same, proved for every role (unknown role included) and status in `write-screens.test.mjs`.
+4. **Everything else in the write path is Android's:** bulk and its stop rule (Q1), the guards, the requests, the confirmations' wording.
+
+**Where iOS differs from the web on the write path, with the reason:**
+
+| Web | iOS (= Android unless noted) | Reason |
+|---|---|---|
+| L2_MANAGER gets group and technician pickers on create | ADMIN, AGENT only | 🔒 SAFER: 403 (`GET /teams`, `/users/search`) |
+| AI assistant on create; AI summary and draft reply | Not built | 🔒 SAFER: §C gaps C.5, C.24, C.25 |
+| Change status to any status from a drop-down | The transition map only (status card, status sheet, list chip) | 🔒 SAFER: §A rule (05 §A.1) |
+| L2_MANAGER: Pick up, Assign/Reassign/Remove, Move to group | Hidden; the sheet and the guard refuse | 🔒 SAFER: 403 (`POST /tickets/:id/assign` is `agentOrAdmin`) |
+| The requester edits the resolution | Value only | 🔒 SAFER: §C gap C.5 |
+| L2_MANAGER and END_USER write an "internal" note | Not offered; refused on the device | 🔒 SAFER: leak C.27 (sent as a public email) |
+| A private note can carry files | **No files on a note (iOS-3b)** | 🔒 SAFER (added by Ronit for iOS-3b): leak C.26 (note files visible to the requester and L2_MANAGER) |
+| The requester adds, ticks or removes tasks | Read-only for END_USER | 🔒 SAFER: §C gap C.3 |
+| Any page by address | Each write sheet refuses a role it is not for | 🔒 SAFER: 403 / leak (ROLE-MATRIX §1) |
+| END_USER and L2_MANAGER see "Submit for approval"; END_USER sees a file's delete button | Hidden; refused on the device | The web control always gets 403 (counted ✅ SAME in WEB-VS-MOBILE-ROLES §5, not 🔒) |
+| No status chip on list cards | A status chip on list cards (staff), same rules and call | ➕ MOBILE ONLY, from Android (not a 🔒 row) |
+| No bulk actions | Select up to 20: Pick up, Assign, Close | ➕ MOBILE ONLY, from Android; kept on Ronit's brief and Q1 (not a 🔒 row) |
+| No requester field on create | "Raise on behalf" for ADMIN and AGENT | ➕ MOBILE ONLY, from Android; awaits Ronit (ROLE-MATRIX §8 item 4; not a 🔒 row) |
+| END_USER: Reply all and To/Cc | Staff only | ⊘ OUT OF SCOPE, from Android: TKT-9 has no access check (05 C.1; ROLE-MATRIX §8 item 6). Not a 🔒 row, though its ground is a §C gap |
+| Mode, level and source on create | Not offered; `source` is "API" | ⊘ OUT OF SCOPE: the server drops mode and level (05 B.13) |
+| A plain AGENT changes the ticket's country | Locked, with the reason | ⊘ OUT OF SCOPE: Ronit decided in G2 (05 §A.12) |
+| Print, duplicate, delete, "email the technician", tags, problem/change links | Not offered | ⊘ OUT OF SCOPE |
+| Rich-text composer; templates keep formatting and images | Plain text; a template's images are left out and the composer says so | 05 §A.16 (plain-text composer); no inline base64 images (01 §0.1) |
+| G1 impact/urgency "Not Set" (saves nothing) | Not offered | It does nothing on the web (G1 §6) |
+| Submit for approval: "until all approvers respond"; blank comments sent as `''` | Says what the server does (05 B.35); blank comments left out | The web's wording is wrong (G3 §4); same stored meaning |
+| Some writes unconfirmed (e.g. a status change, Pick up) | Every irreversible write asks first, naming who is emailed | Android's rule (`utils/dialogs.ts`): writes that email people can't be undone |
+| No re-read before writing | Status changes and assignments re-read the ticket's status first (one GET) | The server accepts any transition (05 B.2); a stale status could reopen a closed ticket |
+| Offline writes fail at the network | Refused on the device, never queued | `writeGuards.requireOnline` |
+
+**Safety rules → tests** (each was broken on purpose and the tests failed, then restored byte for byte):
+
+| Rule | Tests |
+|---|---|
+| Status only via POST `/status` | `write-screens`: one POST to `/status`; no role's PUT carries `status`; only two callers of TKT-6, the loop after both guards. Broken: `status` in a PUT allow-list → caught |
+| No files on a private note | `write-screens`: `sendComment` and `createComment` refuse with nothing sent; no picker in Note mode. Broken twice (the hook, the composer) → caught |
+| No internal note for L2_MANAGER or END_USER | `write-screens`, `role-gating`, `g3-features`: modes per persona; refused with nothing sent |
+| No Assign for L2_MANAGER | `write-screens`, `technician-editor`, `role-gating`: no Pick up or Assign in any status; refused before the status read. Broken (Assign for everyone) → caught |
+| Bulk: max 20, sequential, Android's stop rule, per-ticket results | `write-screens`: 21 refused unsent; in flight at most 1; 403 continues; 401, 429, 5xx, timeout and network stop; Stop and offline. Broken (stop on any error) → caught |
+| One sheet per ticket | `get-id`: per sheet, B opens a new sheet over A (and without getId, A's sheet takes B); 2,000 × 40 random runs: 0 reuse with getId, some without. Broken (no getId) → caught |
+| Non-JSON 200 is an error | `write-screens`: 8 write calls reject a 200 `text/html`; HTML labelled JSON; through the hooks; notices only after the write resolves. Broken (both client checks) → caught |
+| Role decisions from `permissions.ts` | `role-gating` (Android's three rows plus two), `shell` (no role string), `write-screens` (StatusClosure equals Android's answers). Broken (`canChangeStatus` in StatusClosure) → caught |
+| Action sheets list exactly `permissions.ts`'s answers | `write-screens`: per persona, spelled out, and every persona × status × assignee. Broken twice (an extra transition, Assign for all) → caught |
+| Destructive confirmations | `write-screens`: Alert styles; every destructive site. Broken (delete not destructive) → caught |
+| Success notice, not Alert or toast | `write-screens`, `read-screens`. Broken (`Alert` in `notify`) → caught |
+
+**Tests:** 429 → 731.
+- New: `write-screens` (93).
+- Copied from `c84d53a`, expectations unchanged:
+  - `g3-features`, `g5-audit` and `technician-editor` (198 together);
+  - `role-gating` (+6).
+- Grown: `get-id` (12 → 19).
+- Rewritten for the removed gate: `read-screens` (49 → 47).
+- Sum: 93 + 198 + 6 + 7 − 2 = 302 new.
+
+**Release bundle** (`npx expo export --platform ios`, Hermes, with its source map; the export was deleted afterwards):
+- **0 developer-token strings** (6 searched), **0 test-login markers**, **0 DEV-placeholder strings**. The placeholder, phase-gate and developer-token modules are not bundled.
+- **Present:** Send Reply, Save Note, Create ticket, Choose a different status, Add attachment, Take Photo, Remove and write a note, Submit for approval?, Not available for your role, and the status sheet's message.
+- **`ToastAndroid` and `DateTimePickerAndroid`:** no app code mentions either. One app comment does (`DatePickerSheet.tsx` line 1). The bundle's occurrences come only from library code:
+  - React Native's lazy `index.js` getter, which runs only if the property is read;
+  - the iOS fallbacks (`ToastAndroidFallback.js`, datetimepicker's `DateTimePickerAndroid.js`), which only warn;
+  - FlashList comments.
+
+**Still to check on a device (iOS-7):**
+- every sheet over the tabs, with the keyboard up (including an iPhone SE);
+- the composer's Send button above the keyboard;
+- swipe-down with unsent input;
+- the action sheets, including the status sheet's 9 choices plus Cancel;
+- Camera, Photos and Files;
+- the success notice over a closing sheet, and with VoiceOver;
+- the bulk progress sheet;
+- the new ticket opening in each tab;
+- React Native `Modal` sheets (OptionSheet, PersonPickerSheet) over the page sheets.
+
+**Open for iOS-3c:** TaskEditor is still the DEV placeholder. In a release build, "Add task" would open an empty sheet, so iOS-3c must build it before any release build (iOS-7; compliance A2).
+
 ## 5. SKIP
 
 Whole files:
@@ -781,19 +904,19 @@ Android-only parts of ADAPT files, not brought over:
 | # | Screen | iOS changes beyond the common ones |
 |---|---|---|
 | **iOS-3a — Read** | | |
-| 1 | `dashboard/HomeScreen.tsx` | The KPI tiles keep `navigate('TicketsTab', { screen: 'TicketList', … })`. A recent ticket pushes `TicketDetail` inside Home. Create opens the `CreateTicket` sheet. "Pending approvals" goes to `ApprovalsTab`, or to More's `ApprovalsInbox` when `hasApprovalsTab()` is false. The banner pushes `Announcements` inside Home (§4.5). Check the FAB `shadow-lg` and the KPI tiles at large Dynamic Type sizes (UI-STANDARDS §5.1 measured Android only). **Built in iOS-3a (§4.9):** the FAB's shadow is the `shadows.fab` token; the offline and error banners moved inside the scroll view so the large title collapses; "Raise a ticket" and the FAB wait for iOS-3b |
-| 2 | `tickets/TicketListScreen.tsx` | The `BackHandler` that clears the selection is removed. iOS has no hardware back, so the selection bar gets a visible **Cancel** (Done) button. The `StatusBar` `light-content` during selection works unchanged (verify). **Built in iOS-3a (§4.9):** the selection shows in the native bar ("N selected", Cancel), so the `StatusBar` and Android's red bar are gone; a standard title, because the search and filter bar is pinned; the status chip, selection and FAB wait for iOS-3b |
+| 1 | `dashboard/HomeScreen.tsx` | The KPI tiles keep `navigate('TicketsTab', { screen: 'TicketList', … })`. A recent ticket pushes `TicketDetail` inside Home. Create opens the `CreateTicket` sheet. "Pending approvals" goes to `ApprovalsTab`, or to More's `ApprovalsInbox` when `hasApprovalsTab()` is false. The banner pushes `Announcements` inside Home (§4.5). Check the FAB `shadow-lg` and the KPI tiles at large Dynamic Type sizes (UI-STANDARDS §5.1 measured Android only). **Built in iOS-3a (§4.9):** the FAB's shadow is the `shadows.fab` token; the offline and error banners moved inside the scroll view so the large title collapses; "Raise a ticket" and the FAB wait for iOS-3b. **iOS-3b:** both back |
+| 2 | `tickets/TicketListScreen.tsx` | The `BackHandler` that clears the selection is removed. iOS has no hardware back, so the selection bar gets a visible **Cancel** (Done) button. The `StatusBar` `light-content` during selection works unchanged (verify). **Built in iOS-3a (§4.9):** the selection shows in the native bar ("N selected", Cancel), so the `StatusBar` and Android's red bar are gone; a standard title, because the search and filter bar is pinned; the status chip, selection and FAB wait for iOS-3b. **iOS-3b:** all three back; the chip opens an action sheet |
 | 3 | `tickets/TicketFiltersScreen.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet` (§7). It still sends the device's calendar day. **Built in iOS-3a (§4.9):** a root page sheet; "Clear all" in the bar's right side |
-| 4 | `tickets/TicketDetailScreen.tsx` | The ⋮ (`ellipsis-vertical`, the Android overflow mark) → `ellipsis-horizontal-circle`, the iOS "more" mark. It imports `TicketPropertyEditors`, so that file comes along (its write paths are checked at #11). **Built in iOS-3a (§4.9):** read-only; the title and More options are in the native bar |
+| 4 | `tickets/TicketDetailScreen.tsx` | The ⋮ (`ellipsis-vertical`, the Android overflow mark) → `ellipsis-horizontal-circle`, the iOS "more" mark. It imports `TicketPropertyEditors`, so that file comes along (its write paths are checked at #11). **Built in iOS-3a (§4.9):** read-only; the title and More options are in the native bar. **iOS-3b:** every write back; More options is an action sheet; the list keeps an inline editor above the keyboard |
 | 5 | `tickets/TicketLinkScreen.tsx` | None expected. `Linking.openURL` opens Safari. **Built in iOS-3a (§4.9):** "Go to tickets" switches to the Tickets tab's list |
 | 6 | `notifications/NotificationsScreen.tsx` | A tap pushes `TicketDetail` or `ApprovalDetail` inside Alerts, instead of switching module (§4.5) |
 | **iOS-3b — Write** | | |
-| 7 | `tickets/CreateTicketScreen.tsx` | Now a sheet: on success it closes and the new ticket opens in the tab underneath. Android's `replace('TicketDetail')` can't cross the sheet. On a device, check attachments from Camera, Photos and Files |
-| 8 | `tickets/ReplyComposerScreen.tsx` | Common changes only |
-| 9 | `tickets/StatusClosureScreen.tsx` | `Switch` `thumbColor` is Android-only. iOS keeps a white thumb; the red `trackColor` is fine (verify) |
-| 10 | `tickets/AssignPickerScreen.tsx` | None expected. Check it on a device |
-| 11 | `tickets/TicketPropertyEditors.tsx` | Check the inline editors with the keyboard up. Copied unchanged in iOS-3a with TicketDetail; iOS-3b removes the phase gate that keeps its editors closed (§4.9). `accessibilityLiveRegion` on the priority preview is Android-only: VoiceOver needs `AccessibilityInfo.announceForAccessibility` (iOS-4) |
-| 12 | `tickets/SubmitApprovalScreen.tsx` | Common changes only |
+| 7 | `tickets/CreateTicketScreen.tsx` | Now a sheet: on success it closes and the new ticket opens in the tab underneath. Android's `replace('TicketDetail')` can't cross the sheet. On a device, check attachments from Camera, Photos and Files. **Built in iOS-3b (§4.11):** `popTo('App', …)` into `tabUnderSheets()`; impact and urgency as action sheets |
+| 8 | `tickets/ReplyComposerScreen.tsx` | Common changes only. **Built in iOS-3b (§4.11):** no files on a private note (05 §C.26), stricter than Android |
+| 9 | `tickets/StatusClosureScreen.tsx` | `Switch` `thumbColor` is Android-only. iOS keeps a white thumb; the red `trackColor` is fine (verify). **Built in iOS-3b (§4.11):** `thumbColor` dropped; the closure code as an action sheet; the role gate from `permissions.ts` |
+| 10 | `tickets/AssignPickerScreen.tsx` | None expected. Check it on a device. **Built in iOS-3b (§4.11):** the common changes only |
+| 11 | `tickets/TicketPropertyEditors.tsx` | Check the inline editors with the keyboard up. Copied unchanged in iOS-3a with TicketDetail; iOS-3b removes the phase gate that keeps its editors closed (§4.9). `accessibilityLiveRegion` on the priority preview is Android-only: VoiceOver needs `AccessibilityInfo.announceForAccessibility` (iOS-4). **Built in iOS-3b (§4.11):** the gate is gone; impact and urgency as action sheets |
+| 12 | `tickets/SubmitApprovalScreen.tsx` | Common changes only. **Built in iOS-3b (§4.11)** |
 | **iOS-3c — Modules** | | |
 | 13 | `approvals/ApprovalsInboxScreen.tsx` | The Approvals tab's root (ADMIN, AGENT), or pushed from More (END_USER, L2_MANAGER) |
 | 14 | `approvals/ApprovalDetailScreen.tsx` | `KeyboardAvoidingView` `"height"` → `"padding"`. `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack. "Back to approvals" pops to `ApprovalsInbox`, or goes back when the approval was opened from Alerts |
@@ -818,15 +941,18 @@ Android-only parts of ADAPT files, not brought over:
 | `docs/ios/00-PORT-MANIFEST.md` | iOS-1a | This file |
 | `docs/ios/APP-STORE-COMPLIANCE.md` | iOS-1a | Apple checklist |
 | `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-7 | iOS test steps: TestFlight install, back swipe, sheets, Dynamic Type, VoiceOver |
-| `src/navigation/routes.ts` | iOS-2 (built) | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests |
+| `src/navigation/routes.ts` | iOS-2 (built), iOS-3b | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests. **iOS-3b:** `SHEET_ID_PARAM` (getId for the four write sheets) and `tabUnderSheets()` |
 | `src/navigation/AppTabs.tsx`, `src/navigation/TabStacks.tsx`, `src/navigation/MoreScreen.tsx` | iOS-2 (built) | The tab bar, one native stack per tab, and the More list. They replace `AppDrawer`, `MainTabs`, `AppTabBar`, `DrawerContent`, `TicketStack` and `ModuleStacks` (§3.9) |
 | `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); deleted in iOS-3c | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-3". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
 | `tests/navigation/shell.test.mjs`, `get-id.test.mjs`, `deep-links.test.mjs` | iOS-2 (built) | Tabs, More rows and badges per persona; no role string in navigators, screens or components; `getId` coverage and the randomised `StackRouter` runs; ticket-link parsing and where a link opens |
 | `src/components/DatePickerSheet.tsx` | iOS-3a (built) | The native iOS date picker (`@react-native-community/datetimepicker`, inline) in a sheet with Done/Cancel. Replaces `DateTimePickerAndroid.open` in three screens and returns the same value. Used by TicketFilters since iOS-3a; TaskEditor and ServiceFormFieldInput follow in iOS-3c |
-| `src/components/Notice.tsx` | iOS-3b (moved from iOS-2) | A short, non-modal success notice at the top of the screen, announced to VoiceOver. Replaces the toast. **Needs another name:** `Form.tsx` already exports a `Notice` (the inline info/warning box the screens use). No iOS-3a screen shows a success notice: every `notify()` is on a write path |
-| `src/utils/phase-gate.ts` | iOS-3a (built); deleted in iOS-3b | The write gate (§4.9): `WRITE_CONTROLS = false` and `readOnlyDetail()`, `readOnlyFields()`, `readOnlyActions()`, which empty the role answers' write parts so the read screens offer no write |
+| `src/components/SuccessNotice.tsx`, `src/utils/successNotice.ts` | iOS-3b (built) | Planned as `Notice.tsx`; named `SuccessNotice` (Ronit, iOS-3b plan Q4) because `Form.tsx` already exports a `Notice`. A short, non-modal capsule at the top of the screen after a write, gone after 3 s, taking no touches, read out by VoiceOver (`announceForAccessibilityWithOptions`, queued), no fade under Reduce Motion. `notify()` calls it; `SuccessNoticeHost` is mounted once in `RootNavigator` |
+| `src/utils/phase-gate.ts` | iOS-3a (built); **deleted in iOS-3b** | The write gate (§4.9): `WRITE_CONTROLS = false` and `readOnlyDetail()`, `readOnlyFields()`, `readOnlyActions()`, which empty the role answers' write parts so the read screens offer no write |
+| `src/utils/actionSheet.ts` | iOS-3b (built) | `chooseFromActionSheet()` over ActionSheetIOS (Cancel last, destructive in red, the brand tint), `moreActionChoices()` and `transitionChoices()`, which only label what `permissions.ts` returns |
+| `src/components/SheetKeyboardView.tsx` | iOS-3b (built) | `KeyboardAvoidingView` `padding` with the offset a page sheet needs (its position on screen, `measureInWindow`), for the write sheets |
+| `tests/screens/write-screens.test.mjs` | iOS-3b (built) | 93 tests: the action sheets per persona and status, the destructive confirmations, the success notice, each safety rule, the sheets on iOS (§4.11) |
 | `src/theme/shadows.ts` | iOS-3a (built) | `shadows.fab`: shadowColor, shadowOffset, shadowOpacity and shadowRadius from the palette, for the floating "+" button (Android: `shadow-lg` / elevation) |
-| `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built) | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9) |
+| `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built), iOS-3b | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9). **iOS-3b:** the gate checks became "the writes render from Android's answers"; `ToastAndroid` and `thumbColor` added to the Android-only list; the stub also records ActionSheetIOS, Alert and VoiceOver announcements |
 | `tests/auth/ios-sso.test.mjs` | iOS-6 (built) | Microsoft sign-in on iOS (§4.10):<br>- the exact redirect and its match with the `app.json` scheme;<br>- no `msauth://` in `src/`, and other platforms refused;<br>- PKCE S256, the scopes, the fixed IDs, and no client secret in `src/` or the requests;<br>- the ephemeral sheet, and every cancel path ending without a banner;<br>- the 401 and 403 copy;<br>- `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` on every Keychain call;<br>- sign-out: AUTH-3, then the Keychain, query cache and UI store wiped, even when logout fails or hangs;<br>- the `name` and `department` lessons, and the `__DEV__` gate on the developer-token screen.<br>`tests/support/stubs/react-native.mjs` gains `Platform.OS` ('ios', with a setter) |
 | `src/store/installMarker.ts` | iOS-2 (built) | **iOS Keychain items survive uninstall.** On the first launch after an install, no marker file exists in the app container yet. In that case, wipe the three `mmg.session.*` keys and write the marker. A reinstalled app then never starts signed in to a session from before it was deleted |
 

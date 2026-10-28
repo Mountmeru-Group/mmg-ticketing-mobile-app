@@ -13,8 +13,7 @@
 // ticket and the banner open inside Home; a tile switches to the Tickets tab; "Pending approvals" switches to the
 // Approvals tab, or opens More's Approvals for the roles without that tab (hasApprovalsTab). The offline and error
 // banners sit inside the scroll view, so the large title collapses as the screen scrolls (react-native-screens tracks
-// the first scroll view on the screen). Creating a ticket is a write: "Raise a ticket" and the "+" button arrive with
-// the create sheet in iOS-3b (utils/phase-gate.ts).
+// the first scroll view on the screen). "Raise a ticket" and the "+" button open the create sheet (M8) over the tabs.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -32,7 +31,6 @@ import { colors, shadows } from '@/theme';
 import type { DashboardRecentTicket, HomeStackScreenProps, Ticket } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { hasApprovalsTab, homeTiles, homeVariant, navRole, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
-import { WRITE_CONTROLS } from '@/utils/phase-gate';
 import { ROLE_LABELS } from '@/utils/roles';
 import type { TicketNamedFilter } from '@/utils/ticket-filters';
 
@@ -117,7 +115,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
   const hasAnyData = isL2 ? recent.data !== undefined : dashboard.data !== undefined;
 
   // The "+" button (staff) needs room under the last section; the tab bar already takes the home-indicator inset.
-  const showFab = !isEndUser && WRITE_CONTROLS;
+  const showFab = !isEndUser;
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -142,7 +140,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
           />
         ) : null}
 
-        {isEndUser && WRITE_CONTROLS ? (
+        {isEndUser ? (
           <View className="mx-4 mb-4">
             <SubmitButton label="Raise a ticket" icon="add-circle-outline" onPress={createTicket} />
           </View>
