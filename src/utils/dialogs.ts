@@ -1,9 +1,12 @@
 // Confirmation dialogs and short notices for write actions (Phase 3b).
 // Every irreversible write — status change, closure, assignment, ticket creation, bulk anything — asks first, in
 // words that name exactly what will happen (who is emailed, what becomes public).
-import { Alert, Platform, ToastAndroid } from 'react-native';
+// iOS (docs/ios/00-PORT-MANIFEST.md §3.14): the confirmations stay Alerts, the right iOS control for them, with the
+// destructive button in red. A success notice is the non-modal SuccessNotice (utils/successNotice.ts), not a toast.
+import { Alert } from 'react-native';
 
 import { describeActionWriteError, describeFieldWriteError, describeWriteError, isSessionEndedError } from '@/api/errors';
+import { showSuccessNotice } from './successNotice';
 
 interface ConfirmOptions {
   title: string;
@@ -28,10 +31,9 @@ export function confirmAction({ title, message, confirmLabel, destructive = fals
   });
 }
 
-/** Short success notice (05 §A.2 / §A.8 toasts). The app is Android-only; Alert is the fallback elsewhere. */
+/** Short success notice (05 §A.2 / §A.8 toasts): on iOS, the SuccessNotice at the top, read out by VoiceOver. */
 export function notify(message: string): void {
-  if (Platform.OS === 'android') ToastAndroid.show(message, ToastAndroid.SHORT);
-  else Alert.alert(message);
+  showSuccessNotice(message);
 }
 
 /**

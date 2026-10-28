@@ -80,29 +80,40 @@ export const RECORD_ID_PARAM = {
 } as const satisfies Partial<Record<StackRoute, string>>;
 
 /**
+ * The write sheets (iOS-3b): one sheet per ticket, or per batch of tickets, for the same reason. React Navigation 7
+ * reuses the sheet on top when the same route is opened again with other params; without getId, a typed reply, staged
+ * files or a closure form would then belong to another ticket. A batch's id is its ticket ids, joined in order.
+ */
+export const SHEET_ID_PARAM = {
+  ReplyComposer: 'ticketId',
+  StatusClosure: 'ticketIds',
+  AssignPicker: 'ticketIds',
+  SubmitApproval: 'ticketId',
+} as const satisfies Partial<Record<SheetRoute, string>>;
+
+/**
  * Routes with params but no getId, on purpose (as Android, §9.7). Anything else with params must be in RECORD_ID_PARAM
- * (tests/navigation/get-id.test.mjs).
+ * or SHEET_ID_PARAM (tests/navigation/get-id.test.mjs).
  */
 export const WITHOUT_GET_ID: Partial<Record<StackRoute | SheetRoute, string>> = {
   TicketLink: 'Holds no state of its own: everything comes from `link`, so a reused resolver resolves the new link.',
   TicketList: 'The list root; a filter from Home replaces the one shown, as on Android (`pop: true`).',
   ServiceCatalog: 'The catalogue root; `view` and `resetAt` switch what it shows, as on Android.',
-  ReplyComposer: 'A sheet: it opens only from the screen beneath it and covers everything, so it is never current when opened again.',
-  StatusClosure: 'A sheet (as ReplyComposer).',
-  AssignPicker: 'A sheet (as ReplyComposer).',
-  SubmitApproval: 'A sheet (as ReplyComposer).',
-  TaskEditor: 'A sheet (as ReplyComposer).',
+  TaskEditor: 'A sheet that opens only from the screen beneath it and covers everything; still the DEV placeholder until iOS-3c, which ports it.',
 };
 
 type GetId = (options: { params: Readonly<object | undefined> }) => string | undefined;
 
-/** The route's getId, or undefined when it shows no single record. */
+/** The route's getId, or undefined when it shows no single record (a record screen, or a write sheet). */
 export function getIdFor(name: string): GetId | undefined {
-  const key = (RECORD_ID_PARAM as Record<string, string>)[name];
+  const key = ({ ...RECORD_ID_PARAM, ...SHEET_ID_PARAM } as Record<string, string>)[name];
   if (!key) return undefined;
   return ({ params }) => {
     const value = (params as Record<string, unknown> | undefined)?.[key];
-    return typeof value === 'string' ? value : undefined;
+    if (typeof value === 'string') return value;
+    // A batch (ticketIds): its ids in order. An empty or malformed list names no record.
+    if (Array.isArray(value) && value.length > 0 && value.every((id) => typeof id === 'string')) return value.join(',');
+    return undefined;
   };
 }
 
@@ -165,7 +176,16 @@ export function focusedAppTab(rootState: unknown): AppTab | null {
   if (!routes?.length) return null;
   const top = routes[root?.index ?? routes.length - 1];
   if (top?.name !== 'App') return null;
-  const tabs = top.state as { index?: number; routes?: { name: string }[] } | undefined;
+  return tabUnderSheets(rootState);
+}
+
+/**
+ * The tab under the sheets, whatever is presented above it (iOS-3b): where a sheet opens the record it just made, e.g.
+ * the create sheet's new ticket. 'HomeTab' before the tabs have a state of their own (they start on Home).
+ */
+export function tabUnderSheets(rootState: unknown): AppTab {
+  const root = rootState as { routes?: { name: string; state?: unknown }[] } | undefined;
+  const tabs = root?.routes?.find((route) => route.name === 'App')?.state as { index?: number; routes?: { name: string }[] } | undefined;
   const name = tabs?.routes?.[tabs.index ?? 0]?.name;
   return (name as AppTab | undefined) ?? 'HomeTab';
 }

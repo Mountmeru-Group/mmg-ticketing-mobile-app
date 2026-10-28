@@ -1,15 +1,16 @@
 // iOS-3a: the read screens (Home, Ticket list, Ticket detail, plus the list's Filters sheet and the ticket-link resolver),
 // ported from Android c84d53a (docs/ios/00-PORT-MANIFEST.md §6 #1–#5). Android's own suites still pin every role answer
 // (tests/rbac/role-gating, list-filters); these add what the iOS port itself must hold:
-//   1. no write action is reachable from these screens in iOS-3a (utils/phase-gate.ts), for every persona and status;
+//   1. the write controls render from Android's role answers, unfiltered (iOS-3b removed iOS-3a's phase gate, which
+//      left every write out; tests/screens/write-screens.test.mjs covers the write sheets themselves);
 //   2. the animations skip when iOS's Reduce Motion is on;
 //   3. the 500-ticket cap stops the list and the footer says so;
 //   4. which Home tiles each role sees, and where they lead, is Android's;
 //   5. no Android-only API and no colour literal outside src/theme; the built screens are registered.
-// What is real: the app's permission, gate, rule and hook modules. What is faked: React Native's AccessibilityInfo
+// What is real: the app's permission, rule and hook modules. What is faked: React Native's AccessibilityInfo
 // (tests/support/stubs/react-native.mjs). Screens are .tsx files that need a phone, so their wiring is read as text.
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +26,6 @@ import {
   bulkActions, hasApprovalsTab, homeTiles, homeVariant, inlineStatusTransitions, showApprovalsShortcut,
   ticketDetailPermissions, ticketFieldPermissions,
 } from '../../src/utils/permissions.ts';
-import { WRITE_CONTROLS, readOnlyActions, readOnlyDetail, readOnlyFields } from '../../src/utils/phase-gate.ts';
 import { OTHER_USER, PERSONAS, forEachPersona } from '../rbac/personas.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -50,64 +50,16 @@ const EDITORS = 'src/screens/tickets/TicketPropertyEditors.tsx';
 const LIST = 'src/screens/tickets/TicketListScreen.tsx';
 const HOME = 'src/screens/dashboard/HomeScreen.tsx';
 
-// ── 1. No write action is reachable in iOS-3a ────────────────
+// ── 1. The writes render from Android's role answers (iOS-3b) ─
 
-describe('iOS-3a: no write action is reachable from the read screens', () => {
-  test('the phase gate is off', () => {
-    assert.equal(WRITE_CONTROLS, false);
+describe("iOS-3b: the read screens' write controls come from Android's role answers, unfiltered", () => {
+  test('the iOS-3a phase gate is gone: no file, and nothing reads it', () => {
+    assert.equal(existsSync(path.join(REPO, 'src/utils/phase-gate.ts')), false);
+    const users = sourceFiles('src').filter((rel) => /phase-gate|WRITE_CONTROLS|readOnly(Detail|Fields|Actions)\(/.test(code(read(rel))));
+    assert.deepEqual(users, []);
   });
 
-  const ticketsFor = (p) =>
-    TICKET_STATUSES.flatMap((status) => [null, OTHER_USER, p.id].map((assignedToId) => ({ status, assignedToId })));
-
-  test('ticket detail: no status card, More options, composer buttons, file or task changes, for anyone, in any state', () => {
-    for (const p of Object.values(PERSONAS)) {
-      for (const t of ticketsFor(p)) {
-        const android = ticketDetailPermissions(p, t);
-        assert.deepEqual(
-          readOnlyDetail(android),
-          {
-            locked: false,
-            statusBar: false,
-            transitions: [],
-            moreActions: [],
-            conversationActions: [],
-            // What a person may READ is Android's answer, untouched.
-            privateNotes: android.privateNotes,
-            classification: android.classification,
-            recipients: android.recipients,
-            addAttachments: false,
-            deleteAttachments: false,
-            editTasks: false,
-          },
-          `${p.role} ${t.status} ${t.assignedToId}`,
-        );
-      }
-    }
-  });
-
-  test('ticket detail: every property shows its value only; a field Android hides stays hidden; no priority preview', () => {
-    for (const p of Object.values(PERSONAS)) {
-      for (const t of ticketsFor(p)) {
-        const android = ticketFieldPermissions(p, t);
-        const gated = readOnlyFields(android);
-        for (const field of ['impact', 'urgency', 'category', 'country', 'resolution', 'technician']) {
-          const expected = android[field].mode === 'hidden' ? 'hidden' : 'view';
-          assert.deepEqual(gated[field], { mode: expected }, `${p.role} ${t.status} ${field}`);
-        }
-        assert.equal(gated.priorityPreview, false);
-      }
-    }
-  });
-
-  test('ticket list: no status chip and no selection, for anyone, in any state', () => {
-    for (const p of Object.values(PERSONAS)) {
-      assert.deepEqual(readOnlyActions(bulkActions(p)), [], p.role);
-      for (const status of TICKET_STATUSES) assert.deepEqual(readOnlyActions(inlineStatusTransitions(p.role, status)), [], `${p.role} ${status}`);
-    }
-  });
-
-  test('the test can tell: without the gate, Android offers these writes (so it is the gate that removes them)', () => {
+  test("without a gate, the answers are Android's: staff get writes, and the AGENT lock and END_USER limits stay", () => {
     const admin = PERSONAS.ADMIN;
     const ticket = { status: 'OPEN', assignedToId: OTHER_USER };
     const can = ticketDetailPermissions(admin, ticket);
@@ -118,36 +70,45 @@ describe('iOS-3a: no write action is reachable from the read screens', () => {
     assert.ok(inlineStatusTransitions(admin.role, 'OPEN').length > 0);
     const agentLocked = ticketDetailPermissions(PERSONAS.AGENT, { status: 'CLOSED', assignedToId: OTHER_USER });
     assert.equal(agentLocked.locked, true);
+    assert.equal(agentLocked.addAttachments, false);
     assert.equal(ticketFieldPermissions(PERSONAS.AGENT, { status: 'CLOSED' }).category.mode, 'locked');
+    const endUser = ticketDetailPermissions(PERSONAS.END_USER, ticket);
+    assert.equal(endUser.statusBar, false);
+    assert.deepEqual(endUser.conversationActions, ['reply']);
+    assert.equal(endUser.deleteAttachments, false);
+    assert.equal(endUser.editTasks, false);
+    assert.deepEqual(bulkActions(PERSONAS.END_USER), []);
+    for (const status of TICKET_STATUSES) assert.deepEqual(inlineStatusTransitions('END_USER', status), [], status);
   });
 
-  test('TicketDetailScreen reads its role answers only through the gate', () => {
+  test('TicketDetailScreen reads its role answers straight from permissions.ts, once each', () => {
     const src = read(DETAIL);
     const c = code(src);
-    assert.ok(src.includes('readOnlyDetail(ticketDetailPermissions(user, ticket))'));
-    assert.ok(src.includes('readOnlyFields(ticketFieldPermissions(user, ticket))'));
+    assert.ok(src.includes('const can = useMemo(() => (ticket ? ticketDetailPermissions(user, ticket) : null), [user, ticket]);'));
+    assert.ok(src.includes('const fields = useMemo(() => (ticket ? ticketFieldPermissions(user, ticket) : null), [user, ticket]);'));
     assert.equal(count(c, 'ticketDetailPermissions('), 1);
     assert.equal(count(c, 'ticketFieldPermissions('), 1);
   });
 
-  test('TicketDetailScreen: each write control renders only from its gated list or flag', () => {
+  test('TicketDetailScreen: each write control renders only from its role flag', () => {
     const src = read(DETAIL);
     const c = code(src);
     const GUARDED = {
       'More options (header)': /const hasMoreActions = \(can\?\.moreActions\.length \?\? 0\) > 0;[\s\S]*headerRight: hasMoreActions\s*\?/,
+      'More options lists exactly can.moreActions': /chooseFromActionSheet\(\{ title: 'More options', choices: moreActionChoices\(can\.moreActions\) \}\)/,
       'status card': /if \(!can\.statusBar\) return null;/,
       'Reply / Reply all / Note': /can\.conversationActions\.map\(\(mode\) => \([\s\S]{0,400}navigation\.navigate\('ReplyComposer', \{ ticketId, mode \}\)/,
       'Add files': /tab === 'attachments' && can\.addAttachments \? \(\s*<Card title="Add files">\s*<AttachmentPicker/,
       'delete a file': /onDelete=\{can\.deleteAttachments \? askDelete : undefined\}/,
       'task checkbox': /onToggle=\{can\.editTasks \? toggleTaskDone : undefined\}/,
       'Add task': /tab === 'tasks' && can\.editTasks \? \([\s\S]{0,300}navigation\.navigate\('TaskEditor', \{ ticketId \}\)/,
-      'lock reason for "Add files"': /tab === 'attachments' && can\.locked \? \(/,
+      'lock reason for "Add files"': /tab === 'attachments' && !can\.addAttachments \? \(/,
     };
     for (const [control, guard] of Object.entries(GUARDED)) assert.match(src, guard, control);
     // Every write handler is referenced exactly where the guarded control uses it, and nowhere else.
     const USES = {
-      "setMoreOpen(true)": 1, // the header button
-      'onMore': 2, // defined, and the More options sheet (open only after setMoreOpen(true))
+      'once(openMoreOptions)': 1, // the header button
+      'openMoreOptions': 2, // defined, and the header button
       'transitionStatus': 2, // defined, and the status card
       'uploadStaged': 2, // defined, and the Add files card
       'askDelete': 2, // defined, and the guarded onDelete
@@ -164,7 +125,8 @@ describe('iOS-3a: no write action is reachable from the read screens', () => {
       assert.equal(found, n, ref);
     }
     assert.match(src, /async function pickUp\(\)/);
-    assert.equal(count(c, 'once(pickUp)'), 1); // More options only
+    assert.equal(count(c, 'await pickUp()'), 1); // More options only
+    assert.doesNotMatch(c, /<OptionSheet\b/, 'More options is an iOS action sheet, not a bottom sheet');
   });
 
   test('TicketPropertyEditors: an editor opens only from a field whose access is "edit"', () => {
@@ -177,28 +139,29 @@ describe('iOS-3a: no write action is reachable from the read screens', () => {
     assert.equal(fromFieldAction, opens);
   });
 
-  test('TicketListScreen: the status chip, selection and "+" render only from the gate', () => {
+  test('TicketListScreen: the status chip, selection and "+" render from permissions.ts', () => {
     const src = read(LIST);
     const c = code(src);
-    assert.ok(src.includes('const bulk = readOnlyActions(bulkActions(user));'));
+    assert.ok(src.includes('const bulk = bulkActions(user);'));
     assert.ok(src.includes('const canSelect = bulk.length > 0;'));
     assert.ok(src.includes('onLongPress={canSelect ? toggle : undefined}'));
-    assert.ok(src.includes('const interactive = readOnlyActions(inlineStatusTransitions(role, item.status)).length > 0;'));
+    assert.ok(src.includes('const interactive = inlineStatusTransitions(role, item.status).length > 0;'));
     assert.ok(src.includes('onStatusPress={interactive ? onStatusPress : undefined}'));
-    assert.equal(count(c, 'setStatusFor(t)'), 1); // the status chip's handler only
-    assert.ok(src.includes("onCreate={WRITE_CONTROLS ? () => navigation.navigate('CreateTicket') : undefined}"));
-    assert.match(src, /\) : WRITE_CONTROLS \? \(\s*\/\/ "\+" FAB[\s\S]{0,300}onPress=\{\(\) => navigation\.navigate\('CreateTicket'\)\}/);
+    assert.ok(src.includes('const transitions = inlineStatusTransitions(role, t.status);'));
+    assert.ok(src.includes('choices: transitionChoices(transitions),'));
+    assert.ok(src.includes("onCreate={() => navigation.navigate('CreateTicket')}"));
+    assert.match(src, /\) : \(\s*\/\/ "\+" FAB[\s\S]{0,300}onPress=\{\(\) => navigation\.navigate\('CreateTicket'\)\}/);
     assert.equal(count(c, "navigate('CreateTicket')"), 2);
     assert.equal(count(c, 'bulkActions('), 1);
-    assert.equal(count(c, 'inlineStatusTransitions('), 3); // the gated chip; then, behind it, its sheet and its write
+    assert.equal(count(c, 'inlineStatusTransitions('), 3); // the chip; then, behind it, its action sheet and its write
   });
 
-  test('HomeScreen: "Raise a ticket" and "+" render only from the gate', () => {
+  test('HomeScreen: "Raise a ticket" for END_USER and "+" for staff, as on Android', () => {
     const src = read(HOME);
-    assert.match(src, /isEndUser && WRITE_CONTROLS \? \([\s\S]{0,250}onPress=\{createTicket\}/);
-    assert.ok(src.includes('const showFab = !isEndUser && WRITE_CONTROLS;'));
+    assert.match(src, /\{isEndUser \? \(\s*<View className="mx-4 mb-4">\s*<SubmitButton label="Raise a ticket"[^\n]*onPress=\{createTicket\}/);
+    assert.ok(src.includes('const showFab = !isEndUser;'));
     assert.match(src, /\{showFab \? \([\s\S]{0,300}onPress=\{createTicket\}/);
-    assert.equal((code(src).match(/\bcreateTicket\b/g) ?? []).length, 3); // defined, and the two gated buttons
+    assert.equal((code(src).match(/\bcreateTicket\b/g) ?? []).length, 3); // defined, and the two buttons
   });
 });
 
@@ -224,6 +187,8 @@ describe('animations skip when iOS Reduce Motion is on', () => {
     'src/components/StatusBadge.tsx': /sameRecord && !reduceMotionEnabled\(\)/,
     // Skeleton shimmer: no loop and no band with Reduce Motion on.
     'src/components/Shimmer.tsx': /if \(reduceMotion\) return;[\s\S]*\{reduceMotion \? null :/,
+    // iOS-3b success notice: no fade in or out with Reduce Motion on; it appears and goes at once.
+    'src/components/SuccessNotice.tsx': /reduceMotionEnabled\(\) \? null : fadeTo\(1\)[\s\S]*if \(reduceMotionEnabled\(\)\) \{\s*hide\(\);/,
   };
   for (const [file, check] of Object.entries(CHECKS)) {
     test(`${path.basename(file)} checks Reduce Motion before it animates`, () => {
@@ -351,6 +316,9 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     'the ⋮ glyph': /ellipsis-vertical/,
     'the Android share glyph': /share-social/,
     'KeyboardAvoidingView "height"': /behavior="height"/,
+    // iOS-3b: success notices are SuccessNotice (utils/successNotice.ts); ToastAndroid is gone from src altogether.
+    ToastAndroid: /\bToastAndroid\b/,
+    "the Switch's thumbColor (Android-only; iOS keeps its white thumb)": /\bthumbColor=/,
   };
 
   test('no Android-only API in src', () => {
@@ -360,11 +328,12 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     }
   });
 
-  test('ToastAndroid only in utils/dialogs.ts, behind Platform.OS === \'android\'', () => {
-    const users = sourceFiles('src').filter((rel) => /\bToastAndroid\./.test(code(read(rel))));
-    assert.deepEqual(users, ['src/utils/dialogs.ts']);
-    const calls = code(read('src/utils/dialogs.ts')).split('\n').filter((line) => /ToastAndroid\./.test(line));
-    for (const line of calls) assert.match(line, /if \(Platform\.OS === 'android'\) ToastAndroid\./);
+  test('a success notice is the non-modal SuccessNotice: notify() never opens an Alert or a toast (iOS-3b)', () => {
+    const dialogs = code(read('src/utils/dialogs.ts'));
+    const notify = dialogs.slice(dialogs.indexOf('export function notify('), dialogs.indexOf('export function reportWriteError('));
+    assert.match(notify, /showSuccessNotice\(message\);/);
+    assert.doesNotMatch(notify, /Alert\.|ToastAndroid|Platform/);
+    assert.doesNotMatch(dialogs, /\bPlatform\b/);
   });
 
   test('no colour literal outside src/theme', () => {
@@ -378,14 +347,24 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     assert.deepEqual(users, ['src/screens/PlaceholderScreen.tsx']);
   });
 
-  test('the read screens replace their placeholders; every other route keeps it', () => {
+  test('the built screens replace their placeholders; every other route keeps it', () => {
     const stacks = read('src/navigation/TabStacks.tsx');
     for (const line of ['More: MoreScreen,', 'Home: HomeScreen,', 'TicketList: TicketListScreen,', 'TicketDetail: TicketDetailScreen,', 'TicketLink: TicketLinkScreen,']) {
       assert.ok(stacks.includes(line), line);
     }
     assert.ok(stacks.includes('component={SCREENS[name] ?? PlaceholderRoute}'));
     const root = read('src/navigation/RootNavigator.tsx');
-    assert.ok(root.includes('TicketFilters: TicketFiltersScreen,'));
+    // iOS-3a: the Filters sheet. iOS-3b: the five write sheets. TaskEditor keeps the placeholder until iOS-3c.
+    const sheets = root.slice(root.indexOf('const SHEETS'), root.indexOf('};', root.indexOf('const SHEETS')));
+    const built = [...sheets.matchAll(/^\s+(\w+): (\w+),$/gm)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(built, [
+      ['CreateTicket', 'CreateTicketScreen'],
+      ['ReplyComposer', 'ReplyComposerScreen'],
+      ['StatusClosure', 'StatusClosureScreen'],
+      ['AssignPicker', 'AssignPickerScreen'],
+      ['SubmitApproval', 'SubmitApprovalScreen'],
+      ['TicketFilters', 'TicketFiltersScreen'],
+    ]);
     assert.ok(root.includes('component={SHEETS[name] ?? PlaceholderRoute}'));
   });
 

@@ -6,6 +6,8 @@
 // - Behaviour: randomised navigation on the installed StackRouter, with the stacks and getId functions the app builds
 //   its navigators from (src/navigation/routes.ts). Zero screen-reuse events are required; the same runs without getId
 //   must find some, which proves the check can see one.
+// - iOS-3b: the write sheets (reply, status, assign, submit for approval) get getId too, by their ticket or tickets, so
+//   a typed reply, staged files or a closure form can't move to another ticket. Checked the same way on the root stack.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,6 +19,7 @@ import { CommonActions, StackActions, StackRouter } from '@react-navigation/rout
 import {
   RECORD_ID_PARAM,
   RECORD_ROUTES,
+  SHEET_ID_PARAM,
   SHEET_ROUTES,
   STACK_ROUTES,
   WITHOUT_GET_ID,
@@ -57,7 +60,39 @@ describe('coverage', () => {
     const named = [...params].filter(([, names]) => names.some((n) => recordParam.test(n))).map(([route]) => route);
     assert.ok(named.length >= 10, `parsed too few routes: ${named.join(', ')}`);
     for (const route of named) {
-      assert.ok(route in RECORD_ID_PARAM || route in WITHOUT_GET_ID, `${route} has a record param but no getId`);
+      assert.ok(
+        route in RECORD_ID_PARAM || route in SHEET_ID_PARAM || route in WITHOUT_GET_ID,
+        `${route} has a record param but no getId`,
+      );
+    }
+  });
+
+  test('iOS-3b: the four write sheets have getId by their ticket(s); TaskEditor waits for iOS-3c', () => {
+    const params = paramNamesByRoute();
+    assert.deepEqual(SHEET_ID_PARAM, {
+      ReplyComposer: 'ticketId',
+      StatusClosure: 'ticketIds',
+      AssignPicker: 'ticketIds',
+      SubmitApproval: 'ticketId',
+    });
+    for (const [route, key] of Object.entries(SHEET_ID_PARAM)) {
+      assert.ok(SHEET_ROUTES.includes(route), `${route} is not a sheet`);
+      assert.ok(params.get(route)?.includes(key), `${route} has no param ${key}`);
+      assert.equal(route in WITHOUT_GET_ID, false, `${route} is also listed without getId`);
+    }
+    assert.ok('TaskEditor' in WITHOUT_GET_ID);
+    for (const route of ['CreateTicket', 'TicketFilters']) assert.equal(getIdFor(route), undefined, route);
+  });
+
+  test('a sheet id: the ticket id, or a batch\'s ids joined in order; nothing for an empty or malformed list', () => {
+    assert.equal(getIdFor('ReplyComposer')({ params: { ticketId: 't-1', mode: 'note' } }), 't-1');
+    assert.equal(getIdFor('SubmitApproval')({ params: { ticketId: 't-2' } }), 't-2');
+    assert.equal(getIdFor('StatusClosure')({ params: { ticketIds: ['t-1'], target: 'RESOLVED' } }), 't-1');
+    assert.equal(getIdFor('AssignPicker')({ params: { ticketIds: ['t-1', 't-2', 't-3'] } }), 't-1,t-2,t-3');
+    assert.notEqual(getIdFor('AssignPicker')({ params: { ticketIds: ['t-1', 't-2'] } }), getIdFor('AssignPicker')({ params: { ticketIds: ['t-1'] } }));
+    for (const ticketIds of [[], undefined, [1, 2], 't-1']) {
+      const expected = typeof ticketIds === 'string' ? 't-1' : undefined;
+      assert.equal(getIdFor('StatusClosure')({ params: { ticketIds } }), expected, JSON.stringify(ticketIds));
     }
   });
 
@@ -89,6 +124,7 @@ describe('coverage', () => {
     assert.equal(/<Stack\.Screen[^>]*name="/.test(stacks), false, 'TabStacks hard-codes a screen');
     const root = read('src/navigation/RootNavigator.tsx');
     assert.ok(root.includes('SHEET_ROUTES.map('), 'RootNavigator must build the sheets from SHEET_ROUTES');
+    assert.ok(root.includes('getId={getIdFor(name)}'), 'RootNavigator must pass getIdFor to every sheet');
   });
 });
 
@@ -168,5 +204,84 @@ describe('randomised navigation: 2,000 runs of 40 actions per tab stack', () => 
       assert.ok(without > 0, `the check found no reuse even without getId (${without})`);
       assert.equal(withGetId, 0);
     });
+  });
+});
+
+// ── iOS-3b: the write sheets on the root stack ───────────────
+
+describe('the write sheets: one sheet per ticket or batch (root stack, iOS-3b)', () => {
+  const ROOT = ['App', ...SHEET_ROUTES];
+  const sheetParams = (route, ids) =>
+    ({
+      ReplyComposer: { ticketId: ids[0], mode: 'reply' },
+      StatusClosure: { ticketIds: ids, target: 'CLOSED' },
+      AssignPicker: { ticketIds: ids },
+      SubmitApproval: { ticketId: ids[0] },
+    })[route];
+  const rootOptions = (withGetId) => ({
+    routeNames: ROOT,
+    routeParamList: {},
+    routeGetIdList: withGetId ? Object.fromEntries(ROOT.map((n) => [n, getIdFor(n)])) : {},
+  });
+  const sheetId = (route) => (route.name in SHEET_ID_PARAM ? getIdFor(route.name)({ params: route.params }) : undefined);
+
+  for (const sheet of Object.keys(SHEET_ID_PARAM)) {
+    test(`${sheet}: opened for ticket B over ticket A's, it is a new sheet; without getId A's sheet would take B`, () => {
+      for (const withGetId of [true, false]) {
+        const router = StackRouter({ initialRouteName: 'App' });
+        const options = rootOptions(withGetId);
+        let state = router.getInitialState(options);
+        state = router.getStateForAction(state, CommonActions.navigate(sheet, sheetParams(sheet, ['ticket-a'])), options);
+        const keyA = state.routes.at(-1).key;
+        state = router.getStateForAction(state, CommonActions.navigate(sheet, sheetParams(sheet, ['ticket-b'])), options);
+        const top = state.routes.at(-1);
+        assert.equal(sheetId(top), 'ticket-b');
+        if (withGetId) {
+          assert.equal(state.routes.length, 3);
+          assert.notEqual(top.key, keyA, 'B got its own sheet');
+          assert.equal(sheetId(state.routes[1]), 'ticket-a', "A's sheet still holds A");
+        } else {
+          assert.equal(state.routes.length, 2);
+          assert.equal(top.key, keyA, "without getId, A's sheet (and what was typed in it) now shows B");
+        }
+      }
+    });
+  }
+
+  test('2,000 runs of 40 actions over the sheets: 0 reuse events with getId; the same runs without it find some', () => {
+    const sheets = Object.keys(SHEET_ID_PARAM);
+    const batches = [['rec-a'], ['rec-b'], ['rec-a', 'rec-b'], ['rec-b', 'rec-c']];
+    function events(withGetId) {
+      const router = StackRouter({ initialRouteName: 'App' });
+      const options = rootOptions(withGetId);
+      const next = random(0x5ee7);
+      const pick = (list) => list[Math.floor(next() * list.length)];
+      let count = 0;
+      for (let run = 0; run < 2000; run += 1) {
+        let state = router.getInitialState(options);
+        const seen = new Map();
+        for (let step = 0; step < 40; step += 1) {
+          const roll = next();
+          const sheet = pick(sheets);
+          const action =
+            roll < 0.7
+              ? CommonActions.navigate(sheet, sheetParams(sheet, pick(batches)))
+              : state.routes.length > 1
+                ? StackActions.pop()
+                : CommonActions.navigate('App');
+          state = router.getStateForAction(state, action, options) ?? state;
+          for (const route of state.routes) {
+            const id = sheetId(route);
+            if (id === undefined) continue;
+            if (seen.has(route.key) && seen.get(route.key) !== id) count += 1;
+            seen.set(route.key, id);
+          }
+        }
+      }
+      return count;
+    }
+    const without = events(false);
+    assert.ok(without > 0, `the check found no reuse even without getId (${without})`);
+    assert.equal(events(true), 0);
   });
 });

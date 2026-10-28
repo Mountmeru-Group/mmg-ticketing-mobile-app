@@ -2,17 +2,31 @@
 // Every file is checked on the DEVICE before it is even staged — count, size and blocked extensions
 // (validateUploadFiles, 05 B.9) — because every server-side limit violation is an opaque 500. Picking a file never
 // uploads it: the screen's own explicit Send / Save / Create button does.
+// iOS (docs/ios/00-PORT-MANIFEST.md §4.11): one "Add attachment" button opens an action sheet (Take Photo, Photo Library,
+// Choose File) in place of Android's three buttons. Photos and Files are the system's out-of-process pickers, which ask
+// for no permission; the camera asks once, with the purpose string in app.json, and a refusal offers Settings. Picked
+// documents are copied into the app's cache (App Store 2.5.2, compliance C3).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, Text, View } from 'react-native';
 
 import {
   BLOCKED_EXTENSIONS, MAX_FILES_PER_UPLOAD, MAX_UPLOAD_BYTES, validateUploadFiles, type UploadFile,
 } from '@/api/attachments.api';
 import { colors, palette } from '@/theme';
+import { chooseFromActionSheet, type SheetChoice } from '@/utils/actionSheet';
 import { formatBytes } from '@/utils/format';
+
+type Source = 'camera' | 'photos' | 'files';
+
+/** The attachment sources, in the order iOS apps list them. */
+export const ATTACHMENT_SOURCES: readonly SheetChoice<Source>[] = [
+  { value: 'camera', label: 'Take Photo' },
+  { value: 'photos', label: 'Photo Library' },
+  { value: 'files', label: 'Choose File' },
+];
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
@@ -75,17 +89,25 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
     onChange([...files, ...next]);
   }
 
-  async function run(source: 'camera' | 'photos' | 'files') {
+  async function chooseSource() {
     if (remaining <= 0) {
       Alert.alert("Can't attach", `You can attach up to ${MAX_FILES_PER_UPLOAD} files at a time`);
       return;
     }
+    const source = await chooseFromActionSheet({ title: 'Add attachment', choices: ATTACHMENT_SOURCES });
+    if (source) await run(source);
+  }
+
+  async function run(source: Source) {
     setBusy(true);
     try {
       if (source === 'camera') {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Camera access needed', 'Allow camera access in Settings to take a photo.');
+          Alert.alert('Camera access needed', 'Allow camera access for Setu in Settings to take a photo.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+          ]);
           return;
         }
         const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
@@ -115,32 +137,20 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
     }
   }
 
-  const sources = [
-    { key: 'camera', label: 'Camera', icon: 'camera-outline' },
-    { key: 'photos', label: 'Photos', icon: 'images-outline' },
-    { key: 'files', label: 'Files', icon: 'document-attach-outline' },
-  ] as const;
-
   return (
     <View>
-      <View className="flex-row gap-2">
-        {sources.map((s) => (
-          <Pressable
-            key={s.key}
-            accessibilityRole="button"
-            accessibilityLabel={`Attach from ${s.label}`}
-            disabled={disabled || busy}
-            onPress={() => void run(s.key)}
-            className={`min-h-11 flex-1 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white px-2 ${disabled || busy ? 'opacity-50' : 'active:bg-gray-50'}`}
-          >
-            <Ionicons name={s.icon} size={18} color={colors.text.body} />
-            {/* Three across a form card: shrink a little rather than wrap at 360 dp or with large text. */}
-            <Text className="ml-1.5 shrink text-sm font-medium text-gray-700" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {s.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add attachment"
+        accessibilityHint="Take a photo, or choose one from Photos or a file from Files"
+        accessibilityState={{ disabled: disabled || busy, busy }}
+        disabled={disabled || busy}
+        onPress={() => void chooseSource()}
+        className={`min-h-11 flex-row items-center justify-center rounded-lg border border-gray-300 bg-white px-3 ${disabled || busy ? 'opacity-50' : 'active:bg-gray-50'}`}
+      >
+        <Ionicons name="attach-outline" size={18} color={colors.text.body} />
+        <Text className="ml-1.5 text-sm font-medium text-gray-700">Add attachment</Text>
+      </Pressable>
       {busy ? <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} /> : null}
       <Text className="mt-2 text-xs text-gray-500">
         Up to {MAX_FILES_PER_UPLOAD} files, {formatBytes(MAX_UPLOAD_BYTES)} each. Not allowed: {BLOCKED_EXTENSIONS.join(' ')}

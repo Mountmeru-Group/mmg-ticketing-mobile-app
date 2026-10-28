@@ -13,6 +13,8 @@
 // iOS (docs/ios/00-PORT-MANIFEST.md §3.15): copied in iOS-3a, ahead of iOS-3c, with every expectation unchanged. Only
 // the wiring list differs: the drawer and Android's tab bar are MoreScreen and AppTabs on iOS, and a screen's row is
 // listed once that screen is ported (3b: CreateTicket, ReplyComposer, SubmitApproval; 3c: the catalogue and Profile).
+// iOS-3b restored those three rows with Android's `forbid` unchanged, and added two Android did not have: StatusClosure
+// and AssignPicker, so every write sheet takes its role decisions from permissions.ts.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -535,9 +537,39 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       uses: ['ticketFieldPermissions(', 'useUpdateTicket(', 'useAssignTicket('],
       forbid: /isResolvedLocked\(|countrySelectorMode\(|RESOLUTION_EDIT_STATUSES|updateTicket\(|apiClient|changeTicketStatus|\bpriority:\s|(?<![\w.])assignTicket\(|sendAssignment\(|canAssignTickets\(/,
     },
-    // iOS-3b adds back, with their screens: CreateTicketScreen (createTicketPermissions(), PriorityPreviewBox,
-    // can.priorityPreview), ReplyComposerScreen (composerPermissions(), can.templates) and SubmitApprovalScreen
-    // (canSubmitForApproval(), useSubmitForApproval()), each with its Android `forbid` unchanged.
+    {
+      // G5: every role decision on the create form from createTicketPermissions(); the preview is the G1 component.
+      file: 'src/screens/tickets/CreateTicketScreen.tsx',
+      uses: ['createTicketPermissions(', 'PriorityPreviewBox', 'can.priorityPreview'],
+      forbid: /createTicket\(|apiClient|getPriorityMatrix\(/,
+    },
+    {
+      // G3: the Templates button comes from composerPermissions(); the list only through useCannedResponses.
+      file: 'src/screens/tickets/ReplyComposerScreen.tsx',
+      uses: ['composerPermissions(', 'can.templates'],
+      forbid: /listCannedResponses\(|apiClient/,
+    },
+    {
+      // G3: who only from canSubmitForApproval(); the write only through useSubmitForApproval.
+      file: 'src/screens/tickets/SubmitApprovalScreen.tsx',
+      uses: ['canSubmitForApproval(', 'useSubmitForApproval('],
+      forbid: /submitTicketForApproval\(|apiClient|isResolvedLocked\(/,
+    },
+    {
+      // iOS-3b (not in Android's list): who may change a status and the transitions only from permissions.ts, the same
+      // answers Android read from ticket-rules.ts; one ticket's status only through useChangeStatus, a batch only
+      // through the guarded loop.
+      file: 'src/screens/tickets/StatusClosureScreen.tsx',
+      uses: ['ticketDetailPermissions(', 'bulkActions(', 'useChangeStatus(', 'assertStatusChange(', 'assertStatusUnchanged('],
+      forbid: /updateTicket\(|apiClient|isResolvedLocked\(/,
+    },
+    {
+      // iOS-3b (not in Android's list): who may assign only from canAssignTickets(); one ticket only through
+      // useAssignTicket. Its one other gate, canAssignToSelf (the developer-token placeholder), is checked below.
+      file: 'src/screens/tickets/AssignPickerScreen.tsx',
+      uses: ['canAssignTickets(', 'useAssignTicket('],
+      forbid: /updateTicket\(|apiClient|sendAssignment\(/,
+    },
     {
       file: 'src/screens/tickets/TicketListScreen.tsx',
       uses: ['bulkActions(', 'inlineStatusTransitions(', 'countrySelectorMode(', 'isTicketFilterAllowed(', 'ticketListFilters('],
@@ -560,7 +592,7 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     test(path.basename(file), () => {
       const src = read(file);
       for (const call of uses) assert.ok(src.includes(call), `${file} must call ${call}…)`);
-      const exempt = file.endsWith('ProfileScreen.tsx') || file.endsWith('TicketListScreen.tsx');
+      const exempt = file.endsWith('ProfileScreen.tsx') || file.endsWith('TicketListScreen.tsx') || file.endsWith('AssignPickerScreen.tsx');
       if (!exempt) assert.doesNotMatch(src, RAW_GATE, `${file} must not call a role gate directly`);
       if (forbid) assert.doesNotMatch(src, forbid, `${file} hard-codes a role-gated element`);
     });
@@ -568,6 +600,11 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
 
   test('TicketListScreen calls no role gate except isStaff for the empty-state wording', () => {
     const src = read('src/screens/tickets/TicketListScreen.tsx').replace(/function ListEmpty[\s\S]*?\n}\n/, '');
+    assert.doesNotMatch(src, RAW_GATE);
+  });
+
+  test('AssignPickerScreen calls no role gate except canAssignToSelf, for "Assign to me" (iOS-3b)', () => {
+    const src = read('src/screens/tickets/AssignPickerScreen.tsx').replace(/canAssignToSelf\(/g, '');
     assert.doesNotMatch(src, RAW_GATE);
   });
 });
