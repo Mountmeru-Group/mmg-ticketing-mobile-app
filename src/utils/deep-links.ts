@@ -9,6 +9,7 @@
 // Only links that reach the app are handled — tapped inside a description, comment, announcement or KB article, or
 // pasted into the Tickets search box. The OS never routes links to the app: that needs ask A18 (out of scope).
 import { API_BASE_URL } from '@/config/env';
+import type { Approval, Notification } from '@/types';
 import type { AppTab } from './permissions';
 
 export type TicketLinkTarget = { kind: 'id'; id: string } | { kind: 'number'; ticketNumber: number };
@@ -82,4 +83,26 @@ export function parseTicketLink(input: string): TicketLinkParse {
 export function ticketLinkDestination(link: string, focusedTab: AppTab | null): { tab: AppTab; link: string } | null {
   if (focusedTab === null || !parseTicketLink(link).ok) return null;
   return { tab: focusedTab, link };
+}
+
+/** The record a notification opens: a screen registered in every tab's stack, so it opens in Alerts. */
+export type NotificationDestination =
+  | { route: 'ApprovalDetail'; params: { approvalId: string } }
+  | { route: 'TicketDetail'; params: { ticketId: string } };
+
+/**
+ * iOS-3c: where tapping a notification goes (M9; Android's rule, unchanged). By `ticketId` only, never by `type`:
+ * approval requests and decisions arrive as TICKET_UPDATED (05 B.23). If an approval of mine is pending for that ticket
+ * (APR-1), the approval opens instead, because an approver may not be allowed to open the ticket itself (08 1.49).
+ * No `ticketId`: nothing opens (the tap only marks the row read).
+ */
+export function notificationDestination(
+  notification: Pick<Notification, 'ticketId'>,
+  pendingApprovals: readonly Pick<Approval, 'id' | 'entityType' | 'entityId'>[] | undefined,
+): NotificationDestination | null {
+  const ticketId = notification.ticketId;
+  if (typeof ticketId !== 'string' || !ticketId) return null;
+  const approval = pendingApprovals?.find((a) => a?.entityType === 'ticket' && a.entityId === ticketId);
+  if (approval) return { route: 'ApprovalDetail', params: { approvalId: approval.id } };
+  return { route: 'TicketDetail', params: { ticketId } };
 }

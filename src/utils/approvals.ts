@@ -36,6 +36,21 @@ export function entityLabel(type: string): string {
   return (APPROVAL_ENTITY_LABELS as Record<string, string>)[type] ?? type;
 }
 
+/**
+ * The approval M13 shows, and so the one Approve and Reject act on: the APR-1 row whose id is the route's
+ * `approvalId`, else the copy kept from it once APR-1 stops listing it (after a decision), and nothing else. The copy is
+ * accepted only for that same id, so a screen can never show, or decide, any approval but the one it was opened for.
+ */
+export function approvalOnScreen(
+  approvalId: string,
+  pending: readonly Approval[] | undefined,
+  kept: Approval | null,
+): Approval | null {
+  const found = pending?.find((a) => a?.id === approvalId);
+  if (found) return found;
+  return kept?.id === approvalId ? kept : null;
+}
+
 /** First 8 characters of the approval id — the only identifier an approval has. */
 export function shortApprovalId(id: string): string {
   return id.slice(0, 8).toUpperCase();

@@ -303,6 +303,26 @@ export function ticketDetailPermissions(
   };
 }
 
+// ── Tasks module: list, task detail, task editor (M11) ───────
+
+export interface TaskPermissions {
+  /** Tick done / not done, edit, remove, add (05 §A.3: END_USER read-only, D4); M4's `editTasks` gives the same answer. */
+  edit: boolean;
+  /** The task's technician through USR-3 (ADMIN, AGENT). L2_MANAGER sees it but can't change it: USR-3 is a 403 for L2. */
+  pickTechnician: boolean;
+  /** The task list's "Assigned to me" chip (staff). */
+  mineFilter: boolean;
+}
+
+/**
+ * iOS-3c: the answers Android's task screens worked out themselves (`isStaff(role)`, `isAgentOrAdmin(role)`), now in
+ * this file so the screens compare no roles and tests/rbac pins them per role.
+ */
+export function taskPermissions(role: UserRole | null | undefined): TaskPermissions {
+  const who = navRole(role);
+  return { edit: isStaff(who), pickTechnician: isAgentOrAdmin(who), mineFilter: isStaff(who) };
+}
+
 // ── Ticket property editors on M4 (Phase G1; the web's behaviour, with sources: docs/G1-WEB-BEHAVIOUR.md) ──
 
 /** The fields M4 edits through TKT-4. Impact and urgency share one rule and one editor. */

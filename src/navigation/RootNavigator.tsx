@@ -3,8 +3,8 @@
 // tab bar (HIG, Tab bars: "The exception is when a modal view covers the tab bar, because a modal is temporary and
 // self-contained"). A sheet closes with a swipe down or the standard Close button; a sheet with unsent input asks first
 // (useDiscardGuard: native-stack turns its usePreventRemove into iOS's preventNativeDismiss).
-// The write sheets get getId (routes.ts SHEET_ID_PARAM): one sheet per ticket or batch. The success notice that
-// follows a write (SuccessNotice) is drawn above the whole navigator.
+// The write sheets get getId (routes.ts SHEET_ID_PARAM): one sheet per ticket or batch, and the task editor one per task
+// (iOS-3c). The success notice that follows a write (SuccessNotice) is drawn above the whole navigator.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
@@ -13,7 +13,7 @@ import { AppState, Pressable, View } from 'react-native';
 
 import { endSession } from '@/api/client';
 import { SuccessNoticeHost } from '@/components';
-import { PlaceholderRoute } from '@/screens/placeholders';
+import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { AssignPickerScreen } from '@/screens/tickets/AssignPickerScreen';
 import { CreateTicketScreen } from '@/screens/tickets/CreateTicketScreen';
 import { ReplyComposerScreen } from '@/screens/tickets/ReplyComposerScreen';
@@ -33,14 +33,15 @@ import { STACK_SCREEN_OPTIONS } from './TabStacks';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-/** Built sheets. TaskEditor is still the placeholder; iOS-3c ports it. */
+/** Every sheet's screen (iOS-3a: Filters; iOS-3b: the write sheets; iOS-3c: the task editor). Complete. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SHEETS: Partial<Record<SheetRoute, ComponentType<any>>> = {
+const SHEETS: Record<SheetRoute, ComponentType<any>> = {
   CreateTicket: CreateTicketScreen,
   ReplyComposer: ReplyComposerScreen,
   StatusClosure: StatusClosureScreen,
   AssignPicker: AssignPickerScreen,
   SubmitApproval: SubmitApprovalScreen,
+  TaskEditor: TaskEditorScreen,
   TicketFilters: TicketFiltersScreen,
 };
 
@@ -111,7 +112,7 @@ export function RootNavigator() {
                   <Stack.Screen
                     key={name}
                     name={name}
-                    component={SHEETS[name] ?? PlaceholderRoute}
+                    component={SHEETS[name]}
                     getId={getIdFor(name)}
                     options={{ title: routeTitle(name, role) }}
                   />

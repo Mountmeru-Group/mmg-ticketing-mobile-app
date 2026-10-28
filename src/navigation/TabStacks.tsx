@@ -5,12 +5,23 @@
 // - the record screens (ticket, task, approval, ticket link) are in every stack, and each record gets its own screen
 //   (getId, docs/PERFORMANCE.md §9.7);
 // - freezeOnBlur (Phase P2): a screen that is not on show stops re-rendering until it is shown again.
-// Until iOS-3c every route not built yet renders the DEV placeholder (src/screens/placeholders.ts).
+// Every route renders its real screen since iOS-3c: SCREENS is a complete table, so a route without one does not compile.
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
 
+import { ApprovalDetailScreen } from '@/screens/approvals/ApprovalDetailScreen';
+import { ApprovalsInboxScreen } from '@/screens/approvals/ApprovalsInboxScreen';
+import { ServiceCatalogScreen } from '@/screens/catalog/ServiceCatalogScreen';
+import { ServiceRequestDetailScreen } from '@/screens/catalog/ServiceRequestDetailScreen';
+import { ServiceRequestFormScreen } from '@/screens/catalog/ServiceRequestFormScreen';
+import { AnnouncementsScreen } from '@/screens/dashboard/AnnouncementsScreen';
 import { HomeScreen } from '@/screens/dashboard/HomeScreen';
-import { PlaceholderRoute } from '@/screens/placeholders';
+import { KbArticleScreen } from '@/screens/knowledge/KbArticleScreen';
+import { KnowledgeBaseScreen } from '@/screens/knowledge/KnowledgeBaseScreen';
+import { NotificationsScreen } from '@/screens/notifications/NotificationsScreen';
+import { ProfileScreen } from '@/screens/profile/ProfileScreen';
+import { TaskDetailScreen } from '@/screens/tasks/TaskDetailScreen';
+import { TaskListScreen } from '@/screens/tasks/TaskListScreen';
 import { TicketDetailScreen } from '@/screens/tickets/TicketDetailScreen';
 import { TicketLinkScreen } from '@/screens/tickets/TicketLinkScreen';
 import { TicketListScreen } from '@/screens/tickets/TicketListScreen';
@@ -20,14 +31,26 @@ import type { AppTab } from '@/utils/permissions';
 import { MoreScreen } from './MoreScreen';
 import { STACK_ROUTES, getIdFor, hasLargeTitle, routeTitle, type StackRoute } from './routes';
 
-/** Built screens. Every other route is still the placeholder; iOS-3 adds the real screens here (3a: the read screens). */
+/** Every stack route's screen (iOS-3a: the read screens; iOS-3c: the modules). Complete: no placeholder remains. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SCREENS: Partial<Record<StackRoute, ComponentType<any>>> = {
+const SCREENS: Record<StackRoute, ComponentType<any>> = {
   More: MoreScreen,
   Home: HomeScreen,
   TicketList: TicketListScreen,
   TicketDetail: TicketDetailScreen,
   TicketLink: TicketLinkScreen,
+  TaskDetail: TaskDetailScreen,
+  ApprovalDetail: ApprovalDetailScreen,
+  ApprovalsInbox: ApprovalsInboxScreen,
+  Notifications: NotificationsScreen,
+  Announcements: AnnouncementsScreen,
+  TaskList: TaskListScreen,
+  KnowledgeBase: KnowledgeBaseScreen,
+  KbArticle: KbArticleScreen,
+  ServiceCatalog: ServiceCatalogScreen,
+  ServiceRequestForm: ServiceRequestFormScreen,
+  ServiceRequestDetail: ServiceRequestDetailScreen,
+  Profile: ProfileScreen,
 };
 
 export const STACK_SCREEN_OPTIONS: NativeStackNavigationOptions = {
@@ -53,7 +76,7 @@ function createTabStack(tab: AppTab): ComponentType {
           <Stack.Screen
             key={name}
             name={name}
-            component={SCREENS[name] ?? PlaceholderRoute}
+            component={SCREENS[name]}
             getId={getIdFor(name)}
             options={{ title: routeTitle(name, role), headerLargeTitle: hasLargeTitle(tab, name) }}
           />

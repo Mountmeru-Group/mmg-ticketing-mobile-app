@@ -14,6 +14,12 @@ export const TECHNICIAN_ROLES: readonly UserRole[] = ['AGENT', 'ADMIN'];
  */
 export const CREATE_ASSIGNEE_ROLES: readonly UserRole[] = ['ADMIN', 'AGENT', 'L2_MANAGER'];
 
+/**
+ * USR-3 roles for a task's technician (M11, TSK-2/TSK-3): staff only. iOS-3c: moved here from TaskEditorScreen, which
+ * may not name a role (tests/navigation/shell.test.mjs). WHO may pick one: taskPermissions() in ./permissions.ts.
+ */
+export const TASK_ASSIGNEE_ROLES: readonly UserRole[] = ['ADMIN', 'AGENT', 'L2_MANAGER'];
+
 export interface Technician {
   id: string;
   displayName: string;

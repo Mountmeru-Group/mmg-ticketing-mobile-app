@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { __changeReduceMotion, __setReduceMotion } from 'react-native';
 
 import { TICKET_PAGE_SIZE } from '../../src/api/tickets.api.ts';
-import { hasLargeTitle } from '../../src/navigation/routes.ts';
+import { SHEET_ROUTES, STACK_ROUTES, hasLargeTitle } from '../../src/navigation/routes.ts';
 import { TICKET_LIST_CAP, isTicketListCapped, nextTicketListPage } from '../../src/hooks/useTickets.ts';
 import { motion } from '../../src/theme/motion.ts';
 import { TICKET_STATUSES } from '../../src/types/index.ts';
@@ -347,31 +347,33 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     assert.deepEqual(users, ['src/screens/PlaceholderScreen.tsx']);
   });
 
-  test('the built screens replace their placeholders; every other route keeps it', () => {
+  test('every route renders its real screen: the screen tables are complete and nothing falls back (iOS-3c)', () => {
+    const table = (src) => {
+      const start = src.indexOf(src.includes('const SCREENS') ? 'const SCREENS' : 'const SHEETS');
+      return Object.fromEntries([...src.slice(start, src.indexOf('};', start)).matchAll(/^\s+(\w+): (\w+),$/gm)].map((m) => [m[1], m[2]]));
+    };
     const stacks = read('src/navigation/TabStacks.tsx');
-    for (const line of ['More: MoreScreen,', 'Home: HomeScreen,', 'TicketList: TicketListScreen,', 'TicketDetail: TicketDetailScreen,', 'TicketLink: TicketLinkScreen,']) {
-      assert.ok(stacks.includes(line), line);
-    }
-    assert.ok(stacks.includes('component={SCREENS[name] ?? PlaceholderRoute}'));
+    const screens = table(stacks);
+    const stackRoutes = [...new Set(Object.values(STACK_ROUTES).flat())].sort();
+    assert.deepEqual(Object.keys(screens).sort(), stackRoutes);
+    for (const [route, screen] of Object.entries(screens)) assert.equal(screen, route === 'More' ? 'MoreScreen' : `${route}Screen`, route);
+    assert.match(stacks, /const SCREENS: Record<StackRoute, ComponentType<any>> = \{/, 'a complete table: a missing screen does not compile');
+    assert.ok(stacks.includes('component={SCREENS[name]}'));
+
     const root = read('src/navigation/RootNavigator.tsx');
-    // iOS-3a: the Filters sheet. iOS-3b: the five write sheets. TaskEditor keeps the placeholder until iOS-3c.
-    const sheets = root.slice(root.indexOf('const SHEETS'), root.indexOf('};', root.indexOf('const SHEETS')));
-    const built = [...sheets.matchAll(/^\s+(\w+): (\w+),$/gm)].map((m) => [m[1], m[2]]);
-    assert.deepEqual(built, [
-      ['CreateTicket', 'CreateTicketScreen'],
-      ['ReplyComposer', 'ReplyComposerScreen'],
-      ['StatusClosure', 'StatusClosureScreen'],
-      ['AssignPicker', 'AssignPickerScreen'],
-      ['SubmitApproval', 'SubmitApprovalScreen'],
-      ['TicketFilters', 'TicketFiltersScreen'],
-    ]);
-    assert.ok(root.includes('component={SHEETS[name] ?? PlaceholderRoute}'));
+    const sheets = table(root);
+    assert.deepEqual(Object.keys(sheets).sort(), [...SHEET_ROUTES].sort());
+    for (const [route, screen] of Object.entries(sheets)) assert.equal(screen, `${route}Screen`, route);
+    assert.match(root, /const SHEETS: Record<SheetRoute, ComponentType<any>> = \{/, 'a complete table: a missing sheet does not compile');
+    assert.ok(root.includes('component={SHEETS[name]}'));
+    for (const src of [stacks, root]) assert.doesNotMatch(src, /Placeholder/);
   });
 
-  test('large titles: on the tab roots, except the ticket list with its pinned search bar', () => {
+  test('large titles: on the tab roots, except the ticket list and the approvals inbox with their pinned bars', () => {
     assert.equal(hasLargeTitle('HomeTab', 'Home'), true);
     assert.equal(hasLargeTitle('TicketsTab', 'TicketList'), false);
-    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), true);
+    // iOS-3c plan Q3: the inbox keeps Android's type chips pinned above the list, so a standard title, as the ticket list.
+    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), false);
     assert.equal(hasLargeTitle('AlertsTab', 'Notifications'), true);
     assert.equal(hasLargeTitle('MoreTab', 'More'), true);
     assert.equal(hasLargeTitle('HomeTab', 'TicketDetail'), false);

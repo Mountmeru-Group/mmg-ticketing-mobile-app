@@ -44,6 +44,14 @@ export function chooseFromActionSheet<T extends string>({
   });
 }
 
+/**
+ * A form field's short fixed choices as an action sheet titled with the field's label (iOS-3c: the request form's Impact
+ * and Urgency, a task's Status). Resolves the chosen value, or null for Cancel.
+ */
+export function chooseForField<T extends string>(label: string, choices: readonly SheetChoice<T>[]): Promise<T | null> {
+  return chooseFromActionSheet({ title: label, choices });
+}
+
 /** More options on M4, as Android labelled them. */
 export const MORE_ACTION_LABELS: Record<MoreAction, string> = {
   pickup: 'Pick up',

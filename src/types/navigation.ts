@@ -164,6 +164,17 @@ export type RecordScreenProps<T extends keyof RecordScreensParamList> = Composit
   AppTabScreenProps<keyof AppTabParamList>
 >;
 
+/**
+ * iOS-3c: screens registered under one name in two tab stacks: the approvals inbox (Approvals for ADMIN and AGENT, More
+ * for END_USER and L2_MANAGER) and Announcements (Home's banner, More). Typed like the record screens, which they open.
+ */
+type SharedStackParamList = RecordScreensParamList & { ApprovalsInbox: undefined; Announcements: undefined };
+
+export type SharedStackScreenProps<T extends 'ApprovalsInbox' | 'Announcements'> = CompositeScreenProps<
+  NativeStackScreenProps<SharedStackParamList, T>,
+  AppTabScreenProps<keyof AppTabParamList>
+>;
+
 export type SheetScreenProps<T extends keyof SheetsParamList> = RootStackScreenProps<T>;
 
 declare global {

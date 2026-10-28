@@ -2,7 +2,7 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6 and iOS-3b with what each phase actually built (§4.1–§4.5, §4.9–§4.11).
+> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b and iOS-3c with what each phase actually built (§4.1–§4.5, §4.9–§4.12).
 
 ## 0. Port source and fixed facts
 
@@ -39,10 +39,11 @@ Rules used:
   - `scripts/verify-release-bundle.js`;
   - `tests/auth/mobile-sso.test.mjs`, `tests/rbac/role-gating.test.mjs`, `tests/rbac/service-catalog.test.mjs`;
   - `src/hooks/useProfile.ts`, `tests/support/stubs/expo-auth-session.mjs` and `tests/support/stubs/expo-secure-store.mjs` (reclassified KEEP → ADAPT in iOS-6: sign-out moved into `auth.api.ts`; the stubs record what the iOS tests check);
-  - `src/api/comments.api.ts`, `src/hooks/usePostComment.ts`, `src/components/AttachmentPicker.tsx`, `src/utils/assignment.ts`, `src/theme/motion.ts` and `tests/rbac/g3-features.test.mjs` (reclassified KEEP → ADAPT in iOS-3b: no files on a private note, the attachment action sheet, a role list out of a screen, the notice's motion token, one wiring line; §4.11).
+  - `src/api/comments.api.ts`, `src/hooks/usePostComment.ts`, `src/components/AttachmentPicker.tsx`, `src/utils/assignment.ts`, `src/theme/motion.ts` and `tests/rbac/g3-features.test.mjs` (reclassified KEEP → ADAPT in iOS-3b: no files on a private note, the attachment action sheet, a role list out of a screen, the notice's motion token, one wiring line; §4.11);
+  - `src/utils/approvals.ts` (reclassified KEEP → ADAPT in iOS-3c: `approvalOnScreen()`, the approval Approve and Reject act on; §4.12).
 - **The pre-SSO test login (§8) is not counted here.** It is a proposal, so the classification below covers only what the port itself needs. §8 lists the files the test login would change if it is approved.
 
-**Totals: KEEP 162 · ADAPT 40 · SKIP 3 · SCREEN 25 = 230.** iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
+**Totals: KEEP 161 · ADAPT 41 · SKIP 3 · SCREEN 25 = 230.** iOS-3c moved one file from KEEP to ADAPT (`approvals.ts`, §4.12). iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
 
 ## 2. Phase map
 
@@ -54,7 +55,7 @@ Rules used:
 | iOS-1a | These two documents |
 | iOS-1b | Port the non-screen foundation: every KEEP file marked iOS-1b, plus the iOS versions of `app.json`, `eas.json`, `package.json` (scripts only, no dependency changes) and `CLAUDE.md`. Then `npm ci`, `tsc`, the tests that can run, and `expo-doctor` |
 | **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-3, where the screens that use them arrive |
-| **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read (built 2026-10-28, §4.9), **iOS-3b** write (built 2026-10-28, §4.11), **iOS-3c** modules |
+| **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read (built 2026-10-28, §4.9), **iOS-3b** write (built 2026-10-28, §4.11), **iOS-3c** modules (built 2026-10-28, §4.12) |
 | **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
 | **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
@@ -257,7 +258,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/navigation/DrawerContent.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `src/navigation/MoreScreen.tsx`: the same rows, labels, icons, account card, Sign out and version line, as an iOS grouped list from `moreSections()` (§4.5) |
 | `src/navigation/MainTabs.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `AppTabs.tsx` (tabs from `appTabs()`, badges from `tabBadges()`) |
 | `src/navigation/ModuleStacks.tsx` | ADAPT | iOS-2 | Not copied. **Replaced:** the four module stacks are flattened into the More stack (`routes.ts`), so each module's first screen swipes back to More. The `getId` functions moved to `routes.ts` (`RECORD_ID_PARAM`) |
-| `src/navigation/RootNavigator.tsx` | ADAPT | iOS-2, iOS-3b | Written from the Android file: Auth \| App tabs, plus the seven sheets in a root modal group that covers the tab bar. The reinstall check (`installMarker.ts`) runs before `restoreSession()`. The 8-hour foreground check and the splash hand-over are unchanged. **iOS-3b:** registers the five write sheets, gives every sheet `getIdFor(name)`, and mounts `SuccessNoticeHost` above the navigator |
+| `src/navigation/RootNavigator.tsx` | ADAPT | iOS-2, iOS-3b, iOS-3c | Written from the Android file: Auth \| App tabs, plus the seven sheets in a root modal group that covers the tab bar. The reinstall check (`installMarker.ts`) runs before `restoreSession()`. The 8-hour foreground check and the splash hand-over are unchanged. **iOS-3b:** registers the five write sheets, gives every sheet `getIdFor(name)`, and mounts `SuccessNoticeHost` above the navigator. **iOS-3c:** registers TaskEditor (getId by task); `SHEETS` is a complete table, so a sheet without its screen does not compile |
 | `src/navigation/TicketStack.tsx` | ADAPT | iOS-2 | Not copied. **Replaced:** the list is the Tickets tab's stack; the record screens (`TicketDetail`, `TaskDetail`, `TicketLink`, plus `ApprovalDetail`) are in every tab's stack; the six sheets and `CreateTicket` are root sheets (§4.5) |
 | `src/navigation/navigationRef.ts` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `HtmlText` imports it. **iOS-2:** `openTicketLinkInApp` opens the resolver in the tab on screen (`deep-links.ts` `ticketLinkDestination`, `routes.ts` `focusedAppTab`); nothing opens under a sheet |
 | `src/navigation/splash.ts` | KEEP | iOS-1b | `ErrorBoundary` imports it |
@@ -268,25 +269,25 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `src/screens/PlaceholderScreen.tsx` | ADAPT | iOS-2 | Copied in iOS-2; the `'drawer'` value is removed from `headerVariant`. It is used only by `DevTokenScreen`. The signed-in routes' placeholders are the new `DevPlaceholderScreen` (§7) |
+| `src/screens/PlaceholderScreen.tsx` | ADAPT | iOS-2 | Copied in iOS-2; the `'drawer'` value is removed from `headerVariant`. It is used only by `DevTokenScreen`. The signed-in routes' placeholders are the new `DevPlaceholderScreen` (§7). **iOS-3c:** `DevPlaceholderScreen` is deleted; the header comment says this file is the developer-token layout, not a route placeholder |
 | `src/screens/auth/DevTokenScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. `__DEV__` only, as on Android, and absent from the exported release bundle (compliance A2). §8 would change it only if approved |
 | `src/screens/auth/LoginScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. Nothing platform-specific. The `__DEV__` hint shows whichever redirect `auth.config.ts` returns, which is the Android one until iOS-6, so Microsoft sign-in can't finish on iOS before then |
 | `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-6. **iOS-6:** unchanged. `tests/auth/ios-sso.test.mjs` runs the iOS sequences: the sheet (`inactive`), a trip to Authenticator during sign-in (`background`), and Control Centre while idle (`inactive`). None of them clears the banner. On real AppState events in iOS-7 |
-| `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-3c | §6 #14 |
-| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c | §6 #13 |
-| `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-3c | §6 #20 |
-| `src/screens/catalog/ServiceFormFieldInput.tsx` | SCREEN | iOS-3c | §6 #21 |
-| `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-3c | §6 #23 |
-| `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-3c | §6 #22 |
-| `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-3c | §6 #24 |
+| `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #14, §4.12 |
+| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c (built) | §6 #13, §4.12 |
+| `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-3c (built) | §6 #20, §4.12 |
+| `src/screens/catalog/ServiceFormFieldInput.tsx` | SCREEN | iOS-3c (built) | §6 #21, §4.12 |
+| `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #23, §4.12 |
+| `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-3c (built) | §6 #22, §4.12 |
+| `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-3c (built) | §6 #24, §4.12 |
 | `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #1, §4.9. **iOS-3b:** "Raise a ticket" and "+" back (§4.11) |
-| `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-3c | §6 #19 |
-| `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-3c | §6 #18 |
-| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a | §6 #6 |
-| `src/screens/profile/ProfileScreen.tsx` | SCREEN | iOS-3c | §6 #25 |
-| `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-3c | §6 #16 |
-| `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-3c | §6 #17 |
-| `src/screens/tasks/TaskListScreen.tsx` | SCREEN | iOS-3c | §6 #15 |
+| `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-3c (built) | §6 #19, §4.12 |
+| `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-3c (built) | §6 #18, §4.12 |
+| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a (planned), iOS-3c (built) | §6 #6, §4.12. Planned for iOS-3a, which left it the DEV placeholder (§4.9) |
+| `src/screens/profile/ProfileScreen.tsx` | SCREEN | iOS-3c (built) | §6 #25, §4.12 |
+| `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #16, §4.12 |
+| `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-3c (built) | §6 #17, §4.12 |
+| `src/screens/tasks/TaskListScreen.tsx` | SCREEN | iOS-3c (built) | §6 #15, §4.12 |
 | `src/screens/tickets/AssignPickerScreen.tsx` | SCREEN | iOS-3b (built) | §6 #10, §4.11 |
 | `src/screens/tickets/CreateTicketScreen.tsx` | SCREEN | iOS-3b (built) | §6 #7, §4.11 |
 | `src/screens/tickets/ReplyComposerScreen.tsx` | SCREEN | iOS-3b (built) | §6 #8, §4.11 |
@@ -342,15 +343,15 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `src/utils/activity.ts` | KEEP | iOS-1b | — |
-| `src/utils/approvals.ts` | KEEP | iOS-1b | — |
-| `src/utils/assignment.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** receives `CREATE_ASSIGNEE_ROLES` from CreateTicketScreen, which may not name a role (`tests/navigation/shell.test.mjs`). Same list |
+| `src/utils/approvals.ts` | ADAPT | iOS-1b, iOS-3c | Copied unchanged in iOS-1b. **iOS-3c:** adds `approvalOnScreen(approvalId, pending, kept)`: the approval M13 shows and decides is the APR-1 row with the route's id, else the copy kept from that same id, else none. Android shows `found ?? snapshot`, which a reused screen could point at another approval; getId already prevents the reuse, and this makes it impossible (§4.12) |
+| `src/utils/assignment.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** receives `CREATE_ASSIGNEE_ROLES` from CreateTicketScreen, which may not name a role (`tests/navigation/shell.test.mjs`). Same list. **iOS-3c:** receives `TASK_ASSIGNEE_ROLES` from TaskEditorScreen (same list), for the same reason |
 | `src/utils/compose.ts` | KEEP | iOS-1b | — |
-| `src/utils/deep-links.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `ticketLinkDestination()`: a ticket link opens the resolver in the tab on screen, and nothing under a sheet. `parseTicketLink()` is unchanged |
+| `src/utils/deep-links.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `ticketLinkDestination()`: a ticket link opens the resolver in the tab on screen, and nothing under a sheet. `parseTicketLink()` is unchanged. **iOS-3c:** adds `notificationDestination()`: Android's rule for a tapped notification (an approval of mine pending for its ticket, else the ticket, by `ticketId` only), returned as a record route that every tab's stack has |
 | `src/utils/dialogs.ts` | ADAPT | iOS-1b as-is, iOS-3 | Copied unchanged in iOS-1b: its `ToastAndroid` call is already behind `Platform.OS === 'android'`. Its change moved from iOS-2 to iOS-3, with `Notice` and the screens that show notices. Today `notify()` uses `ToastAndroid`, and on iOS it falls back to a modal `Alert` for every success notice. The HIG discourages that. In iOS-3 it changes to the non-modal `Notice` (§7), which VoiceOver announces. Drop the `ToastAndroid` and `Platform` imports. `confirmAction` and the error alerts stay as `Alert`, which is the right iOS control for them. **Done in iOS-3b:** `notify()` calls `showSuccessNotice()`; the component is named `SuccessNotice`, not `Notice` (§7) |
 | `src/utils/format.ts` | KEEP | iOS-1b | — |
 | `src/utils/html.ts` | KEEP | iOS-1b | — |
 | `src/utils/kb.ts` | KEEP | iOS-1b | — |
-| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers. **iOS-3a:** exports the existing `navRole()` (no user: END_USER's answers), so the screens no longer name a role themselves, which `tests/navigation/shell.test.mjs` forbids |
+| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers. **iOS-3a:** exports the existing `navRole()` (no user: END_USER's answers), so the screens no longer name a role themselves, which `tests/navigation/shell.test.mjs` forbids. **iOS-3c:** adds `taskPermissions()` (`edit`, `pickTechnician`, `mineFilter`): the answers Android's three task screens computed with `isStaff` and `isAgentOrAdmin`, pinned per role in `role-gating` |
 | `src/utils/roles.ts` | KEEP | iOS-1b | — |
 | `src/utils/service-catalog.ts` | KEEP | iOS-1b | — |
 | `src/utils/session.ts` | KEEP | iOS-1b | — |
@@ -373,8 +374,8 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a (copied) | Reads `TicketListScreen` and `TicketFiltersScreen`. Copied unchanged; all pass |
 | `tests/rbac/personas.mjs` | KEEP | iOS-1b | — |
 | `tests/rbac/property-editing.test.mjs` | KEEP | iOS-1b | Pure modules only |
-| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass |
-| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack` |
+| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass. **iOS-3c:** Android's last four rows are back, byte-identical (the three catalogue screens, Profile); five rows Android did not have (the three task screens on `taskPermissions()`, the two approval screens on APR-1 and `approvalOnScreen()`); `taskPermissions()` pinned per persona and shown equal to Android's inline answers and to M4's `editTasks`; 145 pass |
+| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack`. **Copied in iOS-3c**, every other expectation unchanged, plus one line (plan Q2): a number field's keyboard is `numbers-and-punctuation`, not `numeric`; 108 pass |
 | `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b (copied) | Reads AssignPicker, TicketDetail and TicketPropertyEditors. Copied unchanged; all pass |
 | `tests/support/loader.mjs` | KEEP | iOS-1b | — |
 | `tests/support/register.mjs` | KEEP | iOS-1b | — |
@@ -865,7 +866,124 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 - the new ticket opening in each tab;
 - React Native `Modal` sheets (OptionSheet, PersonPickerSheet) over the page sheets.
 
-**Open for iOS-3c:** TaskEditor is still the DEV placeholder. In a release build, "Add task" would open an empty sheet, so iOS-3c must build it before any release build (iOS-7; compliance A2).
+**Open for iOS-3c:** TaskEditor is still the DEV placeholder. In a release build, "Add task" would open an empty sheet, so iOS-3c must build it before any release build (iOS-7; compliance A2). **Done in iOS-3c (§4.12):** TaskEditor is the real task editor.
+
+### 4.12 iOS-3c: the modules (built 2026-10-28)
+
+**Approved by Ronit on 2026-10-28** (the iOS-3c plan, Q1–Q5 as recommended). The phase rule: behave exactly as the web portal does, with only the interface iOS; the 17 🔒 SAFER divergences (`docs/WEB-VS-MOBILE-ROLES.md` §5) and the Android-only extras stay (the same app on both phones).
+- Q1: **no attachments on the catalogue form.** The brief asked for Files/Photos there, but the web never uploads that box's files (G4 §3, D2; 05 §B.24) and Android has none; `service-catalog.test.mjs` pins their absence.
+- Q2: a number field opens the `numbers-and-punctuation` keyboard. On iOS `numeric` is the decimal pad, which has no "-", while the web accepts "-3". The rules are unchanged.
+- Q3: the approvals inbox keeps Android's type chips pinned above the list, so the Approvals tab has a standard title, as Tickets (routes.ts `PINNED_BAR_ROOTS`).
+- Q4: TaskEditor gets getId, `<ticketId>/<taskId>` or `<ticketId>/new`: one sheet per task, as iOS-3b Q3 did for the write sheets.
+- Q5: the privacy-policy link and the account-deletion entry are not in iOS-3c. They wait for the policy URL and D10 (compliance H1, H6: iOS-4).
+
+**What was built:**
+- **The 14 module files,** ported from `c84d53a` (`git checkout c84d53a -- <path>`, byte-identical first, then adapted): Notifications (#6), the approvals inbox and detail (#13, #14), the task list, detail and editor (#15–#17), the knowledge base and article (#18, #19), the catalogue, its field control, request form and request detail (#20–#23), Announcements (#24) and Profile (#25).
+- **Every route renders its real screen.** `SCREENS` (TabStacks.tsx) and `SHEETS` (RootNavigator.tsx) are complete `Record`s, so a route without a screen does not compile. `src/screens/placeholders.ts` and `src/screens/DevPlaceholderScreen.tsx` are deleted. The 13 routes that were placeholders (23 registrations): Notifications · ApprovalsInbox (Approvals, More) · ApprovalDetail (all five) · TaskDetail (all five) · TaskList · KnowledgeBase · KbArticle · ServiceCatalog · ServiceRequestForm · ServiceRequestDetail · Profile · Announcements (Home, More) · TaskEditor (sheet). `src/screens/PlaceholderScreen.tsx` stays: it is the `__DEV__` developer-token screen's layout (Android's name), not a route, and goes with that screen (compliance K1).
+- **Shared code:**
+
+| File | Added |
+|---|---|
+| `src/utils/deep-links.ts` | `notificationDestination()` (§3.14) |
+| `src/utils/approvals.ts` | `approvalOnScreen()` (§3.14) |
+| `src/utils/permissions.ts` | `taskPermissions()` (§3.14) |
+| `src/utils/assignment.ts` | `TASK_ASSIGNEE_ROLES` (moved out of TaskEditorScreen) |
+| `src/utils/actionSheet.ts` | `chooseForField(label, choices)`: a field's fixed choices as an action sheet titled with its label |
+| `src/navigation/routes.ts` | TaskEditor's getId; ApprovalsInbox in `PINNED_BAR_ROOTS` |
+| `src/types/navigation.ts` | `SharedStackScreenProps` for the two screens registered in two stacks (ApprovalsInbox, Announcements) |
+
+- **No new package, no `eas` command, no API change** (every endpoint was already in 01 and `src/api`), **no auth or SSO change.** No hook, API module or component changed.
+
+**iOS adaptations (interface only):**
+
+| Where | Android | iOS |
+|---|---|---|
+| Every module screen | `ScreenHeader` (drawer, back, close) | The native navigation bar; titles from the route table, or `setOptions` where they name the record ("Ticket approval", "SR-12", "Edit task") |
+| Every list | `RefreshControl colors` | `tintColor={colors.primary}` |
+| Tab-bar screens | `insets.bottom` padding | Dropped: the tab bar takes the home-indicator inset. The TaskEditor sheet keeps it |
+| Notifications | A tap switched to Tickets or the Approvals module; "Mark all read" in the header | The record opens inside Alerts (`notificationDestination()`); "Mark all read" in the native bar. The Alerts root has a large title: every state scrolls under it (`contentInsetAdjustmentBehavior="automatic"`) and the banners ride in the list header |
+| Approval detail | `KeyboardAvoidingView "height"`; "Open the ticket" switched to Tickets; "Back to approvals" `navigate(…, { pop: true })` | A ScrollView with `automaticallyAdjustKeyboardInsets`; the ticket opens in the same tab; "Back to approvals" pops to the inbox below in this tab's stack (Approvals, More), else goes back (Alerts, Home, Tickets). Reject keeps its red destructive Alert |
+| Task detail | "View parent ticket" switched to Tickets when the ticket wasn't underneath | Opens it in the same tab |
+| Task editor | `DateTimePickerAndroid.open`; Status in OptionSheet; `KeyboardAvoidingView "height"`; `ScreenHeader` close | `DatePickerSheet` (same 2000–2100 range, the same day sent as UTC midnight); Status as an action sheet; `SheetKeyboardView`; a root page sheet with ✕, one per task |
+| Catalogue | `BackHandler` left an open category or search | Gone: the in-screen "Home" breadcrumb (the web's) does it, and the edge swipe leaves the catalogue |
+| Catalogue date field | `DateTimePickerAndroid.open` | `DatePickerSheet`, any year (the web's date input has no limit) |
+| Catalogue number field | `numeric` (Android: digits and "-") | `numbers-and-punctuation` (Q2) |
+| Request form Impact / Urgency | OptionSheet | Action sheets, "Not set" first. A drop-down field keeps its scrollable sheet (the service's own list, any length) |
+| Request form, Profile | `KeyboardAvoidingView` | `automaticallyAdjustKeyboardInsets` on the ScrollView: it measures its own position, so the focused field clears the keyboard and the tab bar. A drag down puts the keyboard away |
+| Task screens | `isStaff(role)`, `isAgentOrAdmin(role)`, `role ?? 'END_USER'`, a role list in the editor | `taskPermissions()` and `TASK_ASSIGNEE_ROLES` (screens name no role, `shell.test.mjs`) |
+
+**Behaviour that differs from Android:**
+1. Records open in the tab the person is in (§4.5): from Alerts, an approval, a task.
+2. **The approval acted on is checked by id** (`approvalOnScreen()`). Android's `found ?? snapshot` could act on another approval's copy on a reused screen; getId already prevents the reuse, and the runs below show both.
+3. One task editor per task (Q4).
+4. The number keyboard has "-" (Q2).
+5. Everything else is Android's: the requests, the guards, the confirmations and their wording, the empty and error states.
+
+**Where iOS differs from the web in this phase, with the reason:**
+
+| Web | iOS (= Android unless noted) | Reason |
+|---|---|---|
+| The requester adds, ticks or removes tasks | Read-only for END_USER (the editor refuses; each task write hook refuses on the device) | 🔒 SAFER: §C gap C.3 |
+| ADMIN and AGENT: the "All" approvals tab (unscoped `GET /approvals`) | APR-1 only: my pending approvals | 🔒 SAFER: leak C.16 |
+| Any page by address | Each module screen checks the role (catalogue, request detail, task editor) | 🔒 SAFER: 403 / leak (ROLE-MATRIX §1) |
+| No task list across tickets | Task list for every role ("Assigned to me" for staff) | ➕ MOBILE ONLY, from Android |
+| Tasks: no edit of title, description, due date; no technician | Staff edit; ADMIN and AGENT pick a technician | ➕ MOBILE ONLY, from Android |
+| Approvals page only for ADMIN and AGENT | END_USER and L2_MANAGER too, while they have one | ➕ MOBILE ONLY, from Android (08 S1) |
+| No ticket context on an approval | The ticket's details, only on a TKT-3 200 | ➕ MOBILE ONLY, from Android |
+| No Alerts badge; announcements not for END_USER | The badge; Announcements for every role | ➕ MOBILE ONLY, from Android |
+| No request detail | One's own request (SCR-6) | ➕ MOBILE ONLY, from Android |
+| No profile page | Name, phone, department, timezone (USR-2) | ➕ MOBILE ONLY, from Android |
+| Approve in one click (Approvals page); "Mark all read" and "helpful" without asking | Each asks first; one helpful vote per device | Android's rule: writes that can't be undone ask (`utils/dialogs.ts`) |
+| My Requests: the newest 50 | Older pages load as the list scrolls | Android (G4 §9) |
+| The request form's 13 inert controls and its attachment box | Only the four kept fields; no attachments (Q1) | The server keeps nothing else (05 §B.24); counted ✅ SAME |
+| Theme setting | Not built | D9: light only for v1 |
+
+**Safety rules → tests** (each was broken on purpose, the tests failed, then the file was restored byte for byte, SHA-256 checked):
+
+| Broken on purpose | Caught by |
+|---|---|
+| `approvalOnScreen()` returns any kept copy | `get-id`: Approve/Reject on the approval shown, in all three stacks (4 failures) |
+| TaskEditor loses its getId | `get-id`: coverage, the sheet ids, the editor's id (4 failures) |
+| A notification routed by its `type` | `module-screens`: "never by type" |
+| END_USER may edit tasks | `role-gating`: `taskPermissions` per persona, Android's answers, M4's agreement (4 failures) |
+| A placeholder route comes back | `module-screens`: no placeholder anywhere in `src/`, every route's real screen |
+| Reject asks in the default style | `module-screens`: Reject's red confirmation |
+
+**getId: randomised runs on the module stacks** (`tests/navigation/get-id.test.mjs`; 2,000 runs × 40 actions on each stack a module lives in, the router knowing the whole stack, the actions aimed at the module's routes):
+
+| Module | Stack | Reuse without getId | With getId |
+|---|---|---|---|
+| Approvals | ApprovalsTab · MoreTab · AlertsTab | 16,605 · 16,639 · 16,653 | 0 · 0 · 0 |
+| Tasks | MoreTab · TicketsTab | 16,582 · 16,483 | 0 · 0 |
+| Knowledge | MoreTab | 16,674 | 0 |
+| Catalogue | MoreTab | 16,283 | 0 |
+
+**Approve and Reject act on the approval shown:** in the same Approvals runs, with APR-1 changing at every step, 134,240 · 136,437 · 134,490 approval screens were checked: **0** would act on another approval, with or without getId. Android's rule without getId would have in 3,161 · 3,175 · 3,174 cases, which proves the check can see it. A mocked APR-2/APR-3 posts to `/approvals/<that id>/approve|reject`.
+
+**Tests: 731 → 920.**
+- New: `tests/rbac/service-catalog.test.mjs` (108, from Android) and `tests/screens/module-screens.test.mjs` (49, §7).
+- Grown: `role-gating` 128 → 145; `get-id` 19 → 34.
+- Rewritten for the placeholders' removal: `read-screens` (the registration test now requires every route's real screen; the Approvals tab's title, Q3) and `write-screens` (TaskEditor is built, and is the fifth sheet with getId); counts unchanged (47, 93).
+- Sum: 108 + 49 + 17 + 15 = 189.
+
+**Release bundle** (`npx expo export --platform ios`, Hermes, with its source map, written outside the repo and deleted afterwards):
+- **0** of 8 DEV-placeholder strings, **0** of 10 developer-token strings, **0** of 4 test-login markers. `placeholders.ts`, `DevPlaceholderScreen`, `DevTokenScreen` and `PlaceholderScreen` are not bundled.
+- **20 of 20** control strings from the iOS-3c screens present ("Mark all read", "Back to approvals", "Remove this task?", "Was this helpful?", "Add Request" …); all 27 app screens bundled.
+- **Android-only APIs:** none in app code. `BackHandler`, `DateTimePickerAndroid`, `ToastAndroid`, `PermissionsAndroid`, `android_ripple` and `DrawerLayoutAndroid` occur only in library modules (React Native's lazy getters and iOS fallbacks, React Navigation, gesture-handler, datetimepicker, FlashList) and in two app comments (`ServiceCatalogScreen.tsx` explaining the removal, `DatePickerSheet.tsx` line 1).
+- The only Mount Meru host is `uat-servicedesk.mountmerugroup.com`.
+
+**Knowledge-base HTML on iOS** (react-native-render-html 6.3.4, engine 11.2.3; the library is not replaced):
+- **Checked in Node** (`module-screens`): an article with links, a UAT ticket link, a base64 image, a remote image, a table (thead, tbody), a list, `<script>`, `<iframe>`, `<style>` and a form goes through the app's `sanitizeForRender()` and the renderer's own tree engine without throwing. The links keep their targets, the base64 image stays, the remote one becomes "[image]" (never fetched), the table's 3 rows and 6 cells are there, and the blocked elements are gone. Broken HTML does not throw either. A renderer failure on the phone falls back to plain text (`RendererBoundary`).
+- **What a reader sees:** https and mailto links open in Safari; a UAT ticket link opens in the app; any other link is not opened. Only inline images are drawn (05 §A.6), so an article whose pictures are hosted elsewhere shows "[image]". A table's cells share the screen's width equally, with no sideways scroll, as on Android.
+- **Flagged, not fixed:** (1) a link tap inside selectable text (`defaultTextProps.selectable`) on a device; (2) wide tables get narrow columns, worse at large Dynamic Type (iOS-4); readable tables would need a table plugin, a new package; (3) memory with many inline images in one long article; (4) `expo-doctor` reports the library as unmaintained (known since iOS-1b).
+
+**Still to check on a device (iOS-7):** the Alerts large title collapsing with the banners in the list; "Mark all read" in the bar; every action sheet (task status, Impact, Urgency); the calendar sheet in the task editor and a catalogue date field; the request form, Profile and the approval comment with the keyboard up (iPhone SE included); the task editor's swipe-down with changes; the approvals inbox from the tab and from More; "Back to approvals" from Alerts; the KB article's links, images and tables; Announcements from Home's banner and from More.
+
+**Flagged for iOS-4 and later:**
+- Search and filters in the navigation bar for Tickets and Approvals, which would give both tabs a large title (Q3).
+- The privacy-policy link and account deletion on Profile (Q5; H1, H6).
+- The KB "helpful" vote marker is a Keychain item without `keychainAccessible` (`useKnowledgeBase.ts`, KEEP): it survives a reinstall, unlike the session, which `installMarker.ts` wipes. Harmless (it records only that this device voted), but different from Android.
+- `dayFromDate()` (`utils/tasks.ts`, KEEP) writes years before 1000 without leading zeros, so a catalogue date in year 99, which the web accepts, would fail validation. As on Android; the iOS calendar makes it reachable only by scrolling back nineteen centuries.
 
 ## 5. SKIP
 
@@ -909,7 +1027,7 @@ Android-only parts of ADAPT files, not brought over:
 | 3 | `tickets/TicketFiltersScreen.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet` (§7). It still sends the device's calendar day. **Built in iOS-3a (§4.9):** a root page sheet; "Clear all" in the bar's right side |
 | 4 | `tickets/TicketDetailScreen.tsx` | The ⋮ (`ellipsis-vertical`, the Android overflow mark) → `ellipsis-horizontal-circle`, the iOS "more" mark. It imports `TicketPropertyEditors`, so that file comes along (its write paths are checked at #11). **Built in iOS-3a (§4.9):** read-only; the title and More options are in the native bar. **iOS-3b:** every write back; More options is an action sheet; the list keeps an inline editor above the keyboard |
 | 5 | `tickets/TicketLinkScreen.tsx` | None expected. `Linking.openURL` opens Safari. **Built in iOS-3a (§4.9):** "Go to tickets" switches to the Tickets tab's list |
-| 6 | `notifications/NotificationsScreen.tsx` | A tap pushes `TicketDetail` or `ApprovalDetail` inside Alerts, instead of switching module (§4.5) |
+| 6 | `notifications/NotificationsScreen.tsx` | A tap pushes `TicketDetail` or `ApprovalDetail` inside Alerts, instead of switching module (§4.5). **Built in iOS-3c (§4.12):** through `notificationDestination()`; "Mark all read" in the native bar; a large title over every state |
 | **iOS-3b — Write** | | |
 | 7 | `tickets/CreateTicketScreen.tsx` | Now a sheet: on success it closes and the new ticket opens in the tab underneath. Android's `replace('TicketDetail')` can't cross the sheet. On a device, check attachments from Camera, Photos and Files. **Built in iOS-3b (§4.11):** `popTo('App', …)` into `tabUnderSheets()`; impact and urgency as action sheets |
 | 8 | `tickets/ReplyComposerScreen.tsx` | Common changes only. **Built in iOS-3b (§4.11):** no files on a private note (05 §C.26), stricter than Android |
@@ -918,19 +1036,19 @@ Android-only parts of ADAPT files, not brought over:
 | 11 | `tickets/TicketPropertyEditors.tsx` | Check the inline editors with the keyboard up. Copied unchanged in iOS-3a with TicketDetail; iOS-3b removes the phase gate that keeps its editors closed (§4.9). `accessibilityLiveRegion` on the priority preview is Android-only: VoiceOver needs `AccessibilityInfo.announceForAccessibility` (iOS-4). **Built in iOS-3b (§4.11):** the gate is gone; impact and urgency as action sheets |
 | 12 | `tickets/SubmitApprovalScreen.tsx` | Common changes only. **Built in iOS-3b (§4.11)** |
 | **iOS-3c — Modules** | | |
-| 13 | `approvals/ApprovalsInboxScreen.tsx` | The Approvals tab's root (ADMIN, AGENT), or pushed from More (END_USER, L2_MANAGER) |
-| 14 | `approvals/ApprovalDetailScreen.tsx` | `KeyboardAvoidingView` `"height"` → `"padding"`. `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack. "Back to approvals" pops to `ApprovalsInbox`, or goes back when the approval was opened from Alerts |
-| 15 | `tasks/TaskListScreen.tsx` | Common changes only |
-| 16 | `tasks/TaskDetailScreen.tsx` | `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack; it still goes back when the ticket is underneath |
-| 17 | `tasks/TaskEditorScreen.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet`. `KeyboardAvoidingView` `"height"` → `"padding"` |
-| 18 | `knowledge/KnowledgeBaseScreen.tsx` | Common changes only |
-| 19 | `knowledge/KbArticleScreen.tsx` | Common changes only |
-| 20 | `catalog/ServiceCatalogScreen.tsx` | The `BackHandler` that leaves an open category or search first is removed. Instead there is a visible in-screen "Catalogue" back control (the web's Home breadcrumb). The iOS swipe-back leaves the catalogue, as iOS users expect. Two `RefreshControl`s |
-| 21 | `catalog/ServiceFormFieldInput.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet` |
-| 22 | `catalog/ServiceRequestFormScreen.tsx` | Common changes only |
-| 23 | `catalog/ServiceRequestDetailScreen.tsx` | Common changes only |
-| 24 | `dashboard/AnnouncementsScreen.tsx` | Registered in the Home and More stacks. `AppDrawerScreenProps` → props that fit both |
-| 25 | `profile/ProfileScreen.tsx` | `AppDrawerScreenProps` → `MoreStackScreenProps`. `KeyboardAvoidingView` `"height"` → `"padding"`. Adds a **Privacy policy** link and the **account-deletion** entry (compliance H1, H6; content depends on D10). The Theme setting stays unbuilt (light only) |
+| 13 | `approvals/ApprovalsInboxScreen.tsx` | The Approvals tab's root (ADMIN, AGENT), or pushed from More (END_USER, L2_MANAGER). **Built in iOS-3c (§4.12):** chips pinned, so a standard title on the tab (Q3) |
+| 14 | `approvals/ApprovalDetailScreen.tsx` | `KeyboardAvoidingView` `"height"` → `"padding"`. `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack. "Back to approvals" pops to `ApprovalsInbox`, or goes back when the approval was opened from Alerts. **Built in iOS-3c (§4.12):** `automaticallyAdjustKeyboardInsets` instead of `KeyboardAvoidingView`; the approval from `approvalOnScreen()` |
+| 15 | `tasks/TaskListScreen.tsx` | Common changes only. **Built in iOS-3c (§4.12):** "Assigned to me" from `taskPermissions()` |
+| 16 | `tasks/TaskDetailScreen.tsx` | `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack; it still goes back when the ticket is underneath. **Built in iOS-3c (§4.12)** |
+| 17 | `tasks/TaskEditorScreen.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet`. `KeyboardAvoidingView` `"height"` → `"padding"`. **Built in iOS-3c (§4.12):** `SheetKeyboardView` (a sheet); Status as an action sheet; one sheet per task (Q4) |
+| 18 | `knowledge/KnowledgeBaseScreen.tsx` | Common changes only. **Built in iOS-3c (§4.12)** |
+| 19 | `knowledge/KbArticleScreen.tsx` | Common changes only. **Built in iOS-3c (§4.12):** HTML checked with the renderer's engine in Node |
+| 20 | `catalog/ServiceCatalogScreen.tsx` | The `BackHandler` that leaves an open category or search first is removed. Instead there is a visible in-screen "Catalogue" back control (the web's Home breadcrumb). The iOS swipe-back leaves the catalogue, as iOS users expect. Two `RefreshControl`s. **Built in iOS-3c (§4.12):** the breadcrumb was already Android's; `BackHandler` removed |
+| 21 | `catalog/ServiceFormFieldInput.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet`. **Built in iOS-3c (§4.12):** also the number keyboard (Q2) |
+| 22 | `catalog/ServiceRequestFormScreen.tsx` | Common changes only. **Built in iOS-3c (§4.12):** Impact and Urgency as action sheets; keyboard insets; no attachments (Q1) |
+| 23 | `catalog/ServiceRequestDetailScreen.tsx` | Common changes only. **Built in iOS-3c (§4.12)** |
+| 24 | `dashboard/AnnouncementsScreen.tsx` | Registered in the Home and More stacks. `AppDrawerScreenProps` → props that fit both. **Built in iOS-3c (§4.12):** `SharedStackScreenProps` |
+| 25 | `profile/ProfileScreen.tsx` | `AppDrawerScreenProps` → `MoreStackScreenProps`. `KeyboardAvoidingView` `"height"` → `"padding"`. Adds a **Privacy policy** link and the **account-deletion** entry (compliance H1, H6; content depends on D10). The Theme setting stays unbuilt (light only). **Built in iOS-3c (§4.12):** keyboard insets instead of `KeyboardAvoidingView`. The privacy link and account deletion wait for iOS-4 (Q5) |
 
 ## 7. iOS-only additions
 
@@ -941,16 +1059,17 @@ Android-only parts of ADAPT files, not brought over:
 | `docs/ios/00-PORT-MANIFEST.md` | iOS-1a | This file |
 | `docs/ios/APP-STORE-COMPLIANCE.md` | iOS-1a | Apple checklist |
 | `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-7 | iOS test steps: TestFlight install, back swipe, sheets, Dynamic Type, VoiceOver |
-| `src/navigation/routes.ts` | iOS-2 (built), iOS-3b | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests. **iOS-3b:** `SHEET_ID_PARAM` (getId for the four write sheets) and `tabUnderSheets()` |
-| `src/navigation/AppTabs.tsx`, `src/navigation/TabStacks.tsx`, `src/navigation/MoreScreen.tsx` | iOS-2 (built) | The tab bar, one native stack per tab, and the More list. They replace `AppDrawer`, `MainTabs`, `AppTabBar`, `DrawerContent`, `TicketStack` and `ModuleStacks` (§3.9) |
-| `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); deleted in iOS-3c | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-3". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
-| `tests/navigation/shell.test.mjs`, `get-id.test.mjs`, `deep-links.test.mjs` | iOS-2 (built) | Tabs, More rows and badges per persona; no role string in navigators, screens or components; `getId` coverage and the randomised `StackRouter` runs; ticket-link parsing and where a link opens |
-| `src/components/DatePickerSheet.tsx` | iOS-3a (built) | The native iOS date picker (`@react-native-community/datetimepicker`, inline) in a sheet with Done/Cancel. Replaces `DateTimePickerAndroid.open` in three screens and returns the same value. Used by TicketFilters since iOS-3a; TaskEditor and ServiceFormFieldInput follow in iOS-3c |
+| `src/navigation/routes.ts` | iOS-2 (built), iOS-3b, iOS-3c | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests. **iOS-3b:** `SHEET_ID_PARAM` (getId for the four write sheets) and `tabUnderSheets()`. **iOS-3c:** TaskEditor's getId (`<ticketId>/<taskId or new>`) and ApprovalsInbox in `PINNED_BAR_ROOTS` |
+| `src/navigation/AppTabs.tsx`, `src/navigation/TabStacks.tsx`, `src/navigation/MoreScreen.tsx` | iOS-2 (built) | The tab bar, one native stack per tab, and the More list. They replace `AppDrawer`, `MainTabs`, `AppTabBar`, `DrawerContent`, `TicketStack` and `ModuleStacks` (§3.9). **iOS-3c:** TabStacks registers every module screen; `SCREENS` is a complete table |
+| `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); **deleted in iOS-3c** | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-3". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
+| `tests/navigation/shell.test.mjs`, `get-id.test.mjs`, `deep-links.test.mjs` | iOS-2 (built) | Tabs, More rows and badges per persona; no role string in navigators, screens or components; `getId` coverage and the randomised `StackRouter` runs; ticket-link parsing and where a link opens. **iOS-3c:** `get-id` adds the module runs and the check that Approve and Reject act on the approval shown (§4.12) |
+| `src/components/DatePickerSheet.tsx` | iOS-3a (built) | The native iOS date picker (`@react-native-community/datetimepicker`, inline) in a sheet with Done/Cancel. Replaces `DateTimePickerAndroid.open` in three screens and returns the same value. Used by TicketFilters since iOS-3a, and by TaskEditor and ServiceFormFieldInput since iOS-3c |
 | `src/components/SuccessNotice.tsx`, `src/utils/successNotice.ts` | iOS-3b (built) | Planned as `Notice.tsx`; named `SuccessNotice` (Ronit, iOS-3b plan Q4) because `Form.tsx` already exports a `Notice`. A short, non-modal capsule at the top of the screen after a write, gone after 3 s, taking no touches, read out by VoiceOver (`announceForAccessibilityWithOptions`, queued), no fade under Reduce Motion. `notify()` calls it; `SuccessNoticeHost` is mounted once in `RootNavigator` |
 | `src/utils/phase-gate.ts` | iOS-3a (built); **deleted in iOS-3b** | The write gate (§4.9): `WRITE_CONTROLS = false` and `readOnlyDetail()`, `readOnlyFields()`, `readOnlyActions()`, which empty the role answers' write parts so the read screens offer no write |
-| `src/utils/actionSheet.ts` | iOS-3b (built) | `chooseFromActionSheet()` over ActionSheetIOS (Cancel last, destructive in red, the brand tint), `moreActionChoices()` and `transitionChoices()`, which only label what `permissions.ts` returns |
+| `src/utils/actionSheet.ts` | iOS-3b (built) | `chooseFromActionSheet()` over ActionSheetIOS (Cancel last, destructive in red, the brand tint), `moreActionChoices()` and `transitionChoices()`, which only label what `permissions.ts` returns. **iOS-3c:** `chooseForField()` for a form field's fixed choices (task Status, request Impact and Urgency) |
 | `src/components/SheetKeyboardView.tsx` | iOS-3b (built) | `KeyboardAvoidingView` `padding` with the offset a page sheet needs (its position on screen, `measureInWindow`), for the write sheets |
 | `tests/screens/write-screens.test.mjs` | iOS-3b (built) | 93 tests: the action sheets per persona and status, the destructive confirmations, the success notice, each safety rule, the sheets on iOS (§4.11) |
+| `tests/screens/module-screens.test.mjs` | iOS-3c (built) | 49 tests: no placeholder in `src/`; notifications (destination, never by type, the badge never polled, the bar, the large title); approvals (Reject in red with a reason, APR-1 only, the tab's navigation); tasks (action sheet, calendar sheet, keyboard, the write guard); KB HTML through the sanitiser and the renderer's engine, and the KB requests; the catalogue and Profile on iOS; every module screen's bar, refresh tint, insets and props (§4.12) |
 | `src/theme/shadows.ts` | iOS-3a (built) | `shadows.fab`: shadowColor, shadowOffset, shadowOpacity and shadowRadius from the palette, for the floating "+" button (Android: `shadow-lg` / elevation) |
 | `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built), iOS-3b | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9). **iOS-3b:** the gate checks became "the writes render from Android's answers"; `ToastAndroid` and `thumbColor` added to the Android-only list; the stub also records ActionSheetIOS, Alert and VoiceOver announcements |
 | `tests/auth/ios-sso.test.mjs` | iOS-6 (built) | Microsoft sign-in on iOS (§4.10):<br>- the exact redirect and its match with the `app.json` scheme;<br>- no `msauth://` in `src/`, and other platforms refused;<br>- PKCE S256, the scopes, the fixed IDs, and no client secret in `src/` or the requests;<br>- the ephemeral sheet, and every cancel path ending without a banner;<br>- the 401 and 403 copy;<br>- `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` on every Keychain call;<br>- sign-out: AUTH-3, then the Keychain, query cache and UI store wiped, even when logout fails or hangs;<br>- the `name` and `department` lessons, and the `__DEV__` gate on the developer-token screen.<br>`tests/support/stubs/react-native.mjs` gains `Platform.OS` ('ios', with a setter) |
