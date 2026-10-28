@@ -28,7 +28,7 @@ Drift found at the port source (reported here, not fixed):
 | **KEEP** | Copy byte for byte |
 | **ADAPT** | Copy, then make the iOS change stated in the row. **ADAPT · verify** means the file uses something on the brief's list (for example `StatusBar`) that works on iOS unchanged: no code change is expected, and it is checked on a device |
 | **SKIP** | Not brought over. One-line reason in the row |
-| **SCREEN** | A screen file, ported in iOS-4 in the order of §6 (iOS-4a read, iOS-4b write, iOS-4c modules) |
+| **SCREEN** | A screen file, ported in iOS-3 in the order of §6 (iOS-3a read, iOS-3b write, iOS-3c modules) |
 
 Rules used:
 - **An Android comment alone does not make a file ADAPT.** Comments such as "Android back", "APK" or "Keystore" are corrected the next time the file changes for a real reason.
@@ -44,21 +44,29 @@ Rules used:
 
 ## 2. Phase map
 
-**Decided by Ronit on 2026-10-27 (D1).** The "Phase" columns in both documents use this roadmap.
+**Decided by Ronit on 2026-10-27 (D1); renumbered by Ronit on 2026-10-28** (the iOS-3a brief). The "Phase" columns in both documents use this roadmap.
 
 | Phase | Content |
 |---|---|
 | **iOS-1** | **Foundation** |
 | iOS-1a | These two documents |
 | iOS-1b | Port the non-screen foundation: every KEEP file marked iOS-1b, plus the iOS versions of `app.json`, `eas.json`, `package.json` (scripts only, no dependency changes) and `CLAUDE.md`. Then `npm ci`, `tsc`, the tests that can run, and `expo-doctor` |
-| **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-4, where the screens that use them arrive |
-| **iOS-3** | **First EAS build → TestFlight + EAS Update:** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
-| **iOS-4** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-4a** read, **iOS-4b** write, **iOS-4c** modules |
-| **iOS-5** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
-| **iOS-6** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
-| **iOS-7** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`) |
+| **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-3, where the screens that use them arrive |
+| **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read, **iOS-3b** write, **iOS-3c** modules |
+| **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
+| **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
+| **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`) |
+| **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
 | **iOS-9** | **App Store readiness + submit:** metadata, screenshots, privacy labels, demo account, review notes, test login removed, `production` profile |
+
+**The 2026-10-28 renumbering.** The first EAS build moved from third to seventh, after the screens, the polish, parity and SSO, so the first TestFlight build tests the whole system. Commit messages and code comments written before it use the old numbers:
+
+| Old | iOS-3 | iOS-4 (4a, 4b, 4c) | iOS-5 | iOS-6 | iOS-7 |
+|---|---|---|---|---|---|
+| **New** | **iOS-7** | **iOS-3** (3a, 3b, 3c) | **iOS-4** | **iOS-5** | **iOS-6** |
+
+iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 
 ## 3. Every file in the port source
 
@@ -73,7 +81,7 @@ Rules used:
 | `README.md` | KEEP | — | Already on `ios-dev`, byte-identical |
 | `app.json` | ADAPT | iOS-1b | §4.2 |
 | `babel.config.js` | KEEP | iOS-1b | — |
-| `eas.json` | ADAPT | iOS-1b, iOS-3 | §4.3 |
+| `eas.json` | ADAPT | iOS-1b, iOS-7 | §4.3 |
 | `global.css` | KEEP | iOS-1b | — |
 | `globals.d.ts` | KEEP | iOS-1b | — |
 | `index.ts` | KEEP | iOS-1b | — |
@@ -105,16 +113,16 @@ Rules used:
 | `docs/G2-WEB-FILTERS.md` | KEEP | iOS-1b | — |
 | `docs/G3-WEB-BEHAVIOUR.md` | KEEP | iOS-1b | — |
 | `docs/G4-WEB-CATALOGUE.md` | KEEP | iOS-1b | — |
-| `docs/PERFORMANCE.md` | KEEP | iOS-1b | Android measurements. iOS figures, if needed, go in `docs/ios/` (iOS-5) |
-| `docs/RELEASE.md` | ADAPT | iOS-3 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-3 (§4.7) |
+| `docs/PERFORMANCE.md` | KEEP | iOS-1b | Android measurements. iOS figures, if needed, go in `docs/ios/` (iOS-4) |
+| `docs/RELEASE.md` | ADAPT | iOS-7 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-7 (§4.7) |
 | `docs/ROLE-MATRIX.md` | KEEP | iOS-1b | Role rules are platform-neutral |
-| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is a new `docs/ios/` file (iOS-3) |
+| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is a new `docs/ios/` file (iOS-7) |
 | `docs/WEB-VS-MOBILE-ROLES.md` | KEEP | iOS-1b | — |
-| `docs/brand/UI-STANDARDS.md` | ADAPT | iOS-1b as-is, iOS-5 | Copied unchanged in iOS-1b; adapted in iOS-5 (§4.8). Until then the iOS navigation chrome is described in §4.5 |
+| `docs/brand/UI-STANDARDS.md` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b; adapted in iOS-4 (§4.8). Until then the iOS navigation chrome is described in §4.5 |
 | `docs/brand/WEB-TOKENS.md` | KEEP | iOS-1b | — |
 | `docs/web-system/00-OVERVIEW.md` | KEEP | iOS-1b | Environments table unchanged: UAT only |
 | `docs/web-system/01-API-CONTRACT.md` | KEEP | iOS-1b | — |
-| `docs/web-system/02-AUTH.md` | ADAPT | iOS-1b as-is, iOS-7 | Copied unchanged in iOS-1b; adapted in iOS-7 (§4.6) |
+| `docs/web-system/02-AUTH.md` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b; adapted in iOS-6 (§4.6) |
 | `docs/web-system/03-DATA-MODEL.md` | KEEP | iOS-1b | — |
 | `docs/web-system/04-SCREEN-MAP.md` | KEEP | iOS-1b | — |
 | `docs/web-system/05-RULES-AND-GAPS.md` | KEEP | iOS-1b | — |
@@ -130,7 +138,7 @@ Rules used:
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `scripts/eas-build-guard.js` | KEEP | iOS-1b | Platform-neutral: it checks the profile name and `EXPO_PUBLIC_APP_ENV`, which `preview` and `production` still use |
-| `scripts/verify-release-bundle.js` | ADAPT | iOS-3 | Not copied in iOS-1b, so until iOS-3 the `verify:release-bundle` script in `package.json` points at a missing file. Change `--platform android` to `ios`, and the output file from `index.android.bundle` to `main.jsbundle`. Hermes compiles iOS bundles too, so the bytecode step stays. Run it on the `production` configuration: the result must be PASS It can PASS only once the Login screen exists (iOS-2), because it requires the "Sign in with Microsoft" string |
+| `scripts/verify-release-bundle.js` | ADAPT | iOS-7 | Not copied in iOS-1b, so until iOS-7 the `verify:release-bundle` script in `package.json` points at a missing file. Change `--platform android` to `ios`, and the output file from `index.android.bundle` to `main.jsbundle`. Hermes compiles iOS bundles too, so the bytecode step stays. Run it on the `production` configuration: the result must be PASS It can PASS only once the Login screen exists (iOS-2), because it requires the "Sign in with Microsoft" string |
 
 ### 3.5 `src/api/` (22)
 
@@ -140,7 +148,7 @@ Rules used:
 | `src/api/approvals.api.ts` | KEEP | iOS-1b | — |
 | `src/api/attachmentDownload.ts` | KEEP | iOS-1b | `expo-sharing` opens the iOS share sheet. `dialogTitle` is Android-only and is ignored on iOS |
 | `src/api/attachments.api.ts` | KEEP | iOS-1b | — |
-| `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-7 | Copied unchanged in iOS-1b. In iOS-7, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5 |
+| `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b. In iOS-6, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5 |
 | `src/api/client.ts` | KEEP | iOS-1b | — |
 | `src/api/comments.api.ts` | KEEP | iOS-1b | — |
 | `src/api/dashboard.api.ts` | KEEP | iOS-1b | — |
@@ -177,14 +185,14 @@ Rules used:
 | `src/components/Filters.tsx` | KEEP | iOS-1b | — |
 | `src/components/Form.tsx` | KEEP | iOS-1b | — |
 | `src/components/HtmlText.tsx` | KEEP | iOS-1b | `Linking.openURL` opens Safari |
-| `src/components/ImageViewerModal.tsx` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b. In iOS-4, change the share icon from `share-social-outline` (the Android glyph) to `share-outline` (the iOS glyph). The `StatusBar` there works unchanged (verify). Because this shares images, the share sheet offers "Save Image", which needs `NSPhotoLibraryAddUsageDescription` (§4.2) |
+| `src/components/ImageViewerModal.tsx` | ADAPT | iOS-1b as-is, iOS-3 | Copied unchanged in iOS-1b. In iOS-3, change the share icon from `share-social-outline` (the Android glyph) to `share-outline` (the iOS glyph). The `StatusBar` there works unchanged (verify). Because this shares images, the share sheet offers "Save Image", which needs `NSPhotoLibraryAddUsageDescription` (§4.2) |
 | `src/components/ListEntry.tsx` | KEEP | iOS-1b | — |
 | `src/components/LoadingSkeleton.tsx` | KEEP | iOS-1b | — |
-| `src/components/OptionSheet.tsx` | KEEP | iOS-1b | Android-only Modal props are ignored. Whether this becomes a native iOS sheet is an iOS-5 design question, not a port change |
+| `src/components/OptionSheet.tsx` | KEEP | iOS-1b | Android-only Modal props are ignored. Whether this becomes a native iOS sheet is an iOS-4 design question, not a port change |
 | `src/components/PersonPickerSheet.tsx` | KEEP | iOS-1b | Same as `OptionSheet` |
 | `src/components/PriorityBadge.tsx` | KEEP | iOS-1b | — |
 | `src/components/RecentTicketRow.tsx` | KEEP | iOS-1b | — |
-| `src/components/ScreenHeader.tsx` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `components/index.ts` exports it. **iOS-2:** the `'drawer'` variant and `DrawerActions` are removed; the back icon is `chevron-back`. Signed-in screens use the native navigation bar instead (§4.5), so only the `__DEV__` developer-token screen uses this header now. Its 56 pt height is an iOS-5 item (§4.8) |
+| `src/components/ScreenHeader.tsx` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `components/index.ts` exports it. **iOS-2:** the `'drawer'` variant and `DrawerActions` are removed; the back icon is `chevron-back`. Signed-in screens use the native navigation bar instead (§4.5), so only the `__DEV__` developer-token screen uses this header now. Its 56 pt height is an iOS-4 item (§4.8) |
 | `src/components/Shimmer.tsx` | KEEP | iOS-1b | — |
 | `src/components/SlaBadge.tsx` | KEEP | iOS-1b | — |
 | `src/components/StatusBadge.tsx` | KEEP | iOS-1b | Already sets the iOS `accessibilityElementsHidden` next to the Android prop |
@@ -198,7 +206,7 @@ Rules used:
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `src/config/auth.config.ts` | ADAPT | iOS-1b as-is, iOS-7 | Copied unchanged in iOS-1b; nothing calls it on iOS before iOS-7. In iOS-7, `getAuthRedirectUri()` returns `'msauth.com.mountmeru.servicedesk://auth'` instead of the Android `msauth://com.mountmeru.servicedesk/<signature hash>`. `AUTH_REDIRECT_SCHEME` becomes `'msauth.com.mountmeru.servicedesk'`. Drop the unused `makeRedirectUri` import and fix the comments. The client and tenant IDs stay: same Entra registration, so the backend's ID-token audience check is unchanged |
+| `src/config/auth.config.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b; nothing calls it on iOS before iOS-6. In iOS-6, `getAuthRedirectUri()` returns `'msauth.com.mountmeru.servicedesk://auth'` instead of the Android `msauth://com.mountmeru.servicedesk/<signature hash>`. `AUTH_REDIRECT_SCHEME` becomes `'msauth.com.mountmeru.servicedesk'`. Drop the unused `makeRedirectUri` import and fix the comments. The client and tenant IDs stay: same Entra registration, so the backend's ID-token audience check is unchanged |
 | `src/config/env.ts` | KEEP | iOS-1b | UAT only; PROD placeholder unchanged |
 
 ### 3.8 `src/hooks/` (31)
@@ -216,7 +224,7 @@ Rules used:
 | `src/hooks/useCreateTicket.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDebouncedValue.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDeleteAttachment.ts` | KEEP | iOS-1b | — |
-| `src/hooks/useDiscardGuard.ts` | KEEP | iOS-1b | Uses `usePreventRemove`. In iOS-4, check on a device that it also stops the iOS swipe-back and the swipe-down that closes a sheet. If it doesn't, the affected screens set `gestureEnabled: false` while there is unsent input |
+| `src/hooks/useDiscardGuard.ts` | KEEP | iOS-1b | Uses `usePreventRemove`. In iOS-3, check on a device that it also stops the iOS swipe-back and the swipe-down that closes a sheet. If it doesn't, the affected screens set `gestureEnabled: false` while there is unsent input |
 | `src/hooks/useHome.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useKnowledgeBase.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useLookups.ts` | KEEP | iOS-1b | — |
@@ -260,33 +268,33 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 |---|---|---|---|
 | `src/screens/PlaceholderScreen.tsx` | ADAPT | iOS-2 | Copied in iOS-2; the `'drawer'` value is removed from `headerVariant`. It is used only by `DevTokenScreen`. The signed-in routes' placeholders are the new `DevPlaceholderScreen` (§7) |
 | `src/screens/auth/DevTokenScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. `__DEV__` only, as on Android, and absent from the exported release bundle (compliance A2). §8 would change it only if approved |
-| `src/screens/auth/LoginScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. Nothing platform-specific. The `__DEV__` hint shows whichever redirect `auth.config.ts` returns, which is the Android one until iOS-7, so Microsoft sign-in can't finish on iOS before then |
-| `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-7 |
-| `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-4c | §6 #14 |
-| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-4c | §6 #13 |
-| `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-4c | §6 #20 |
-| `src/screens/catalog/ServiceFormFieldInput.tsx` | SCREEN | iOS-4c | §6 #21 |
-| `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-4c | §6 #23 |
-| `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-4c | §6 #22 |
-| `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-4c | §6 #24 |
-| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-4a | §6 #1 |
-| `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-4c | §6 #19 |
-| `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-4c | §6 #18 |
-| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-4a | §6 #6 |
-| `src/screens/profile/ProfileScreen.tsx` | SCREEN | iOS-4c | §6 #25 |
-| `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-4c | §6 #16 |
-| `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-4c | §6 #17 |
-| `src/screens/tasks/TaskListScreen.tsx` | SCREEN | iOS-4c | §6 #15 |
-| `src/screens/tickets/AssignPickerScreen.tsx` | SCREEN | iOS-4b | §6 #10 |
-| `src/screens/tickets/CreateTicketScreen.tsx` | SCREEN | iOS-4b | §6 #7 |
-| `src/screens/tickets/ReplyComposerScreen.tsx` | SCREEN | iOS-4b | §6 #8 |
-| `src/screens/tickets/StatusClosureScreen.tsx` | SCREEN | iOS-4b | §6 #9 |
-| `src/screens/tickets/SubmitApprovalScreen.tsx` | SCREEN | iOS-4b | §6 #12 |
-| `src/screens/tickets/TicketDetailScreen.tsx` | SCREEN | iOS-4a | §6 #4 |
-| `src/screens/tickets/TicketFiltersScreen.tsx` | SCREEN | iOS-4a | §6 #3 |
-| `src/screens/tickets/TicketLinkScreen.tsx` | SCREEN | iOS-4a | §6 #5 |
-| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-4a | §6 #2 |
-| `src/screens/tickets/TicketPropertyEditors.tsx` | SCREEN | iOS-4b | §6 #11 |
+| `src/screens/auth/LoginScreen.tsx` | KEEP | iOS-2 | Copied in iOS-2. Nothing platform-specific. The `__DEV__` hint shows whichever redirect `auth.config.ts` returns, which is the Android one until iOS-6, so Microsoft sign-in can't finish on iOS before then |
+| `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-6 |
+| `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-3c | §6 #14 |
+| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c | §6 #13 |
+| `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-3c | §6 #20 |
+| `src/screens/catalog/ServiceFormFieldInput.tsx` | SCREEN | iOS-3c | §6 #21 |
+| `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-3c | §6 #23 |
+| `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-3c | §6 #22 |
+| `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-3c | §6 #24 |
+| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a | §6 #1 |
+| `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-3c | §6 #19 |
+| `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-3c | §6 #18 |
+| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a | §6 #6 |
+| `src/screens/profile/ProfileScreen.tsx` | SCREEN | iOS-3c | §6 #25 |
+| `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-3c | §6 #16 |
+| `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-3c | §6 #17 |
+| `src/screens/tasks/TaskListScreen.tsx` | SCREEN | iOS-3c | §6 #15 |
+| `src/screens/tickets/AssignPickerScreen.tsx` | SCREEN | iOS-3b | §6 #10 |
+| `src/screens/tickets/CreateTicketScreen.tsx` | SCREEN | iOS-3b | §6 #7 |
+| `src/screens/tickets/ReplyComposerScreen.tsx` | SCREEN | iOS-3b | §6 #8 |
+| `src/screens/tickets/StatusClosureScreen.tsx` | SCREEN | iOS-3b | §6 #9 |
+| `src/screens/tickets/SubmitApprovalScreen.tsx` | SCREEN | iOS-3b | §6 #12 |
+| `src/screens/tickets/TicketDetailScreen.tsx` | SCREEN | iOS-3a | §6 #4 |
+| `src/screens/tickets/TicketFiltersScreen.tsx` | SCREEN | iOS-3a | §6 #3 |
+| `src/screens/tickets/TicketLinkScreen.tsx` | SCREEN | iOS-3a | §6 #5 |
+| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-3a | §6 #2 |
+| `src/screens/tickets/TicketPropertyEditors.tsx` | SCREEN | iOS-3b | §6 #11 |
 
 ### 3.11 `src/store/` (2)
 
@@ -336,11 +344,11 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/utils/assignment.ts` | KEEP | iOS-1b | — |
 | `src/utils/compose.ts` | KEEP | iOS-1b | — |
 | `src/utils/deep-links.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `ticketLinkDestination()`: a ticket link opens the resolver in the tab on screen, and nothing under a sheet. `parseTicketLink()` is unchanged |
-| `src/utils/dialogs.ts` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b: its `ToastAndroid` call is already behind `Platform.OS === 'android'`. Its change moved from iOS-2 to iOS-4, with `Notice` and the screens that show notices. Today `notify()` uses `ToastAndroid`, and on iOS it falls back to a modal `Alert` for every success notice. The HIG discourages that. In iOS-4 it changes to the non-modal `Notice` (§7), which VoiceOver announces. Drop the `ToastAndroid` and `Platform` imports. `confirmAction` and the error alerts stay as `Alert`, which is the right iOS control for them |
+| `src/utils/dialogs.ts` | ADAPT | iOS-1b as-is, iOS-3 | Copied unchanged in iOS-1b: its `ToastAndroid` call is already behind `Platform.OS === 'android'`. Its change moved from iOS-2 to iOS-3, with `Notice` and the screens that show notices. Today `notify()` uses `ToastAndroid`, and on iOS it falls back to a modal `Alert` for every success notice. The HIG discourages that. In iOS-3 it changes to the non-modal `Notice` (§7), which VoiceOver announces. Drop the `ToastAndroid` and `Platform` imports. `confirmAction` and the error alerts stay as `Alert`, which is the right iOS control for them |
 | `src/utils/format.ts` | KEEP | iOS-1b | — |
 | `src/utils/html.ts` | KEEP | iOS-1b | — |
 | `src/utils/kb.ts` | KEEP | iOS-1b | — |
-| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers in iOS-4c |
+| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers in iOS-3c |
 | `src/utils/roles.ts` | KEEP | iOS-1b | — |
 | `src/utils/service-catalog.ts` | KEEP | iOS-1b | — |
 | `src/utils/session.ts` | KEEP | iOS-1b | — |
@@ -357,15 +365,15 @@ Several suites read screen or navigator source files as text. Each suite is copi
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `tests/auth/mobile-sso.test.mjs` | ADAPT | iOS-2, then iOS-7 | **Copied as it is in iOS-2**, together with `src/screens/auth/signInAttempt.ts`, which it imports; it passes. In iOS-7 its fixed-redirect assertion (line 152) changes to `msauth.com.mountmeru.servicedesk://auth`, together with `auth.config.ts` |
-| `tests/rbac/g3-features.test.mjs` | KEEP | iOS-4b | Reads the TicketDetail, ReplyComposer and SubmitApproval screens and `TicketStack.tsx` |
-| `tests/rbac/g5-audit.test.mjs` | KEEP | iOS-4b | Reads `CreateTicketScreen` |
-| `tests/rbac/list-filters.test.mjs` | KEEP | iOS-4a | Reads `TicketListScreen` and `TicketFiltersScreen` |
+| `tests/auth/mobile-sso.test.mjs` | ADAPT | iOS-2, then iOS-6 | **Copied as it is in iOS-2**, together with `src/screens/auth/signInAttempt.ts`, which it imports; it passes. In iOS-6 its fixed-redirect assertion (line 152) changes to `msauth.com.mountmeru.servicedesk://auth`, together with `auth.config.ts` |
+| `tests/rbac/g3-features.test.mjs` | KEEP | iOS-3b | Reads the TicketDetail, ReplyComposer and SubmitApproval screens and `TicketStack.tsx` |
+| `tests/rbac/g5-audit.test.mjs` | KEEP | iOS-3b | Reads `CreateTicketScreen` |
+| `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a | Reads `TicketListScreen` and `TicketFiltersScreen` |
 | `tests/rbac/personas.mjs` | KEEP | iOS-1b | — |
 | `tests/rbac/property-editing.test.mjs` | KEEP | iOS-1b | Pure modules only |
-| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-4c | Not copied in iOS-2: it reads screens that arrive in iOS-4. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). When copied: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged |
-| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-4c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack` |
-| `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-4b | Reads AssignPicker, TicketDetail and TicketPropertyEditors |
+| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). When copied: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged |
+| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack` |
+| `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b | Reads AssignPicker, TicketDetail and TicketPropertyEditors |
 | `tests/support/loader.mjs` | KEEP | iOS-1b | — |
 | `tests/support/register.mjs` | KEEP | iOS-1b | — |
 | `tests/support/stubs/expo-auth-session.mjs` | KEEP | iOS-1b | The comment says "needs an Android build" (wording only) |
@@ -379,7 +387,7 @@ Several suites read screen or navigator source files as text. Each suite is copi
   - the stack corrected to Expo SDK 57, React Native 0.86 and React Navigation 7, with "documentation only" removed;
   - bundle ID and iPhone only;
   - the roadmap (§2);
-  - auth status on iOS: SSO in iOS-7, the developer-token screen from iOS-2, the TestFlight test login not approved.
+  - auth status on iOS: SSO in iOS-6, the developer-token screen from iOS-2, the TestFlight test login not approved.
 - **New "iOS branch rules" I1–I7:**
   - I1: `ios-dev` only; never push to, merge into, rebase or touch `main`, `dev` or any Android branch.
   - I2: never open or modify `..\mmg-ticketing-mobile-app` or `..\MMG-Ticketing-Platform`. Read Android code only through git; porting is `git checkout <port source> -- <path>`.
@@ -407,7 +415,7 @@ Every value below is in the repo's `app.json` now, apart from the comments:
 {
   "expo": {
     "name": "Setu",                                   // CFBundleDisplayName (under the icon)
-    "slug": "setu-ios",                               // separate EAS project (created in iOS-3)
+    "slug": "setu-ios",                               // separate EAS project (created in iOS-7)
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -442,7 +450,7 @@ Every value below is in the repo's `app.json` now, apart from the comments:
 - **`extra.eas.projectId` and `owner`** (decision D7).
 
 **Added later, not in iOS-1b:**
-- **iOS-3:**
+- **iOS-7:**
   - `owner` and `extra.eas.projectId` (`eas init` for `setu-ios`);
   - `runtimeVersion` (`fingerprint` proposed) and `updates.url`, both of which need `expo-updates` (D6);
   - `ios.privacyManifests` (compliance H4).
@@ -457,18 +465,18 @@ Every value below is in the repo's `app.json` now, apart from the comments:
 
 **Other values:**
 - **Export compliance:** `ios.config.usesNonExemptEncryption: false`. The app only uses HTTPS through iOS and the OS's SHA-256 (via `expo-crypto`) for PKCE, both of which are exempt.
-- **`runtimeVersion: fingerprint` (iOS-3):** an EAS Update only reaches binaries built from the same native code (compliance C2). The alternative is `appVersion`, which needs a manual version bump on every native change.
+- **`runtimeVersion: fingerprint` (iOS-7):** an EAS Update only reaches binaries built from the same native code (compliance C2). The alternative is `appVersion`, which needs a manual version bump on every native change.
 
 ### 4.3 `eas.json` (written in iOS-1b)
 
-`preview` and `production`, as set out in the iOS-1b brief. No build is run before iOS-3.
+`preview` and `production`, as set out in the iOS-1b brief. No build is run before iOS-7.
 
 ```jsonc
 {
   "cli": { "version": ">= 24.8.0", "appVersionSource": "local" },
   "build": {
     // TestFlight build for internal testers, pointed at UAT. Store-signed, because TestFlight requires it.
-    // The channel takes effect once expo-updates is added (iOS-3).
+    // The channel takes effect once expo-updates is added (iOS-7).
     "preview":    { "node": "24.18.0", "distribution": "store", "channel": "ios-preview", "env": { "EXPO_PUBLIC_APP_ENV": "UAT" } },
     // ⛔ PLACEHOLDER: refused by scripts/eas-build-guard.js while the PROD URL in src/config/env.ts is empty.
     "production": { "node": "24.18.0", "distribution": "store", "channel": "production",  "env": { "EXPO_PUBLIC_APP_ENV": "PROD" } }
@@ -478,7 +486,7 @@ Every value below is in the repo's `app.json` now, apart from the comments:
 
 - **Removed:** the Android outputs, `android.buildType: apk` and `android.buildType: app-bundle` (§5). The name `preview` is kept, but on iOS it means a store-signed TestFlight build instead of an installable APK. An iOS "internal" (ad hoc) build would need every tester's device UDID registered.
 - **Shared app record:** `preview` and `production` builds share one bundle ID and one App Store Connect record. Only `production` builds are ever submitted for review.
-- **Added in iOS-3:**
+- **Added in iOS-7:**
   - a pinned build image with Xcode 26 or later (compliance J1);
   - `submit.preview.ios.ascAppId`;
   - a `development` profile, if `expo-dev-client` is approved (D6).
@@ -487,14 +495,14 @@ Every value below is in the repo's `app.json` now, apart from the comments:
 ### 4.4 `package.json` (and `package-lock.json`)
 - **Scripts (iOS-1b):**
   - `"android": "expo start --android"` is replaced by `"ios": "expo start --ios"`.
-  - `verify:release-bundle` stays, but its script file arrives in iOS-3 (§3.4).
+  - `verify:release-bundle` stays, but its script file arrives in iOS-7 (§3.4).
   - `eas-build-pre-install` runs `scripts/eas-build-guard.js`, which is copied.
 - **Dependencies:** none added or removed in iOS-1b. `package-lock.json` is the Android lockfile, unchanged.
 - **`@react-navigation/drawer` is unused since iOS-2:** nothing imports it. It stays installed until you approve its removal (D6); the iOS-2 brief did not allow removals.
 - **iOS-2 added no package:** `@react-navigation/native-stack` and `@react-navigation/bottom-tabs` (7.21.0) were already dependencies.
 - **Keep** `react-native-gesture-handler` (only `App.tsx`'s root view uses it since iOS-2) and `react-native-reanimated` / `react-native-worklets` (NativeWind needs them).
 - **Add only with your approval (D6):**
-  - `expo-updates`, for EAS Update and the `ios-preview` channel (iOS-3);
+  - `expo-updates`, for EAS Update and the `ios-preview` channel (iOS-7);
   - `expo-dev-client`, for a `development` profile.
 - **`eas-cli`:** pin it in `devDependencies` or always run `npx eas-cli@<version>`. Android's RELEASE §1 claims it is pinned, but it is not (§0 drift).
 - **`package-lock.json`:** never edited by hand. `npm install` regenerates it when a dependency changes.
@@ -556,7 +564,7 @@ Every row is a `drawerItems()` row that is not a tab, so no screen has two route
 |---|---|
 | 1 | Approvals for END_USER and L2_MANAGER is a More row while ≥ 1, not a tab; More shows the pending badge (settles D3) |
 | 2 | The tab is labelled "Alerts" (Android and web), not "Notifications". The screen's title stays "Notifications", as on Android |
-| 3 | React Navigation's own tab bar, which supports `freezeOnBlur`; the native `UITabBar` is reconsidered in iOS-5 (D4) |
+| 3 | React Navigation's own tab bar, which supports `freezeOnBlur`; the native `UITabBar` is reconsidered in iOS-4 (D4) |
 | 4 | Record screens open in the tab the person is in |
 | 5 | `CreateTicket` is a sheet |
 | 6 | My Requests is its own More row |
@@ -571,7 +579,7 @@ Every row is a `drawerItems()` row that is not a tab, so no screen has two route
 | A ticket opened from Home, Alerts, an approval or a task switched to the Tickets tab | It opens in the current tab (the record screens are in every stack) |
 | An alert about an approval opened the drawer's Approvals module | It opens `ApprovalDetail` inside Alerts |
 | A ticket link in HTML switched to the Tickets tab | It opens in the current tab; under a sheet it is left to the browser |
-| `CreateTicket` was pushed, then replaced by the new ticket | A sheet. On success (iOS-4b) it closes and the new ticket opens in the tab underneath |
+| `CreateTicket` was pushed, then replaced by the new ticket | A sheet. On success (iOS-3b) it closes and the new ticket opens in the tab underneath |
 | The drawer's back history (`backBehavior: 'fullHistory'`) and Android back on a tab root returning to Home | None: there is no back button. Each tab keeps its own stack, and tapping the current tab again returns to its root |
 | Home's "Pending approvals" opened the drawer module | It switches to the Approvals tab, or pushes More's Approvals for END_USER and L2_MANAGER (`hasApprovalsTab()`) |
 | Home's announcement banner opened the drawer screen | It pushes Announcements inside Home |
@@ -613,7 +621,7 @@ Unchanged: Home's KPI tiles switch to the Tickets tab with the named filter. The
 | `src/store/installMarker.ts` | The reinstall check (§7) |
 | `src/types/navigation.ts`, `src/utils/permissions.ts`, `src/utils/deep-links.ts`, `src/components/ScreenHeader.tsx`, `src/screens/PlaceholderScreen.tsx`, `src/store/auth.store.ts`, `App.tsx` | See their rows in §3 |
 
-**For the iOS-4 screens:**
+**For the iOS-3 screens:**
 - **Header:** the screen's own `ScreenHeader` goes. Its title and right-hand actions move to the native bar through `navigation.setOptions({ title, headerRight })`.
 - **Props types:** `AppDrawerScreenProps`, `MainTabScreenProps`, `TicketStackScreenProps` and `TaskScreenProps` become:
   - the tab-stack props (`HomeStackScreenProps`, `TicketsStackScreenProps`, `ApprovalsStackScreenProps`, `AlertsStackScreenProps`, `MoreStackScreenProps`);
@@ -622,13 +630,13 @@ Unchanged: Home's KPI tiles switch to the Tickets tab with the named filter. The
 - **Opening another screen:** a record opens with a plain `navigation.navigate('TicketDetail', …)`, because every stack has it. Only Home's tiles and its Approvals shortcut switch tab.
 - **Registering a screen:** add the built screen to `SCREENS` in `TabStacks.tsx`, or to the sheets in `RootNavigator.tsx`. The placeholder then drops out of that route.
 
-### 4.6 `docs/web-system/02-AUTH.md` (iOS-7)
+### 4.6 `docs/web-system/02-AUTH.md` (iOS-6)
 - **§7.1:** the existing registration `76c6edf5-…` gains the **iOS/macOS platform** for bundle ID `com.mountmeru.servicedesk`, which gives the redirect `msauth.com.mountmeru.servicedesk://auth`. This is an IT ask, the iOS half of A2. No new client ID and no backend change.
 - **§7.2:** add the iOS row: `msauth.com.mountmeru.servicedesk://auth` through `ASWebAuthenticationSession`, plus the `preferEphemeralSession` decision (D5).
 - **§5.1:** record that `keychainAccessible` is now in the code (`auth.store.ts`).
 - **§6:** changes only if §8 is approved.
 
-### 4.7 `docs/RELEASE.md` (iOS-3)
+### 4.7 `docs/RELEASE.md` (iOS-7)
 The file name is kept, because code comments cite "docs/RELEASE.md §6".
 
 | Section | Change |
@@ -642,9 +650,9 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 | §6 Bundle proof | The iOS bundle (`main.jsbundle`), re-run with the result recorded |
 | §7 Assets | Android adaptive-icon and splash geometry removed. iOS icon rules (opaque, 1024 px; optional dark and tinted variants) and the launch screen added |
 | §8 Packages | `expo-dev-client`, `expo-updates` |
-| §9 State audit | Kept; re-run on iOS in iOS-4 |
+| §9 State audit | Kept; re-run on iOS in iOS-3 |
 
-### 4.8 `docs/brand/UI-STANDARDS.md` (iOS-5; moved from iOS-2)
+### 4.8 `docs/brand/UI-STANDARDS.md` (iOS-4; moved from iOS-2)
 - **S1 header:** the native navigation bar (iOS-2): back chevron on pushed screens, a large title and no left button on tab roots, ✕ on sheets. The DEV-only `ScreenHeader` keeps 56 pt until then.
 - **S12 navigation chrome:** the drawer is replaced by tab bar + More (§4.5); ripple and elevation removed.
 - **§4 large text:** re-checked at iOS Dynamic Type sizes, up to the largest accessibility size (AX5), instead of Android's 130 % / 200 %.
@@ -675,7 +683,7 @@ Android-only parts of ADAPT files, not brought over:
 | `package.json` | `"android"` script | Android launcher |
 | Not in the repo | `android/` native folder, `*.jks`, `*.keystore`, `google-services.json` | Generated or secret. Already git-ignored, never present |
 
-## 6. SCREEN — porting order: iOS-4a read → iOS-4b write → iOS-4c modules
+## 6. SCREEN — porting order: iOS-3a read → iOS-3b write → iOS-3c modules
 
 **Applies to every screen:**
 - **Pull to refresh:** add `tintColor={colors.primary}` to `RefreshControl`, because iOS ignores the Android `colors` prop.
@@ -688,21 +696,21 @@ Android-only parts of ADAPT files, not brought over:
 
 | # | Screen | iOS changes beyond the common ones |
 |---|---|---|
-| **iOS-4a — Read** | | |
+| **iOS-3a — Read** | | |
 | 1 | `dashboard/HomeScreen.tsx` | The KPI tiles keep `navigate('TicketsTab', { screen: 'TicketList', … })`. A recent ticket pushes `TicketDetail` inside Home. Create opens the `CreateTicket` sheet. "Pending approvals" goes to `ApprovalsTab`, or to More's `ApprovalsInbox` when `hasApprovalsTab()` is false. The banner pushes `Announcements` inside Home (§4.5). Check the FAB `shadow-lg` and the KPI tiles at large Dynamic Type sizes (UI-STANDARDS §5.1 measured Android only) |
 | 2 | `tickets/TicketListScreen.tsx` | The `BackHandler` that clears the selection is removed. iOS has no hardware back, so the selection bar gets a visible **Cancel** (Done) button. The `StatusBar` `light-content` during selection works unchanged (verify) |
 | 3 | `tickets/TicketFiltersScreen.tsx` | `DateTimePickerAndroid.open` → `DatePickerSheet` (§7). It still sends the device's calendar day |
 | 4 | `tickets/TicketDetailScreen.tsx` | The ⋮ (`ellipsis-vertical`, the Android overflow mark) → `ellipsis-horizontal-circle`, the iOS "more" mark. It imports `TicketPropertyEditors`, so that file comes along (its write paths are checked at #11) |
 | 5 | `tickets/TicketLinkScreen.tsx` | None expected. `Linking.openURL` opens Safari |
 | 6 | `notifications/NotificationsScreen.tsx` | A tap pushes `TicketDetail` or `ApprovalDetail` inside Alerts, instead of switching module (§4.5) |
-| **iOS-4b — Write** | | |
+| **iOS-3b — Write** | | |
 | 7 | `tickets/CreateTicketScreen.tsx` | Now a sheet: on success it closes and the new ticket opens in the tab underneath. Android's `replace('TicketDetail')` can't cross the sheet. On a device, check attachments from Camera, Photos and Files |
 | 8 | `tickets/ReplyComposerScreen.tsx` | Common changes only |
 | 9 | `tickets/StatusClosureScreen.tsx` | `Switch` `thumbColor` is Android-only. iOS keeps a white thumb; the red `trackColor` is fine (verify) |
 | 10 | `tickets/AssignPickerScreen.tsx` | None expected. Check it on a device |
 | 11 | `tickets/TicketPropertyEditors.tsx` | Check the inline editors with the keyboard up |
 | 12 | `tickets/SubmitApprovalScreen.tsx` | Common changes only |
-| **iOS-4c — Modules** | | |
+| **iOS-3c — Modules** | | |
 | 13 | `approvals/ApprovalsInboxScreen.tsx` | The Approvals tab's root (ADMIN, AGENT), or pushed from More (END_USER, L2_MANAGER) |
 | 14 | `approvals/ApprovalDetailScreen.tsx` | `KeyboardAvoidingView` `"height"` → `"padding"`. `navigate('MainTabs' …)` becomes `navigate('TicketDetail', …)` in the same stack. "Back to approvals" pops to `ApprovalsInbox`, or goes back when the approval was opened from Alerts |
 | 15 | `tasks/TaskListScreen.tsx` | Common changes only |
@@ -725,13 +733,13 @@ Android-only parts of ADAPT files, not brought over:
 |---|---|---|
 | `docs/ios/00-PORT-MANIFEST.md` | iOS-1a | This file |
 | `docs/ios/APP-STORE-COMPLIANCE.md` | iOS-1a | Apple checklist |
-| `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-3 | iOS test steps: TestFlight install, back swipe, sheets, Dynamic Type, VoiceOver |
+| `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-7 | iOS test steps: TestFlight install, back swipe, sheets, Dynamic Type, VoiceOver |
 | `src/navigation/routes.ts` | iOS-2 (built) | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests |
 | `src/navigation/AppTabs.tsx`, `src/navigation/TabStacks.tsx`, `src/navigation/MoreScreen.tsx` | iOS-2 (built) | The tab bar, one native stack per tab, and the More list. They replace `AppDrawer`, `MainTabs`, `AppTabBar`, `DrawerContent`, `TicketStack` and `ModuleStacks` (§3.9) |
-| `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); deleted in iOS-4c | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-4". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
+| `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); deleted in iOS-3c | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-3". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
 | `tests/navigation/shell.test.mjs`, `get-id.test.mjs`, `deep-links.test.mjs` | iOS-2 (built) | Tabs, More rows and badges per persona; no role string in navigators, screens or components; `getId` coverage and the randomised `StackRouter` runs; ticket-link parsing and where a link opens |
-| `src/components/DatePickerSheet.tsx` | iOS-4 (moved from iOS-2) | The native iOS date picker (`@react-native-community/datetimepicker`, inline) in a sheet with Done/Cancel. Replaces `DateTimePickerAndroid.open` in three screens and returns the same value |
-| `src/components/Notice.tsx` | iOS-4 (moved from iOS-2) | A short, non-modal success notice at the top of the screen, announced to VoiceOver. Replaces the toast |
+| `src/components/DatePickerSheet.tsx` | iOS-3 (moved from iOS-2) | The native iOS date picker (`@react-native-community/datetimepicker`, inline) in a sheet with Done/Cancel. Replaces `DateTimePickerAndroid.open` in three screens and returns the same value |
+| `src/components/Notice.tsx` | iOS-3 (moved from iOS-2) | A short, non-modal success notice at the top of the screen, announced to VoiceOver. Replaces the toast |
 | `src/store/installMarker.ts` | iOS-2 (built) | **iOS Keychain items survive uninstall.** On the first launch after an install, no marker file exists in the app container yet. In that case, wipe the three `mmg.session.*` keys and write the marker. A reinstalled app then never starts signed in to a session from before it was deleted |
 
 **iOS identity and settings** (the values are in §4.2 and §4.3):
@@ -746,15 +754,15 @@ Android-only parts of ADAPT files, not brought over:
 | EAS | Separate project `setu-ios` |
 | EAS Update | Channel `ios-preview` (TestFlight); `production` reserved |
 | TestFlight | `preview` build profile |
-| Privacy manifest | Declared in `app.json` (`ios.privacyManifests`) in iOS-3 |
+| Privacy manifest | Declared in `app.json` (`ios.privacyManifests`) in iOS-7 |
 
 ## 8. Pre-SSO sign-in on TestFlight — PROPOSAL (nothing built)
 
 ### 8.1 The problem
 - TestFlight builds are release builds, so `__DEV__` is false.
 - The developer-token screen is compiled out of release builds: `AuthStack` `require`s it only inside `__DEV__`, and `verify-release-bundle` proves it is absent.
-- Microsoft SSO arrives in iOS-7.
-- So between the first TestFlight build (iOS-3) and iOS-7, **no tester can sign in**.
+- Microsoft SSO arrives in iOS-6, before the first TestFlight build (iOS-7) since the 2026-10-28 renumbering.
+- So the gap exists only if IT has not registered the iOS redirect (§8.5) by iOS-7: then **no tester can sign in** to a TestFlight build until it is registered.
 
 ### 8.2 The rules it runs into
 `02-AUTH.md` §6 and `CLAUDE.md` rule 5 forbid three things:
@@ -784,20 +792,20 @@ Any TestFlight test login therefore needs **your written amendment to 02 §6 and
 | L2 | The build guard refuses any build with the flag set when the profile is `production` or `EXPO_PUBLIC_APP_ENV` is `PROD`. It fails in seconds, before compiling | `scripts/eas-build-guard.js` |
 | L3 | At runtime, the flag counts only when `APP_ENV` is UAT. A PROD bundle can't show the screen even if the flag leaks into it | `src/config/env.ts` |
 | L4 | The `require` sits inside `__DEV__ \|\| process.env.EXPO_PUBLIC_UAT_TEST_LOGIN === '1'`. Expo inlines that at build time, so a bundle built without the flag does not contain the module. `verify-release-bundle` on the `production` configuration must find 0 developer-token strings | `AuthStack.tsx`, `verify-release-bundle.js` |
-| L5 | `eas update` does not run the build guard. So updates to `production` are published only by a script that sets `APP_ENV=PROD`, unsets the flag and runs `verify-release-bundle` first. `ios-preview` updates are built with the `preview` environment | iOS-3 script and RELEASE |
+| L5 | `eas update` does not run the build guard. So updates to `production` are published only by a script that sets `APP_ENV=PROD`, unsets the flag and runs `verify-release-bundle` first. `ios-preview` updates are built with the `preview` environment | iOS-7 script and RELEASE |
 
 **Also:**
 - The Login screen shows "UAT test build — test sign-in on".
 - Flagged builds go to **TestFlight internal testers only**, never to external groups, and are never submitted for App Review.
 
-**Files it would change (iOS-3):**
+**Files it would change (iOS-7):**
 - `eas.json`, `src/config/env.ts`, `src/navigation/AuthStack.tsx`;
 - `src/screens/auth/LoginScreen.tsx` (the condition on the developer button);
 - `src/screens/auth/DevTokenScreen.tsx` (its `if (!__DEV__)` self-guard switches to the same availability check);
 - `scripts/eas-build-guard.js`, `scripts/verify-release-bundle.js` (a second run on the `preview` configuration, where the strings are expected);
 - `02-AUTH.md` §6, `CLAUDE.md` rule 5, `docs/RELEASE.md`.
 
-**Removal:** the flag, the screen and the route are deleted under the existing release-checklist item "Developer-token screen removed", once SSO works (iOS-7 → iOS-9).
+**Removal:** the flag, the screen and the route are deleted under the existing release-checklist item "Developer-token screen removed", once SSO works (iOS-6 → iOS-9).
 
 **Risks:**
 - A tester handles a live 8-hour UAT session token and moves it from the computer to the phone. Clipboard only; never chat or email.
@@ -811,8 +819,8 @@ Any TestFlight test login therefore needs **your written amendment to 02 §6 and
 - AUTH-P2 is already live on UAT, and the Entra registration exists.
 - iOS needs only two things:
   1. IT adds the iOS platform (bundle ID `com.mountmeru.servicedesk`) to registration `76c6edf5-…`;
-  2. the iOS-7 changes to `app.json` `scheme` and `auth.config.ts` (§3.7).
-- If IT can do item 1 before the first TestFlight build, iOS-7 can run before iOS-3, and §8.3 is never built.
+  2. the iOS-6 changes to `app.json` `scheme` and `auth.config.ts` (§3.7).
+- The renumbered roadmap (§2) already runs iOS-6 before the first TestFlight build (iOS-7). If IT does item 1 by then, §8.3 is never built.
 
 **Recommendation:** send IT that ask now. Build §8.3 only if the registration can't be ready in time.
 
@@ -820,10 +828,10 @@ Any TestFlight test login therefore needs **your written amendment to 02 §6 and
 
 | # | Decision | My recommendation |
 |---|---|---|
-| D1 | Phase map (§2) | **Decided 2026-10-27:** iOS-1 foundation … iOS-9 App Store submit (§2) |
+| D1 | Phase map (§2) | **Decided 2026-10-27; renumbered 2026-10-28:** iOS-1 foundation … iOS-9 App Store submit, with the first EAS build moved to iOS-7 (§2) |
 | D2 | Pre-SSO sign-in (§8) | Ask IT for the iOS redirect now (§8.5). Approve §8.3 only as the fallback |
 | D3 | Pending-approvals badge on the More tab, as well as on its row | **Decided 2026-10-27 (iOS-2 plan #1):** yes, for END_USER and L2_MANAGER, whose Approvals is a More row. ADMIN and AGENT have the Approvals tab and its badge |
-| D4 | Tab bar: keep the custom bar, or switch to the native iOS tab bar (Liquid Glass on iOS 26) | **Decided for v1 on 2026-10-27 (iOS-2 plan #3):** React Navigation's own bar, which supports `freezeOnBlur`. Android's custom bar is not ported. The native bar (`@react-navigation/bottom-tabs/unstable`, already installed) is reconsidered in iOS-5 |
+| D4 | Tab bar: keep the custom bar, or switch to the native iOS tab bar (Liquid Glass on iOS 26) | **Decided for v1 on 2026-10-27 (iOS-2 plan #3):** React Navigation's own bar, which supports `freezeOnBlur`. Android's custom bar is not ported. The native bar (`@react-navigation/bottom-tabs/unstable`, already installed) is reconsidered in iOS-4 |
 | D5 | `preferEphemeralSession` for Microsoft sign-in | Yes |
 | D6 | Packages: add `expo-updates` and `expo-dev-client`; remove `@react-navigation/drawer`; pin `eas-cli` | Approve all four |
 | D7 | EAS owner for `setu-ios` (`ronitpc`, as for Android?), and the Apple Developer team | Your call |
