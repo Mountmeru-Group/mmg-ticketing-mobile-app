@@ -7,8 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
-import { logout } from '@/api/auth.api';
-import { endSession } from '@/api/client';
+import { signOutAndWipe } from '@/api/auth.api';
 import { assertObject, checkFields } from '@/api/drift';
 import { ApiClientError } from '@/api/errors';
 import { USER_PROFILE_SPEC, USER_PROFILE_UPDATED_SPEC } from '@/api/responseSpecs';
@@ -113,11 +112,9 @@ export function useUpdateProfile() {
   });
 }
 
-const LOGOUT_WAIT_MS = 5_000;
-
 /**
- * Sign out (02 §5.5), always after a confirmation: AUTH-3 (result ignored, waits at most 5 s), then the local wipe —
- * SecureStore token, the whole query cache and every store (endSession). The app then shows Login.
+ * Sign out (02 §5.5), always after a confirmation, then signOutAndWipe(): AUTH-3 (result ignored, waits at most 5 s),
+ * then the local wipe — Keychain session, the whole query cache and every store. The app then shows Login.
  */
 export function useSignOut() {
   const [signingOut, setSigningOut] = useState(false);
@@ -134,12 +131,8 @@ export function useSignOut() {
     if (!ok) return;
     setSigningOut(true);
     try {
-      await Promise.race([
-        logout().catch(() => undefined),
-        new Promise((resolve) => setTimeout(resolve, LOGOUT_WAIT_MS)),
-      ]);
+      await signOutAndWipe();
     } finally {
-      await endSession(null);
       setSigningOut(false);
     }
   }, []);

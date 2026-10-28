@@ -1,13 +1,12 @@
-// Microsoft Entra ID settings for native sign-in (ask A2, 02-AUTH.md §7).
-// - PUBLIC CLIENT: authorization code + PKCE through the system browser. There is NO client secret here and there
-//   must never be one (02 §6). Neither ID below is a secret: both ship inside every build.
-// - Ronit fills in the two IDs from the A2 app registration, in either of two ways:
-//     1. replace the '<CLIENT_ID>' / '<TENANT_ID>' defaults below. This is what an EAS build (preview APK) uses:
-//        EAS does not upload `.env`, which is git-ignored.
-//     2. set EXPO_PUBLIC_AZURE_CLIENT_ID / EXPO_PUBLIC_AZURE_TENANT_ID in a local `.env` (names in .env.example).
-//        Read once at bundle time; restart `npx expo start` after a change.
+// Microsoft Entra ID settings for native sign-in (ask A2, 02-AUTH.md §7; iOS: §7.7).
+// - PUBLIC CLIENT: authorization code + PKCE (S256) through Apple's sign-in sheet (ASWebAuthenticationSession). There
+//   is NO client secret here and there must never be one (02 §6). Neither ID below is a secret: both ship in every build.
+// - The two IDs are the A2 app registration's. iOS uses the same registration as Android, with its iOS/macOS platform,
+//   so the backend's ID-token audience check is unchanged. A local `.env` can override them
+//   (EXPO_PUBLIC_AZURE_CLIENT_ID / EXPO_PUBLIC_AZURE_TENANT_ID, read once at bundle time); EAS builds use the defaults.
 //   Until both are real GUIDs, the app refuses to open Microsoft sign-in and says why (isMicrosoftSignInConfigured).
-import { makeRedirectUri } from 'expo-auth-session';
+import type { AuthRequestPromptOptions } from 'expo-auth-session';
+import { Platform } from 'react-native';
 
 // Must stay direct `process.env.EXPO_PUBLIC_*` accesses so Expo inlines them at build time (no destructuring).
 /** Entra "Application (client) ID" of the mobile (public-client) app registration. */
@@ -30,25 +29,33 @@ export const AZURE_ENDPOINTS = {
  */
 export const AZURE_SCOPES: readonly string[] = ['openid', 'profile', 'email', 'offline_access'];
 
-/** Registered in Entra as `com.mountmeru.servicedesk://auth`; listed under `scheme` in app.json. */
-export const AUTH_REDIRECT_SCHEME = 'msauth';
-const AUTH_REDIRECT_PATH = 'auth';
+/** The iOS redirect's scheme: Entra's iOS/macOS platform form `msauth.<bundle ID>`. Also `scheme` in app.json. */
+export const AUTH_REDIRECT_SCHEME = 'msauth.com.mountmeru.servicedesk';
+
+/** Registered in Entra under the iOS/macOS platform for bundle ID `com.mountmeru.servicedesk`. Exact string. */
+export const IOS_AUTH_REDIRECT_URI = 'msauth.com.mountmeru.servicedesk://auth';
 
 /**
- * The redirect URI this build sends to Microsoft, from expo-auth-session's own helper:
- * - EAS / standalone build (preview APK) or a dev-client build: `com.mountmeru.servicedesk://auth`, the registered one.
- * - Expo Go: `exp://<LAN IP>:8081/--/auth`. Expo Go cannot receive a custom scheme, so this URI differs per machine
- *   and network, and it is NOT registered. Microsoft refuses it (AADSTS50011) unless that exact URI is also added
- *   to the registration under "Mobile and desktop applications". The Login screen shows it in __DEV__ builds.
- * A function, not a constant: it reads the app manifest, which must not throw while modules load.
+ * The redirect URI this build sends to Microsoft. iOS only: this branch builds no other platform, and Android's
+ * signature-hash redirect lives on `dev`, never here. The sign-in sheet catches the redirect by its scheme and hands it
+ * straight back to the app: no deep link is involved.
  */
 export function getAuthRedirectUri(): string {
-  return 'msauth://com.mountmeru.servicedesk/tlz9kcLBCrCtaVd%2FAvzUpkcOfgo%3D';
+  if (Platform.OS !== 'ios') throw new Error(`No Microsoft redirect URI is registered for ${Platform.OS} in this build`);
+  return IOS_AUTH_REDIRECT_URI;
 }
+
+/**
+ * How the sign-in sheet opens (02 §7.7, decision D5). Ephemeral: the sheet neither reads nor keeps Safari's Microsoft
+ * cookies, so iOS asks no "'Setu' Wants to Use 'microsoftonline.com' to Sign In" first, a shared phone never carries the
+ * previous person's Microsoft session, and signing out of Setu leaves nothing behind. The cost: a full Microsoft
+ * sign-in (password, and MFA where Conditional Access asks for it) every time.
+ */
+export const AUTH_SESSION_OPTIONS: AuthRequestPromptOptions = { preferEphemeralSession: true };
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** False while either ID is still a placeholder (or not a GUID): sign-in would only fail on Microsoft's page. */
+/** False on any platform but iOS, or while either ID is still a placeholder (or not a GUID). */
 export function isMicrosoftSignInConfigured(): boolean {
-  return GUID_RE.test(AZURE_CLIENT_ID) && GUID_RE.test(AZURE_TENANT_ID);
+  return Platform.OS === 'ios' && GUID_RE.test(AZURE_CLIENT_ID) && GUID_RE.test(AZURE_TENANT_ID);
 }
