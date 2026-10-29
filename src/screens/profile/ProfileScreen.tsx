@@ -18,7 +18,7 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
 import {
-  Card, ErrorState, FieldLabel, InlineError, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
+  Card, ErrorState, FieldLabel, InlineError, LoadingSkeleton, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
@@ -32,7 +32,6 @@ import type { AppDrawerScreenProps, UserProfile } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
 import { ROLE_LABELS } from '@/utils/roles';
-import { isPlaceholderUser } from '@/utils/session';
 import { countrySelectorMode } from '@/utils/ticket-filters';
 
 const ALL_COUNTRIES = '__ALL__';
@@ -54,7 +53,6 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
   const insets = useSafeAreaInsets();
   const offline = useIsOffline();
   const user = useAuthStore((s) => s.user);
-  const placeholder = isPlaceholderUser(user);
   const profile = useProfile();
   const update = useUpdateProfile();
   const { signOut, signingOut } = useSignOut();
@@ -155,13 +153,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
           ) : null}
         </Card>
 
-        {placeholder ? (
-          <View className="mx-4 mb-3">
-            <Notice tone="warning">
-              This session holds a placeholder account, so the profile can't be loaded or edited. Sign out and sign in again.
-            </Notice>
-          </View>
-        ) : !profile.data && profile.isError ? (
+        {!profile.data && profile.isError ? (
           <Card>
             <ErrorState error={profile.error} title="Couldn't load your profile" onRetry={() => void profile.refetch()} />
           </Card>

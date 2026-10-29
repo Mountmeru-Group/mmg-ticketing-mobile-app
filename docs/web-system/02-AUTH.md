@@ -6,7 +6,7 @@
 > - **Backend:** AUTH-P2 is **deployed to UAT**: `https://uat-servicedesk.mountmerugroup.com/api/v1/auth/microsoft/mobile`. Production is **not confirmed** (`10-A2-STATUS.md` §0).
 > - **The contract is CONFIRMED, not assumed.** The backend team gave the real shape on **2026-10-19**; recorded here 2026-10-20 (§7.5).
 >   - Its `user` has **`name`**, not `displayName`, plus `department` and `phone`. It is **not** the `GET /auth/me` user shape (§7.5).
-> - `__DEV__` builds keep the developer-token screen as the fallback until SSO works end to end. It is removed in Phase 8.
+> - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into every build.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
@@ -298,7 +298,7 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 - Parsing `Set-Cookie` from `/auth/login`.
 - Shipping the existing web app registration's client secret, or any secret.
 - Asking users to paste a token.
-  - One documented exception: the `__DEV__`-only developer-token screen (`src/screens/auth/DevTokenScreen.tsx`). It is absent from release bundles (`docs/RELEASE.md` §6) and is deleted in Phase 8, once SSO works end to end.
+  - There is no exception. The one there was, the `__DEV__`-only developer-token screen (`src/screens/auth/DevTokenScreen.tsx`), was deleted on 2026-10-29 (`docs/RELEASE.md` §5).
 
 ---
 
@@ -473,7 +473,7 @@ Accept: application/json
 5. **Country and office for users created through mobile:** an ID token alone does not carry Graph `country`/`officeLocation`. The confirmed request is `{ idToken }` only, so a user first created through mobile may have no `countryId`. If the backend wants parity, the request gains `accessToken` and the app needs the `User.Read` scope. That is a scope change, so it needs Ronit's approval.
 6. **Bearer through IIS/ARR on UAT** is still unverified (`00-OVERVIEW.md` BLOCKER B4).
 7. **Expo Go redirect** is not registered (§7.2). Test with an EAS build, or register the `exp://` URI the Login screen shows.
-8. **`npm run verify:release-bundle` now FAILS.** It needs Ronit's decision; the script was not changed.
+8. **Resolved 2026-10-29:** the allow-list was fixed as suggested below and the check passes (`docs/RELEASE.md` §6). Record of the 2026-10-20 finding: **`npm run verify:release-bundle` FAILED.** It needed Ronit's decision; the script was not changed then.
     - `client_secret` / `clientSecret` appear in `expo-auth-session`'s own option names (`AuthRequest.js`, `TokenRequest.js`, `AuthRequestHooks.js`). They are option names only; the app passes no secret.
     - One UUID-v4 literal: the EAS `extra.eas.projectId` in `app.json`. It is bundled because `src/config/env.ts` imports `app.json`. **This predates Phase 2.**
     - Once the real Entra IDs are filled in, those two GUIDs will be flagged the same way.

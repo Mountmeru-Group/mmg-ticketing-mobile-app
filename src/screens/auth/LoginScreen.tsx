@@ -5,13 +5,14 @@
 //   again can help. Closing Microsoft's page just returns here: no error, no spinner.
 // - The attempt itself, the messages and the stale-banner rule are in ./signInAttempt.ts; this file only renders.
 // - The environment badge stays visible (04 M1).
+// - This is the only way into the app: the __DEV__ developer-token screen was deleted on 2026-10-29.
 // TODO(later phase):
 // - AUTH-1 decides which buttons show; `microsoftEnabled` describes the WEB SSO only (01 AUTH-1).
 // - SYS-1 health check on start / after a network error.
 // - Never: password form (production is SSO only), /auth/test-login, WebView cookie lifting (02 §6).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { AppState, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, OfflineBanner, OutlineButton, SubmitButton } from '@/components';
@@ -32,7 +33,7 @@ function describeRedirectUri(): string {
   }
 }
 
-export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
+export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
   const signOutMessage = useAuthStore((s) => s.signOutMessage);
   const insets = useSafeAreaInsets();
   const [signingIn, setSigningIn] = useState(false);
@@ -134,20 +135,9 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
 
         {__DEV__ ? (
           <View className="mt-6 rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-            <Text className="text-xs text-amber-900">
-              Developer build: if Microsoft sign-in is not ready yet (AUTH-P2 not deployed), the developer token
-              below is the fallback.
-            </Text>
-            <Text className="mt-2 font-mono text-xs text-amber-900">
+            <Text className="font-mono text-xs text-amber-900">
               Redirect URI sent to Microsoft: {describeRedirectUri()}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('DevToken')}
-              className="mt-3 min-h-11 justify-center rounded-lg border border-amber-500 bg-white px-4 py-2"
-            >
-              <Text className="text-center font-medium text-amber-900">Developer: use a UAT session token</Text>
-            </Pressable>
           </View>
         ) : null}
       </ScrollView>

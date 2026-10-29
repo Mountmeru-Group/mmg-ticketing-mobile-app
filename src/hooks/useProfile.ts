@@ -16,11 +16,10 @@ import { getUser, updateOwnProfile, type UpdateOwnProfileBody } from '@/api/user
 import { useAuthStore } from '@/store/auth.store';
 import type { UserProfile, UserProfileUpdated } from '@/types';
 import { confirmAction } from '@/utils/dialogs';
-import { isPlaceholderUser } from '@/utils/session';
 import { queryKeys } from './queryKeys';
 import { refuse, requireOnline, wasRefusedOnDevice } from './writeGuards';
 
-/** USR-1 for the signed-in user (not called for the old dev placeholder user, whose id is not a real account). */
+/** USR-1 for the signed-in user. */
 export function useProfile() {
   const user = useAuthStore((s) => s.user);
   const id = user?.id ?? '';
@@ -33,7 +32,7 @@ export function useProfile() {
       checkFields('USR-1', res, USER_PROFILE_SPEC);
       return res;
     },
-    enabled: !!id && !isPlaceholderUser(user),
+    enabled: !!id,
   });
 }
 
@@ -78,7 +77,7 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: async ({ form, before }: { form: ProfileForm; before: UserProfile }): Promise<UserProfileUpdated> => {
       requireOnline();
-      if (!user || isPlaceholderUser(user)) throw refuse('You are not signed in to a real account.');
+      if (!user) throw refuse('You are not signed in to a real account.');
       const problem = validateProfile(form);
       if (problem) throw refuse(problem);
       const changes = profileChanges(before, form);
@@ -125,9 +124,7 @@ export function useSignOut() {
   const signOut = useCallback(async () => {
     const ok = await confirmAction({
       title: 'Sign out?',
-      message: __DEV__
-        ? 'You will need to sign in again. This also ends the UAT session the developer token came from, so that browser is signed out too.'
-        : 'You will need to sign in again.',
+      message: 'You will need to sign in again.',
       confirmLabel: 'Sign out',
       destructive: true,
     });
