@@ -15,6 +15,7 @@ export { useDiscardGuard } from './useDiscardGuard';
 export { useSingleFlight } from './useSingleFlight';
 export { useStableCallback } from './useStableCallback';
 export { reduceMotionEnabled, useReduceMotion } from './useReduceMotion';
+export { ACCESSIBILITY_TEXT_SCALE, isAccessibilityTextScale, useAccessibilityTextSize, useScaledIconSize } from './useTextSize';
 export { findCachedTicket } from './cache';
 
 // Phase 4 reads

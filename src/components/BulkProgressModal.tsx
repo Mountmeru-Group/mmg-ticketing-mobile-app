@@ -41,7 +41,7 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
             {outcomes.map((o) => {
               const style = OUTCOME_STYLE[o.state];
               return (
-                <View key={o.id} className="flex-row items-start border-b border-gray-100 py-2">
+                <View key={o.id} className="flex-row items-start border-b border-border py-2">
                   <Ionicons name={style.icon} size={18} color={style.color} />
                   <View className="ml-2 flex-1">
                     <Text className="text-sm text-gray-900">
@@ -58,14 +58,16 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
             {running ? (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={stopRequested ? 'Stopping' : 'Stop'}
+                accessibilityState={{ disabled: stopRequested }}
                 disabled={stopRequested}
                 onPress={onStop}
-                className={`h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''} active:bg-red-50`}
+                className={`min-h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''} active:bg-red-50`}
               >
                 <Text className="text-base font-semibold text-red-700">{stopRequested ? 'Stopping…' : 'Stop'}</Text>
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" onPress={onClose} className="h-12 items-center justify-center rounded-lg bg-primary active:opacity-80">
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} className="min-h-12 items-center justify-center rounded-lg bg-primary active:opacity-80">
                 <Text className="text-base font-semibold text-primary-foreground">Close</Text>
               </Pressable>
             )}

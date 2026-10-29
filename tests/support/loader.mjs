@@ -15,6 +15,7 @@ const ts = createRequire(path.join(REPO, 'package.json'))('typescript');
 const STUBS = {
   'expo-secure-store': 'expo-secure-store.mjs',
   'expo-auth-session': 'expo-auth-session.mjs',
+  'expo-haptics': 'expo-haptics.mjs',
   'react-native': 'react-native.mjs',
 };
 

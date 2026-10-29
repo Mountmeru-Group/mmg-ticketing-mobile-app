@@ -49,7 +49,13 @@ export function AnnouncementBanner({
     <View accessibilityRole="summary" className={`mx-4 mb-3 rounded-xl border p-4 ${s.banner}`}>
       <View className="flex-row items-start">
         <Ionicons name={s.icon} size={20} color={s.color} />
-        <Pressable accessibilityRole="button" accessibilityHint="Opens announcements" onPress={onOpen} className="ml-2 flex-1 active:opacity-70">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${announcement.title || 'Announcement'}. ${moreCount > 0 ? `See all announcements, ${moreCount} more` : 'Read more'}`}
+          accessibilityHint="Opens announcements"
+          onPress={onOpen}
+          className="ml-2 min-h-11 flex-1 active:opacity-70"
+        >
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={2}>
             {announcement.title || 'Announcement'}
           </Text>
@@ -66,8 +72,7 @@ export function AnnouncementBanner({
           accessibilityRole="button"
           accessibilityLabel="Dismiss announcement for this session"
           onPress={onDismiss}
-          hitSlop={6}
-          className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center rounded-full active:bg-black/5"
+          className="-mr-3 -mt-3 ml-1 h-11 w-11 items-center justify-center rounded-full active:bg-black/5"
         >
           <Ionicons name="close" size={18} color={palette.gray[600]} />
         </Pressable>
@@ -109,7 +114,12 @@ export const AnnouncementCard = memo(function AnnouncementCard({
       </Text>
       <HtmlText html={announcement.body} collapsedHeight={160} emptyText="No details" />
       {hiddenOnHome ? (
-        <Pressable accessibilityRole="button" onPress={() => onShowOnHome(announcement.id)} className="mt-1 min-h-11 justify-center self-start active:opacity-60">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Hidden from Home for this session. Show it again"
+          onPress={() => onShowOnHome(announcement.id)}
+          className="mt-1 min-h-11 justify-center self-start active:opacity-60"
+        >
           <Text className="text-sm font-medium text-blue-700">Hidden from Home for this session · Show it again</Text>
         </Pressable>
       ) : null}

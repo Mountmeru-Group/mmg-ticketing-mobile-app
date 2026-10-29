@@ -163,12 +163,11 @@ export function AttachmentPicker({ files, onChange, disabled = false }: Attachme
             <Text className="text-xs text-gray-500">{formatBytes(f.size)}</Text>
           </View>
           <Pressable
-            className="active:opacity-60"
+            className="-my-2 -mr-3 h-11 w-11 items-center justify-center active:opacity-60"
             accessibilityRole="button"
             accessibilityLabel={`Remove ${f.name}`}
             disabled={disabled}
             onPress={() => onChange(files.filter((x) => x.uri !== f.uri))}
-            hitSlop={12}
           >
             <Ionicons name="close-circle" size={20} color={colors.text.muted} />
           </Pressable>

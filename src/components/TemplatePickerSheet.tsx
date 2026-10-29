@@ -3,8 +3,7 @@
 // first opens, never with the composer. Picking a template writes nothing: the composer inserts it into its own text.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo, useMemo, useState } from 'react';
-import { Modal, Pressable, SectionList, Text, View, type SectionListData } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, SectionList, Text, View, type SectionListData } from 'react-native';
 
 import { useCannedResponses, useStableCallback } from '@/hooks';
 import { colors } from '@/theme';
@@ -13,6 +12,7 @@ import { filterTemplates, groupTemplates, templatePreview } from '@/utils/templa
 import { SearchField } from './Filters';
 import { LookupError } from './Form';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { PageSheet } from './PageSheet';
 
 interface TemplatePickerSheetProps {
   visible: boolean;
@@ -21,7 +21,6 @@ interface TemplatePickerSheetProps {
 }
 
 export function TemplatePickerSheet({ visible, onPick, onClose }: TemplatePickerSheetProps) {
-  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   // Only while the sheet is open; reopening it within 60 s uses the cached list.
   const templates = useCannedResponses({ enabled: visible });
@@ -39,14 +38,10 @@ export function TemplatePickerSheet({ visible, onPick, onClose }: TemplatePicker
     onPick(template);
   });
 
-  // Same sheet frame as OptionSheet and PersonPickerSheet: grab handle, title, search, then the list.
+  // Same sheet frame as OptionSheet and PersonPickerSheet (iOS-4: a native page sheet), then search and the list.
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <Pressable accessibilityLabel="Close" onPress={close} className="flex-1 bg-black/40" />
-      <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-2">
-        <View className="mb-1 h-1 w-10 self-center rounded-full bg-gray-300" />
-        <Text className="px-4 py-3 text-base font-semibold text-gray-900" accessibilityRole="header">Insert a template</Text>
-        <View className="mx-4 mb-2">
+    <PageSheet visible={visible} title="Insert a template" onClose={close}>
+        <View className="mx-4 mb-2 mt-3">
           <SearchField
             value={search}
             onChangeText={setSearch}
@@ -79,8 +74,7 @@ export function TemplatePickerSheet({ visible, onPick, onClose }: TemplatePicker
           renderSectionHeader={renderGroupHeader}
           renderItem={({ item }) => <TemplateRow template={item} onPick={pick} />}
         />
-      </View>
-    </Modal>
+    </PageSheet>
   );
 }
 
@@ -89,7 +83,7 @@ type TemplateSection = SectionListData<CannedResponse, { key: string }>;
 const templateKey = (t: CannedResponse) => t.id;
 
 const renderGroupHeader = ({ section }: { section: TemplateSection }) => (
-  <Text className="border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500" accessibilityRole="header">
+  <Text className="border-b border-border bg-gray-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500" accessibilityRole="header">
     {section.key}
   </Text>
 );
@@ -99,9 +93,10 @@ const TemplateRow = memo(function TemplateRow({ template: t, onPick }: { templat
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={t.title}
       accessibilityHint="Inserts this template into your message"
       onPress={() => onPick(t)}
-      className="min-h-12 flex-row items-center border-b border-gray-100 px-4 py-3 active:bg-gray-50"
+      className="min-h-12 flex-row items-center border-b border-border px-4 py-3 active:bg-gray-50"
     >
       <View className="flex-1">
         <Text className="text-base text-gray-900" numberOfLines={1}>{t.title}</Text>

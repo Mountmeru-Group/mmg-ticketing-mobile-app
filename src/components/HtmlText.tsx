@@ -8,18 +8,18 @@
 import { useRecyclingState } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { Component, memo, useMemo, type ComponentProps, type ReactNode } from 'react';
-import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import {
   IMGElementContainer, IMGElementContentError, IMGElementContentLoading, RenderHTMLConfigProvider, RenderHTMLSource,
-  TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts, useIMGElementProps, useIMGElementState,
+  TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts, useContentWidth, useIMGElementProps, useIMGElementState,
   type CustomBlockRenderer, type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
 } from 'react-native-render-html';
 
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
 import { useAuthStore } from '@/store/auth.store';
-import { colors, palette } from '@/theme';
+import { colors, palette, textStylePoints } from '@/theme';
 import { parseTicketLink } from '@/utils/deep-links';
-import { BLOCKED_TAGS, clearPreparedHtml, prepareHtmlBody } from '@/utils/html';
+import { BLOCKED_TAGS, clearPreparedHtml, prepareHtmlBody, tableColumnCount, tableLayoutWidth } from '@/utils/html';
 
 // Prepared bodies (utils/html.ts) and expo-image's caches (inline images, attachments opened in ImageViewerModal) are
 // ticket content: drop them when the session ends, as the query cache is dropped.
@@ -32,20 +32,22 @@ useAuthStore.subscribe((state, previous) => {
 
 // ── App-wide renderer setup (one engine shared by every snippet: RenderHTMLSource pattern) ──
 
-// `text-sm` body text (14/20 dp, colors.text.body), the same as every other paragraph in the app.
-const BASE_STYLE: MixedStyleDeclaration = { fontSize: 14, lineHeight: 20, color: colors.text.body };
+// `text-sm` body text (iOS-4: Subheadline, 15/20 pt, colors.text.body), the same as every other paragraph in the app.
+// The headings and code take the iOS text styles too (theme/typography.ts). React Native scales them all with the
+// person's text size.
+const BASE_STYLE: MixedStyleDeclaration = { fontSize: textStylePoints.subheadline, lineHeight: 20, color: colors.text.body };
 
 const TAGS_STYLES: MixedStyleRecord = {
   body: { margin: 0, padding: 0 },
   p: { marginTop: 0, marginBottom: 8 },
   a: { color: palette.blue[700], textDecorationLine: 'underline' },
-  h1: { fontSize: 18, marginTop: 4, marginBottom: 8 },
-  h2: { fontSize: 17, marginTop: 4, marginBottom: 8 },
+  h1: { fontSize: textStylePoints.title3, marginTop: 4, marginBottom: 8 },
+  h2: { fontSize: textStylePoints.body, marginTop: 4, marginBottom: 8 },
   h3: { fontSize: 16, marginTop: 4, marginBottom: 6 },
-  h4: { fontSize: 15, marginTop: 4, marginBottom: 6 },
+  h4: { fontSize: textStylePoints.subheadline, marginTop: 4, marginBottom: 6 },
   blockquote: { marginLeft: 0, marginRight: 0, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: palette.gray[300], color: palette.gray[600] },
-  pre: { fontSize: 12 },
-  code: { fontSize: 12 },
+  pre: { fontSize: textStylePoints.footnote },
+  code: { fontSize: textStylePoints.footnote },
   ul: { marginTop: 0, marginBottom: 8 },
   ol: { marginTop: 0, marginBottom: 8 },
 };
@@ -98,7 +100,24 @@ const ImgRenderer: CustomBlockRenderer = (props) => {
   );
 };
 
-const RENDERERS = { img: ImgRenderer };
+/**
+ * iOS-4: a table is laid out at its columns' minimum width (utils/html.ts tableLayoutWidth), growing with the text size,
+ * and scrolls sideways when that is wider than the body. Rows, cells and their text are the library's own rendering.
+ */
+const TableRenderer: CustomBlockRenderer = ({ TDefaultRenderer, tnode, ...props }) => {
+  const { fontScale } = useWindowDimensions();
+  const available = useContentWidth();
+  const width = tableLayoutWidth(tableColumnCount(tnode), fontScale, available);
+  const table = <TDefaultRenderer tnode={tnode} {...props} style={[props.style, { width }]} />;
+  if (width <= available) return table;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator accessibilityHint="Scroll sideways to see every column">
+      {table}
+    </ScrollView>
+  );
+};
+
+const RENDERERS = { img: ImgRenderer, table: TableRenderer };
 
 /**
  * Wrap the app once (App.tsx). Every TRenderEngineProvider option is passed explicitly: react-native-render-html
@@ -109,7 +128,7 @@ export function HtmlRenderProvider({ children }: { children: ReactNode }) {
   return (
     <TRenderEngineProvider
       htmlParserOptions={{ decodeEntities: true }}
-      emSize={14}
+      emSize={textStylePoints.subheadline}
       ignoredDomTags={[...BLOCKED_TAGS]}
       ignoredStyles={[]}
       allowedStyles={ALLOWED_STYLES}
@@ -224,7 +243,12 @@ function HtmlTextImpl({
         <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>{body}</View>
       </View>
       {collapsible ? (
-        <Pressable accessibilityRole="button" onPress={toggle} className="min-h-11 justify-center self-start active:opacity-60">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Show less' : 'Show more'}
+          onPress={toggle}
+          className="min-h-11 justify-center self-start active:opacity-60"
+        >
           <Text className="text-sm font-medium text-blue-700">{expanded ? 'Show less' : 'Show more'}</Text>
         </Pressable>
       ) : null}
