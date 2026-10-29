@@ -40,19 +40,21 @@ const targets = (transitions) => transitions.map((t) => t.target);
 
 describe('drawer and tab bar', () => {
   // G4: "Service Request" (the catalogue) for every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
-  const ALWAYS = ['tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
+  // 2026-10-29: Knowledge base and Announcements are ADMIN only (a product decision; tests/rbac/kb-announcements.test.mjs).
+  const ALWAYS = ['tasks', 'catalog', 'settings'];
   const WITH_APPROVALS = ['approvals', ...ALWAYS];
+  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
 
   forEachPersona(
     'drawer rows with no pending approvals',
-    { END_USER: ALWAYS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: ALWAYS, ADMIN: WITH_APPROVALS },
+    { END_USER: ALWAYS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: ALWAYS, ADMIN: ADMIN_ROWS },
     (p) => drawerItems(p.role, 0),
   );
 
   // 08 S1: END_USER and L2_MANAGER see Approvals only while APR-1 (scoped to them as approver) returns something.
   forEachPersona(
     'drawer rows with 2 pending approvals',
-    { END_USER: WITH_APPROVALS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: WITH_APPROVALS, ADMIN: WITH_APPROVALS },
+    { END_USER: WITH_APPROVALS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: WITH_APPROVALS, ADMIN: ADMIN_ROWS },
     (p) => drawerItems(p.role, 2),
   );
 

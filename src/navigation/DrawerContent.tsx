@@ -5,6 +5,8 @@
 //   sees an empty module they can't use. Badge = APR-1 count (one cached query, shared with Home and the inbox; it
 //   refreshes on pull-to-refresh and after a decision, never polled).
 // - Tasks: every role (END_USER read-only). The list is built from TKT-1 rows; see hooks/useTasks.ts (no A20 yet).
+// - Knowledge base, Announcements: ADMIN only (2026-10-29, a product decision; their routes are registered for ADMIN
+//   only too, AppDrawer.tsx).
 // - Service Request (Phase G4): every role, the service catalogue and My Requests (docs/G4-WEB-CATALOGUE.md).
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
 // - Layout follows the web sidebar (frontend/src/layouts/AppLayout.tsx), top to bottom:

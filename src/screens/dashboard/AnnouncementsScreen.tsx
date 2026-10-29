@@ -1,5 +1,5 @@
-// M16 Announcements (04 §2.1 M16; drawer item for every role, 08 S1). ANN-1, read-only — ADMIN management is out of
-// scope. The server's order is kept (pinned first, then type, then newest; 01 ANN-1). Bodies are server HTML and go
+// M16 Announcements (04 §2.1 M16). ADMIN only since 2026-10-29: the route is registered for ADMIN alone
+// (utils/permissions.ts canReadAnnouncements, drawerRoutes). ANN-1, read-only — ADMIN management is out of scope. The server's order is kept (pinned first, then type, then newest; 01 ANN-1). Bodies are server HTML and go
 // through the same safe renderer as ticket comments (HtmlText). Dismissing on Home hides one from the Home banner for
 // this session only; it stays listed here, with a way to show it on Home again.
 import { FlashList } from '@shopify/flash-list';

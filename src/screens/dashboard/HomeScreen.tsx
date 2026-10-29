@@ -5,13 +5,17 @@
 //   UI's triage AGENT only (05 §A.12) — plus shortcuts (My open, Due soon) and DSH-1 `recent`.
 // L2_MANAGER: the same tiles WITHOUT counts, and a TKT-1 recent list. DSH-1 is never called for L2: the server caches
 //   it per role for L2 (05 C.19), so its numbers can be another L2 manager's. Reasons and the KPI list: hooks/useHome.ts.
-// Every role: active-announcement banner (ANN-1, dismissible for this session), "Pending approvals" tile (APR-1;
-//   END_USER/L2 only while they have one, 08 S1). The Alerts badge (NTF-2) lives on the tab bar.
+// Every role: "Pending approvals" tile (APR-1; END_USER/L2 only while they have one, 08 S1). The Alerts badge (NTF-2)
+//   lives on the tab bar.
+// ADMIN only (2026-10-29): the active-announcement banner (ANN-1, dismissible for this session) and its "Read more".
+//   Other roles get no banner and no ANN-1 request, because the Announcements screen does not exist for them.
+// The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
 // A tile opens the Tickets tab with the matching filter (utils/ticket-filters.ts: the same status set as the KPI).
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useState, type ReactNode } from 'react';
+import { AppState, Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
@@ -24,8 +28,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
-import { formatDisplayName } from '@/utils/format';
-import { homeTiles, homeVariant, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
+import { greetingLine, greetingNow } from '@/utils/greeting';
+import { homeTiles, homeVariant, showAnnouncementBanner, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
 import { ROLE_LABELS } from '@/utils/roles';
 import type { TicketNamedFilter } from '@/utils/ticket-filters';
 
@@ -57,10 +61,25 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const isL2 = variant === 'l2';
   const dashboard = useDashboard(); // disabled for L2_MANAGER inside the hook
   const recent = useRecentTickets({ enabled: isEndUser || isL2 });
-  const announcements = useAnnouncements();
+  const showBanner = showAnnouncementBanner(role); // ADMIN only
+  const announcements = useAnnouncements(); // disabled inside the hook for every other role
   const approvals = usePendingApprovals();
   const pendingCount = approvals.data?.length ?? 0;
   const showApprovalsTile = showApprovalsShortcut(role, pendingCount); // 08 S1
+
+  // The time-of-day greeting: from the device clock on first render, again each time Home is focused, and again when
+  // the app comes back to the foreground on Home (an app left open overnight). Events only: no timer, no polling.
+  // The state is the greeting itself, so a check that finds the same band does not re-render.
+  const [greeting, setGreeting] = useState(() => greetingNow());
+  useFocusEffect(
+    useCallback(() => {
+      setGreeting(greetingNow());
+      const subscription = AppState.addEventListener('change', (next) => {
+        if (next === 'active') setGreeting(greetingNow());
+      });
+      return () => subscription.remove();
+    }, []),
+  );
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
@@ -70,7 +89,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
       await Promise.all([
         isL2 ? Promise.resolve() : dashboard.refetch(),
         isEndUser || isL2 ? recent.refetch() : Promise.resolve(),
-        announcements.refetch(),
+        // refetch() runs even on a disabled query, so ANN-1 is skipped here for every role but ADMIN.
+        showBanner ? announcements.refetch() : Promise.resolve(),
         approvals.refetch(),
         queryClient.invalidateQueries({ queryKey: queryKeys.notifications.count() }), // the Alerts badge
       ]);
@@ -91,12 +111,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const createTicket = () => navigation.navigate('TicketsTab', { screen: 'CreateTicket', initial: false });
   const openApprovals = () => navigation.navigate('Approvals', { screen: 'ApprovalsInbox', pop: true });
 
-  // ── Announcement banner: the first active one not dismissed this session (server order: pinned first) ──
-  const activeAnnouncements = announcements.data ?? [];
+  // ── Announcement banner (ADMIN): the first active one not dismissed this session (server order: pinned first) ──
+  const activeAnnouncements = showBanner ? (announcements.data ?? []) : [];
   const visibleAnnouncements = activeAnnouncements.filter((a) => !dismissed.includes(a.id));
   const banner = visibleAnnouncements[0];
-
-  const firstName = formatDisplayName(user?.displayName).split(/\s+/)[0] ?? '';
 
   // ── Tiles ──────────────────────────────────────────────────
   const kpis = dashboard.data?.kpis;
@@ -116,7 +134,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <View className="mx-4 mb-4">
-          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900">{firstName ? `Hello, ${firstName}` : 'Hello'}</Text>
+          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900">{greetingLine(greeting, user?.displayName)}</Text>
           <Text className="text-sm text-gray-500">{ROLE_LABELS[role]}</Text>
         </View>
 
