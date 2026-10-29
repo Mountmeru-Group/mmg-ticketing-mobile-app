@@ -12,6 +12,8 @@
 
 **Updated for Phase G5, 2026-10-22.** The create form's priority preview is built (CR8, new), and "My Requests" lists every request for staff, as on the web (SC7 is now a MATCH). The full role audit was re-run over every element G1–G4 added; it found two too-permissive cases, both fixed, and one latent one, hardened. §14 has the audit, the fixes and the answers to the brief's four questions. §0, §1.6, §1.9, §2, §6 and §7 are updated.
 
+**Updated 2026-10-29: Knowledge base and Announcements are ADMIN only (Ronit's decision).** A deliberate divergence from the web, where all four roles have both and they work. It is recorded under its own reason tag, *simplified*: a product decision to simplify the mobile app. It is not *defect avoided*: nothing fails or leaks on the web. Both elements are hidden **and** unreachable for END_USER, AGENT, triage AGENT and L2_MANAGER: the drawer does not register the routes for them. Rows N3, N4, K1 and AN1, the totals, §0, §3 and §8 item 5 are updated; §16 has every entry point found and the tests.
+
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
 **Sources**
@@ -40,9 +42,9 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **30** of the 95 rows in §2 (31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
-| More permissive than the web UI | **3**, all deliberate and documented (N1, N4, CR4). None exposes data or actions beyond what the server already scopes to the user. **G5 audit:** two too-permissive cases below the UI were fixed (§14.3); neither was reachable from a screen |
-| More restrictive than the web UI | **27**. Of these: **15** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **0** are undocumented. G5: SC7 (My Requests for staff) is now a MATCH, settled against the web's source (§14.2). G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
+| Elements whose role gating differs from the web portal | **31** of the 95 rows in §2 (30 before 2026-10-29; 31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
+| More permissive than the web UI | **2**, both deliberate and documented (N1, CR4). None exposes data or actions beyond what the server already scopes to the user. N4 was the third until 2026-10-29; it is now narrower. **G5 audit:** two too-permissive cases below the UI were fixed (§14.3); neither was reachable from a screen |
+| More restrictive than the web UI | **29**. Of these: **15** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **2** are *simplified* (2026-10-29): N3 Knowledge base and N4 Announcements, ADMIN only by Ronit's decision to simplify the app, although both work on the web for every role that has them (§16). **0** are undocumented. G5: SC7 (My Requests for staff) is now a MATCH, settled against the web's source (§14.2). G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
 | Attachments on private notes (check B) | **Real leak, Critical, backend-only fix.** The requester can list, view, download and zip files attached to a private note, and the header count includes them. The app cannot tell those files apart from others. It can only stop creating new ones (§5) |
 | Actions that 403 (check C) | **All hidden**, and assignment is also refused on the device (§6) |
@@ -196,10 +198,12 @@ Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.m
 **Reason tags**
 - *defect avoided:* the web element 403s, leaks or is mis-scoped, so mobile is correct.
 - *decision:* a documented product decision.
+- *simplified* (2026-10-29): Ronit's product decision to keep the mobile app simple, for an element that **works** on the web. Unlike *defect avoided*, mobile is not correcting anything; it is choosing to offer less.
 - *UNDOCUMENTED:* no recorded reason.
 
 **Role gating source.** All gating now comes from `src/utils/permissions.ts`, abbreviated **perm**. Its functions:
-- `drawerItems`, `mainTabs`
+- `drawerItems`, `drawerRoutes`, `mainTabs` (2026-10-29: `drawerRoutes` decides which drawer routes are registered at all)
+- `canUseKnowledgeBase`, `canReadAnnouncements`, `showAnnouncementBanner` (2026-10-29: ADMIN only)
 - `homeVariant`, `homeTiles`
 - `ticketDetailPermissions`, `composerPermissions`
 - `ticketFieldPermissions`, `fieldEditProblem` (G1: the M4 property editors and their write guard)
@@ -216,8 +220,8 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 |---|---|---|---|---|---|
 | N1 | Drawer · Approvals (badge) | ADMIN, AGENT always; END_USER and L2 while APR-1 ≥ 1 | ADMIN, AGENT; anyone by URL | **WIDER**, *decision* 08 S1. Not a security problem: APR-1 returns only approvals assigned to the caller, and the server lets any approver act | `src/navigation/DrawerContent.tsx:83` → perm `drawerItems` |
 | N2 | Drawer · Tasks | all (END_USER read-only) | – (no standalone page) | N/A (mobile module, D4) | same |
-| N3 | Drawer · Knowledge base | all | all | MATCH | same |
-| N4 | Drawer · Announcements | all | ADMIN, AGENT, L2 | **WIDER**, *decision* 08 S1. Not a security problem: the server filters by `targetRoles`, and END_USER is a target option on the web (`AnnouncementsPage.tsx:146-150`) | same |
+| N3 | Drawer · Knowledge base | ADMIN (2026-10-29; all before) | all | **NARROWER**, *simplified* (§16). The route is not registered for anyone else, so the screen is unreachable, not merely unlisted | perm `drawerItems`, `drawerRoutes`, `canUseKnowledgeBase`; `src/navigation/AppDrawer.tsx` |
+| N4 | Drawer · Announcements | ADMIN (2026-10-29; all before, which was **WIDER**, *decision* 08 S1) | ADMIN, AGENT, L2 | **NARROWER** for AGENT and L2, *simplified* (§16). MATCH for END_USER (neither side) and ADMIN. The route is not registered for anyone but ADMIN | perm `drawerItems`, `drawerRoutes`, `canReadAnnouncements`; `AppDrawer.tsx` |
 | N5 | Drawer · Settings | all | – (no web page) | N/A | same |
 | N6 | Sign out | all | all | MATCH | `DrawerContent.tsx` account card |
 | N7 | Locked-country chip | country AGENT | country AGENT (lock icon) | MATCH | `DrawerContent.tsx:59` |
@@ -319,9 +323,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | AP2 | Reject needs a comment | yes | yes | MATCH | `ApprovalDetailScreen.tsx:172` |
 | AP3 | "All approvals" (unscoped `GET /approvals`) | never called | ADMIN, AGENT tab | **NARROWER**, *defect avoided* (05 C.16) | `src/api/approvals.api.ts:3` |
 | AP4 | Ticket context on an approval | only on a 200 from TKT-3 | – | N/A (08 S8). See §8 item 8 | `ApprovalDetailScreen.tsx:190-250` |
-| K1 | KB: read, search, "Was this helpful?" (M14, M15) | all | all | MATCH | – |
+| K1 | KB: read, search, "Was this helpful?" (M14, M15) | ADMIN (2026-10-29; all before, a MATCH) | all | as N3 (*simplified*; not counted twice) | `src/screens/knowledge/*`, reachable only through the Knowledge route (`drawerRoutes`) |
 | K2 | KB: authoring and drafts | none | ADMIN, AGENT | N/A (skipped, 04 §2.3) | – |
-| AN1 | Announcements: read (M16, Home banner) | all | ADMIN, AGENT, L2 | as N4 | `src/screens/dashboard/AnnouncementsScreen.tsx` |
+| AN1 | Announcements: read (M16, Home banner) | ADMIN (2026-10-29; all before). Others: no screen, no banner, and ANN-1 is never requested | ADMIN, AGENT, L2 (no banner on the web) | as N4 | `src/screens/dashboard/AnnouncementsScreen.tsx`; banner perm `showAnnouncementBanner`; read `src/hooks/useAnnouncements.ts` (`canReadAnnouncements`) |
 | AN2 | Announcements: create, delete | none | ADMIN | N/A (skipped) | – |
 | DL1 | Ticket link → ticket (deep link) | all, server scope | all | MATCH | `src/screens/tickets/TicketLinkScreen.tsx` |
 
@@ -338,14 +342,16 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role; only one's own rows are links | none (rows are not links) | N/A (mobile addition, ➕). Never another person's answers, as on the web | `src/screens/catalog/ServiceRequestDetailScreen.tsx`, `ServiceCatalogScreen.tsx` `canOpen` → perm `isOwnServiceRequest` |
 | SC9 | Cancel, edit, comment on, assign or change the status of a request | none | none | MATCH (the server's routes are staff-only and no web page calls them) | – |
 
-**Totals** (after G5, 2026-10-22)
-- 95 rows (94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12).
-- **30 mismatches** (31 after G4, 28 after G3, 29 after G2, 28 after G1, 30 before it):
-  - 3 WIDER: N1, N4, CR4.
-  - 27 NARROWER:
+**Totals** (2026-10-29)
+- 95 rows (94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12). 2026-10-29 added no row.
+- **31 mismatches** (30 after G5, 31 after G4, 28 after G3, 29 after G2, 28 after G1, 30 before it):
+  - 2 WIDER: N1, CR4.
+  - 29 NARROWER:
     - **15 defect avoided:** H5, H6, L10, T5, T6, T7, T16, T17, T18, T26, T27, CR3, CR6, AP3, SC6.
     - **12 decisions:** H2, H4, L9, T3, T10, T11, T12, T15, T24, C2, CR5, SC3.
+    - **2 simplified (2026-10-29):** N3 (Knowledge base), N4 (Announcements). K1 and AN1 follow them and, as AN1 already did, are not counted a second time.
     - **0 UNDOCUMENTED** (before G1: T8, T9, T11, T12).
+- 2026-10-29: N3 went from MATCH to NARROWER (+1 mismatch). N4 went from WIDER to NARROWER (WIDER −1, NARROWER +1).
 - G5: CR8 is a new MATCH; SC7 moved from NARROWER (*defect avoided*) to MATCH.
 - G2: L10 went from N/A (not built) to built, MATCH for ADMIN and AGENT and NARROWER for END_USER and L2 (the web shows them an empty list). L12 is a new MATCH row.
 - G3: T22 (delete) from *decision* to MATCH; T26 (submit for approval) from *decision* to MATCH for ADMIN and AGENT and *defect avoided* for END_USER and L2; C4 (templates) from N/A to MATCH.
@@ -406,6 +412,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 - G4: the request properties (END_USER): not on the form, and a `priority` from END_USER is refused before sending. Another person's request (any role): its detail shows "Not one of your requests". G5: staff see it listed in My Requests, as on the web, but the row is not a link
 - G5: on the create form, the priority preview (L2, END_USER), group and technician (L2, END_USER), requester (L2, END_USER) and impact/urgency (END_USER): not rendered, from `createTicketPermissions()`; the API allow-list drops `teamId`, `assignedToId` and `requesterId` for L2 as well
 - 2026-10-27: "Change technician" (L2, END_USER): the Technician row shows the value, with no link and no reason (`ticketFieldPermissions().technician` is `view`); the row itself is never hidden
+- 2026-10-29: Knowledge base and Announcements (END_USER, AGENT, triage AGENT, L2): no drawer row and no Home banner, and **the routes are not registered** (`drawerRoutes`). Rule 1 applied at the navigator: there is no screen to reach, so no "Not available for your role" screen is needed
 
 **G2, state rather than role:** while "My open" or "Unassigned" is the quick filter, the Technician filter stays offered, and its hint says that picking a technician replaces that quick filter (one `assignedToId` on TKT-1, as on the web).
 
@@ -667,7 +674,7 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 | 2 | ~~Staff property editing on M4 was never built~~ **Built in G1** (T8, T9, T11, T12). ~~`UPDATE_KEYS_BY_ROLE.L2_MANAGER` allows `categoryId` and `teamId`~~ | ✅ **RESOLVED (G2, Ronit: match the web).** The L2 allow-list is now `title`, `description`, `impact`, `urgency`, `tags`, `resolution`: no `categoryId` (read-only for L2 on the web) and no `teamId` (the web changes the group through TKT-5, a 403 for L2). 01 TKT-4 matches. Tested at the API layer, under the write guard |
 | 3 | END_USER country selector: the app hides it (D8); 05 §A.12 says "shown read-only" | Keep it hidden: END_USER always sends `countryId=`, so a country label would be wrong. Update the 05 §A.12 text to match |
 | 4 | "Raise on behalf" (requester picker) for ADMIN and AGENT: not in the web UI, but in 01 TKT-2 and 04 M8. CLAUDE.md rule 6 says the UI offers only what the web offers | Keep it: it is the server's intended feature and SDP parity, and exposes nothing. Record the exception against rule 6 |
-| 5 | 08 S1 (Approvals for END_USER/L2 approvers, Announcements for END_USER) is implemented on its *proposed* default | Confirm S1 as decided |
+| 5 | 08 S1 (Approvals for END_USER/L2 approvers, Announcements for END_USER) is implemented on its *proposed* default | Confirm S1 as decided. **2026-10-29:** the Announcements half is superseded: announcements are ADMIN only (§16). The Approvals half is unchanged and still open |
 | 6 | Reply all and To/CC for END_USER: the web offers them, mobile does not (04 M5) | Keep: TKT-9 has no access check (C.1), and the server builds END_USER recipients |
 | 7 | Hide vs disable leftovers: Pick up / Assign for a locked AGENT, and Pick up on your own ticket, are hidden rather than disabled | Keep. The lock reason is on the same screen, and `OptionSheet` has no disabled state. Revisit if UAT finds it confusing |
 | 8 | Approval detail shows ticket context whenever TKT-3 returns 200. For AGENT that is always true, because TKT-3 is unscoped for AGENT (C.6) | Keep: the approver is designated for that ticket, and the 403 path takes over automatically once A7 scopes TKT-3 |
@@ -1024,3 +1031,113 @@ So the restriction was not justified, and it was removed:
 - The status flow: TKT-6 POST only; `PUT /tickets/:id` never carries a status.
 - The auth flow, `auth.config.ts`, the dev-token screen; navigation; no library; no EAS build; nothing committed.
 - The web repo: byte-for-byte unchanged (SHA-1 of all 840 files outside `node_modules` and `.git`, before and after).
+
+---
+
+## 16. Knowledge base and Announcements: ADMIN only (2026-10-29, uncommitted)
+
+### 16.1 The decision, and why it is its own category
+
+- **Ronit's decision:** remove the "Knowledge base" and "Announcements" drawer rows for every role except ADMIN.
+- **A deliberate divergence from the web.** On the web all four roles have Knowledge Base in the sidebar, and AGENT, L2_MANAGER and ADMIN have Announcements (§1.1, `AppLayout.tsx:21, :31`). Both work there.
+- **Not a §5 "safer" case.** Those exist because the web control errors, leaks or skips a rule. Nothing here fails on the web.
+- **Recorded as *simplified*:** a product decision to simplify the mobile app, the reason tag added in §2. In `WEB-VS-MOBILE-ROLES.md` it is the new status ✂ SIMPLIFIED, which counts against parity.
+
+### 16.2 Hidden AND unreachable
+
+- **One rule each,** in `src/utils/permissions.ts`:
+  - `canUseKnowledgeBase(role)` and `canReadAnnouncements(role)`: ADMIN only;
+  - `drawerItems` reads them for the rows;
+  - `drawerRoutes` reads them for the routes;
+  - `showAnnouncementBanner` reads `canReadAnnouncements` for the Home banner.
+- **The routes are not registered for anyone else.** `AppDrawer.tsx` registers exactly `drawerRoutes(role)`, as `MainTabs.tsx` registers `mainTabs(role)`.
+  - For END_USER, AGENT, triage AGENT and L2_MANAGER, the `Knowledge` and `Announcements` routes do not exist.
+  - React Navigation's drawer router returns "not handled" for any action that names them: navigate, navigate with a nested `screen`, jumpTo, push, replace, preload and reset. Neither the root stack nor any other navigator has those names, so the action is dropped.
+  - A saved or stale navigation state that names them is rehydrated without them.
+- **No new screen guard was needed.** There is no screen to reach.
+- **The role cannot change in a session.** It is set only at sign-in and on restore (`auth.store.ts`), so the registered routes cannot go stale.
+
+### 16.3 Every entry point found, and what was done
+
+| # | Entry point | Before | Now |
+|---|---|---|---|
+| E1 | Drawer row "Knowledge base" (`DrawerContent.tsx`) | every role | ADMIN only (`drawerItems`) |
+| E2 | Drawer row "Announcements" | every role | ADMIN only (`drawerItems`) |
+| E3 | The `Knowledge` drawer route (Knowledge stack: M14 list and search, M15 article, "Was this helpful?") | registered for every role | registered for ADMIN only (`drawerRoutes`) |
+| E4 | The `Announcements` drawer route (M16) | registered for every role | registered for ADMIN only (`drawerRoutes`) |
+| E5 | Home announcement banner, and its "Read more" / "See all announcements (n more)" link | every role | **removed for every role but ADMIN** (`showAnnouncementBanner`). See 16.4 |
+| E6 | The ANN-1 read behind the banner (`useAnnouncements`, mounted by Home for every role) | requested for every role | requested for ADMIN only. The hook's `enabled` reads `canReadAnnouncements`. Home's pull-to-refresh skips it too, because TanStack's `refetch()` runs even on a disabled query |
+| E7 | Article list → article (`KnowledgeBaseScreen` → `KbArticle`) | inside the Knowledge stack | unchanged; the stack exists for ADMIN only |
+| E8 | URL deep links (the app's schemes `mmgservicedesk`, `com.mountmeru.servicedesk`, `msauth`) | no `linking` config: the OS routes no URL to a screen (ask A18); the schemes serve sign-in | unchanged; tested so that a `linking` config cannot appear unnoticed |
+| E9 | A KB or announcement link tapped inside a description, reply, announcement or article (`HtmlText`) | not a ticket link, so it opens in the browser (the web portal), never an in-app screen | unchanged; tested with `/kb`, `/kb/articles/…`, `/knowledge-base/…`, `/announcements`, `/announcements/…` |
+| E10 | Notifications (Alerts) | open a ticket or an approval only | unchanged; no notification type opens KB or announcements |
+| E11 | Drawer back history (`backBehavior="fullHistory"`) | holds only visited routes | unchanged; an unregistered route is never visited, which is tested |
+| E12 | `navigationRef.openTicketLinkInApp` | opens the ticket-link resolver only | unchanged |
+
+Searched for: every `navigate(` and `screen:` naming `Knowledge`, `KnowledgeBase`, `KbArticle` or `Announcements` in `src/`; every use of `KnowledgeStack`, `AnnouncementsScreen` and the KB screens; every caller of the KB hooks, the KB API and ANN-1; any `linking`, `getInitialURL`, URL listener or `expo-linking` import. Only E1, E5 and E7 navigate to either module, and each one is behind the ADMIN rule.
+
+### 16.4 The Home banner: removed, not kept without a link
+
+- **Chosen:** for every role but ADMIN, Home shows no announcement banner, and ANN-1 is not requested.
+- **Not chosen:** keeping the banner with no "Read more".
+  - The banner shows a two-line preview of an announcement whose full text would then be on no screen.
+  - Its "Dismiss" hides it for the session, and the only "Show it again" is on the Announcements screen.
+  - A role that cannot open announcements would see some announcement content but not all of it. That contradicts the decision.
+- **Kept the banner with a dead "Read more":** rejected, as the brief says.
+- **ADMIN:** the banner, "Read more" and "Dismiss" are unchanged.
+
+### 16.5 What a non-ADMIN role loses, against the web
+
+| Role | On the web | On mobile now |
+|---|---|---|
+| END_USER | Knowledge Base: read, search, "Was this helpful?" | none of them (announcements: neither side; mobile's END_USER announcements and banner, ➕ until now, are gone) |
+| AGENT, triage AGENT | Knowledge Base as above; read announcements | none of them |
+| L2_MANAGER | Knowledge Base as above; read announcements | none of them |
+| ADMIN | all of it | all of it, unchanged |
+
+Authoring (KB articles, announcements) was already out of scope for every role (K2, AN2).
+
+### 16.6 Tests
+
+- **`tests/rbac/kb-announcements.test.mjs`, new, 56 tests.** For each of the five personas:
+  - the drawer rows with 0 and 3 pending approvals;
+  - `canUseKnowledgeBase` and `canReadAnnouncements`;
+  - the registered routes;
+  - every row a person sees opens a route registered for them.
+- **Unreachable, on React Navigation's own drawer router** (`@react-navigation/routers` 7.6.5, configured as `AppDrawer.tsx` is, with each role's routes). For every non-ADMIN persona and both routes:
+  - eight actions are each refused (navigate, navigate with `screen`, navigate with `pop`, jumpTo, push, replace, preload, reset);
+  - a stale state naming them is rehydrated without them;
+  - walking every route and back never puts them in the history.
+  - For ADMIN, the same actions open both routes.
+- **Entry points, from the source:**
+  - `AppDrawer.tsx` registers only `drawerRoutes(role)`, with no literal registration;
+  - only `ModuleStacks.tsx` registers the KB screens, and only `AppDrawer.tsx` uses `KnowledgeStack` and `AnnouncementsScreen`;
+  - exactly three files navigate to either module (E1, E5, E7);
+  - the banner, its one "Read more" and its refresh sit behind `showAnnouncementBanner`, and the hook behind `canReadAnnouncements`;
+  - the KB hooks and API are used only by the KB screens;
+  - there is no URL routing, and KB and announcement URLs are not in-app links.
+- **Changed, because of the decision:**
+  - `role-gating.test.mjs`, "drawer rows" (8 persona cases): END_USER and L2 lost `knowledge` and `announcements`; AGENT and triage AGENT likewise. Count unchanged, 129.
+  - `service-catalog.test.mjs`, "the drawer row catalog sits after Knowledge base" (4 cases): the index is now 1 for END_USER and L2 and 2 for AGENT, as Knowledge base is gone for them. ADMIN is unchanged.
+  - Its registration check read the literal `<Drawer.Screen name="Catalog" …/>`. Registration now goes through `drawerRoutes`, so the check reads the `Catalog: CatalogStack` table entry and that every persona's routes include `Catalog`. Count unchanged, 108.
+  - No permission was relaxed to make a test pass.
+- **Proof the tests bite:** `canUseKnowledgeBase` was widened to AGENT, tested and reverted. 20 tests failed, including all three reachability tests for AGENT and triage AGENT.
+
+### 16.7 What changed (uncommitted)
+
+**Created**
+- `tests/rbac/kb-announcements.test.mjs`.
+
+**Changed**
+- `src/utils/permissions.ts`: `canUseKnowledgeBase`, `canReadAnnouncements`, `drawerRoutes`, `showAnnouncementBanner` (new); `drawerItems` reads the first two.
+- `src/navigation/AppDrawer.tsx`: registers `drawerRoutes(role)` from a route → screen table. The navigator, its options, `backBehavior`, `screenLayout`, the screens and their order are unchanged.
+- `src/hooks/useAnnouncements.ts`: `enabled` is ADMIN only.
+- `src/screens/dashboard/HomeScreen.tsx`: the banner and its refresh read `showAnnouncementBanner`.
+- Comments: `DrawerContent.tsx`, `AnnouncementsScreen.tsx`, `KnowledgeBaseScreen.tsx`.
+- Tests: `role-gating.test.mjs`, `service-catalog.test.mjs` (16.6).
+- Docs: this file; `WEB-VS-MOBILE-ROLES.md` (the ✂ status, three rows, the parity drop, §5a); `docs/brand/UI-STANDARDS.md` (S12's drawer rows); `docs/UAT-TEST-PLAN.md` (what each role should see).
+
+**Not touched**
+- Every other row, route and permission; the KB and announcements screens themselves (ADMIN sees exactly what everyone saw before).
+- The auth flow, `auth.config.ts`, the dev-token screen; no library; no EAS build; nothing committed.
+- The web repo: not opened in this phase; `git status` clean at HEAD `d7f3887`.

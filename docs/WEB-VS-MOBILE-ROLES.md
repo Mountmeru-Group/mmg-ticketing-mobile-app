@@ -1,6 +1,12 @@
 # Web portal vs mobile app: who can do what
 
-**Final state, 2026-10-22 (Phases G1–G5).** G1 built ticket property editing (impact and urgency with the priority preview, category, country, resolution); G2 the list's priority, category, date, technician and group filters; G3 reply templates, deleting a file and submitting a ticket for approval; G4 the service catalogue; G5 the priority preview on the create form, settled My Requests against the web (staff see every request, as on the web), re-audited every G1–G4 element, and traced six workflows end to end. **No ❌ NOT BUILT row remains: every role is at 100% parity** (section 2). What mobile still does differently is deliberate and listed with its reason: section 5 (safer), section 6 (out of scope), section 8 (workflow steps).
+**2026-10-29: Knowledge base and Announcements are ADMIN only on mobile (Ronit's decision). Parity drops below 100 % for every role but ADMIN.**
+- **What changed:** END_USER, AGENT (plain and triage) and L2_MANAGER no longer have the Knowledge base (read, search, "Was this helpful?") or announcements (the screen and the Home banner). The rows are hidden **and** the screens are unreachable: the menu does not register them for those roles.
+- **This is a deliberate divergence, and a new kind.** On the web both work, for every role that has them. So this is not 🔒 SAFER, where mobile hides something that fails or leaks on the web. It is not ⊘ OUT OF SCOPE either, which this document reserves for desk work that does not fit a phone. It is a product decision to simplify the mobile app, with its own status, **✂ SIMPLIFIED** (section 1), and it **counts against parity**.
+- **The figures** (section 2): END_USER 94 %, AGENT 95 %, triage AGENT 95 %, L2_MANAGER 93 %, ADMIN 100 %. There is still no ❌ NOT BUILT row.
+- **Where:** three rows changed (section 3) and the Home banner row narrowed to ADMIN. Section 5a gives the reason. The evidence, every entry point and the tests are in `docs/ROLE-MATRIX.md` §16.
+
+**Final state, 2026-10-22 (Phases G1–G5).** G1 built ticket property editing (impact and urgency with the priority preview, category, country, resolution); G2 the list's priority, category, date, technician and group filters; G3 reply templates, deleting a file and submitting a ticket for approval; G4 the service catalogue; G5 the priority preview on the create form, settled My Requests against the web (staff see every request, as on the web), re-audited every G1–G4 element, and traced six workflows end to end. **No ❌ NOT BUILT row remains: every role was at 100% parity until 2026-10-29** (above; section 2). What mobile still does differently is deliberate and listed with its reason: section 5 (safer), section 6 (out of scope), section 8 (workflow steps).
 
 **2026-10-27: the technician can also be changed inline on the ticket** ("Change technician" in Properties, beside the impact/urgency, category and country editors). This is placement, not a new capability: the same roles and the same AGENT lock as "Assign…", through the same request. **No row was added and no figure in sections 2 and 3 changed.** See the assignment row in section 3.
 
@@ -8,7 +14,7 @@
 
 ## 1. How to read this
 
-This document compares, one capability per row, what the **web portal** lets each role do with what the **mobile app** lets the same role do, for five personas: END_USER, AGENT, triage AGENT, L2_MANAGER and ADMIN. Each row carries one of these five status codes:
+This document compares, one capability per row, what the **web portal** lets each role do with what the **mobile app** lets the same role do, for five personas: END_USER, AGENT, triage AGENT, L2_MANAGER and ADMIN. Each row carries one of these six status codes:
 
 | Status | Meaning |
 |---|---|
@@ -17,34 +23,43 @@ This document compares, one capability per row, what the **web portal** lets eac
 | ❌ NOT BUILT | The web allows it; mobile does not. A genuine gap |
 | ⊘ OUT OF SCOPE | Deliberately left out of mobile (reports, admin and similar) |
 | 🔒 SAFER | Mobile hides something that fails, returns an error or exposes data on the web |
+| ✂ SIMPLIFIED | (2026-10-29) Mobile leaves out, for some roles, something that **works** on the web, by a product decision to keep the app simple. Built, but not offered to those roles. **Counts against parity** (section 2), unlike ⊘ and 🔒 |
 
 ## 2. Summary by role
 
-| Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps |
-|---|---|---|---|---|
-| END_USER | 46 | 43 | 100% | none |
-| AGENT | 80 | 79 | 100% | none |
-| triage AGENT | 79 | 80 | 100% | none |
-| L2_MANAGER | 59 | 58 | 100% | none |
-| ADMIN | 82 | 80 | 100% | none |
+| Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps | Left out by decision (✂) |
+|---|---|---|---|---|---|
+| END_USER | 46 | 39 | **94%** (29 of 31) | none | 2: read and search the Knowledge base; "Was this helpful?" |
+| AGENT | 80 | 75 | **95%** (56 of 59) | none | 3: the two above; read announcements |
+| triage AGENT | 79 | 76 | **95%** (57 of 60) | none | 3: as AGENT |
+| L2_MANAGER | 59 | 54 | **93%** (39 of 42) | none | 3: as AGENT |
+| ADMIN | 82 | 80 | 100% (60 of 60) | none | none |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
-- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips on purpose (⊘ and 🔒) for that role. What remains is exactly the genuine gaps. If the deliberate exclusions are counted as misses too, the roles are at 67–76% (END_USER 67%, L2_MANAGER 71%, ADMIN 73%, AGENT 74%, triage AGENT 76%).
-- **Is anything still ❌ NOT BUILT? No.** G5 built the last row, "See the priority a new ticket will get, before saving" (gap 11). Every web capability is now on mobile, or left out on purpose with its reason in section 5 or 6.
+- **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips for that role as ⊘ OUT OF SCOPE or 🔒 SAFER.
+  - **✂ SIMPLIFIED rows stay in: they are misses on purpose, and the figure shows them.**
+  - What remains below 100 % is exactly the ✂ rows: no role has a ❌ gap.
+  - If the ⊘ and 🔒 exclusions are counted as misses too, the roles are at 63–73% (END_USER 63%, L2_MANAGER 66%, AGENT 70%, triage AGENT 72%, ADMIN 73%).
+- **Why parity dropped (2026-10-29):** Ronit decided that only ADMIN keeps the Knowledge base and announcements on mobile, to simplify the app (section 5a).
+  - Each role lost exactly the rows in the last column. END_USER also lost two ➕ rows, announcements and the Home banner, which were never on its web side, so they do not change its parity.
+  - ADMIN is unchanged.
+- **Is anything still ❌ NOT BUILT? No.** G5 built the last row, "See the priority a new ticket will get, before saving" (gap 11). Every web capability is now on mobile; left out on purpose with its reason in section 5 or 6; or, since 2026-10-29, ✂ left out by decision (section 5a).
+- **Before 2026-10-29** (after G5): END_USER 43 on mobile, AGENT 79, triage AGENT 80, L2_MANAGER 58, ADMIN 80, every role at 100% with no gap. With the exclusions counted as misses, 67–76%.
 - **Before G5** (after G4, 2026-10-22): END_USER 43 on mobile, 100%, no gap; AGENT 77, 98%, 1 gap; triage AGENT 78, 98%, 1; L2_MANAGER 57, 100%, none; ADMIN 78, 98%, 1. With the exclusions counted as misses, 67–73%. G5 moved two rows to ✅ SAME: the create form's priority preview (❌ → ✅, ADMIN and AGENT) and everyone's requests under My Requests (🔒 → ✅, ADMIN, AGENT and L2_MANAGER).
 - **Before G4** (after G3, 2026-10-22): END_USER 39 on mobile, 97%, 1 gap; AGENT 72, 96%, 2; triage AGENT 73, 96%, 2; L2_MANAGER 52, 97%, 1; ADMIN 73, 96%, 2. With the exclusions counted as misses, 64–72%. G4 replaced the one catalogue row (❌) with seven: four ✅ SAME, one ➕ MOBILE ONLY (a request's detail), one 🔒 SAFER (everyone's requests under My Requests) and one ⊘ OUT OF SCOPE (creating templates).
 - **Before G3** (after G2, 2026-10-22): END_USER 38 on mobile, 93%, 2 gaps; AGENT 69, 91%, 5; triage AGENT 70, 91%, 5; L2_MANAGER 50, 92%, 3; ADMIN 70, 91%, 5. With the exclusions counted as misses, 61–68%. G3 moved three rows to ✅ SAME: reply templates (every role), delete a file (ADMIN, AGENT, L2_MANAGER) and submit for approval (ADMIN, AGENT).
 - **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
-- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed. For 2026-10-29 it was rebuilt again, with ✂ SIMPLIFIED kept in the denominator. It was first run on the unchanged table, where it reproduced every published figure: 112 rows; 50, 22, 0, 23, 17; each role's counts; 100%; and 67–76%. Only then were the four rows changed.
 
 ## 3. Main table: 112 capabilities
 
-| ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
-|---|---|---|---|---|---|
-| 50 | 22 | 0 | 23 | 17 | **112** |
+| ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | ✂ SIMPLIFIED | Total |
+|---|---|---|---|---|---|---|
+| 48 | 21 | 0 | 23 | 17 | 3 | **112** |
 
+Before 2026-10-29: 50 SAME, 22 MOBILE ONLY, 0 NOT BUILT, 23 OUT OF SCOPE, 17 SAFER. Two Knowledge Base rows moved from ✅ to ✂ (read and search; "Was this helpful?"). "Read announcements" moved from ➕ to ✂. The Home banner stays ➕, for ADMIN only.
 Before G5: 48 SAME, 22 MOBILE ONLY, 1 NOT BUILT, 23 OUT OF SCOPE, 18 SAFER. G5 moved the create form's priority preview from ❌ to ✅ and everyone's requests under My Requests from 🔒 to ✅.
 Before G4: 44 SAME, 21 MOBILE ONLY, 2 NOT BUILT, 22 OUT OF SCOPE, 17 SAFER, 106 rows. G4 replaced the catalogue row with the seven rows of "Service catalogue".
 Before G3: 41 SAME, 5 NOT BUILT. G3 moved reply templates, delete a file and submit for approval to ✅ SAME.
@@ -178,16 +193,16 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 |---|---|---|---|---|
 | Alerts: list, mark read, mark all read, open the ticket | All roles | All roles | ✅ SAME | |
 | Unread alerts badge | Nobody | All roles | ➕ MOBILE ONLY | |
-| Read announcements | ADMIN, AGENT, L2_MANAGER | All roles | ➕ MOBILE ONLY | The server sends each role only the announcements meant for it. Awaiting Ronit's confirmation. |
-| Announcement banner on the Home screen | Nobody | All roles | ➕ MOBILE ONLY | |
+| Read announcements | ADMIN, AGENT, L2_MANAGER | ADMIN | ✂ SIMPLIFIED | **ADMIN only since 2026-10-29** (Ronit's decision; section 5a). AGENT and L2_MANAGER read them on the web, not on mobile. ADMIN: as before, the same on both. END_USER, who had them on mobile only (➕ until 2026-10-29), now has them on neither. For the other roles the screen is unreachable, not just unlisted, and the app never asks the server for announcements. |
+| Announcement banner on the Home screen | Nobody | ADMIN | ➕ MOBILE ONLY | ADMIN only since 2026-10-29 (every role before). Other roles get no banner at all, rather than a banner whose "Read more" opens nothing. |
 | Create or delete announcements | ADMIN | Nobody | ⊘ OUT OF SCOPE | |
 
 ### Knowledge Base
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
-| Browse, search and read articles | All roles | All roles | ✅ SAME | |
-| Vote "Was this helpful?" | All roles | All roles | ✅ SAME | |
+| Browse, search and read articles | All roles | ADMIN | ✂ SIMPLIFIED | **ADMIN only since 2026-10-29** (Ronit's decision; section 5a). Every other role has it on the web, not on mobile; for them the screen is unreachable, not just unlisted. ADMIN: the same on both, unchanged. |
+| Vote "Was this helpful?" | All roles | ADMIN | ✂ SIMPLIFIED | As above: it is on the article screen. |
 | Write, edit or delete articles; see drafts | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
 
 ### Profile
@@ -202,7 +217,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
-| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts; Knowledge and the catalogue ("Service Request", G4) are in the drawer. |
+| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts; the catalogue ("Service Request", G4) is in the drawer, and so is Knowledge for ADMIN (ADMIN only since 2026-10-29; counted in its own rows). |
 | Main menu | All roles | All roles | ✅ SAME | Its items differ by role; each one is compared in its own row. |
 | Country lock label in the menu | plain AGENT | plain AGENT | ✅ SAME | |
 | Open a ticket from an email link | All roles | All roles | ✅ SAME | |
@@ -212,7 +227,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
-| Self-service portal (raise a ticket, recent tickets, search help) | All roles | All roles | ✅ SAME | On mobile it is the requester's Home screen and the Knowledge base. |
+| Self-service portal (raise a ticket, recent tickets, search help) | All roles | All roles | ✅ SAME | On mobile it is the requester's Home screen and the Knowledge base. **Since 2026-10-29 the "search help" part (the Knowledge base) is ADMIN only.** That loss is counted once, in the Knowledge Base rows (✂), not again here. |
 | Raise a ticket from the Home screen | All roles | All roles | ✅ SAME | |
 | Requester's open and resolved counts | END_USER | END_USER | ✅ SAME | |
 | Requester's other counts (total, in progress, SLA breached) | END_USER | Nobody | ⊘ OUT OF SCOPE | |
@@ -341,6 +356,24 @@ Three ✅ SAME rows also contain web controls that always fail, or do nothing, w
 - **Filter by technician or group:** the web shows END_USER and L2_MANAGER these lists, always empty (403).
 - **Submit a ticket for approval (G3):** the web's Actions menu offers it to END_USER and L2_MANAGER, and the Approvals tab offers it to L2_MANAGER. The server always answers 403. Mobile offers it to ADMIN and AGENT only and refuses it on the device for anyone else.
 - **Request a service through its form (G4):** the web's form also shows a subject, a description, a category cascade, a group, a technician, assets and a site, for staff a request type, status, mode, level and impact details, and an attachment box. The server keeps none of them: it stores only the service, the priority, the custom fields and the notes (05 §B.24). Some are not even sent, the group list is a 403 for L2_MANAGER, and the files are never uploaded. Mobile shows only what is kept. Sources: `docs/G4-WEB-CATALOGUE.md` §3.
+
+## 5a. Left out by decision (✂ SIMPLIFIED), not safer (2026-10-29)
+
+**Knowledge base and announcements: ADMIN only.** Ronit's explicit decision: remove the "Knowledge base" and "Announcements" drawer rows for every role except ADMIN.
+
+- **Why this is not in section 5.** Section 5's entries exist because the web control returns a 403, leaks data, relies on a backend gap or skips a rule. None of that applies here:
+  - On the web every role reads, searches and votes on KB articles.
+  - AGENT, L2_MANAGER and ADMIN read announcements.
+  - Both work.
+  - Mobile is not avoiding a defect. It is choosing to offer less, to keep the phone app simple.
+- **Why this is not in section 6.** ⊘ OUT OF SCOPE in this document means desk work that does not fit a phone (reports, wide tables, administration), and it is left out of the parity figure. These rows are reading features that were built, worked on mobile, and still work for ADMIN. Leaving them out of the figure would hide the decision, so ✂ rows count as misses.
+- **What it costs each role:** section 2's last column. END_USER: 2 web capabilities. AGENT, triage AGENT and L2_MANAGER: 3 each. ADMIN: none.
+  - The "search help" part of the self-service portal row is the same Knowledge base. It is noted there and counted once.
+- **How it is enforced:**
+  - The rows are hidden and the screens cannot be reached: the app's menu does not register the two routes for those roles, so no link, banner, back step or saved state can open them.
+  - The Home banner is gone for those roles too, and the app no longer asks the server for announcements for them. A banner whose "Read more" opened nothing would be worse than either keeping or removing the screen.
+  - One rule each in `src/utils/permissions.ts` (`canUseKnowledgeBase`, `canReadAnnouncements`), pinned for all five personas by `tests/rbac/kb-announcements.test.mjs`. Every entry point is in `docs/ROLE-MATRIX.md` §16.
+- **To undo it,** for one role or all: change those two functions. The screens, hooks and API calls are unchanged and are still used by ADMIN.
 
 ## 6. Out of scope by design
 

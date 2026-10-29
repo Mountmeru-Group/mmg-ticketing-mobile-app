@@ -6,7 +6,8 @@ the one standard chosen for each finding (§2), the contrast report (§3) and th
 defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match. On
 2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4. Phase A1 (2026-10-23) added
 motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
-property-editor pattern on the ticket, now that the technician has one too.
+property-editor pattern on the ticket, now that the technician has one too. §9 (2026-10-29) sets the rule for the
+time-of-day greeting on Home.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -59,7 +60,7 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
   - **No percentage widths in a wrapping row** (`w-[48%]` + `flex-wrap`) for a grid, anywhere. On a device the tiles came out as wide as their content (§5).
 
 **S3 Typography and avatars.**
-- Screen title: `text-lg font-semibold`. Home greeting: `text-xl font-bold`.
+- Screen title: `text-lg font-semibold`. Home greeting: `text-xl font-bold`. Its text is "Good morning, Ronit" (since 2026-10-29; "Hello, Ronit" before). §9 has the rule.
 - Record title: `text-lg font-bold`. Card/list title: `text-base font-semibold`. Row title: `text-sm font-semibold`.
 - Section caption: `text-xs font-semibold uppercase tracking-wide text-gray-500`. Sub-label: `text-xs font-semibold text-gray-500`.
 - Body `text-sm`, meta `text-xs`, IDs `text-xs font-semibold text-gray-500`.
@@ -134,7 +135,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 - Header left button: ☰ only on the three tab roots (Home, Tickets, Alerts). Every other screen, including the first screen of each drawer module, has the back arrow (44 dp button, 24 dp icon), which does exactly what Android back does. Sheets have ✕.
 - Drawer, top to bottom, as in the web sidebar:
   - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
-  - Nav rows (Approvals when shown, Tasks, Knowledge base, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls.
+  - Nav rows (Approvals when shown, Tasks, Knowledge base, Service Request, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), so other roles have four rows at most.
   - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
     - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
     - a gray-100 line;
@@ -410,3 +411,22 @@ the same pieces and adds no new styles.
   - Success: a toast, the editor closes and the row shows the server's value.
   - Failure: the server's message (a 403 says the role can't change that field), the editor closes and the row shows
     the saved value. Nothing is optimistic.
+
+## 9. Time-of-day text: the Home greeting (2026-10-29)
+
+Home's first line greets by the time of day: "Good morning, Ronit". Same place, same `text-xl font-bold
+text-gray-900` header as the "Hello, Ronit" it replaces (S3), with the role under it as before.
+
+- **Three greetings only,** from `src/utils/greeting.ts`: "Good morning" 05:00–11:59, "Good afternoon" 12:00–16:59,
+  "Good evening" 17:00–04:59. The small hours stay "evening", because there is no fourth greeting and "Good morning" at
+  2 a.m. reads as wrong to someone still on a late shift.
+- **Format:** the greeting, a comma, then the first word of the display name. With no name, the greeting alone ("Good
+  evening"). An e-mail-style display name gives the same first name the drawer shows.
+- **Clock:** the phone's local time. No server time, and not the timezone in the person's profile: the phone's clock is
+  what they see beside the app.
+- **When it is recomputed, and the pattern for any later time-dependent text:**
+  - read the clock on first render, when the screen gains focus, and when the app returns to the foreground on that
+    screen (`AppState` → `active`), so an app left open overnight shows the right greeting when it is picked up;
+  - never on a timer or by polling: a screen nobody is looking at does no work;
+  - keep the derived value (the greeting), not the time, in state, so a check that finds the same band does not
+    re-render the screen.

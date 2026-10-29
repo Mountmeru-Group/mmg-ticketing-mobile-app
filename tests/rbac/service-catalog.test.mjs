@@ -25,7 +25,8 @@ import {
 } from '../../src/api/serviceCatalog.api.ts';
 import { assertServiceRequest, wasRefusedOnDevice } from '../../src/hooks/writeGuards.ts';
 import {
-  canUseServiceCatalog, drawerItems, isOwnServiceRequest, myServiceRequestRows, serviceCatalogPermissions, serviceRequestProblem,
+  canUseServiceCatalog, drawerItems, drawerRoutes, isOwnServiceRequest, myServiceRequestRows, serviceCatalogPermissions,
+  serviceRequestProblem,
 } from '../../src/utils/permissions.ts';
 import {
   DATE_FORMAT_MESSAGE, EMAIL_FORMAT_MESSAGE, NUMBER_FORMAT_MESSAGE, OPTION_MESSAGE,
@@ -107,9 +108,10 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
     (p) => serviceCatalogPermissions(p),
   );
 
+  // 2026-10-29: Knowledge base is ADMIN only, so for every other role the row follows Tasks directly.
   forEachPersona(
-    'the drawer row "catalog" sits after Knowledge base (web sidebar order)',
-    { END_USER: 2, AGENT: 3, TRIAGE_AGENT: 3, L2_MANAGER: 2, ADMIN: 3 },
+    'the drawer row "catalog" sits after Knowledge base (web sidebar order; ADMIN only has Knowledge base)',
+    { END_USER: 1, AGENT: 2, TRIAGE_AGENT: 2, L2_MANAGER: 1, ADMIN: 3 },
     (p) => drawerItems(p.role, 0).indexOf('catalog'),
   );
 
@@ -125,7 +127,10 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
   test('the drawer row is labelled as the web sidebar ("Service Request") and opens the catalogue stack', () => {
     assert.match(read('src/navigation/DrawerContent.tsx'), /catalog: \{ label: 'Service Request', icon: '[\w-]+', route: 'Catalog' \}/);
     assert.match(read('src/navigation/DrawerContent.tsx'), /navigate\('Catalog', \{ screen: 'ServiceCatalog', pop: true \}\)/);
-    assert.match(read('src/navigation/AppDrawer.tsx'), /<Drawer\.Screen name="Catalog" component=\{CatalogStack\} \/>/);
+    // 2026-10-29: the drawer registers its routes from drawerRoutes() (as MainTabs does from mainTabs()), so the Catalog
+    // screen is a table entry; Catalog is registered for every role.
+    assert.match(read('src/navigation/AppDrawer.tsx'), /\n {2}Catalog: CatalogStack,\n/);
+    for (const p of Object.values(PERSONAS)) assert.ok(drawerRoutes(p.role).includes('Catalog'), p.role);
     const stacks = read('src/navigation/ModuleStacks.tsx');
     for (const screen of ['ServiceCatalog', 'ServiceRequestForm', 'ServiceRequestDetail']) {
       assert.match(stacks, new RegExp(`<Catalog\\.Screen name="${screen}"`));
