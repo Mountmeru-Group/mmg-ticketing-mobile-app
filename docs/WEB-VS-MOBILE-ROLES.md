@@ -1,5 +1,18 @@
 # Web portal vs mobile app: who can do what
 
+**iOS (Phase iOS-5, 2026-10-29): an iOS column on all 112 rows of section 3; summary in section 9.**
+- **The columns.** "MOBILE: who can" and "Status" are still the **Android** app at the port source `c84d53a`. Those columns, and sections 2 and 4–8, are unchanged. The new last column is the **iOS** app on `ios-dev` at `a12a5be`.
+- **The iOS cell.** Each one gives:
+  - the iOS status (same codes as section 1);
+  - **= Android** or **≠ Android** with the reason; "(interface)" marks a difference in the controls only;
+  - the evidence, as `file:line` under `src/`.
+
+  Where iOS's "who can" differs from Android's, the cell says so.
+- **Result.**
+  - **0 ❌ NOT BUILT**, and every role at 100% parity on iOS.
+  - **iOS = Android on 110 of 112 rows.** One row is deliberately SAFER on iOS (files on a private note). On one row the Android documentation is wrong, and iOS matches Android's code (theme).
+  - Section 9 has the figures and the differences.
+
 **Final state, 2026-10-22 (Phases G1–G5).** G1 built ticket property editing (impact and urgency with the priority preview, category, country, resolution); G2 the list's priority, category, date, technician and group filters; G3 reply templates, deleting a file and submitting a ticket for approval; G4 the service catalogue; G5 the priority preview on the create form, settled My Requests against the web (staff see every request, as on the web), re-audited every G1–G4 element, and traced six workflows end to end. **No ❌ NOT BUILT row remains: every role is at 100% parity** (section 2). What mobile still does differently is deliberate and listed with its reason: section 5 (safer), section 6 (out of scope), section 8 (workflow steps).
 
 **2026-10-27: the technician can also be changed inline on the ticket** ("Change technician" in Properties, beside the impact/urgency, category and country editors). This is placement, not a new capability: the same roles and the same AGENT lock as "Assign…", through the same request. **No row was added and no figure in sections 2 and 3 changed.** See the assignment row in section 3.
@@ -62,190 +75,190 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 **The ticket list**
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| See your ticket list | All roles | All roles | ✅ SAME | Requesters see their own tickets; staff see their queue. The server decides. |
-| Search and sort the list | All roles | All roles | ✅ SAME | Mobile has three sort orders: last updated, priority, due date. |
-| Filter by status | All roles | All roles | ✅ SAME | A drop-down on the web; named filters (Open, Pending, Resolved, Closed) on mobile. |
-| Quick filters "My open", "Overdue", "Due soon" | Nobody | All roles | ➕ MOBILE ONLY | |
-| Filter to unassigned tickets | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | A plain AGENT sees the unassigned tickets in their own groups. |
-| Filter by technician or group | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In the Filters sheet. The web shows END_USER and L2_MANAGER these two lists, always empty; mobile leaves them out. Technicians are found by name (the web lists its first 100). Built in G2. |
-| Filter by priority, category or date | All roles | All roles | ✅ SAME | In the Filters sheet, combined with the quick filters, search and sort. As on the web, the category filter lists top-level categories and skips tickets filed under their sub-categories, and the date is the day the ticket was created. Built in G2. |
-| Export the list to a spreadsheet | All roles | Nobody | ⊘ OUT OF SCOPE | |
-| Saved views | All roles | Nobody | ⊘ OUT OF SCOPE | |
-| Switch the country filter (any country or "All") | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | L2_MANAGER has no country filter on either. |
-| Country filter fixed to your own country | plain AGENT | plain AGENT | ✅ SAME | Shown with a lock. |
-| See your country filter, read-only | END_USER | Nobody | ⊘ OUT OF SCOPE | Mobile always shows a requester all of their own tickets. |
-| Change status from the ticket list | Nobody | ADMIN, AGENT (lock), L2_MANAGER | ➕ MOBILE ONLY | Same rules as on the ticket itself. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| See your ticket list | All roles | All roles | ✅ SAME | Requesters see their own tickets; staff see their queue. The server decides. | ✅ SAME · = Android · `screens/tickets/TicketListScreen.tsx:137` (TKT-1; the server scopes it) |
+| Search and sort the list | All roles | All roles | ✅ SAME | Mobile has three sort orders: last updated, priority, due date. | ✅ SAME · = Android; the search is in the navigation bar (interface) · `screens/tickets/TicketListScreen.tsx:192`; sort `:91-95` |
+| Filter by status | All roles | All roles | ✅ SAME | A drop-down on the web; named filters (Open, Pending, Resolved, Closed) on mobile. | ✅ SAME · = Android · `utils/ticket-filters.ts:89-92`; chips `screens/tickets/TicketListScreen.tsx:423` |
+| Quick filters "My open", "Overdue", "Due soon" | Nobody | All roles | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `utils/ticket-filters.ts:90`; `screens/tickets/TicketListScreen.tsx:423` |
+| Filter to unassigned tickets | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | A plain AGENT sees the unassigned tickets in their own groups. | ➕ MOBILE ONLY · = Android · `utils/ticket-filters.ts:91` (ADMIN, AGENT) |
+| Filter by technician or group | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In the Filters sheet. The web shows END_USER and L2_MANAGER these two lists, always empty; mobile leaves them out. Technicians are found by name (the web lists its first 100). Built in G2. | ✅ SAME · = Android · `utils/permissions.ts:479-484`; `screens/tickets/TicketFiltersScreen.tsx:58, :158, :172` |
+| Filter by priority, category or date | All roles | All roles | ✅ SAME | In the Filters sheet, combined with the quick filters, search and sort. As on the web, the category filter lists top-level categories and skips tickets filed under their sub-categories, and the date is the day the ticket was created. Built in G2. | ✅ SAME · = Android; dates in the iOS calendar sheet (interface) · `screens/tickets/TicketFiltersScreen.tsx:118, :127, :137, :250` |
+| Export the list to a spreadsheet | All roles | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no export call in `api/tickets.api.ts` |
+| Saved views | All roles | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Switch the country filter (any country or "All") | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | L2_MANAGER has no country filter on either. | ✅ SAME · = Android · `utils/ticket-filters.ts:373-377`; `screens/tickets/TicketListScreen.tsx:130, :438-442` |
+| Country filter fixed to your own country | plain AGENT | plain AGENT | ✅ SAME | Shown with a lock. | ✅ SAME · = Android · `screens/tickets/TicketListScreen.tsx:451-457` (lock icon) |
+| See your country filter, read-only | END_USER | Nobody | ⊘ OUT OF SCOPE | Mobile always shows a requester all of their own tickets. | ⊘ OUT OF SCOPE · = Android · `utils/ticket-filters.ts:376` (hidden for END_USER) |
+| Change status from the ticket list | Nobody | ADMIN, AGENT (lock), L2_MANAGER | ➕ MOBILE ONLY | Same rules as on the ticket itself. | ➕ MOBILE ONLY · = Android; the chip opens an action sheet (interface) · `screens/tickets/TicketListScreen.tsx:289-306`; `utils/permissions.ts:487-489` |
 
 **Raising a ticket**
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Create a ticket (title, description, category, files) | All roles | All roles | ✅ SAME | |
-| Set impact and urgency when creating | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | |
-| See the priority a new ticket will get, before saving | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | Recomputed whenever impact or urgency changes, from the priority matrix, as on the web: "Auto-computed from Impact × Urgency", or "Set Impact and Urgency above to compute priority". Nobody picks the priority by hand on either side. It is the box from the ticket's impact/urgency editor (G1), reused. L2_MANAGER's web box never computes (the matrix is a 403 for L2); mobile tells L2 the Service Desk sets it. Built in G5. |
-| Choose the group and technician when creating | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | 🔒 SAFER | On the web L2_MANAGER's lists come back empty. |
-| Raise a ticket on someone else's behalf | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | The server supports it; the web form never offers it. Awaiting Ronit's confirmation. |
-| Set mode, level and source when creating | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
-| AI assistant while creating | All roles | Nobody | 🔒 SAFER | |
-| Tell a requester how their ticket will be routed | END_USER | END_USER | ✅ SAME | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Create a ticket (title, description, category, files) | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; a page sheet over the tabs (interface) · `screens/tickets/CreateTicketScreen.tsx:132, :294`; `navigation/routes.ts:41-49` |
+| Set impact and urgency when creating | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | | ✅ SAME · = Android; action sheets (interface) · `screens/tickets/CreateTicketScreen.tsx:256-259`; `utils/permissions.ts:515` |
+| See the priority a new ticket will get, before saving | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | Recomputed whenever impact or urgency changes, from the priority matrix, as on the web: "Auto-computed from Impact × Urgency", or "Set Impact and Urgency above to compute priority". Nobody picks the priority by hand on either side. It is the box from the ticket's impact/urgency editor (G1), reused. L2_MANAGER's web box never computes (the matrix is a 403 for L2); mobile tells L2 the Service Desk sets it. Built in G5. | ✅ SAME · = Android · `screens/tickets/CreateTicketScreen.tsx:260`; `utils/permissions.ts:516` |
+| Choose the group and technician when creating | ADMIN, AGENT (L2_MANAGER: error) | ADMIN, AGENT | 🔒 SAFER | On the web L2_MANAGER's lists come back empty. | 🔒 SAFER · = Android · `screens/tickets/CreateTicketScreen.tsx:264-280`; `utils/permissions.ts:517` |
+| Raise a ticket on someone else's behalf | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | The server supports it; the web form never offers it. Awaiting Ronit's confirmation. | ➕ MOBILE ONLY · = Android · `screens/tickets/CreateTicketScreen.tsx:151, :281`; `utils/permissions.ts:518` |
+| Set mode, level and source when creating | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · `hooks/useCreateTicket.ts:65` (`source: 'API'`); no mode or level key in `api/tickets.api.ts:64` |
+| AI assistant while creating | All roles | Nobody | 🔒 SAFER | | 🔒 SAFER · = Android · no AI call in `api/` |
+| Tell a requester how their ticket will be routed | END_USER | END_USER | ✅ SAME | | ✅ SAME · = Android · `screens/tickets/CreateTicketScreen.tsx:251-252`; `utils/permissions.ts:519` |
 
 **Working on a ticket**
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Open a ticket and read it | All roles | All roles | ✅ SAME | Description, properties, requester, history. |
-| Change status with the allowed buttons | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Same transition rules on both. |
-| Change status to any status from a drop-down | ADMIN, AGENT (lock), L2_MANAGER | Nobody | 🔒 SAFER | Skips the transition rules. |
-| Resolve, close or cancel, with the closure form | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Resolution and closure comments are required on both. |
-| Pick up a ticket (assign it to yourself) | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | Mobile also hides it when the ticket is already yours. |
-| Assign, reassign or unassign a technician | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | Two places since 2026-10-27: "Assign…" in More options, and **also inline**: "Change technician" on the Technician row in Properties, with Save and Cancel like the other property editors (the web has its own panel there too). **This is placement, not capability: the parity figures do not change.** The same roles, the same AGENT lock, the same list of technicians and the same request (POST /tickets/:id/assign). L2_MANAGER and END_USER see the technician with no link. Details: `ROLE-MATRIX.md` §15. |
-| Move a ticket to another group | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | |
-| Change category | ADMIN, AGENT (lock) | ADMIN, AGENT (lock) | ✅ SAME | Three levels; changing a level clears the ones below. L2_MANAGER sees it read-only on both. The server may re-route the ticket, and mobile says so. Built in G1. |
-| Change impact and urgency | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Together they set the priority and the SLA deadline. Mobile shows ADMIN and AGENT the resulting priority before Save; the web saves on selection, then shows it. Since G2, ADMIN and AGENT send that priority with the change, as the web does, so the requester and the technician get the "priority changed" email. Built in G1. |
-| See impact and urgency | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | Requesters see them read-only on the web. |
-| Change the ticket's country: ADMIN, triage AGENT | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | In any status, as on the web. On the web L2_MANAGER gets a success message, but nothing is saved; mobile shows L2_MANAGER the value only. Built in G1. |
-| Change the ticket's country: plain AGENT | plain AGENT | Nobody | ⊘ OUT OF SCOPE | Mobile shows the value with a lock reason. The web lets every AGENT change it. Ronit decided in G2 to keep it locked (05 §A.12; ROLE-MATRIX.md §8 item 12). |
-| Edit the resolution (staff) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | While the ticket is Resolved or Closed, as on the web; the AGENT lock does not apply. Built in G1. |
-| Edit the resolution (requester) | END_USER | Nobody | 🔒 SAFER | |
-| See the priority | All roles | All roles | ✅ SAME | Nobody edits it; it follows impact and urgency. Staff see an "Auto" label. |
-| Submit a ticket for approval | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In "More options", in every status: the AGENT lock doesn't apply, as on the web. Approvers can be any user; a comment is optional. The ticket moves to Pending with Management Review at once (on a resolved, closed or canceled ticket that reopens it), and approving or rejecting doesn't move it again. Mobile says so; the web says "until all approvers respond". The web also shows END_USER and L2_MANAGER the action, which always fails; mobile hides it. Built in G3. |
-| AI summary and AI draft reply | All roles | Nobody | 🔒 SAFER | |
-| Print, duplicate, delete, "email the technician", tags, link to a problem or change | All roles (some staff only) | Nobody | ⊘ OUT OF SCOPE | Most of these do nothing on the web. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Open a ticket and read it | All roles | All roles | ✅ SAME | Description, properties, requester, history. | ✅ SAME · = Android; it opens in the tab you are in (interface) · `screens/tickets/TicketDetailScreen.tsx:84, :118`; `navigation/routes.ts:17` |
+| Change status with the allowed buttons | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Same transition rules on both. | ✅ SAME · = Android · `screens/tickets/TicketDetailScreen.tsx:600-631`; `utils/permissions.ts:293-294` |
+| Change status to any status from a drop-down | ADMIN, AGENT (lock), L2_MANAGER | Nobody | 🔒 SAFER | Skips the transition rules. | 🔒 SAFER · = Android · only the transition map is offered: `utils/permissions.ts:294, :487-489` |
+| Resolve, close or cancel, with the closure form | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Resolution and closure comments are required on both. | ✅ SAME · = Android · `screens/tickets/StatusClosureScreen.tsx:68, :137, :216` |
+| Pick up a ticket (assign it to yourself) | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | Mobile also hides it when the ticket is already yours. | 🔒 SAFER · = Android; More options is an action sheet (interface) · `utils/permissions.ts:284-285`; `screens/tickets/TicketDetailScreen.tsx:191, :270` |
+| Assign, reassign or unassign a technician | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | Two places since 2026-10-27: "Assign…" in More options, and **also inline**: "Change technician" on the Technician row in Properties, with Save and Cancel like the other property editors (the web has its own panel there too). **This is placement, not capability: the parity figures do not change.** The same roles, the same AGENT lock, the same list of technicians and the same request (POST /tickets/:id/assign). L2_MANAGER and END_USER see the technician with no link. Details: `ROLE-MATRIX.md` §15. | 🔒 SAFER · = Android · `utils/permissions.ts:241-243, :286, :400`; `screens/tickets/TicketPropertyEditors.tsx:606-623`; `screens/tickets/AssignPickerScreen.tsx:45` |
+| Move a ticket to another group | ADMIN, AGENT (lock) (L2_MANAGER: error) | ADMIN, AGENT (lock) | 🔒 SAFER | | 🔒 SAFER · = Android · `screens/tickets/AssignPickerScreen.tsx:45, :55-63` |
+| Change category | ADMIN, AGENT (lock) | ADMIN, AGENT (lock) | ✅ SAME | Three levels; changing a level clears the ones below. L2_MANAGER sees it read-only on both. The server may re-route the ticket, and mobile says so. Built in G1. | ✅ SAME · = Android · `screens/tickets/TicketPropertyEditors.tsx:488-508`; `utils/permissions.ts:396` |
+| Change impact and urgency | ADMIN, AGENT (lock), L2_MANAGER | ADMIN, AGENT (lock), L2_MANAGER | ✅ SAME | Together they set the priority and the SLA deadline. Mobile shows ADMIN and AGENT the resulting priority before Save; the web saves on selection, then shows it. Since G2, ADMIN and AGENT send that priority with the change, as the web does, so the requester and the technician get the "priority changed" email. Built in G1. | ✅ SAME · = Android · `screens/tickets/TicketPropertyEditors.tsx:283-307`; `utils/permissions.ts:395` |
+| See impact and urgency | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | Requesters see them read-only on the web. | ⊘ OUT OF SCOPE · = Android · `screens/tickets/TicketDetailScreen.tsx:659` (`can.classification`) |
+| Change the ticket's country: ADMIN, triage AGENT | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | In any status, as on the web. On the web L2_MANAGER gets a success message, but nothing is saved; mobile shows L2_MANAGER the value only. Built in G1. | ✅ SAME · = Android · `screens/tickets/TicketPropertyEditors.tsx:709-726`; `utils/permissions.ts:397-398` |
+| Change the ticket's country: plain AGENT | plain AGENT | Nobody | ⊘ OUT OF SCOPE | Mobile shows the value with a lock reason. The web lets every AGENT change it. Ronit decided in G2 to keep it locked (05 §A.12; ROLE-MATRIX.md §8 item 12). | ⊘ OUT OF SCOPE · = Android · `utils/permissions.ts:353, :398` (lock reason) |
+| Edit the resolution (staff) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | While the ticket is Resolved or Closed, as on the web; the AGENT lock does not apply. Built in G1. | ✅ SAME · = Android · `screens/tickets/TicketPropertyEditors.tsx:785-805`; `utils/permissions.ts:399` |
+| Edit the resolution (requester) | END_USER | Nobody | 🔒 SAFER | | 🔒 SAFER · = Android · `utils/permissions.ts:399` (value only) |
+| See the priority | All roles | All roles | ✅ SAME | Nobody edits it; it follows impact and urgency. Staff see an "Auto" label. | ✅ SAME · = Android · `screens/tickets/TicketDetailScreen.tsx:556-557` |
+| Submit a ticket for approval | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In "More options", in every status: the AGENT lock doesn't apply, as on the web. Approvers can be any user; a comment is optional. The ticket moves to Pending with Management Review at once (on a resolved, closed or canceled ticket that reopens it), and approving or rejecting doesn't move it again. Mobile says so; the web says "until all approvers respond". The web also shows END_USER and L2_MANAGER the action, which always fails; mobile hides it. Built in G3. | ✅ SAME · = Android · `utils/permissions.ts:289`; `screens/tickets/TicketDetailScreen.tsx:272`; `screens/tickets/SubmitApprovalScreen.tsx:43` |
+| AI summary and AI draft reply | All roles | Nobody | 🔒 SAFER | | 🔒 SAFER · = Android · no AI call in `api/` |
+| Print, duplicate, delete, "email the technician", tags, link to a problem or change | All roles (some staff only) | Nobody | ⊘ OUT OF SCOPE | Most of these do nothing on the web. | ⊘ OUT OF SCOPE · = Android · More options holds only Pick up, Assign, Close and Submit for approval (`utils/permissions.ts:245`) |
 
 ### Service catalogue
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Browse the catalogue: categories, their services, search | All roles | All roles | ✅ SAME | Mobile: the drawer's "Service Request" (the web: the sidebar's "Service Request" and a "Requests" bottom tab). Every active service, for every role: nothing is scoped by role, team or country. Search covers service names and descriptions in every category, on the device, as on the web. Built in G4. |
-| Request a service through its form | All roles | All roles | ✅ SAME | All seven field types the web renders: text, long text, date, phone, e-mail, number, drop-down. Any other type is a text box on both. The web's checks: "<label> is required", a valid e-mail address, a whole number. Notes go in a collapsed "Resolution" section. No confirmation, then back to the catalogue, as on the web. Thirteen other web controls and the attachment box are not shown: the server keeps nothing they collect (see the note under section 5). Built in G4. |
-| Set impact and urgency on a request (they set its priority) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | With the web form's own map and labels (its Urgency has no Urgent). Only the priority reaches the server; without both, a request is Medium. Built in G4. |
-| See my requests (My Requests) | All roles | All roles | ✅ SAME | SR number, service, status and date, newest first; no requester column, on either side. The web shows the latest 50; mobile loads older ones as the list scrolls. Built in G4. |
-| See everyone's requests under "My Requests" | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | As on the web, since G5. The server lists every request to every role except END_USER, by design: it scopes END_USER only, and staff fulfil requests. A request carries no country, group or technician from the web, so there is no narrower scope. The rows show the same four columns as the web; your own say "by you". G4 had made this 🔒 SAFER; G5 settled it against the web's source (section 5, review). |
-| Open a request: its answers, notes, approvals and progress | Nobody | All roles | ➕ MOBILE ONLY | Own requests only: only your own rows in My Requests are links. The web's rows are never links, and the web never shows anyone a request's answers again, so another person's answers stay unshown on both. Read-only: neither side lets anyone change or cancel a request. Built in G4. |
-| Create a service template (admin) | ADMIN | Nobody | ⊘ OUT OF SCOPE | The catalogue page's "+ New Template (admin)". |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Browse the catalogue: categories, their services, search | All roles | All roles | ✅ SAME | Mobile: the drawer's "Service Request" (the web: the sidebar's "Service Request" and a "Requests" bottom tab). Every active service, for every role: nothing is scoped by role, team or country. Search covers service names and descriptions in every category, on the device, as on the web. Built in G4. | ✅ SAME · = Android; More › Service Request (interface) · `navigation/MoreScreen.tsx:53`; `screens/catalog/ServiceCatalogScreen.tsx:66, :169` |
+| Request a service through its form | All roles | All roles | ✅ SAME | All seven field types the web renders: text, long text, date, phone, e-mail, number, drop-down. Any other type is a text box on both. The web's checks: "<label> is required", a valid e-mail address, a whole number. Notes go in a collapsed "Resolution" section. No confirmation, then back to the catalogue, as on the web. Thirteen other web controls and the attachment box are not shown: the server keeps nothing they collect (see the note under section 5). Built in G4. | ✅ SAME · = Android; a number field's keyboard has "-" (interface) · `screens/catalog/ServiceRequestFormScreen.tsx:107-122`; `screens/catalog/ServiceFormFieldInput.tsx:51-148` |
+| Set impact and urgency on a request (they set its priority) | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | With the web form's own map and labels (its Urgency has no Urgent). Only the priority reaches the server; without both, a request is Medium. Built in G4. | ✅ SAME · = Android; action sheets (interface) · `screens/catalog/ServiceRequestFormScreen.tsx:112, :193` |
+| See my requests (My Requests) | All roles | All roles | ✅ SAME | SR number, service, status and date, newest first; no requester column, on either side. The web shows the latest 50; mobile loads older ones as the list scrolls. Built in G4. | ✅ SAME · = Android; also its own More row (interface) · `navigation/MoreScreen.tsx:55`; `screens/catalog/ServiceCatalogScreen.tsx:90, :369` |
+| See everyone's requests under "My Requests" | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | As on the web, since G5. The server lists every request to every role except END_USER, by design: it scopes END_USER only, and staff fulfil requests. A request carries no country, group or technician from the web, so there is no narrower scope. The rows show the same four columns as the web; your own say "by you". G4 had made this 🔒 SAFER; G5 settled it against the web's source (section 5, review). | ✅ SAME · = Android · `utils/permissions.ts:576-592`; `screens/catalog/ServiceCatalogScreen.tsx:417` |
+| Open a request: its answers, notes, approvals and progress | Nobody | All roles | ➕ MOBILE ONLY | Own requests only: only your own rows in My Requests are links. The web's rows are never links, and the web never shows anyone a request's answers again, so another person's answers stay unshown on both. Read-only: neither side lets anyone change or cancel a request. Built in G4. | ➕ MOBILE ONLY · = Android · `screens/catalog/ServiceCatalogScreen.tsx:142`; `screens/catalog/ServiceRequestDetailScreen.tsx:34` |
+| Create a service template (admin) | ADMIN | Nobody | ⊘ OUT OF SCOPE | The catalogue page's "+ New Template (admin)". | ⊘ OUT OF SCOPE · = Android · no template call in `api/serviceCatalog.api.ts` |
 
 ### Comments
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Reply to the requester (public reply) | All roles | All roles | ✅ SAME | |
-| Reply all (everyone on the email thread) | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | |
-| Choose the To and Cc addresses | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | |
-| Address suggestions while typing | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | The server refuses other roles, so mobile never asks for them. |
-| Write an internal (private) note | ADMIN, AGENT (L2_MANAGER, END_USER: sent as a public email) | ADMIN, AGENT | 🔒 SAFER | Mobile also refuses it on the phone for those roles. See 7.2. |
-| Read internal notes | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT | 🔒 SAFER | The web shows them to L2_MANAGER by mistake. |
-| History line "added a comment" for an internal note | All roles | ADMIN, AGENT | 🔒 SAFER | |
-| Conversation count on the ticket | Nobody | All roles | ➕ MOBILE ONLY | Counts only the replies that person may see. |
-| Reply templates (canned responses) | All roles | All roles | ✅ SAME | A "Templates" button in the composer, for replies and private notes alike. Search by title or category; grouped by category. A blank message is replaced by the template, otherwise it is added at the end. Neither side fills in placeholders. Mobile inserts the text without its formatting or images, because the phone composer is plain text. Built in G3. |
-| Attach files to a reply | All roles | All roles | ✅ SAME | |
-| Attach files to an internal note | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | ⚠ The requester can see these files. See 7.1. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Reply to the requester (public reply) | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `utils/permissions.ts:178`; `screens/tickets/ReplyComposerScreen.tsx:54` |
+| Reply all (everyone on the email thread) | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · `utils/permissions.ts:179` |
+| Choose the To and Cc addresses | All roles | ADMIN, AGENT, L2_MANAGER | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · `screens/tickets/ReplyComposerScreen.tsx:59, :210-211` |
+| Address suggestions while typing | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | The server refuses other roles, so mobile never asks for them. | ✅ SAME · = Android · `utils/permissions.ts:198`; `screens/tickets/ReplyComposerScreen.tsx:210` |
+| Write an internal (private) note | ADMIN, AGENT (L2_MANAGER, END_USER: sent as a public email) | ADMIN, AGENT | 🔒 SAFER | Mobile also refuses it on the phone for those roles. See 7.2. | 🔒 SAFER · = Android · `utils/permissions.ts:180`; `hooks/usePostComment.ts:40-41`; `api/comments.api.ts:27` |
+| Read internal notes | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT | 🔒 SAFER | The web shows them to L2_MANAGER by mistake. | 🔒 SAFER · = Android · `utils/activity.ts:15`; `screens/tickets/TicketDetailScreen.tsx:858` |
+| History line "added a comment" for an internal note | All roles | ADMIN, AGENT | 🔒 SAFER | | 🔒 SAFER · = Android · `utils/activity.ts:23-24` |
+| Conversation count on the ticket | Nobody | All roles | ➕ MOBILE ONLY | Counts only the replies that person may see. | ➕ MOBILE ONLY · = Android · `screens/tickets/TicketDetailScreen.tsx:437-438` |
+| Reply templates (canned responses) | All roles | All roles | ✅ SAME | A "Templates" button in the composer, for replies and private notes alike. Search by title or category; grouped by category. A blank message is replaced by the template, otherwise it is added at the end. Neither side fills in placeholders. Mobile inserts the text without its formatting or images, because the phone composer is plain text. Built in G3. | ✅ SAME · = Android · `utils/permissions.ts:212-214`; `screens/tickets/ReplyComposerScreen.tsx:228, :284` |
+| Attach files to a reply | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; one "Add attachment" button and an action sheet (interface) · `screens/tickets/ReplyComposerScreen.tsx:240-245` |
+| Attach files to an internal note | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | ⚠ The requester can see these files. See 7.1. | 🔒 SAFER · **≠ Android** (iOS-3b, added by Ronit). iOS: **Nobody**: a note takes no files, because the requester can see them (05 §C.26; section 7.1) · `screens/tickets/ReplyComposerScreen.tsx:215, :240-245`; `hooks/usePostComment.ts:44-45`; `api/comments.api.ts:30` |
 
 ### Attachments
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Add files to a ticket | All roles; AGENT (lock) | All roles; AGENT (lock) | ✅ SAME | Mobile tells a locked AGENT why they cannot. |
-| View or download a file | All roles | All roles | ✅ SAME | |
-| Download all files as one zip | All roles | Nobody | ⊘ OUT OF SCOPE | |
-| Delete a file | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | Any file on the ticket, whoever uploaded it, in every status (the AGENT lock doesn't apply). It asks first, naming the file; deleting is permanent. The list and both file counts update. Built in G3. |
-| See how many files a ticket has | All roles | All roles | ✅ SAME | The number includes files on internal notes. See 7.1. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Add files to a ticket | All roles; AGENT (lock) | All roles; AGENT (lock) | ✅ SAME | Mobile tells a locked AGENT why they cannot. | ✅ SAME · = Android; one button and an action sheet (interface) · `screens/tickets/TicketDetailScreen.tsx:457-474`; `utils/permissions.ts:300` |
+| View or download a file | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; the iOS share sheet (interface) · `screens/tickets/TicketDetailScreen.tsx:533`; `api/attachmentDownload.ts:64-67` |
+| Download all files as one zip | All roles | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no zip call in `api/` |
+| Delete a file | ADMIN, AGENT, L2_MANAGER | ADMIN, AGENT, L2_MANAGER | ✅ SAME | Any file on the ticket, whoever uploaded it, in every status (the AGENT lock doesn't apply). It asks first, naming the file; deleting is permanent. The list and both file counts update. Built in G3. | ✅ SAME · = Android · `utils/permissions.ts:221-223`; `screens/tickets/TicketDetailScreen.tsx:252, :399` |
+| See how many files a ticket has | All roles | All roles | ✅ SAME | The number includes files on internal notes. See 7.1. | ✅ SAME · = Android · `screens/tickets/TicketDetailScreen.tsx:439, :558` |
 
 ### Tasks
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| See a ticket's tasks | All roles | All roles | ✅ SAME | |
-| Add, tick off or remove tasks | All roles | ADMIN, AGENT, L2_MANAGER | 🔒 SAFER | Read-only for requesters on mobile. |
-| Edit a task's title, description and due date | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | |
-| Assign a task to a technician | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | L2_MANAGER cannot load the technician list. |
-| Task list across all tickets | Nobody | All roles | ➕ MOBILE ONLY | "Assigned to me" filter for staff; read-only for requesters. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| See a ticket's tasks | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `screens/tickets/TicketDetailScreen.tsx:84` (Tasks tab); `screens/tasks/TaskDetailScreen.tsx:34` |
+| Add, tick off or remove tasks | All roles | ADMIN, AGENT, L2_MANAGER | 🔒 SAFER | Read-only for requesters on mobile. | 🔒 SAFER · = Android · `utils/permissions.ts:302, :323`; `screens/tickets/TicketDetailScreen.tsx:414, :477-479`; `screens/tasks/TaskDetailScreen.tsx:34, :165` |
+| Edit a task's title, description and due date | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `utils/permissions.ts:321-324`; `screens/tasks/TaskEditorScreen.tsx:62, :141` |
+| Assign a task to a technician | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | L2_MANAGER cannot load the technician list. | ➕ MOBILE ONLY · = Android · `utils/permissions.ts:323`; `screens/tasks/TaskEditorScreen.tsx:63` |
+| Task list across all tickets | Nobody | All roles | ➕ MOBILE ONLY | "Assigned to me" filter for staff; read-only for requesters. | ➕ MOBILE ONLY · = Android; a More row (interface) · `navigation/MoreScreen.tsx:51`; `screens/tasks/TaskListScreen.tsx:32, :169-170` |
 
 ### Approvals
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| See my pending approvals | ADMIN, AGENT | All roles (END_USER, L2_MANAGER: only while something waits for them) | ➕ MOBILE ONLY | On the web the others reach the page only by typing its address. Awaiting Ronit's confirmation. |
-| Approve or reject | All roles (the named approver only) | All roles (the named approver only) | ✅ SAME | Web: Approvals page or the ticket. Mobile: the Approvals inbox. |
-| Rejecting requires a reason | All roles | All roles | ✅ SAME | |
-| See everyone's approvals | ADMIN, AGENT | Nobody | 🔒 SAFER | |
-| See the ticket behind an approval | Nobody | All roles | ➕ MOBILE ONLY | Only when the person is allowed to open that ticket. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| See my pending approvals | ADMIN, AGENT | All roles (END_USER, L2_MANAGER: only while something waits for them) | ➕ MOBILE ONLY | On the web the others reach the page only by typing its address. Awaiting Ronit's confirmation. | ➕ MOBILE ONLY · = Android; ADMIN, AGENT: a tab; END_USER, L2_MANAGER: a More row while one waits (interface) · `utils/permissions.ts:78-80, :110`; `screens/approvals/ApprovalsInboxScreen.tsx:38` |
+| Approve or reject | All roles (the named approver only) | All roles (the named approver only) | ✅ SAME | Web: Approvals page or the ticket. Mobile: the Approvals inbox. | ✅ SAME · = Android · `screens/approvals/ApprovalDetailScreen.tsx:51, :82-89` |
+| Rejecting requires a reason | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `screens/approvals/ApprovalDetailScreen.tsx:202, :206` |
+| See everyone's approvals | ADMIN, AGENT | Nobody | 🔒 SAFER | | 🔒 SAFER · = Android · only `/approvals/pending` is read (`api/approvals.api.ts:13`) |
+| See the ticket behind an approval | Nobody | All roles | ➕ MOBILE ONLY | Only when the person is allowed to open that ticket. | ➕ MOBILE ONLY · = Android · `screens/approvals/ApprovalDetailScreen.tsx:62, :229-236` |
 
 ### Notifications
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Alerts: list, mark read, mark all read, open the ticket | All roles | All roles | ✅ SAME | |
-| Unread alerts badge | Nobody | All roles | ➕ MOBILE ONLY | |
-| Read announcements | ADMIN, AGENT, L2_MANAGER | All roles | ➕ MOBILE ONLY | The server sends each role only the announcements meant for it. Awaiting Ronit's confirmation. |
-| Announcement banner on the Home screen | Nobody | All roles | ➕ MOBILE ONLY | |
-| Create or delete announcements | ADMIN | Nobody | ⊘ OUT OF SCOPE | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Alerts: list, mark read, mark all read, open the ticket | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; an approval alert opens the approval inside Alerts (interface) · `screens/notifications/NotificationsScreen.tsx:63-64, :102-104, :159` |
+| Unread alerts badge | Nobody | All roles | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `navigation/AppTabs.tsx:41-43, :70`; `utils/permissions.ts:130-135` |
+| Read announcements | ADMIN, AGENT, L2_MANAGER | All roles | ➕ MOBILE ONLY | The server sends each role only the announcements meant for it. Awaiting Ronit's confirmation. | ➕ MOBILE ONLY · = Android; a More row (interface) · `navigation/MoreScreen.tsx:59`; `screens/dashboard/AnnouncementsScreen.tsx:24` |
+| Announcement banner on the Home screen | Nobody | All roles | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `screens/dashboard/HomeScreen.tsx:69, :107` |
+| Create or delete announcements | ADMIN | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · `api/announcements.api.ts:10` is the only call (read) |
 
 ### Knowledge Base
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Browse, search and read articles | All roles | All roles | ✅ SAME | |
-| Vote "Was this helpful?" | All roles | All roles | ✅ SAME | |
-| Write, edit or delete articles; see drafts | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Browse, search and read articles | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; a More row (interface) · `navigation/MoreScreen.tsx:57`; `screens/knowledge/KnowledgeBaseScreen.tsx:20-30` |
+| Vote "Was this helpful?" | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `screens/knowledge/KbArticleScreen.tsx:31-56, :117` |
+| Write, edit or delete articles; see drafts | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · read calls only (`api/kb.api.ts:9-59`); published and public only (`screens/knowledge/KbArticleScreen.tsx:2`) |
 
 ### Profile
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Edit your own name, phone, department and time zone | Nobody | All roles | ➕ MOBILE ONLY | The web has no profile page. |
-| Choose a light or dark theme | Nobody | All roles | ➕ MOBILE ONLY | |
-| Sign out | All roles | All roles | ✅ SAME | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Edit your own name, phone, department and time zone | Nobody | All roles | ➕ MOBILE ONLY | The web has no profile page. | ➕ MOBILE ONLY · = Android · `screens/profile/ProfileScreen.tsx:58, :85, :258` |
+| Choose a light or dark theme | Nobody | All roles | ➕ MOBILE ONLY | | ✅ SAME (web: nobody; iOS: nobody) · = Android's **code**, ≠ this row: Android never built it either (`screens/profile/ProfileScreen.tsx:10` at `c84d53a`). iOS stays light on a dark-mode phone · `app.json:8`; `screens/profile/ProfileScreen.tsx:10` |
+| Sign out | All roles | All roles | ✅ SAME | | ✅ SAME · = Android; at the bottom of More (interface) · `navigation/MoreScreen.tsx:41, :114-128` |
 
 ### Navigation
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts; Knowledge and the catalogue ("Service Request", G4) are in the drawer. |
-| Main menu | All roles | All roles | ✅ SAME | Its items differ by role; each one is compared in its own row. |
-| Country lock label in the menu | plain AGENT | plain AGENT | ✅ SAME | |
-| Open a ticket from an email link | All roles | All roles | ✅ SAME | |
-| Open a page your role isn't meant to use, by typing its address | END_USER, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | Each mobile screen checks the role. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Bottom tab bar | All roles | All roles | ✅ SAME | Web: Dashboard, Tickets, Alerts, Knowledge, Requests. Mobile: Home, Tickets, Alerts; Knowledge and the catalogue ("Service Request", G4) are in the drawer. | ✅ SAME · ≠ Android, **interface only**: Home, Tickets, Approvals (ADMIN, AGENT), Alerts, More, instead of three tabs and a drawer · `utils/permissions.ts:83-91`; `navigation/AppTabs.tsx:60` |
+| Main menu | All roles | All roles | ✅ SAME | Its items differ by role; each one is compared in its own row. | ✅ SAME · ≠ Android, **interface only**: the More tab replaces the drawer, with the drawer's rows (`drawerItems()`) · `utils/permissions.ts:106-127`; `navigation/MoreScreen.tsx:67` |
+| Country lock label in the menu | plain AGENT | plain AGENT | ✅ SAME | | ✅ SAME · = Android; on More's account card · `navigation/MoreScreen.tsx:42, :101-104` |
+| Open a ticket from an email link | All roles | All roles | ✅ SAME | | ✅ SAME · = Android: a link pasted in the search or tapped in a message opens in the app; no OS app link on either (A18) · `screens/tickets/TicketListScreen.tsx:173`; `components/HtmlText.tsx:66`; `navigation/navigationRef.ts:17` |
+| Open a page your role isn't meant to use, by typing its address | END_USER, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | Each mobile screen checks the role. | 🔒 SAFER · = Android · each screen re-checks the role: `screens/tickets/SubmitApprovalScreen.tsx:43`, `AssignPickerScreen.tsx:45`, `StatusClosureScreen.tsx:216`; `screens/tasks/TaskEditorScreen.tsx:141`; `screens/catalog/ServiceCatalogScreen.tsx:66` |
 
 ### Dashboard
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Self-service portal (raise a ticket, recent tickets, search help) | All roles | All roles | ✅ SAME | On mobile it is the requester's Home screen and the Knowledge base. |
-| Raise a ticket from the Home screen | All roles | All roles | ✅ SAME | |
-| Requester's open and resolved counts | END_USER | END_USER | ✅ SAME | |
-| Requester's other counts (total, in progress, SLA breached) | END_USER | Nobody | ⊘ OUT OF SCOPE | |
-| Staff counts: open, in progress, on hold, SLA breached, active | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | |
-| Counts for L2_MANAGER | L2_MANAGER | Nobody | 🔒 SAFER | Mobile shows the tiles without numbers. |
-| Unassigned count | ADMIN, AGENT, L2_MANAGER | ADMIN, triage AGENT | 🔒 SAFER | |
-| Closed count and pending-reason counts | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
-| Charts, technician and team tables, trends, workload | ADMIN, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | |
-| Recent tickets | All roles | All roles | ✅ SAME | |
-| Shortcuts to "My open" and "Due soon" | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | |
-| Pending approvals tile | Nobody | ADMIN, AGENT; END_USER, L2_MANAGER while something waits for them | ➕ MOBILE ONLY | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Self-service portal (raise a ticket, recent tickets, search help) | All roles | All roles | ✅ SAME | On mobile it is the requester's Home screen and the Knowledge base. | ✅ SAME · = Android · `screens/dashboard/HomeScreen.tsx:64-68, :152`; Knowledge base `navigation/MoreScreen.tsx:57` |
+| Raise a ticket from the Home screen | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `screens/dashboard/HomeScreen.tsx:152, :211` |
+| Requester's open and resolved counts | END_USER | END_USER | ✅ SAME | | ✅ SAME · = Android · `utils/permissions.ts:160` |
+| Requester's other counts (total, in progress, SLA breached) | END_USER | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · `utils/permissions.ts:160` |
+| Staff counts: open, in progress, on hold, SLA breached, active | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | | ✅ SAME · = Android · `utils/permissions.ts:161` |
+| Counts for L2_MANAGER | L2_MANAGER | Nobody | 🔒 SAFER | Mobile shows the tiles without numbers. | 🔒 SAFER · = Android · `screens/dashboard/HomeScreen.tsx:67, :116` |
+| Unassigned count | ADMIN, AGENT, L2_MANAGER | ADMIN, triage AGENT | 🔒 SAFER | | 🔒 SAFER · = Android · `utils/permissions.ts:162` |
+| Closed count and pending-reason counts | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no such tile (`utils/permissions.ts:156`) |
+| Charts, technician and team tables, trends, workload | ADMIN, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | | 🔒 SAFER · = Android · no such tile or screen (`utils/permissions.ts:156`; `navigation/routes.ts:20-50`) |
+| Recent tickets | All roles | All roles | ✅ SAME | | ✅ SAME · = Android · `screens/dashboard/HomeScreen.tsx:68, :433` |
+| Shortcuts to "My open" and "Due soon" | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `screens/dashboard/HomeScreen.tsx:186-187` |
+| Pending approvals tile | Nobody | ADMIN, AGENT; END_USER, L2_MANAGER while something waits for them | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android; it opens the Approvals tab, or More's Approvals (interface) · `utils/permissions.ts:167-169`; `screens/dashboard/HomeScreen.tsx:72, :101-104, :191` |
 
 ### Bulk actions
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Select several tickets at once | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | Up to 20 at a time. |
-| Bulk pick up | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | |
-| Bulk assign | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | |
-| Bulk close | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | Skips any ticket the person could not close on its own. |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Select several tickets at once | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | Up to 20 at a time. | ➕ MOBILE ONLY · = Android; "N selected" in the navigation bar (interface) · `utils/permissions.ts:460-470`; `screens/tickets/TicketListScreen.tsx:236-253, :382` |
+| Bulk pick up | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `utils/permissions.ts:465` |
+| Bulk assign | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | | ➕ MOBILE ONLY · = Android · `utils/permissions.ts:466`; `screens/tickets/TicketListScreen.tsx:363` |
+| Bulk close | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | Skips any ticket the person could not close on its own. | ➕ MOBILE ONLY · = Android · `utils/permissions.ts:468`; `screens/tickets/StatusClosureScreen.tsx:355` |
 
 ### Admin
 
-| Capability | WEB: who can | MOBILE: who can | Status | Note |
-|---|---|---|---|---|
-| Reports, query builder, scheduled reports | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
-| Kanban board | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
-| Problem and change management | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
-| Asset management | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
-| Purchase orders | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
-| Projects | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | |
-| Surveys | ADMIN | Nobody | ⊘ OUT OF SCOPE | |
-| Admin settings (users, teams, categories, SLAs and more) | ADMIN | Nobody | ⊘ OUT OF SCOPE | |
+| Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
+|---|---|---|---|---|---|
+| Reports, query builder, scheduled reports | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Kanban board | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Problem and change management | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Asset management | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Purchase orders | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Projects | ADMIN, AGENT | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Surveys | ADMIN | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
+| Admin settings (users, teams, categories, SLAs and more) | ADMIN | Nobody | ⊘ OUT OF SCOPE | | ⊘ OUT OF SCOPE · = Android · no screen for it (`navigation/routes.ts:20-50`) |
 
 ## 4. Genuine gaps: what mobile cannot do that the web can
 
@@ -429,3 +442,108 @@ None of them changes who can do what, or what the server stores.
 | 6b | | A date picker instead of typed dates; a warning when From is after To | No | `:531-546`; `TicketFiltersScreen.tsx` | G2 §5 |
 
 **Not determinable from the source:** whether 5b's second "priority changed" email is actually sent on UAT depends on its priority matrix, which was not queried (no API call was made in G5).
+
+## 9. iOS parity (Phase iOS-5, 2026-10-29)
+
+**The iOS app** is `ios-dev` @ `a12a5be`. **Android** is the port source, `origin/dev` @ `c84d53a`. The iOS column of section 3 has the evidence for each row. This section has the method, the figures and every difference from Android.
+
+### 9.1 How it was checked
+
+1. **Every row was read on iOS.** The column cites the screen, navigator or rule that offers the capability. Where nothing offers it, the column cites the missing call or screen instead.
+2. **The role rules were run on both platforms.**
+   - Android's `src/utils` at `c84d53a` was extracted with `git archive` into a scratch folder outside the repo. Nothing was checked out.
+   - Both `permissions.ts` files export the same 31 items: 25 functions and 6 constants. Each was given the same inputs on both platforms:
+     - 7 viewers: the five personas, an unknown role and the dev placeholder user, plus no session;
+     - all 12 statuses (`types/enums.ts:11-14`; older text says 11) and 3 assignees;
+     - 14 update bodies and 5 service-request bodies;
+     - 0, 1 and 3 pending approvals.
+   - **1,985 inputs. Every answer is identical.**
+   - The six functions only iOS has were checked against Android's rules, for every role and approval count:
+     - the Approvals tab plus the More rows are exactly Android's drawer rows;
+     - Android's three tabs keep their titles;
+     - `taskPermissions()` equals the `isStaff` and `isAgentOrAdmin` checks in Android's task screens;
+     - `navRole()` equals `user?.role ?? 'END_USER'`.
+3. **Every role check outside `permissions.ts` was compared.**
+   - The role-check calls were listed, file by file, on both platforms: in the 25 screens and in every hook, API module, store and util. They are the same calls, with two kinds of exception:
+     - iOS calls `navRole()` and `taskPermissions()` where Android checked inline;
+     - StatusClosure reads `ticketDetailPermissions()` and `bulkActions()` instead of `ticket-rules.ts` (manifest §4.11 #3).
+
+     Step 2 proved each of these gives the same answers.
+   - These files are byte-identical to Android's: the write guards (`hooks/writeGuards.ts`), the API allow-lists (`api/tickets.api.ts`), and the rule modules `ticket-rules.ts`, `roles.ts`, `session.ts`, `ticket-filters.ts`, `activity.ts`, `ticket-properties.ts` and `service-catalog.ts`.
+4. **The figures were recounted by script.**
+   - It was first run on the Android columns. There it reproduced every published figure in sections 2 and 3: 112 rows; 50, 22, 0, 23 and 17; each role's counts and parity; and the 67–76% range.
+   - It was then run on the iOS column.
+
+### 9.2 Figures (iOS)
+
+| ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | Total |
+|---|---|---|---|---|---|
+| 50 | 21 | **0** | 23 | 18 | **112** |
+
+Android: 50, 22, 0, 23, 17. Two rows change:
+- the private-note files row, ✅ → 🔒;
+- the theme row, ➕ → ✅ (nobody on either side; 9.3).
+
+| Role | Capabilities on web | on iOS | on Android | % parity, iOS | Genuine gaps |
+|---|---|---|---|---|---|
+| END_USER | 46 | 42 | 43 | 100% | none |
+| AGENT | 80 | 77 | 79 | 100% | none |
+| triage AGENT | 79 | 78 | 80 | 100% | none |
+| L2_MANAGER | 59 | 57 | 58 | 100% | none |
+| ADMIN | 82 | 78 | 80 | 100% | none |
+
+- **With the deliberate exclusions counted as misses:** END_USER 67%, L2_MANAGER 71%, ADMIN 72%, AGENT 73%, triage AGENT 75%. Android is 67, 71, 73, 74 and 76.
+- **Why the iOS counts are lower:** the theme row, for every role, and the private-note files row, for ADMIN and both AGENTs. Neither is a gap: the web has no theme setting, and the note files are 🔒 SAFER.
+
+### 9.3 Where iOS differs from Android
+
+**In who can do what: one row, SAFER on purpose.**
+
+| Row | Android | iOS | Why |
+|---|---|---|---|
+| Attach files to an internal note | ADMIN, AGENT (✅ SAME) | Nobody (🔒 SAFER) | Ronit's rule for iOS-3b (manifest §4.11). The server keeps a note's files on the ticket, where the requester and L2_MANAGER can list and download them (05 §C.26; section 7.1). On iOS:<br>- Note mode has no file picker;<br>- switching to Note asks before dropping the files already chosen;<br>- `sendComment` and `createComment` refuse a note with files before anything is sent.<br><br>This is the recommendation in `ROLE-MATRIX.md` §8 item 1, still open for Android |
+
+**In the documentation only: one row.**
+
+| Row | This table (Android) | Android's code | iOS |
+|---|---|---|---|
+| Choose a light or dark theme | ➕ MOBILE ONLY, all roles | No theme setting:<br>- `ProfileScreen.tsx:10` at `c84d53a`: "not in this phase's brief and is not built";<br>- `app.json` has `userInterfaceStyle: "light"` | No theme setting; the app stays light on a dark-mode phone. **Same as Android's code** |
+
+- The Android row overstates mobile by one capability for every role. It was planned in 04 M10 and never built.
+- It is not a web gap: the web has no theme setting either.
+- **For Ronit:** correct the Android row (documentation only), or build a theme setting later (a feature, outside iOS-5).
+
+**In the interface only.** None of these changes who can do what:
+- **Navigation** (manifest §4.5):
+  - The tab bar is Home · Tickets · Approvals (ADMIN, AGENT) · Alerts · More, instead of three tabs plus a drawer.
+  - More holds the drawer's rows. My Requests is its own row there.
+  - END_USER and L2_MANAGER see Approvals as a More row while an approval waits for them, which is the drawer's rule.
+  - The Approvals and More tabs show the pending count as a badge.
+- **Where screens open:**
+  - A ticket, task or approval opens in the tab you are in.
+  - An approval alert opens the approval inside Alerts.
+  - Home's "Pending approvals" switches to the Approvals tab, or opens More's Approvals.
+- **Write screens** are page sheets that close with ✕ or a swipe down, one sheet per ticket.
+- **Short fixed choices are action sheets:** More options, the list's status chip, impact, urgency, the closure code, and the attachment source (one "Add attachment" button).
+- **Success messages** are a non-modal notice that VoiceOver reads, instead of an Android toast. Destructive confirmations use the destructive style.
+- **Small controls:** the Tickets search is in the navigation bar, and the number keyboard has "-".
+
+**In the implementation only.** The answers are the same:
+- StatusClosure takes its answers from `permissions.ts`; they are proven equal (9.1).
+- Approve and Reject act only on the approval whose id the screen was opened with (`approvalOnScreen()`).
+- Every sheet and record screen has a `getId`, so one screen is never reused for another record.
+
+**Added on iOS only.** These are not in the 112 rows. They are App Store requirements (compliance H1, H6), not web capabilities.
+
+| Capability | iOS: who can | Status | Evidence |
+|---|---|---|---|
+| Open the privacy policy | All roles, once `config/legal.ts` has the URL | ➕ iOS ONLY | `utils/accountDeletion.ts:15-24`; `screens/profile/ProfileScreen.tsx:62, :354` |
+| Request deletion of your account | All roles, once `legal.ts` has the category and the working days | ➕ iOS ONLY | `screens/profile/ProfileScreen.tsx:176, :359`; `utils/accountDeletion.ts` |
+
+- Neither row changes a role's answers.
+- The deletion request is a confirmation, then an ordinary ticket raised by the person, through the same TKT-2 allow-list.
+
+### 9.4 Not covered here
+
+- **Behaviour on a device.** That is iOS-7: the manifest's device lists, and the iOS UAT test plan (to be written in iOS-5). This audit read the source and ran the rules in Node.
+- **The web.** It was not opened (CLAUDE.md I4). The WEB column is the G5 record.

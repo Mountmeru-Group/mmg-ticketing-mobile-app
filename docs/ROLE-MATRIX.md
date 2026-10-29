@@ -14,6 +14,13 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**iOS, Phase iOS-5 (2026-10-29): the §14 audit re-run on the iOS app** (`ios-dev` @ `a12a5be`), for all five personas. §16 has the answers and the result:
+- **too permissive: none;**
+- one more restrictive case, deliberate: no files on a private note;
+- every §14 verdict holds.
+
+The sections above are Android's record, unchanged.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -1024,3 +1031,73 @@ So the restriction was not justified, and it was removed:
 - The status flow: TKT-6 POST only; `PUT /tickets/:id` never carries a status.
 - The auth flow, `auth.config.ts`, the dev-token screen; navigation; no library; no EAS build; nothing committed.
 - The web repo: byte-for-byte unchanged (SHA-1 of all 840 files outside `node_modules` and `.git`, before and after).
+
+---
+
+## 16. Phase iOS-5: the §14 audit re-run on iOS (2026-10-29)
+
+**What was audited:** the iOS app, `ios-dev` @ `a12a5be`, against §14's expected behaviour, for all five personas. §14 audited Android at `c84d53a`. The web was not opened (CLAUDE.md I4): its side is §14's record.
+
+### 16.1 Method
+
+- **Each persona's answers were computed from the iOS code**, not read off it. The script that produced the 16.2 table called iOS's `src/utils/permissions.ts` for each persona (`tests/rbac/personas.mjs`). It wrote nothing to the repo.
+- **iOS was proven equal to Android, input by input** (`WEB-VS-MOBILE-ROLES.md` §9.1):
+  - the 31 items both `permissions.ts` files export, over 1,985 inputs: every answer identical;
+  - the six functions only iOS has, against Android's drawer, tabs and task-screen rules;
+  - every role check in the screens, hooks, API modules and stores.
+- **So each §14 verdict carries over to iOS unchanged.** 16.2 shows the answers that verdict rests on, per persona. 16.3 audits what iOS added.
+
+### 16.2 The §14.1 elements on iOS
+
+Key: per status O = OPEN, R = RESOLVED, C = CLOSED, X = CANCELED. e = edit, l = locked (with the reason), v = value only, h = hidden.
+
+| Element | END_USER | AGENT | triage AGENT | L2_MANAGER | ADMIN | = Android | Verdict vs web (§14.1) |
+|---|---|---|---|---|---|---|---|
+| T9 impact and urgency | h h h h | e e l l | e e l l | e e e e | e e e e | yes | MATCH |
+| T13 priority preview (OPEN / CLOSED) | no / no | yes / no | yes / no | no / no | yes / yes | yes | MATCH |
+| T8 category | v v v v | e e l l | e e l l | v v v v | e e e e | yes | MATCH |
+| T11 country | v v v v | l l l l | e e e e | v v v v | e e e e | yes | too restrictive: plain AGENT (decision), L2 (defect avoided) |
+| T12 resolution | v v v v | l e e l | l e e l | l e e l | l e e l | yes | too restrictive for END_USER (§C gap C.5) |
+| T6 technician (§15) | v v v v | e e l l | e e l l | v v v v | e e e e | yes | too restrictive for L2 (403) |
+| L12 priority, category, date filters | yes | yes | yes | yes | yes | yes | MATCH |
+| L10 technician and group filters | no | yes | yes | no | yes | yes | MATCH for ADMIN, AGENT; too restrictive for END_USER, L2 (403) |
+| C4 reply templates | yes | yes | yes | yes | yes | yes | MATCH |
+| T22 delete a file (statuses offered, of 12) | 0 | 12 | 12 | 12 | 12 | yes | MATCH |
+| T26 submit for approval (statuses offered, of 12) | 0 | 12 | 12 | 0 | 12 | yes | MATCH for ADMIN, AGENT; too restrictive for END_USER, L2 (403) |
+| SC1, SC2 catalogue and search | yes | yes | yes | yes | yes | yes | MATCH |
+| SC4 request form | yes | yes | yes | yes | yes | yes | MATCH |
+| SC5 request properties | no | yes | yes | yes | yes | yes | MATCH |
+| SC7 everyone's requests | no (own) | yes | yes | yes | yes | yes | MATCH |
+| SC8 open another person's request | no | no | no | no | no | yes | mobile addition, own requests only |
+| CR8 create preview | no | yes | yes | no | yes | yes | MATCH |
+| CR3, CR4 group, technician, requester on create | no | yes | yes | no | yes | yes | CR3 too restrictive for L2 (403); CR4 mobile addition (§8 item 4) |
+| TKT-2 / TKT-4 allow-lists, write guards | — | — | — | — | — | byte-identical files | MATCH (§14.3) |
+| SC6 inert form controls, SC3 creating a template | nobody | nobody | nobody | nobody | nobody | yes | too restrictive (defect avoided; decision) |
+
+### 16.3 What iOS added, audited for over-permissiveness
+
+| iOS element | END_USER | AGENT | triage AGENT | L2_MANAGER | ADMIN | Over-permissive? |
+|---|---|---|---|---|---|---|
+| Tabs (`appTabs()`) | Home, My Tickets, Alerts, More | Home, Tickets, Approvals, Alerts, More | the same as AGENT | Home, Tickets, Alerts, More | the same as AGENT | **No.** The Approvals tab is exactly the roles with the web's Approvals nav item (`AppLayout.tsx:32`) |
+| More rows, nothing pending | Tasks, Service Request, My Requests, Knowledge base, Announcements, Settings | the same | the same | the same | the same | **No.** Android's drawer rows, minus the Approvals tab. My Requests opens the catalogue's own view |
+| More rows, ≥ 1 pending | the above plus Approvals | as above | as above | the above plus Approvals | as above | **No.** Android's drawer rule (08 S1) |
+| Badges (3 unread, 2 pending) | Alerts 3, More 2 | Alerts 3, Approvals 2 | the same as AGENT | Alerts 3, More 2 | the same as AGENT | **No.** Counts the person's own NTF-2 and APR-1 answers only |
+| Task module: edit / pick a technician / "Assigned to me" | no / no / no | yes / yes / yes | yes / yes / yes | yes / no / yes | yes / yes / yes | **No.** Equal to Android's task screens for every role (`taskPermissions()`) |
+| A file on a private note | — | nobody | nobody | — | nobody | **No: more restrictive** (05 §C.26; Ronit, iOS-3b) |
+| Privacy Policy, account-deletion request | every role, once `legal.ts` is set | the same | the same | the same | the same | **No.** A link, and a ticket the person raises themselves through the same TKT-2 allow-list |
+
+### 16.4 §14.4's four questions, on iOS
+
+- **(a) Is anything editable on a closed ticket that the web locks?** **No.** The AGENT lock removes the same elements on iOS as on Android (16.2: T9, T8, T6 `l` on C and X). `g5-audit.test.mjs` pins all ten G1–G4 elements per persona on CLOSED and CANCELED; it passes on iOS.
+- **(b) Can any role submit a catalogue field it should not?** **No.** `serviceRequestProblem()` gives identical answers on both platforms over 40 inputs. Only staff send a priority, and every other extra key is refused (`service-catalog.test.mjs`, passing).
+- **(c) Can a role filter by a technician or group outside their scope?** **No.** `ticketListFilters()` is identical. `utils/ticket-filters.ts`, which builds the query, is byte-identical to Android's (`list-filters.test.mjs`, passing).
+- **(d) Can every staff role delete any file in any state?** **Yes, as on the web:** 12 of 12 statuses for ADMIN, both AGENTs and L2_MANAGER, and none for END_USER (16.2).
+
+### 16.5 Result
+
+- **Too permissive on iOS: none.** No element, old or iOS-only, offers a role more than Android does. Where iOS differs, it offers less.
+- **Too restrictive:**
+  - §14's twelve, unchanged;
+  - one more, deliberate: files on a private note (🔒 SAFER).
+- **Undocumented:** none. The one documentation error found is in the Android row "Choose a light or dark theme" (`WEB-VS-MOBILE-ROLES.md` §9.3).
+- **Tests on iOS:** all 961 pass, including `role-gating`, `property-editing`, `list-filters`, `g3-features`, `service-catalog`, `g5-audit`, `technician-editor` and `tests/navigation/shell.test.mjs`.
