@@ -664,6 +664,13 @@ describe('rule: every role decision on the write path comes from permissions.ts'
     }
   });
 
+  // iOS-5 mutation check, B8: the answer above was pinned, but not that the bulk sheet applies it. Removing the check
+  // left all tests green (Android had no such test either); the device guard still refused each ticket.
+  test("the bulk Close sheet refuses a role that bulkActions() gives no Close (iOS-5, mutation B8)", () => {
+    const src = read('src/screens/tickets/StatusClosureScreen.tsx');
+    assert.match(src, /const invalidRequest =\s*route\.params\.target !== 'CLOSED' \|\| !bulkActions\(user\)\.includes\('close'\) \|\|/);
+  });
+
   test('the write sheets name no role and call no low-level role gate (tests/rbac/role-gating has their rows)', () => {
     const rawGate = /\b(isStaff|isAgentOrAdmin|canSeePrivateNotes|canChangeStatus|isTriageAgent|isCountryLockedAgent|getAvailableTransitions)\(/;
     for (const file of SHEET_SCREENS) {

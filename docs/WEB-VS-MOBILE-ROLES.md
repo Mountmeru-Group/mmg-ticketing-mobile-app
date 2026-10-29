@@ -512,6 +512,7 @@ Android: 50, 22, 0, 23, 17. Two rows change:
 - The Android row overstates mobile by one capability for every role. It was planned in 04 M10 and never built.
 - It is not a web gap: the web has no theme setting either.
 - **For Ronit:** correct the Android row (documentation only), or build a theme setting later (a feature, outside iOS-5).
+- **The HIG advises against building it.** HIG, Dark Mode, read on developer.apple.com on 2026-10-29: *"Avoid offering an app-specific appearance setting. An app-specific appearance mode option creates more work for people because they have to adjust more than one setting to get the appearance they want."* iOS's choice is light only (compliance E7, D9), not an in-app setting.
 
 **In the interface only.** None of these changes who can do what:
 - **Navigation** (manifest §4.5):

@@ -2,7 +2,7 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b, iOS-3c and iOS-4 with what each phase actually built (§4.1–§4.5, §4.9–§4.13).
+> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b, iOS-3c, iOS-4 and iOS-5 with what each phase actually built (§4.1–§4.5, §4.9–§4.14).
 
 ## 0. Port source and fixed facts
 
@@ -43,7 +43,7 @@ Rules used:
   - `src/utils/approvals.ts` (reclassified KEEP → ADAPT in iOS-3c: `approvalOnScreen()`, the approval Approve and Reject act on; §4.12).
 - **The pre-SSO test login (§8) is not counted here.** It is a proposal, so the classification below covers only what the port itself needs. §8 lists the files the test login would change if it is approved.
 
-**Totals: KEEP 161 · ADAPT 41 · SKIP 3 · SCREEN 25 = 230.** iOS-3c moved one file from KEEP to ADAPT (`approvals.ts`, §4.12). iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
+**Totals: KEEP 159 · ADAPT 43 · SKIP 3 · SCREEN 25 = 230.** iOS-5 moved two docs from KEEP to ADAPT (`WEB-VS-MOBILE-ROLES.md`, `ROLE-MATRIX.md`: the iOS column and §16, §4.14). iOS-3c moved one file from KEEP to ADAPT (`approvals.ts`, §4.12). iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
 
 ## 2. Phase map
 
@@ -57,7 +57,7 @@ Rules used:
 | **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-3, where the screens that use them arrive |
 | **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read (built 2026-10-28, §4.9), **iOS-3b** write (built 2026-10-28, §4.11), **iOS-3c** modules (built 2026-10-28, §4.12) |
 | **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode. Built 2026-10-29 (§4.13), with the account-deletion request and the privacy link |
-| **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
+| **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green. Built 2026-10-29 (§4.14), with three items pulled forward from iOS-7 by its brief: the release-bundle check, the iOS release guide and the iOS UAT test plan |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
@@ -117,10 +117,10 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `docs/G3-WEB-BEHAVIOUR.md` | KEEP | iOS-1b | — |
 | `docs/G4-WEB-CATALOGUE.md` | KEEP | iOS-1b | — |
 | `docs/PERFORMANCE.md` | KEEP | iOS-1b | Android measurements. iOS figures, if needed, go in `docs/ios/` (iOS-4) |
-| `docs/RELEASE.md` | ADAPT | iOS-7 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-7 (§4.7) |
-| `docs/ROLE-MATRIX.md` | KEEP | iOS-1b | Role rules are platform-neutral |
-| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is a new `docs/ios/` file (iOS-7) |
-| `docs/WEB-VS-MOBILE-ROLES.md` | KEEP | iOS-1b | — |
+| `docs/RELEASE.md` | ADAPT | iOS-7 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-7 (§4.7). **iOS-5:** the iOS guide was written as a new file, `docs/ios/RELEASE-IOS.md` (the brief), so this file is still not copied. Whether iOS-7 brings it over at all is open (§4.14) |
+| `docs/ROLE-MATRIX.md` | ADAPT | iOS-1b, iOS-5 | Role rules are platform-neutral. **iOS-5:** §16, the §14 audit re-run on iOS for all five personas; §7, the iOS-5 mutation check. Android's sections are unchanged (§4.14) |
+| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is `docs/ios/UAT-TEST-PLAN-IOS.md`, written in iOS-5 (§4.14) |
+| `docs/WEB-VS-MOBILE-ROLES.md` | ADAPT | iOS-1b, iOS-5 | **iOS-5:** an iOS column on all 112 rows, and §9, the iOS parity summary. Android's columns and sections are unchanged (§4.14) |
 | `docs/brand/UI-STANDARDS.md` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b; adapted in iOS-4 (§4.8). Until then the iOS navigation chrome is described in §4.5 |
 | `docs/brand/WEB-TOKENS.md` | KEEP | iOS-1b | — |
 | `docs/web-system/00-OVERVIEW.md` | KEEP | iOS-1b | Environments table unchanged: UAT only |
@@ -141,7 +141,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `scripts/eas-build-guard.js` | KEEP | iOS-1b | Platform-neutral: it checks the profile name and `EXPO_PUBLIC_APP_ENV`, which `preview` and `production` still use |
-| `scripts/verify-release-bundle.js` | ADAPT | iOS-7 | Not copied in iOS-1b, so until iOS-7 the `verify:release-bundle` script in `package.json` points at a missing file. Change `--platform android` to `ios`, and the output file from `index.android.bundle` to `main.jsbundle`. Hermes compiles iOS bundles too, so the bytecode step stays. Run it on the `production` configuration: the result must be PASS It can PASS only once the Login screen exists (iOS-2), because it requires the "Sign in with Microsoft" string |
+| `scripts/verify-release-bundle.js` | ADAPT | iOS-7 | Not copied in iOS-1b, so until iOS-7 the `verify:release-bundle` script in `package.json` points at a missing file. Change `--platform android` to `ios`, and the output file from `index.android.bundle` to `main.jsbundle`. Hermes compiles iOS bundles too, so the bytecode step stays. Run it on the `production` configuration: the result must be PASS It can PASS only once the Login screen exists (iOS-2), because it requires the "Sign in with Microsoft" string. **iOS-5 (built 2026-10-29), pulled forward by the brief:** ported with `git checkout <port source> -- <path>`, then adapted. It now uses `export:embed --platform ios`, `main.jsbundle` with its source map, and Hermes; it adds the iOS checks and fixes Android's false positives (§4.14; `docs/ios/RELEASE-IOS.md` §3). PASS on `preview` and on `production` |
 
 ### 3.5 `src/api/` (22)
 
@@ -374,7 +374,9 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a (copied) | Reads `TicketListScreen` and `TicketFiltersScreen`. Copied unchanged; all pass |
 | `tests/rbac/personas.mjs` | KEEP | iOS-1b | — |
 | `tests/rbac/property-editing.test.mjs` | KEEP | iOS-1b | Pure modules only |
-| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass. **iOS-3c:** Android's last four rows are back, byte-identical (the three catalogue screens, Profile); five rows Android did not have (the three task screens on `taskPermissions()`, the two approval screens on APR-1 and `approvalOnScreen()`); `taskPermissions()` pinned per persona and shown equal to Android's inline answers and to M4's `editTasks`; 145 pass |
+| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass. **iOS-3c:** Android's last four rows are back, byte-identical (the three catalogue screens, Profile); five rows Android did not have (the three task screens on `taskPermissions()`, the two approval screens on APR-1 and `approvalOnScreen()`); `taskPermissions()` pinned per persona and shown equal to Android's inline answers and to M4's `editTasks`; 145 pass. **iOS-5:** the TicketListScreen check cuts `ListEmpty` with `?
+` instead of `
+`, so it also passes on a CRLF checkout (§4.14); 145 pass |
 | `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack`. **Copied in iOS-3c**, every other expectation unchanged, plus one line (plan Q2): a number field's keyboard is `numbers-and-punctuation`, not `numeric`; 108 pass |
 | `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b (copied) | Reads AssignPicker, TicketDetail and TicketPropertyEditors. Copied unchanged; all pass |
 | `tests/support/loader.mjs` | KEEP | iOS-1b | — |
@@ -1078,9 +1080,99 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 - **iPad:** compatibility mode.
 
 **Flagged, not fixed:**
-- **Missing script:** `package.json` has `verify:release-bundle`, but `scripts/verify-release-bundle.js` does not exist. The bundle checks were run by hand, as in iOS-3c.
+- **Missing script:** `package.json` has `verify:release-bundle`, but `scripts/verify-release-bundle.js` does not exist. The bundle checks were run by hand, as in iOS-3c. **Done in iOS-5 (§4.14).**
 - **npm audit:** after the install, npm reported 13 vulnerabilities (6 low, 3 moderate, 4 high). `expo-haptics` adds no dependencies, so they predate it; not investigated.
 - **AUTH-P2 re-creates a deleted account** at the next sign-in. The confirmation says so; IT and the backend should know (A4, H6).
+
+### 4.14 iOS-5: parity, mutation check, release checks, UAT plan (built 2026-10-29)
+
+**The brief (Ronit, 2026-10-29):**
+- prove parity with the web and Android;
+- prove the tests catch regressions;
+- prepare the release checks;
+- write the iOS UAT plan.
+
+No behaviour change, no `eas` command, no API call. Committed in two parts: `f28afe4` (part 1, pushed on Ronit's instruction), then this.
+
+**Parity** (`docs/WEB-VS-MOBILE-ROLES.md`, iOS column and §9; `docs/ROLE-MATRIX.md` §16):
+- **All 112 rows:** 50 ✅, 21 ➕, **0 ❌**, 23 ⊘, 18 🔒. Every role is at 100% parity.
+- **iOS = Android on 110 rows.** The other two:
+  - files on a private note: 🔒 on iOS (Ronit's iOS-3b rule, 05 §C.26);
+  - the theme row: Android's doc says ➕, but neither app has a theme setting, and the HIG advises against one. A documentation error on Android, listed.
+- **Proven, not just read.** Android's `src/utils` at `c84d53a` was extracted with `git archive` into a scratch folder. The 31 exports both `permissions.ts` files share gave identical answers over 1,985 inputs. The six iOS-only functions equal Android's drawer, tabs and task-screen rules.
+- **The §14 role audit, re-run for five personas on iOS:** no case too permissive.
+
+**Mutation check** (`ROLE-MATRIX.md` §7):
+- **38 mutations, each alone, in a scratch copy;** `ios-dev` never mutated, SHA-256 verified.
+- **A:** Android's 28, recorded for G4. Two are re-expressed for G5's rules.
+- **B:** 10 for rules only iOS has.
+- **First run: 37 caught.** B8, the bulk Close sheet for every role, survived: the rule was pinned, but its use in StatusClosure was not. Android had no such test either, and no write could leak.
+- **After the fixes below: 38 of 38 caught,** each failing 1–10 tests.
+
+**Test fixes, test only (Ronit's OK):**
+- `tests/screens/write-screens.test.mjs`: StatusClosure's bulk branch must apply `bulkActions().includes('close')` (B8).
+- `tests/rbac/role-gating.test.mjs:693`: `\r?\n` instead of `\n`. The TicketListScreen check failed on a CRLF checkout (Windows, `core.autocrlf=true`), because the working copy's LF file was what made it pass.
+- **961 → 962 tests.**
+
+**Release check** (`scripts/verify-release-bundle.js`; `docs/ios/RELEASE-IOS.md` §3):
+- **Ported** with `git checkout <port source> -- <path>` (then unstaged with `git reset -- <path>`, an index-only step, reported to Ronit), and rewritten for iOS:
+  - `export:embed --platform ios`, `main.jsbundle` with its source map, Hermes, and the dev control;
+  - the brief's checks: no dev-token or "DEV PLACEHOLDER" string, no client-secret **value**, the iOS redirect present (and no `msauth://`), the UAT URL in `preview`, no Android-only API reached from app code;
+  - Android's checks kept: test-login markers, hosts, token-shaped UUIDs, `Bearer <uuid>`, control strings.
+- **Android's false positives, fixed:**
+  - the `clientSecret` option names, allowed only inside `expo-auth-session`;
+  - the public Entra IDs and the EAS `projectId`, read from their files;
+  - library UUIDs, and the build's own `//# debugId`;
+  - comments, which no longer count as API use: TypeScript strips them first.
+- **Result:** `preview` PASS; `production` PASS.
+- **Proven to fail:** six faults planted in a scratch copy were each reported (§4.14 verification below).
+- **The build guard:** its `legal.ts` rule blocks only `production`; `preview` is OK even with `legal.ts` empty or unreadable (`RELEASE-IOS.md` §1).
+
+**Docs written:**
+- `docs/ios/RELEASE-IOS.md`:
+  - the profiles and the guard;
+  - the pre-build checks;
+  - the release check;
+  - build and submit (`npx eas-cli@24.8.0 build --platform ios --profile preview`; `npx eas-cli@24.8.0 submit --platform ios --latest`);
+  - Ronit's phone-hotspot note;
+  - the EAS Update rules (`--channel ios-preview --platform ios`, fixes only);
+  - the `legal.ts` values for `production`.
+- `docs/ios/UAT-TEST-PLAN-IOS.md`: **211 checks.**
+  - Android's 96 checks (A–F), adapted to iOS: 127 rows, after splitting D1 into rows and adding the iOS steps.
+  - G, iOS only: 60.
+  - H, write safety on **one agreed ticket**: 17. The ticket is TBD, chosen by Ronit before the first TestFlight run; not #19421.
+  - I, account deletion and the privacy link: 7.
+  - The HIG lines it quotes were read on developer.apple.com on 2026-10-29.
+
+**Found, listed, not fixed:**
+- **The Android theme row** (above).
+- **D3.3 is still a known gap on iOS:** the reply path doesn't check the AGENT lock (`usePostComment.ts`), as on Android.
+- **The build guard's refusal message** still names `docs/RELEASE.md`.
+- **The Hermes bundle measures 5.5 MB** (`expo export --platform ios`). iOS-4 recorded 4.2 MB. `src/` is unchanged since `a12a5be`, so the difference is in the measuring; not investigated.
+
+**Verification (2026-10-29):**
+- `tsc` 0 errors. `npm test` 962/962.
+- `expo-doctor` 20/21: only `react-native-render-html` "Unmaintained", known since iOS-1b. `npm ci --dry-run`: up to date.
+- `npx expo export --platform ios`: 5.5 MB Hermes bundle, written to the OS temp folder and deleted.
+- `npm run verify:release-bundle`: PASS on `preview`.
+  - 2,292 modules, 182 of them app code.
+  - Dev-token strings: 0 of 12 (the control finds 12 of 12).
+  - Placeholder strings, test-login markers and secret values: 0.
+  - Client-secret option names: 28, all inside `expo-auth-session`.
+  - The iOS redirect is present; `msauth://`: 0.
+  - Hosts: only `uat-servicedesk.mountmerugroup.com`, and the UAT URL is present.
+  - UUIDs: 4. Three are public IDs; one is the build's debug ID.
+  - Android-only APIs reached from app code: 0. `statusBarTranslucent` is reported in 2 files; iOS ignores it.
+- `--profile production`: PASS, with the same counts; the UAT URL is still in the bundle, because `env.ts` lists both URLs and PROD is empty.
+- **Planted faults** (a scratch copy; one app module given six faults): FAIL, with 10 problems reported. They were:
+  - the developer-token string (in the JS and in Hermes);
+  - a client-secret value, with its option named outside `expo-auth-session`;
+  - `msauth://` (in the JS and in Hermes);
+  - an unapproved host;
+  - a token-shaped UUID, and `Bearer <uuid>`;
+  - `ToastAndroid` reached from app code.
+
+  The copy was then restored and verified byte for byte.
 
 ## 5. SKIP
 
@@ -1155,7 +1247,8 @@ Android-only parts of ADAPT files, not brought over:
 |---|---|---|
 | `docs/ios/00-PORT-MANIFEST.md` | iOS-1a | This file |
 | `docs/ios/APP-STORE-COMPLIANCE.md` | iOS-1a | Apple checklist |
-| `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-7 | iOS test steps: TestFlight install, back swipe, sheets, Dynamic Type, VoiceOver |
+| `docs/ios/UAT-TEST-PLAN-IOS.md` | iOS-5 (written) | The iOS UAT plan: Android's 96 checks (A–F) adapted to iOS, plus G (iOS only: TestFlight, sign-in, tabs and More, back swipe, search, action sheets, destructive confirmations, keyboard, haptics, text sizes, VoiceOver, Dark Mode, iPad, Reduce Motion), H (write safety on one agreed ticket) and I (account deletion, privacy link) (§4.14) |
+| `docs/ios/RELEASE-IOS.md` | iOS-5 (written) | The iOS release guide: profiles and the build guard, pre-build checks, the release-bundle check, build and submit, EAS Update rules, the `legal.ts` values for `production` (§4.14) |
 | `src/navigation/routes.ts` | iOS-2 (built), iOS-3b, iOS-3c | The route table: each tab stack's routes, the sheets, `getId` per record route, titles, and `focusedAppTab()` (§4.5). Plain data, read by the navigators and the tests. **iOS-3b:** `SHEET_ID_PARAM` (getId for the four write sheets) and `tabUnderSheets()`. **iOS-3c:** TaskEditor's getId (`<ticketId>/<taskId or new>`) and ApprovalsInbox in `PINNED_BAR_ROOTS` |
 | `src/navigation/AppTabs.tsx`, `src/navigation/TabStacks.tsx`, `src/navigation/MoreScreen.tsx` | iOS-2 (built) | The tab bar, one native stack per tab, and the More list. They replace `AppDrawer`, `MainTabs`, `AppTabBar`, `DrawerContent`, `TicketStack` and `ModuleStacks` (§3.9). **iOS-3c:** TabStacks registers every module screen; `SCREENS` is a complete table |
 | `src/screens/placeholders.ts`, `src/screens/DevPlaceholderScreen.tsx` | iOS-2 (built); **deleted in iOS-3c** | ⚠ DEV ONLY. What a route renders until its screen is ported: the route, its params and sample links, marked "DEV PLACEHOLDER — replaced in iOS-3". Bundled only in `__DEV__` builds; checked absent from the release bundle (compliance A2) |
@@ -1165,7 +1258,7 @@ Android-only parts of ADAPT files, not brought over:
 | `src/utils/phase-gate.ts` | iOS-3a (built); **deleted in iOS-3b** | The write gate (§4.9): `WRITE_CONTROLS = false` and `readOnlyDetail()`, `readOnlyFields()`, `readOnlyActions()`, which empty the role answers' write parts so the read screens offer no write |
 | `src/utils/actionSheet.ts` | iOS-3b (built) | `chooseFromActionSheet()` over ActionSheetIOS (Cancel last, destructive in red, the brand tint), `moreActionChoices()` and `transitionChoices()`, which only label what `permissions.ts` returns. **iOS-3c:** `chooseForField()` for a form field's fixed choices (task Status, request Impact and Urgency) |
 | `src/components/SheetKeyboardView.tsx` | iOS-3b (built) | `KeyboardAvoidingView` `padding` with the offset a page sheet needs (its position on screen, `measureInWindow`), for the write sheets |
-| `tests/screens/write-screens.test.mjs` | iOS-3b (built) | 93 tests: the action sheets per persona and status, the destructive confirmations, the success notice, each safety rule, the sheets on iOS (§4.11) |
+| `tests/screens/write-screens.test.mjs` | iOS-3b (built), iOS-5 | 93 tests: the action sheets per persona and status, the destructive confirmations, the success notice, each safety rule, the sheets on iOS (§4.11). **iOS-5:** 94, with the bulk Close sheet's role check (mutation B8, §4.14) |
 | `tests/screens/module-screens.test.mjs` | iOS-3c (built) | 49 tests: no placeholder in `src/`; notifications (destination, never by type, the badge never polled, the bar, the large title); approvals (Reject in red with a reason, APR-1 only, the tab's navigation); tasks (action sheet, calendar sheet, keyboard, the write guard); KB HTML through the sanitiser and the renderer's engine, and the KB requests; the catalogue and Profile on iOS; every module screen's bar, refresh tint, insets and props (§4.12) |
 | `src/theme/shadows.ts` | iOS-3a (built) | `shadows.fab`: shadowColor, shadowOffset, shadowOpacity and shadowRadius from the palette, for the floating "+" button (Android: `shadow-lg` / elevation) |
 | `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built), iOS-3b | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9). **iOS-3b:** the gate checks became "the writes render from Android's answers"; `ToastAndroid` and `thumbColor` added to the Android-only list; the stub also records ActionSheetIOS, Alert and VoiceOver announcements |
