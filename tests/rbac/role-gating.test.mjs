@@ -690,7 +690,7 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
   }
 
   test('TicketListScreen calls no role gate except isStaff for the empty-state wording', () => {
-    const src = read('src/screens/tickets/TicketListScreen.tsx').replace(/function ListEmpty[\s\S]*?\n}\n/, '');
+    const src = read('src/screens/tickets/TicketListScreen.tsx').replace(/function ListEmpty[\s\S]*?\r?\n}\r?\n/, '');
     assert.doesNotMatch(src, RAW_GATE);
   });
 

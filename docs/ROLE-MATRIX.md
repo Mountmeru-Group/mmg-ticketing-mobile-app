@@ -664,6 +664,32 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - M4 drops the editor for a plain Technician row
   - M7 gates with its own role check again
 
+**iOS-5 (2026-10-29), on the iOS app (`ios-dev`): 962 tests in all (961 after iOS-4).**
+- **How it was run:**
+  - Each mutation was applied alone, in a scratch copy of the repo outside it, byte-identical to the working tree.
+  - The full suite ran; the file was restored, and its SHA-256 checked.
+  - After the run, all 207 files under `src/`, `tests/` and `scripts/` and the config files were verified byte-identical. `ios-dev` itself was never mutated.
+- **A. The 28 Android recorded for G4** (above). Two are re-expressed for G5's rules:
+  - "My Requests shows everyone's rows" is now "END_USER sees everyone's requests";
+  - "the automatic page reading unbounded" is now "a page is read by itself".
+
+  **All 28 caught** (1–10 failures each).
+- **B. Ten for rules only iOS has. All 10 caught** (1–10 failures each):
+  - the Approvals tab for every role;
+  - More's Approvals row with nothing pending;
+  - a double badge;
+  - END_USER edits tasks;
+  - a private note with files accepted by the API, and by the hook;
+  - the file picker in Note mode;
+  - the bulk Close sheet for every role;
+  - More options listing every action;
+  - the Privacy Policy row with no URL.
+- **One survived the first run: B8, the bulk Close sheet for every role.**
+  - `write-screens.test.mjs` pinned `bulkActions().includes('close')` against Android's `canChangeStatus()`, but not that StatusClosure's bulk branch applies it. Android had no such test either.
+  - No write leaked: each ticket still went through `assertStatusChange()`, which refuses END_USER on the device.
+  - **Fixed, test only (Ronit, iOS-5):** `write-screens.test.mjs` now requires the bulk branch's check, and B8 fails 1 test.
+- **A test made independent of line endings (Ronit, iOS-5).** `role-gating.test.mjs`'s TicketListScreen check cut the `ListEmpty` function out with `\n}\n`. On a CRLF checkout (Windows, `core.autocrlf=true`) it cut nothing, and the test failed. It now uses `\r?\n`; it passes on both, checked on a CRLF copy.
+
 ---
 
 ## 8. For Ronit to decide (items 2, 11 and 12 RESOLVED in G2; the rest not changed)
