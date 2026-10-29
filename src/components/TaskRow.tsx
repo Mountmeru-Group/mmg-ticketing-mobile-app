@@ -46,8 +46,7 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
       accessibilityLabel={done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
       disabled={toggling}
       onPress={onToggle}
-      hitSlop={10}
-      className="mr-3 h-6 w-6 items-center justify-center active:opacity-60"
+      className="-my-2.5 -ml-2.5 mr-0.5 h-11 w-11 items-center justify-center active:opacity-60"
     >
       {toggling ? (
         <ActivityIndicator size="small" color={colors.primary} />
@@ -91,14 +90,15 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
   );
 
   return (
-    <View className={`flex-row items-start py-3 ${last ? '' : 'border-b border-gray-100'}`}>
+    <View className={`flex-row items-start py-3 ${last ? '' : 'border-b border-border'}`}>
       {statusIcon}
       {onPress ? (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={`${parent ? `Ticket ${parent.ticketNumber}. ` : ''}${task.title || 'Untitled task'}. ${taskStatusLabel(task.status)}${assignee ? `, ${assignee}` : ', unassigned'}${task.dueDate ? `${overdue ? ', overdue' : ', due'} ${formatDueDay(task.dueDate)}` : ''}`}
           accessibilityHint="Opens the task"
           onPress={onPress}
-          className="flex-1 flex-row items-center active:opacity-70"
+          className="min-h-11 flex-1 flex-row items-center active:opacity-70"
         >
           {body}
           <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />

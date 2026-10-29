@@ -58,7 +58,7 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
             disabled={disabled}
             onPress={() => onChangeChips(chips.filter((c) => c !== email))}
             hitSlop={6}
-            className="m-0.5 h-8 flex-row items-center rounded-full bg-blue-100 px-2.5 active:opacity-70"
+            className="m-0.5 min-h-8 flex-row items-center rounded-full bg-blue-100 px-2.5 py-1 active:opacity-70"
           >
             <Text className="text-xs text-blue-900">{email}</Text>
             <Ionicons name="close" size={14} color={palette.blue[900]} style={{ marginLeft: 4 }} />
@@ -89,8 +89,9 @@ export function EmailChipsInput({ label, chips, onChangeChips, input, onChangeIn
             <Pressable
               key={u.id}
               accessibilityRole="button"
+              accessibilityLabel={`${formatDisplayName(u.displayName)}, ${u.email}`}
               onPress={() => commit(u.email)}
-              className="min-h-11 justify-center border-b border-gray-100 px-3 py-2 active:bg-gray-50"
+              className="min-h-11 justify-center border-b border-border px-3 py-2 active:bg-gray-50"
             >
               <Text className="text-sm text-gray-900">{formatDisplayName(u.displayName)}</Text>
               <Text className="text-xs text-gray-500">{u.email}</Text>

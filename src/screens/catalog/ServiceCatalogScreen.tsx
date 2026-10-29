@@ -18,13 +18,13 @@ import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, QueryBanner, SearchField, StatusBadge,
+  OfflineState, OutlineButton, QueryBanner, SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { MoreStackScreenProps, ServiceCategory, ServiceItem, ServiceRequest } from '@/types';
-import { formatDateTime } from '@/utils/format';
+import { formatDateTime, statusLabel } from '@/utils/format';
 import { isOwnServiceRequest, serviceCatalogPermissions, type ServiceCatalogPermissions } from '@/utils/permissions';
 import { categoryItemCount, filterCatalogItems, itemCountLabel, requestRef } from '@/utils/service-catalog';
 
@@ -330,8 +330,9 @@ function CatalogRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={description ? `${title || 'Untitled'}. ${description}` : title || 'Untitled'}
       onPress={onPress}
-      className="mx-4 mb-3 flex-row items-center rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 min-h-11 flex-row items-center rounded-xl border border-border bg-white p-4 active:opacity-80"
     >
       {/* The web's icon square: `bg-blue-100 text-blue-600` (ServiceCatalogPage.tsx:429, :463). */}
       <View className="h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
@@ -438,10 +439,10 @@ function MyRequestsView({
           ) : isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
           ) : isFetchNextPageError ? (
-            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4 active:opacity-60">
-              <Text className="text-sm text-red-700">Couldn't load older requests.</Text>
-              <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
-            </Pressable>
+            <View className="items-center py-4">
+              <Text className="mb-2 text-sm text-red-700">Couldn't load older requests.</Text>
+              <OutlineButton label="Retry" icon="refresh" onPress={() => void fetchNextPage()} />
+            </View>
           ) : null
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 24, flexGrow: 1 }}
@@ -475,7 +476,12 @@ const RequestRow = memo(function RequestRow({ request, own, onPress }: { request
   );
   const className = 'mx-4 mb-3 rounded-xl border border-border bg-white p-4';
   return onPress ? (
-    <Pressable accessibilityRole="button" onPress={onPress} className={`${className} active:opacity-80`}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${requestRef(request.requestNumber)}, ${request.serviceItem?.name || 'Service request'}, ${statusLabel(request.status)}`}
+      onPress={onPress}
+      className={`${className} min-h-11 active:opacity-80`}
+    >
       {body}
     </Pressable>
   ) : (

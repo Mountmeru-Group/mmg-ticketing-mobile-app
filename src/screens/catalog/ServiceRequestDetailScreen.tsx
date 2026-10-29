@@ -17,7 +17,7 @@ import {
 import { useServiceItem, useServiceRequest } from '@/hooks';
 import { Row } from '@/screens/tickets/TicketPropertyEditors';
 import { useAuthStore } from '@/store/auth.store';
-import { colors } from '@/theme';
+import { colors, maxTextScale } from '@/theme';
 import type { MoreStackScreenProps, ServiceRequest } from '@/types';
 import { formatDateTime, formatDisplayName } from '@/utils/format';
 import { htmlToDisplayText } from '@/utils/html';
@@ -97,7 +97,7 @@ export function ServiceRequestDetailScreen({ navigation, route }: MoreStackScree
       >
         <Card>
           <Text className="text-xs font-semibold text-gray-500">{requestRef(request.requestNumber)}</Text>
-          <Text className="text-lg font-bold text-gray-900">{request.serviceItem?.name || 'Service request'}</Text>
+          <Text className="text-lg font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title3}>{request.serviceItem?.name || 'Service request'}</Text>
           <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
             <StatusBadge status={request.status} recordId={request.id} />
             <PriorityBadge priority={request.priority} />
@@ -157,7 +157,7 @@ function Approvals({ request, approvals }: { request: ServiceRequest; approvals:
   return (
     <Card title="Approvals">
       {approvals.map((a, index) => (
-        <View key={a.id} className={`py-2 ${index < approvals.length - 1 ? 'border-b border-gray-100' : ''}`}>
+        <View key={a.id} className={`py-2 ${index < approvals.length - 1 ? 'border-b border-border' : ''}`}>
           <View className="flex-row items-center">
             <Text className="flex-1 pr-2 text-sm font-semibold text-gray-900" numberOfLines={2}>
               {formatDisplayName(a.approver?.displayName) || a.approver?.email || 'Approver'}

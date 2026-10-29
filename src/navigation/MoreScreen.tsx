@@ -6,12 +6,14 @@
 // - At the bottom, as the drawer and the web's user block: the account card (avatar, name, role, and the locked country
 //   chip; it opens Profile & settings) and Sign out (confirmation, AUTH-3, then the local wipe: useSignOut).
 // - Footer: version and environment.
+// - iOS-4: the separators are the cards' border colour (gray-100 was barely visible on white), the row icons grow with
+//   the text size (HIG Typography: "Increase the size of meaningful interface icons"), and every row has a label.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { APP_ENV, APP_VERSION } from '@/config/env';
-import { countryName, useCountryOptions, usePendingApprovals, useSignOut } from '@/hooks';
+import { countryName, useCountryOptions, usePendingApprovals, useScaledIconSize, useSignOut } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import type { MoreStackScreenProps } from '@/types';
@@ -84,8 +86,12 @@ export function MoreScreen({ navigation }: MoreStackScreenProps<'More'>) {
           onPress={() => navigation.navigate('Profile')}
           className="min-h-11 flex-row items-center px-4 py-3 active:bg-gray-100"
         >
-          <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-            <Text className="text-sm font-bold text-primary">{initials(user?.displayName)}</Text>
+          <View
+            className="h-10 w-10 items-center justify-center rounded-full bg-primary/10"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Text className="text-sm font-bold text-primary" maxFontSizeMultiplier={1.4}>{initials(user?.displayName)}</Text>
           </View>
           <View className="ml-3 flex-1">
             <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
@@ -101,10 +107,11 @@ export function MoreScreen({ navigation }: MoreStackScreenProps<'More'>) {
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
         </Pressable>
-        <View className="ml-4 border-t border-gray-100" />
+        <View className="ml-4 border-t border-border" />
         {/* Web: the user menu's Sign out, `text-red-600`. */}
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={signingOut ? 'Signing out' : 'Sign out'}
           accessibilityState={{ busy: signingOut }}
           onPress={() => {
             if (!signingOut) void signOut();
@@ -144,20 +151,21 @@ interface RowProps {
 }
 
 function Row({ label, icon, badge, divider, onPress }: RowProps) {
+  const iconSize = useScaledIconSize(22);
   return (
     <View>
-      {divider ? <View className="ml-14 border-t border-gray-100" /> : null}
+      {divider ? <View className="ml-14 border-t border-border" /> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={badge > 0 ? `${label}, ${badge} waiting` : label}
         onPress={onPress}
         className="min-h-11 flex-row items-center px-4 py-3 active:bg-gray-100"
       >
-        <Ionicons name={icon} size={22} color={colors.primary} />
+        <Ionicons name={icon} size={iconSize} color={colors.primary} />
         <Text className="ml-4 flex-1 text-base text-gray-900">{label}</Text>
         {badge > 0 ? (
           <View className="mr-2 min-w-6 items-center rounded-full bg-red-600 px-1.5 py-0.5">
-            <Text className="text-xs font-bold text-white">{badge > 99 ? '99+' : badge}</Text>
+            <Text className="text-xs font-bold text-white" maxFontSizeMultiplier={1.4}>{badge > 99 ? '99+' : badge}</Text>
           </View>
         ) : null}
         <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />

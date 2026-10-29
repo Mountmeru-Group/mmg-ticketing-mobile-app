@@ -52,6 +52,7 @@ export function EmptyState({ title, message, icon = 'file-tray-outline', illustr
       {actionLabel && onAction ? (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={actionLabel}
           onPress={onAction}
           className="mt-4 min-h-11 justify-center rounded-lg bg-primary px-5 active:opacity-80"
         >

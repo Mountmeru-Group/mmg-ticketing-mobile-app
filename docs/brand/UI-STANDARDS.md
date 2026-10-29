@@ -8,6 +8,10 @@ defects found on a device, the Home KPI tiles and the drawer layout (§5), and u
 motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
 property-editor pattern on the ticket, now that the technician has one too.
 
+**On iPhone, §9 (Phase iOS-4, 2026-10-29) is the standard.** It supersedes S0's sizes, S1's header, S12's navigation
+chrome, the large-text rules of §4 and the separator colour of S2 and §8, and adds targets, VoiceOver, haptics, sheets,
+search and keyboard rules from Apple's Human Interface Guidelines. Everything else here still applies.
+
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
 
@@ -410,3 +414,101 @@ the same pieces and adds no new styles.
   - Success: a toast, the editor closes and the row shows the server's value.
   - Failure: the server's message (a 403 says the role can't change that field), the editor closes and the row shows
     the saved value. Nothing is optimistic.
+
+## 9. iOS (Phase iOS-4, 2026-10-29)
+
+The standard on iPhone. Each rule names the Human Interface Guidelines page it follows; the quotes are in
+`docs/ios/APP-STORE-COMPLIANCE.md` (section E). The tests that pin these rules are in
+`tests/screens/hig-polish.test.mjs`. pt and dp use the same numbers.
+
+### 9.1 Type: iOS text styles (HIG, Typography)
+The `text-*` classes keep their names, but each one now resolves to an iOS text style at the default text size
+("Large"). `src/theme/typography.ts` is the single source.
+
+| Class | iOS text style | Size / leading (pt) | Was (web, S0) |
+|---|---|---|---|
+| `text-xs` | Caption 1 | 12 / 16 | 12 / 16 |
+| `text-sm` | Subheadline | 15 / 20 | 14 / 20 |
+| `text-base` | Body | 17 / 22 | 16 / 24 |
+| `text-lg` | Title 3 | 20 / 25 | 18 / 28 |
+| `text-xl` | Title 2 | 22 / 28 | 20 / 28 |
+| `text-2xl` | Title 1 | 28 / 34 | 24 / 32 |
+| `text-3xl` | Large Title | 34 / 41 | 30 / 36 |
+
+- **Server HTML** (`HtmlText`): body text at 15 pt; h1 at 20, h2 at 17, h4 at 15; code at 13 (Footnote).
+- **Minimum size:** nothing below 11 pt, iOS's minimum.
+- **Dynamic Type:** React Native scales every size by the person's text size, up to ×3.571 at AX5.
+- **Caps (`maxFontSizeMultiplier`):** iOS's titles grow less than body text, so titles stop at iOS's own AX5 size (`maxTextScale`): Title 1 ×2.07, Title 2 ×2.55, Title 3 ×2.75. That applies only to text of 20 pt and more: the Home greeting, the KPI counts, and the ticket, task, article, request and Profile titles. Initials in avatars and badge counts stop at ×1.4 so they stay inside their circle. Body and caption text is never capped.
+
+### 9.2 Screen frame
+- **Header:** the native navigation bar (replaces S1's ScreenHeader).
+  - Tab roots (Home, Tickets, Approvals, Alerts, More) have a large title that collapses as the content scrolls (HIG, Toolbars).
+  - Pushed screens have a standard title and the back chevron with no label.
+- **Nothing is pinned above a tab root's list.** The banners, filter chips, sort and count ride at the top of the list (`ListHeaderComponent`). Every first-load state (offline, loading, error) scrolls the same way (`StateScroll`). Otherwise the large title can't collapse.
+- **Search** (HIG, Search fields):
+  - On Tickets, search is the navigation bar's own field, under the title and kept on screen while the list scrolls (`placement: 'stacked'`, `hideWhenScrolling: false`). Filters is the bar's right button, with a count badge.
+  - On pushed screens (Knowledge base, the catalogue, the people and template pickers), the inline `SearchField` stays above what it searches.
+- **Sheets:**
+  - The write sheets are root page sheets with ✕ on the left.
+  - The picker sheets (`OptionSheet`, `PersonPickerSheet`, `TemplatePickerSheet`, `DatePickerSheet`) are native page sheets through `PageSheet`: a swipe down closes them, and the title sits between ✕ (or Cancel) and an optional Done.
+  - No drawn grabber (HIG, Sheets: a grabber means the sheet can be dragged to resize). Done always comes with Cancel.
+
+### 9.3 Large text (HIG, Typography: "Consider adjusting your layout at large font sizes")
+- **Accessibility sizes:** these start at AX1 (`fontScale` ≥ 1.786, `useAccessibilityTextSize()`). From there:
+  - Home's KPI tiles are one per row.
+  - The ticket's four tabs are two rows of two.
+  - The ticket card's header (number, Updated, New reply) stacks.
+  - The bulk-selection bar's buttons stack.
+  - The Filters sheet's date rows put the label above the field.
+- **No `adjustsFontSizeToFit` at the accessibility sizes:** the text wraps instead.
+- **Controls grow with the text:** `min-h-*`, never `h-*`, on any button, field or chip that holds text (`SubmitButton` 48, `SearchField` 44, chips 36 plus slop).
+- **Icons:** icons that carry meaning grow with the text, up to twice their size (`useScaledIconSize()`). These are More's row icons and the KPI glyph with its square.
+- **Knowledge-base tables:** each column is at least 120 pt × the text size, and a table wider than the screen scrolls sideways (`utils/html.ts` `tableLayoutWidth`).
+- **Truncation:** keep it to text you can read in full elsewhere. The Profile email is never cut.
+
+### 9.4 Targets (HIG, Buttons: "a hit region of at least 44x44 pt")
+- **44 pt minimum:** every Pressable is at least 44 pt tall (and wide, when its width is set), from its own size or its hit slop. A test enforces this on every Pressable in `src/`.
+- **Icon buttons** (✕, mark read, remove, the task checkbox, the notification and announcement corners) are 44 × 44 pt boxes. A hit slop is only for chips in a row (36 pt + 4 pt slop).
+
+### 9.5 VoiceOver (HIG, VoiceOver)
+- **Labels:** every Pressable, TextInput and Switch has an `accessibilityLabel` that says what is visible (and the state, e.g. "Filters, 2 on"). A test enforces this.
+- **No control inside another:** VoiceOver can't reach a control nested in another, so it is offered as one of the outer element's custom actions instead.
+  - Ticket card: Change status, Select.
+  - Attachment row: Show details, Download and share, Delete.
+- **Decorative avatars:** initials circles are hidden from VoiceOver; the name is beside them.
+- **Announcements:** a success notice is read out (`SuccessNotice`). The ticket's priority preview announces a new priority, since its live region works on Android only.
+
+### 9.6 Haptics (HIG, Playing haptics: "Use system-provided haptic patterns according to their documented meanings")
+Only `src/utils/haptics.ts` plays haptics, and each one has a single meaning:
+
+| Haptic | When |
+|---|---|
+| Success | A write finished: every `notify()`, an approval decision, the account-deletion request |
+| Warning | It finished only in part: a ticket created but its files failed; a bulk run with failures, skips or a Stop; a mark-read that failed while the notification still opened (`notifyWarning()`, amber notice) |
+| Error | A write failed: every `reportWriteError*()` |
+| Selection | A filter chip that changes, a segmented tab (ticket detail, reply mode), a ticket added to or taken out of a selection |
+
+Nothing else plays one. iOS's System Haptics switch turns them all off.
+
+### 9.7 Motion (HIG, Motion; Accessibility)
+- **Rules:** S7 and `docs/PERFORMANCE.md` §10 stand (timing curves, no springs or bounce, transform and opacity only).
+- **Reduce Motion:** every animation is skipped, the success notice appears without a fade, and the picker sheets fade instead of sliding.
+
+### 9.8 Keyboard (HIG, Virtual keyboards)
+- **Return key:** a single-line field's Return key is Next to the following field, and Done on the last one (Profile, the ticket's title, the task's title).
+- **Done bar:** multiline fields, and the phone pad (which has no Return key), get the Done bar above the keyboard (`KeyboardDoneBar`, one per form).
+- **Keyboard types:** match the content: email, phone, `numbers-and-punctuation` for a number.
+- **AutoFill:** name, phone and email fields set `textContentType`.
+
+### 9.9 Feedback
+- **Success notice:** a non-modal notice for a write. Green tick for success, amber mark for a partial outcome; never the tick for anything that failed.
+- **Alerts:** confirmations name exactly what happens. Destructive style only for a destructive result the person didn't directly choose; the account-deletion request uses the default style (HIG, Alerts). Cancel is always "Cancel".
+
+### 9.10 Appearance and colour
+- **Light only (D9):** `userInterfaceStyle: "light"`. Nothing reads the system appearance: no `dark:` classes, no `useColorScheme`, a dark-content status bar, a light date picker. A dark-mode phone shows the light app and light system controls.
+- **Brand yellow:** `#FFCC00` (the web's CSS variable; the logo's sampled `#FECB03` is not in the app) is 1.5:1 on white, below the 4.5:1 text minimum and the 3:1 graphics minimum. It is never a text, icon or control colour; it appears only in the two decorative empty-state illustrations. Its accessible use is as a fill behind `#1A1A1A` text (11.5:1), as on the web's secondary button. A test enforces this.
+- **Brand red:** `#D21121` is 5.5:1 on white and passes for text either way.
+- **Separators:** `border-border` (`#e2e8f0`), the card edge, everywhere. gray-100 (S2, §8) was too faint on white (1.06:1).
+
+### 9.11 Empty, loading and error states
+S11 stands; the shared `EmptyState`, `ErrorState`, `OfflineState` and `LoadingSkeleton` are on every screen. A list footer whose next page failed shows its message and the same `OutlineButton` "Retry" as `ErrorState`, not a "Tap to retry" text.

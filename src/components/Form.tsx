@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { describeError } from '@/api/errors';
+import { useAccessibilityTextSize } from '@/hooks/useTextSize';
 import { colors, palette } from '@/theme';
 import { Card } from './Card';
 
@@ -132,13 +133,15 @@ export function SubmitButton({
 }) {
   const off = disabled || loading;
   const style = BUTTON_TONES[tone];
+  // iOS-4: at least 48 pt, and taller when the person's text size needs it (a fixed height cut the label off).
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: off, busy: loading }}
       disabled={off}
       onPress={onPress}
-      className={`h-12 flex-row items-center justify-center rounded-lg px-4 ${off ? 'bg-gray-300' : `${style.bg} active:opacity-80`}`}
+      className={`min-h-12 flex-row items-center justify-center rounded-lg px-4 py-2 ${off ? 'bg-gray-300' : `${style.bg} active:opacity-80`}`}
     >
       {loading ? (
         // On the grey in-flight background: white would be 1.5:1, the grey label colour is 5.1:1.
@@ -170,9 +173,14 @@ export function OutlineButton({
 }) {
   const danger = tone === 'danger';
   const color = danger ? palette.red[700] : colors.text.body;
+  // iOS-4: at the accessibility text sizes a compact label wraps instead of shrinking (HIG Typography: keep truncation
+  // to a minimum); the rows that hold compact buttons stack them at those sizes.
+  const largeText = useAccessibilityTextSize();
+  const shrink = compact && !largeText;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       onPress={onPress}
@@ -181,9 +189,9 @@ export function OutlineButton({
       {loading ? <ActivityIndicator size="small" color={color} /> : icon ? <Ionicons name={icon} size={18} color={color} /> : null}
       <Text
         className={`shrink text-sm font-medium ${danger ? 'text-red-700' : 'text-gray-700'} ${loading || icon ? (compact ? 'ml-1.5' : 'ml-2') : ''}`}
-        numberOfLines={compact ? 1 : undefined}
-        adjustsFontSizeToFit={compact}
-        minimumFontScale={compact ? 0.75 : undefined}
+        numberOfLines={shrink ? 1 : undefined}
+        adjustsFontSizeToFit={shrink}
+        minimumFontScale={shrink ? 0.75 : undefined}
       >
         {label}
       </Text>

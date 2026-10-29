@@ -12,36 +12,58 @@
 //
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #25): pushed from More (its account card and "Settings" row), with the native
 // navigation bar. The form scrolls the focused field above the keyboard and the tab bar (automaticallyAdjustKeyboardInsets)
-// and a drag down puts the keyboard away. The country list keeps its scrollable sheet (a server list). Not here yet, by
-// decision (iOS-3c plan Q5): the privacy-policy link and the account-deletion entry wait for the policy URL and D10
-// (docs/ios/APP-STORE-COMPLIANCE.md H1, H6; iOS-4).
+// and a drag down puts the keyboard away. The country list keeps its scrollable sheet (a server list).
+// iOS-4:
+// - the Account card (docs/ios/APP-STORE-COMPLIANCE.md H1, H6): Privacy Policy opens MMG's policy in Safari, and Request
+//   Account Deletion files a ticket for IT through the existing TKT-2 after a confirmation (utils/accountDeletion.ts).
+//   Each row shows only once its release value is set in config/legal.ts; a production build refuses empty ones.
+// - the fields: Return moves Name → Phone → Department → Timezone; the phone pad, which has no Return key, gets the
+//   keyboard's Done bar; Name and Phone offer AutoFill (textContentType). The email wraps instead of being cut.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Text, TextInput, View, type ReturnKeyTypeOptions,
+  type TextInputProps,
+} from 'react-native';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
+import { ACCOUNT_DELETION_CATEGORY, ACCOUNT_DELETION_WORKING_DAYS, PRIVACY_POLICY_URL } from '@/config/legal';
 import {
-  Card, ErrorState, FieldLabel, InlineError, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner,
+  Card, ErrorState, FieldLabel, InlineError, KeyboardDoneBar, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
-  countryName, profileChanges, useCountryOptions, useProfile, useSignOut, useSingleFlight, useUpdateProfile, validateProfile,
-  type ProfileForm,
+  countryName, profileChanges, useCategories, useCountryOptions, useCreateTicket, useProfile, useSignOut, useSingleFlight,
+  useUpdateProfile, validateProfile, type ProfileForm,
 } from '@/hooks';
+import { requireOnline } from '@/hooks/writeGuards';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
-import { colors } from '@/theme';
+import { colors, maxTextScale, palette } from '@/theme';
 import type { MoreStackScreenProps, UserProfile } from '@/types';
-import { notify } from '@/utils/dialogs';
+import {
+  DELETION_CONFIRM_LABEL, DELETION_CONFIRM_TITLE, accountDeletionTicket, accountRows, deletionConfirmMessage,
+  findDeletionCategory,
+} from '@/utils/accountDeletion';
+import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { ROLE_LABELS } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { countrySelectorMode } from '@/utils/ticket-filters';
 
 const ALL_COUNTRIES = '__ALL__';
 const EMPTY_FORM: ProfileForm = { displayName: '', phone: '', department: '', timezone: '' };
+/** The profile form's keyboard Done bar (iOS-4, components/KeyboardDoneBar.tsx). */
+const PROFILE_KEYBOARD = 'profile-keyboard';
+/** Which Account rows this build shows (config/legal.ts, set per release). */
+const ACCOUNT_ROWS = accountRows({
+  privacyPolicyUrl: PRIVACY_POLICY_URL,
+  deletionCategory: ACCOUNT_DELETION_CATEGORY,
+  deletionWorkingDays: ACCOUNT_DELETION_WORKING_DAYS,
+});
 
 function formFrom(p: UserProfile): ProfileForm {
   return { displayName: p.displayName ?? '', phone: p.phone ?? '', department: p.department ?? '', timezone: p.timezone ?? '' };
@@ -55,7 +77,7 @@ function deviceTimezone(): string | null {
   }
 }
 
-export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
+export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
   const offline = useIsOffline();
   const user = useAuthStore((s) => s.user);
   const placeholder = isPlaceholderUser(user);
@@ -122,7 +144,52 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
       }
     });
 
+  // ── Account (iOS-4): the privacy policy, and a deletion request for IT through TKT-2 ──
+  const createTicket = useCreateTicket();
+  // LKP-1 only when a request is being sent (refetch runs even while the query is disabled), never on opening Profile.
+  const categories = useCategories({ enabled: false });
+  const canRequestDeletion = ACCOUNT_ROWS.requestDeletion && !!user && !placeholder;
+  const openPrivacyPolicy = () => {
+    Linking.openURL(PRIVACY_POLICY_URL).catch(() => Alert.alert("Couldn't open the privacy policy", 'Try again.'));
+  };
+  const requestDeletion = () =>
+    void once(async () => {
+      if (!user) return;
+      const ok = await confirmAction({
+        title: DELETION_CONFIRM_TITLE,
+        message: deletionConfirmMessage(ACCOUNT_DELETION_WORKING_DAYS),
+        confirmLabel: DELETION_CONFIRM_LABEL,
+      });
+      if (!ok) return;
+      try {
+        // Offline, the lookup below would wait for the network: say so now, as every write does.
+        requireOnline();
+        const lookup = categories.data ? { data: categories.data, error: null } : await categories.refetch();
+        if (!lookup.data) throw lookup.error ?? new Error('No categories');
+        const category = findDeletionCategory(lookup.data, ACCOUNT_DELETION_CATEGORY);
+        if (!category) {
+          hapticOutcome('error');
+          Alert.alert("Couldn't send the request", `The Service Desk has no "${ACCOUNT_DELETION_CATEGORY}" category. Nothing was sent. Contact IT.`);
+          return;
+        }
+        const { ticket } = await createTicket.mutateAsync(
+          accountDeletionTicket(user, { appVersion: APP_VERSION, requestedAt: new Date(), categoryId: category.id }),
+        );
+        hapticOutcome('success');
+        Alert.alert('Request Sent', `Ticket #${ticket.ticketNumber} was created. IT will reply on it; updates appear in Alerts.`, [
+          { text: 'View Ticket', onPress: () => navigation.navigate('TicketDetail', { ticketId: ticket.id }) },
+          { text: 'OK', style: 'cancel' },
+        ]);
+      } catch (e) {
+        reportWriteError("Couldn't send the request", e);
+      }
+    });
+
   const set = (key: keyof ProfileForm) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
+  // Return moves through the fields in order (iOS-4).
+  const phoneInput = useRef<TextInput>(null);
+  const departmentInput = useRef<TextInput>(null);
+  const timezoneInput = useRef<TextInput>(null);
   const tz = deviceTimezone();
   const displayName = formatDisplayName(profile.data?.displayName ?? user?.displayName);
 
@@ -140,14 +207,19 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
         <Card>
           <View className="flex-row items-center">
             {/* The web's avatar (AppLayout.tsx): brand red at 10 % with red initials, as in the drawer. */}
-            <View className="h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-              <Text className="text-lg font-bold text-primary">{initials(profile.data?.displayName ?? user?.displayName)}</Text>
+            <View
+              className="h-14 w-14 items-center justify-center rounded-full bg-primary/10"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Text className="text-lg font-bold text-primary" maxFontSizeMultiplier={1.4}>{initials(profile.data?.displayName ?? user?.displayName)}</Text>
             </View>
             <View className="ml-3 flex-1">
-              <Text className="text-lg font-bold text-gray-900" numberOfLines={1}>
+              <Text className="text-lg font-bold text-gray-900" numberOfLines={2} maxFontSizeMultiplier={maxTextScale.title3}>
                 {displayName || 'Signed in'}
               </Text>
-              <Text selectable className="text-sm text-gray-500" numberOfLines={1}>
+              {/* Wraps (iOS-4): the email is shown nowhere else, so it is never cut off (HIG Typography). */}
+              <Text selectable className="text-sm text-gray-500">
                 {user?.email ?? ''}
               </Text>
               <View className="mt-1 self-start rounded-full bg-gray-100 px-2.5 py-0.5">
@@ -180,11 +252,36 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
           </Card>
         ) : (
           <Card title="Your details">
-            <Field label="Name" required value={form.displayName} onChange={set('displayName')} autoCapitalize="words" editable={!update.isPending} />
+            <Field
+              label="Name"
+              required
+              value={form.displayName}
+              onChange={set('displayName')}
+              autoCapitalize="words"
+              textContentType="name"
+              editable={!update.isPending}
+              next={phoneInput}
+            />
             <ReadOnly label="Email" value={user?.email ?? profile.data.email} />
             <ReadOnly label="Role" value={user ? ROLE_LABELS[user.role] : ''} />
-            <Field label="Phone" value={form.phone} onChange={set('phone')} keyboardType="phone-pad" editable={!update.isPending} />
-            <Field label="Department" value={form.department} onChange={set('department')} autoCapitalize="words" editable={!update.isPending} />
+            <Field
+              label="Phone"
+              value={form.phone}
+              onChange={set('phone')}
+              keyboardType="phone-pad"
+              textContentType="telephoneNumber"
+              editable={!update.isPending}
+              inputRef={phoneInput}
+            />
+            <Field
+              label="Department"
+              value={form.department}
+              onChange={set('department')}
+              autoCapitalize="words"
+              editable={!update.isPending}
+              inputRef={departmentInput}
+              next={timezoneInput}
+            />
             <Field
               label="Timezone"
               required
@@ -192,9 +289,15 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
               value={form.timezone}
               onChange={set('timezone')}
               editable={!update.isPending}
+              inputRef={timezoneInput}
             />
             {tz && tz !== form.timezone ? (
-              <Pressable accessibilityRole="button" onPress={() => set('timezone')(tz)} className="-mt-3 mb-2 min-h-11 justify-center self-start active:opacity-60">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Use this device's timezone, ${tz}`}
+                onPress={() => set('timezone')(tz)}
+                className="-mt-3 mb-2 min-h-11 justify-center self-start active:opacity-60"
+              >
                 <Text className="text-sm font-medium text-blue-700">Use this device's timezone ({tz})</Text>
               </Pressable>
             ) : null}
@@ -206,6 +309,7 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
             {dirty ? (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Discard changes"
                 onPress={() => {
                   setError(null);
                   if (profile.data) setForm(formFrom(profile.data));
@@ -244,6 +348,25 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
           </Card>
         ) : null}
 
+        {ACCOUNT_ROWS.privacyPolicy || canRequestDeletion ? (
+          <Card title="Account" flush>
+            {ACCOUNT_ROWS.privacyPolicy ? (
+              <AccountRow icon="shield-checkmark-outline" label="Privacy Policy" hint="Opens in Safari" onPress={openPrivacyPolicy} trailing="open-outline" />
+            ) : null}
+            {canRequestDeletion ? (
+              <AccountRow
+                icon="person-remove-outline"
+                label="Request Account Deletion"
+                hint="Asks you to confirm, then sends IT a request to delete your Service Desk account"
+                onPress={requestDeletion}
+                busy={createTicket.isPending}
+                destructive
+                divider={ACCOUNT_ROWS.privacyPolicy}
+              />
+            ) : null}
+          </Card>
+        ) : null}
+
         <Card title="App">
           <ReadOnly label="Version" value={APP_VERSION} />
           <ReadOnly label="Environment" value={ENVIRONMENT_LABEL} />
@@ -253,6 +376,7 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
           <SubmitButton label={signingOut ? 'Signing out…' : 'Sign out'} tone="danger" onPress={() => void once(signOut)} loading={signingOut} />
         </View>
       </ScrollView>
+      <KeyboardDoneBar id={PROFILE_KEYBOARD} />
 
       <OptionSheet
         visible={countrySheet}
@@ -278,7 +402,8 @@ export function ProfileScreen(_props: MoreStackScreenProps<'Profile'>) {
 }
 
 function Field({
-  label, value, onChange, required, hint, editable = true, keyboardType, autoCapitalize = 'none',
+  label, value, onChange, required, hint, editable = true, keyboardType, autoCapitalize = 'none', textContentType, inputRef,
+  next,
 }: {
   label: string;
   value: string;
@@ -288,21 +413,63 @@ function Field({
   editable?: boolean;
   keyboardType?: 'default' | 'phone-pad';
   autoCapitalize?: 'none' | 'words';
+  textContentType?: TextInputProps['textContentType'];
+  inputRef?: RefObject<TextInput | null>;
+  /** The field Return moves to; without one, Return is Done. */
+  next?: RefObject<TextInput | null>;
 }) {
+  const returnKeyType: ReturnKeyTypeOptions = next ? 'next' : 'done';
   return (
     <View className="mb-3">
       <FieldLabel label={label} required={required} hint={hint} />
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChange}
         editable={editable}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
+        textContentType={textContentType}
+        returnKeyType={returnKeyType}
+        submitBehavior={next ? 'submit' : 'blurAndSubmit'}
+        onSubmitEditing={next ? () => next.current?.focus() : undefined}
+        inputAccessoryViewID={PROFILE_KEYBOARD}
         accessibilityLabel={label}
         className={`min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-base text-gray-900 ${editable ? 'bg-white' : 'bg-gray-100'}`}
       />
     </View>
+  );
+}
+
+/** A row of the Account card: an iOS settings row, 44 pt or more, with a red label for the deletion request. */
+function AccountRow({
+  icon, label, hint, onPress, trailing = 'chevron-forward', busy = false, destructive = false, divider = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  hint: string;
+  onPress: () => void;
+  trailing?: keyof typeof Ionicons.glyphMap;
+  busy?: boolean;
+  destructive?: boolean;
+  divider?: boolean;
+}) {
+  const tint = destructive ? palette.red[700] : colors.text.body;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
+      onPress={onPress}
+      className={`min-h-11 flex-row items-center py-3 active:opacity-60 ${divider ? 'border-t border-border' : ''}`}
+    >
+      <Ionicons name={icon} size={20} color={tint} />
+      <Text className={`ml-3 flex-1 text-base ${destructive ? 'text-red-700' : 'text-gray-900'}`}>{label}</Text>
+      {busy ? <ActivityIndicator color={colors.primary} /> : <Ionicons name={trailing} size={18} color={colors.text.muted} />}
+    </Pressable>
   );
 }
 

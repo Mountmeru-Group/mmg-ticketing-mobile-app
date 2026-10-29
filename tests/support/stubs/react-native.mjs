@@ -13,6 +13,19 @@ let reduceMotion = false;
 
 export const Platform = { OS: 'ios' };
 
+// iOS-4: the window and the person's text size (hooks/useTextSize.ts). fontScale is 1 at the default text size and
+// 3.571 at the largest accessibility size, as React Native reports it on an iPhone.
+let fontScale = 1;
+
+export function useWindowDimensions() {
+  return { width: 390, height: 844, scale: 3, fontScale };
+}
+
+/** The person's text size, as React Native's fontScale. */
+export function __setFontScale(value) {
+  fontScale = value;
+}
+
 /** Pretend to be another platform (only to prove the app refuses it); set it back to 'ios' afterwards. */
 export function __setPlatformOS(os) {
   Platform.OS = os;

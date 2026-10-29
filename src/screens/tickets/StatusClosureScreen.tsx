@@ -21,7 +21,7 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { changeTicketStatus } from '@/api/tickets.api';
 import {
   AttachmentPicker, BulkProgressModal, EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice,
-  OfflineBanner, OfflineState, SelectField, SheetKeyboardView, StatusBadge, SubmitButton,
+  KeyboardDoneBar, OfflineBanner, OfflineState, SelectField, SheetKeyboardView, StatusBadge, SubmitButton,
 } from '@/components';
 import {
   assertStatusChange, assertStatusUnchanged, findCachedTicket, useBulkRunner, useChangeStatus, useDiscardGuard, useSingleFlight, useTicket,
@@ -39,6 +39,9 @@ import {
   closureSaveLabel, closureTitle, requiresClosureForm, transitionTone, type ClosureForm, type StatusTransition,
 } from '@/utils/ticket-rules';
 import { bulkCloseMessage, closureMessage, statusChangeMessage } from '@/utils/writeCopy';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const CLOSURE_KEYBOARD = 'closure-keyboard';
 
 type Props = SheetScreenProps<'StatusClosure'>;
 
@@ -72,6 +75,7 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         placeholder="What was done to resolve the issue"
         placeholderTextColor={colors.text.secondary}
         accessibilityLabel="Resolution, required"
+        inputAccessoryViewID={CLOSURE_KEYBOARD}
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
       <SelectField
@@ -101,8 +105,10 @@ function ClosureFields({ form, onChange, disabled }: { form: ClosureForm; onChan
         placeholder="Message to the requester"
         placeholderTextColor={colors.text.secondary}
         accessibilityLabel="Closure comments, required"
+        inputAccessoryViewID={CLOSURE_KEYBOARD}
         className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
+      <KeyboardDoneBar id={CLOSURE_KEYBOARD} />
     </>
   );
 }
@@ -246,6 +252,7 @@ function SingleStatus({ navigation, route }: Props) {
                 <Pressable
                   key={t.target}
                   accessibilityRole="button"
+                  accessibilityLabel={requiresClosureForm(t.target) ? `${t.label}, needs closure details` : t.label}
                   accessibilityState={{ disabled: change.isPending }}
                   disabled={change.isPending}
                   onPress={() => void once(() => quickChange(t))}
@@ -274,7 +281,12 @@ function SingleStatus({ navigation, route }: Props) {
                 tone={saveTone(closure.target)}
               />
               {!change.isPending ? (
-                <Pressable accessibilityRole="button" onPress={() => setClosure(null)} className="mt-2 min-h-11 items-center justify-center active:opacity-60">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose a different status"
+                  onPress={() => setClosure(null)}
+                  className="mt-2 min-h-11 items-center justify-center active:opacity-60"
+                >
                   <Text className="text-sm font-medium text-blue-700">Choose a different status</Text>
                 </Pressable>
               ) : null}

@@ -181,3 +181,40 @@ export function clearPreparedHtml(): void {
   prepared.clear();
   preparedChars = 0;
 }
+
+// ── Tables (iOS-4) ─────────────────────────────────────────────
+// The renderer lays a table row out as equal cells across the width it is given, so a wide table on a phone, and any
+// table at large text sizes, had columns a word or two wide (HIG Typography: "Keep text truncation to a minimum as
+// font size increases"). A table is now laid out at least TABLE_MIN_COLUMN_WIDTH per column, scaled with the text size,
+// and scrolls sideways when that is wider than the screen (components/HtmlText.tsx). The content is unchanged.
+
+/** The narrowest a table column is laid out, in points at the default text size. */
+export const TABLE_MIN_COLUMN_WIDTH = 120;
+
+/** The shape of the render engine's tree that the column count needs (a TNode). */
+export interface TableTreeNode {
+  tagName?: string | null;
+  children: readonly TableTreeNode[];
+}
+
+/** A table's columns: the most cells (td, th) in any one of its rows. Nested tables are their own tables. */
+export function tableColumnCount(table: TableTreeNode): number {
+  let most = 0;
+  const visit = (node: TableTreeNode) => {
+    for (const child of node.children) {
+      if (child.tagName === 'table') continue;
+      if (child.tagName === 'tr') {
+        most = Math.max(most, child.children.filter((cell) => cell.tagName === 'td' || cell.tagName === 'th').length);
+      } else {
+        visit(child);
+      }
+    }
+  };
+  visit(table);
+  return most;
+}
+
+/** The width a table is laid out at: the space it has, or its columns at their minimum width, whichever is wider. */
+export function tableLayoutWidth(columns: number, fontScale: number, available: number): number {
+  return Math.max(available, columns * Math.round(TABLE_MIN_COLUMN_WIDTH * Math.max(fontScale, 1)));
+}

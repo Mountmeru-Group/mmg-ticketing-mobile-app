@@ -14,6 +14,8 @@
 // Approvals tab, or opens More's Approvals for the roles without that tab (hasApprovalsTab). The offline and error
 // banners sit inside the scroll view, so the large title collapses as the screen scrolls (react-native-screens tracks
 // the first scroll view on the screen). "Raise a ticket" and the "+" button open the create sheet (M8) over the tabs.
+// iOS-4: at the accessibility text sizes the KPI tiles are one per row and their labels wrap instead of shrinking; the
+// greeting and the counts stop growing where iOS's Title 2 and Title 1 stop (theme/typography.ts maxTextScale).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -24,10 +26,13 @@ import {
   AnnouncementBanner, EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, QueryBanner, RecentTicketRow,
   Skeleton, SubmitButton,
 } from '@/components';
-import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, type SafeDashboard } from '@/hooks';
+import {
+  queryKeys, useAccessibilityTextSize, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, useScaledIconSize,
+  type SafeDashboard,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
-import { colors, shadows } from '@/theme';
+import { colors, maxTextScale, shadows } from '@/theme';
 import type { DashboardRecentTicket, HomeStackScreenProps, Ticket } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { hasApprovalsTab, homeTiles, homeVariant, navRole, showApprovalsShortcut, type HomeTile } from '@/utils/permissions';
@@ -127,7 +132,9 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
         <OfflineBanner />
         <QueryBanner error={primaryError} hasData={hasAnyData} onRetry={() => void onRefresh()} />
         <View className="mx-4 mb-4 mt-3">
-          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900">{firstName ? `Hello, ${firstName}` : 'Hello'}</Text>
+          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title2}>
+            {firstName ? `Hello, ${firstName}` : 'Hello'}
+          </Text>
           <Text className="text-sm text-gray-500">{ROLE_LABELS[role]}</Text>
         </View>
 
@@ -259,7 +266,12 @@ function Section({
           {caption ? <Text className="mt-0.5 text-xs text-gray-500">{caption}</Text> : null}
         </View>
         {action ? (
-          <Pressable accessibilityRole="button" onPress={action.onPress} hitSlop={10} className="ml-3 py-0.5 active:opacity-60">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${action.label}: ${title}`}
+            onPress={action.onPress}
+            className="-my-2.5 ml-3 min-h-11 justify-center active:opacity-60"
+          >
             <Text className="text-sm font-medium text-blue-700">{action.label}</Text>
           </Pressable>
         ) : null}
@@ -289,12 +301,16 @@ function TileGrid({
   // - An odd last tile (5 tiles: AGENT outside triage, L2_MANAGER) spans the row, so no tile is left alone half-width.
   // - A row is as tall as its taller tile (the tiles stretch) and each count sits at the tile's foot, so the two
   //   counts line up when one label wraps.
+  // - iOS-4: at the accessibility text sizes, one tile per row (HIG Typography: "Reduce the number of columns when the
+  //   font size increases").
   const { width: windowWidth } = useWindowDimensions();
+  const largeText = useAccessibilityTextSize();
   const [gridWidth, setGridWidth] = useState<number>();
   const width = gridWidth ?? windowWidth - 32;
   const half = (width - TILE_GAP) / 2;
+  const perRow = largeText ? 1 : 2;
   const rows: Tile[][] = [];
-  for (let i = 0; i < tiles.length; i += 2) rows.push(tiles.slice(i, i + 2));
+  for (let i = 0; i < tiles.length; i += perRow) rows.push(tiles.slice(i, i + perRow));
 
   return (
     <View>
@@ -318,6 +334,10 @@ function TileGrid({
 }
 
 function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loading: boolean }) {
+  const largeText = useAccessibilityTextSize();
+  // The glyph grows with the text (HIG Typography: "Increase the size of meaningful interface icons"), and its square
+  // with it: 32 pt around an 18 pt glyph at the default size.
+  const iconSize = useScaledIconSize(18);
   // The web's KPI card (DashboardPage.tsx KPICard): white card, a coloured square with a white icon, the label in
   // `text-sm text-gray-500`, the count in `text-2xl font-bold`. The web puts the label beside the square; a phone tile
   // is too narrow for that (about 80 dp at 360 dp), so the label goes under the square and gets the full width.
@@ -330,16 +350,16 @@ function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loadi
       className="min-h-32 justify-between rounded-xl border border-border bg-white p-4 active:opacity-80"
     >
       <View>
-        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: t.color }}>
-          <Ionicons name={t.icon} size={18} color={colors.text.inverse} />
+        <View className="items-center justify-center rounded-lg" style={{ backgroundColor: t.color, width: iconSize + 14, height: iconSize + 14 }}>
+          <Ionicons name={t.icon} size={iconSize} color={colors.text.inverse} />
         </View>
         {/* Never truncated, and a word never breaks: each word may take a line (two at most), and a word still too wide
             shrinks to fit instead ("Unassigned" at 200 % text on a 360 dp phone: about 87 %). No minimumFontScale, so the
             shrink can always finish and nothing is cut. */}
         <Text
           className="mt-2 text-sm text-gray-500"
-          numberOfLines={Math.min(t.label.split(' ').length, 2)}
-          adjustsFontSizeToFit
+          numberOfLines={largeText ? undefined : Math.min(t.label.split(' ').length, 2)}
+          adjustsFontSizeToFit={!largeText}
         >
           {t.label}
         </Text>
@@ -354,7 +374,7 @@ function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loadi
         ) : null}
       </View>
       {t.value !== undefined ? (
-        <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>
+        <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={maxTextScale.title1}>
           {t.value}
         </Text>
       ) : loading ? (
@@ -372,8 +392,9 @@ function Shortcut({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphM
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
-      className="min-h-11 flex-row items-center rounded-full border border-gray-300 bg-white px-4 active:bg-gray-50"
+      className="min-h-11 flex-row items-center rounded-full border border-gray-300 bg-white px-4 py-2 active:bg-gray-50"
     >
       <Ionicons name={icon} size={18} color={colors.text.body} />
       <Text className="ml-2 text-sm font-medium text-gray-700">{label}</Text>

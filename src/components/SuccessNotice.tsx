@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reduceMotionEnabled } from '@/hooks/useReduceMotion';
 import { motion, palette } from '@/theme';
-import { subscribeToSuccessNotices } from '@/utils/successNotice';
+import { subscribeToSuccessNotices, type NoticeTone } from '@/utils/successNotice';
 
 const { fade, visible, curve } = motion.successNotice;
 const ease = Easing.bezier(...curve);
@@ -19,6 +19,7 @@ const ease = Easing.bezier(...curve);
 interface Shown {
   id: number;
   message: string;
+  tone: NoticeTone;
   opacity: Animated.Value;
 }
 
@@ -28,7 +29,7 @@ export function SuccessNoticeHost() {
 
   // A new notice replaces the one on screen.
   useEffect(
-    () => subscribeToSuccessNotices(({ id, message }) => setShown({ id, message, opacity: new Animated.Value(reduceMotionEnabled() ? 1 : 0) })),
+    () => subscribeToSuccessNotices(({ id, message, tone }) => setShown({ id, message, tone, opacity: new Animated.Value(reduceMotionEnabled() ? 1 : 0) })),
     [],
   );
 
@@ -63,7 +64,12 @@ export function SuccessNoticeHost() {
       style={{ position: 'absolute', top: insets.top + 8, left: 16, right: 16, alignItems: 'center' }}
     >
       <Animated.View style={{ opacity: shown.opacity }} className="max-w-full flex-row items-center rounded-full bg-gray-900 px-4 py-2.5">
-        <Ionicons name="checkmark-circle" size={18} color={palette.green[500]} />
+        {/* iOS-4: a partial outcome (notifyWarning) shows an amber mark, never the success tick. */}
+        {shown.tone === 'warning' ? (
+          <Ionicons name="warning" size={18} color={palette.amber[400]} />
+        ) : (
+          <Ionicons name="checkmark-circle" size={18} color={palette.green[500]} />
+        )}
         <Text className="ml-2 shrink text-sm font-medium text-white">{shown.message}</Text>
       </Animated.View>
     </View>

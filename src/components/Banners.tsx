@@ -29,7 +29,7 @@ function Banner({
         <Text className={`text-xs ${textClass}`}>{detail}</Text>
       </View>
       {onRetry ? (
-        <Pressable accessibilityRole="button" onPress={onRetry} className="-mr-2 ml-2 min-h-11 justify-center rounded-md px-3 active:opacity-60">
+        <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={onRetry} className="-mr-2 ml-2 min-h-11 justify-center rounded-md px-3 active:opacity-60">
           <Text className={`text-sm font-semibold ${textClass}`}>Retry</Text>
         </Pressable>
       ) : null}

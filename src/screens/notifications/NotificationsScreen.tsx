@@ -24,7 +24,7 @@ import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState,
-  QueryBanner,
+  OutlineButton, QueryBanner,
 } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
@@ -33,7 +33,7 @@ import {
 import { colors, palette } from '@/theme';
 import type { AlertsStackScreenProps, Notification } from '@/types';
 import { notificationDestination } from '@/utils/deep-links';
-import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
+import { confirmAction, notify, notifyWarning, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatRelative } from '@/utils/format';
 import { htmlToDisplayText } from '@/utils/html';
 
@@ -111,7 +111,8 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
     // reported (the row stays unread). The per-call promise reports every tap, even when several overlap.
     if (!n.isRead) {
       markRead.mutateAsync(n.id).catch((e: unknown) => {
-        if (!isSessionEndedError(e)) notify(`Couldn't mark it read: ${describeWriteError(e)}`);
+        // iOS-4: the amber warning notice and haptic, never the green success tick, for a step that failed.
+        if (!isSessionEndedError(e)) notifyWarning(`Couldn't mark it read: ${describeWriteError(e)}`);
       });
     }
     openRelated(n);
@@ -175,6 +176,7 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
       headerRight: () => (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Mark all read"
           accessibilityState={{ disabled: markAllDisabled, busy: markAllPending }}
           disabled={markAllDisabled}
           onPress={onMarkAll}
@@ -310,7 +312,7 @@ const NotificationRow = memo(function NotificationRow({
         accessibilityLabel={`${n.isRead ? '' : 'Unread. '}${n.title}`}
         accessibilityHint={n.ticketId ? 'Opens the ticket' : undefined}
         onPress={onPress}
-        className="flex-1 flex-row active:opacity-70"
+        className="min-h-11 flex-1 flex-row active:opacity-70"
       >
         <View className="mr-3 mt-0.5">
           <Ionicons name={icon} size={20} color={n.isRead ? palette.gray[500] : palette.blue[700]} />
@@ -343,8 +345,7 @@ const NotificationRow = memo(function NotificationRow({
           accessibilityLabel="Mark as read"
           disabled={marking}
           onPress={onMarkRead}
-          hitSlop={6}
-          className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center self-start rounded-full active:bg-blue-100"
+          className="-mr-3 -mt-3 ml-1 h-11 w-11 items-center justify-center self-start rounded-full active:bg-blue-100"
         >
           {marking ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
         </Pressable>
@@ -365,11 +366,12 @@ function Footer({
   if (hasMore && offline) return <Text className="py-4 text-center text-xs text-gray-500">More load when you reconnect.</Text>;
   if (loading) return <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />;
   if (failed) {
+    // iOS-4: the same Retry button as every other error state (ErrorState).
     return (
-      <Pressable accessibilityRole="button" onPress={onRetry} className="items-center py-4 active:opacity-60">
-        <Text className="text-sm text-red-700">Couldn't load more notifications.</Text>
-        <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
-      </Pressable>
+      <View className="items-center py-4">
+        <Text className="mb-2 text-sm text-red-700">Couldn't load more notifications.</Text>
+        <OutlineButton label="Retry" icon="refresh" onPress={onRetry} />
+      </View>
     );
   }
   return null;

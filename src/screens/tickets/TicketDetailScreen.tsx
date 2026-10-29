@@ -57,11 +57,11 @@ import {
   OfflineBanner, OfflineState, OutlineButton, PriorityBadge, QueryBanner, SlaBadge, StatusBadge, SubmitButton, TaskRow,
 } from '@/components';
 import {
-  useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
+  useAccessibilityTextSize, useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
   useTicketComments, useTicketHistory, useToggleTask, useUploadAttachment,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { colors, palette } from '@/theme';
+import { colors, maxTextScale, palette } from '@/theme';
 import type { ActivityAuditItem, Attachment, Comment, RecordScreenProps, TicketDetail, TicketTaskEmbedded } from '@/types';
 import { chooseFromActionSheet, moreActionChoices } from '@/utils/actionSheet';
 import { describeAudit } from '@/utils/activity';
@@ -69,6 +69,7 @@ import { confirmAction, notify, reportActionWriteError, reportWriteError } from 
 import {
   effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
+import { hapticSelection } from '@/utils/haptics';
 import {
   isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type TicketDetailPermissions,
   type TicketFieldPermissions,
@@ -563,7 +564,7 @@ const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDet
           <Text className="text-xs font-medium" style={{ color: colors.badgeFallback.fg }}>{sourceLabel(ticket.source)}</Text>
         </View>
       </View>
-      <Text selectable className="text-lg font-bold text-gray-900">
+      <Text selectable className="text-lg font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title3}>
         {ticket.title || '(no subject)'}
       </Text>
       <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
@@ -609,10 +610,11 @@ const StatusActionBar = memo(function StatusActionBar({
               key={t.target}
               disabled={busy}
               accessibilityRole="button"
+              accessibilityLabel={t.label}
               accessibilityState={{ disabled: busy }}
               accessibilityHint={requiresClosureForm(t.target) ? 'Opens the closure form' : 'Asks you to confirm'}
               onPress={() => onTransition(t)}
-              className={`min-h-11 justify-center rounded-lg border px-4 ${toneClass[transitionTone(t.target)]} ${busy ? 'opacity-50' : 'active:opacity-70'}`}
+              className={`min-h-11 justify-center rounded-lg border px-4 py-2 ${toneClass[transitionTone(t.target)]} ${busy ? 'opacity-50' : 'active:opacity-70'}`}
             >
               <Text className="text-sm font-medium text-gray-900">{t.label}</Text>
             </Pressable>
@@ -667,8 +669,14 @@ const RequesterCard = memo(function RequesterCard({ ticket }: { ticket: TicketDe
   return (
     <Card title="Requester">
       <View className="flex-row items-center">
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-          <Text className="text-sm font-semibold text-primary">{initials(r?.displayName)}</Text>
+        {/* The initials avatar is decoration (the name is beside it): hidden from VoiceOver, and its letters stop growing
+            at Title 3's limit so they stay inside the circle. */}
+        <View
+          className="h-10 w-10 items-center justify-center rounded-full bg-primary/10"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text className="text-sm font-semibold text-primary" maxFontSizeMultiplier={1.4}>{initials(r?.displayName)}</Text>
         </View>
         <View className="ml-3 flex-1">
           <Text className="text-sm font-semibold text-gray-900">{name}</Text>
@@ -713,15 +721,19 @@ const TabBar = memo(function TabBar({
     attachments: attachmentCount,
     tasks: taskCount,
   };
+  const largeText = useAccessibilityTextSize();
   const select = (t: DetailTab) => {
     if (t === highlighted) return;
+    hapticSelection();
     setPending(t);
     startTransition(() => onSelect(t));
   };
   // Segmented control (UI-STANDARDS S5): 44 dp tabs on a grey track; the active tab is white. Labels shrink a little,
   // then wrap to a second line, so nothing is cut off at 360 dp or with large text.
+  // iOS-4: at the accessibility text sizes the four tabs are two rows of two, with no shrinking (HIG Typography: "Reduce
+  // the number of columns when the font size increases"); a new tab plays the selection haptic.
   return (
-    <View className="mx-4 mb-3 flex-row rounded-xl bg-gray-200 p-1" accessibilityRole="tablist">
+    <View className={`mx-4 mb-3 rounded-xl bg-gray-200 p-1 ${largeText ? 'flex-row flex-wrap' : 'flex-row'}`} accessibilityRole="tablist">
       {(Object.keys(TAB_LABELS) as DetailTab[]).map((t) => {
         const active = t === highlighted;
         const count = counts[t];
@@ -729,15 +741,16 @@ const TabBar = memo(function TabBar({
           <Pressable
             key={t}
             accessibilityRole="tab"
+            accessibilityLabel={`${TAB_LABELS[t]}${count !== undefined ? `, ${count}` : ''}`}
             accessibilityState={{ selected: active }}
             onPress={() => select(t)}
-            className={`min-h-11 flex-1 items-center justify-center rounded-lg px-1 ${active ? 'bg-white' : 'active:bg-white/60'}`}
+            className={`min-h-11 items-center justify-center rounded-lg px-1 py-1 ${largeText ? 'w-1/2' : 'flex-1'} ${active ? 'bg-white' : 'active:bg-white/60'}`}
           >
             <Text
               className={`text-center text-xs ${active ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
+              numberOfLines={largeText ? undefined : 2}
+              adjustsFontSizeToFit={!largeText}
+              minimumFontScale={largeText ? undefined : 0.85}
             >
               {TAB_LABELS[t]}
               {count !== undefined ? ` (${count})` : ''}
@@ -852,8 +865,14 @@ const CommentItem = memo(function CommentItem({
   return (
     <View className={`mx-4 mb-3 rounded-xl border p-4 ${isPrivate ? 'border-amber-200 bg-amber-50' : 'border-border bg-white'}`}>
       <View className="mb-2 flex-row items-center">
-        <View className={`h-8 w-8 items-center justify-center rounded-full ${isPrivate ? 'bg-amber-200' : 'bg-primary/10'}`}>
-          <Text className={`text-xs font-semibold ${isPrivate ? 'text-amber-900' : 'text-primary'}`}>{initials(comment.author?.displayName)}</Text>
+        <View
+          className={`h-8 w-8 items-center justify-center rounded-full ${isPrivate ? 'bg-amber-200' : 'bg-primary/10'}`}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text className={`text-xs font-semibold ${isPrivate ? 'text-amber-900' : 'text-primary'}`} maxFontSizeMultiplier={1.4}>
+            {initials(comment.author?.displayName)}
+          </Text>
         </View>
         <View className="ml-2 flex-1">
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{author}</Text>
@@ -899,7 +918,7 @@ const AuditItem = memo(function AuditItem({ audit, first, last }: { audit: Activ
   const { actor, action } = describeAudit(audit);
   return (
     <CardRow first={first} last={last}>
-      <View className={`flex-row py-3 ${last ? '' : 'border-b border-gray-100'}`}>
+      <View className={`flex-row py-3 ${last ? '' : 'border-b border-border'}`}>
         <View className="mr-3 mt-1.5 h-2 w-2 rounded-full bg-gray-300" />
         <View className="flex-1">
           <Text className="text-sm text-gray-700">
@@ -941,15 +960,31 @@ const AttachmentRow = memo(function AttachmentRow({
   onToggleDetails: (attachmentId: string) => void;
 }) {
   const name = attachment.fileName || 'Unnamed file';
+  // iOS-4, VoiceOver: the row is one element, so its Delete button and "Download and share" can't be reached inside it.
+  // They, and the long-press details, are the row's custom actions instead: the same callbacks, the same conditions.
+  const canDelete = !!onDelete && !(busy || opening);
+  const actions = [
+    { name: 'details', label: detailsOpen ? 'Hide details' : 'Show details' },
+    ...(onView && !opening ? [{ name: 'share', label: 'Download and share' }] : []),
+    ...(canDelete ? [{ name: 'delete', label: 'Delete' }] : []),
+  ];
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${name}, ${formatBytes(attachment.sizeBytes)}`}
       accessibilityState={{ busy: opening || deleting, expanded: detailsOpen }}
-      accessibilityHint={onView ? 'Opens the image. Long-press for details' : 'Downloads the file and opens the share sheet. Long-press for details'}
+      accessibilityHint={onView ? 'Opens the image' : 'Downloads the file and opens the share sheet'}
+      accessibilityActions={actions}
+      onAccessibilityAction={(event) => {
+        const action = event.nativeEvent.actionName;
+        if (action === 'details') onToggleDetails(attachment.id);
+        else if (action === 'share') onOpen(attachment);
+        else if (action === 'delete' && canDelete) onDelete?.(attachment);
+      }}
       disabled={opening || deleting}
       onPress={() => (onView ?? onOpen)(attachment)}
       onLongPress={() => onToggleDetails(attachment.id)}
-      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
     >
       <View className="flex-row items-center">
         <Ionicons name={attachmentIcon(attachment.mimeType)} size={20} color={palette.gray[600]} />
@@ -979,13 +1014,19 @@ const AttachmentRow = memo(function AttachmentRow({
         ) : null}
       </View>
       {detailsOpen ? (
-        <View className="mt-2 border-t border-gray-100 pt-1">
+        <View className="mt-2 border-t border-border pt-1">
           <Row label="Uploaded by">{formatDisplayName(attachment.uploaderName) || 'Unknown'}</Row>
           <Row label="Uploaded">{formatDateTime(attachment.createdAt)}</Row>
           <Row label="Type">{attachment.mimeType || 'Unknown'}</Row>
           <Row label="Size">{formatBytes(attachment.sizeBytes)}</Row>
           <Row label="Added with">{attachment.commentId ? 'A reply' : 'The ticket'}</Row>
-          <Pressable accessibilityRole="button" disabled={opening} onPress={() => onOpen(attachment)} className="mt-1 min-h-11 justify-center self-start active:opacity-60">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Download and share"
+            disabled={opening}
+            onPress={() => onOpen(attachment)}
+            className="mt-1 min-h-11 justify-center self-start active:opacity-60"
+          >
             <Text className="text-sm font-medium text-blue-700">Download and share</Text>
           </Pressable>
         </View>

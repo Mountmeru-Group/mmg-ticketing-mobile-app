@@ -1,8 +1,7 @@
 // Searchable people picker: a local list (group members), plus USR-3 search when `searchRoles` is given.
 // USR-3 is ADMIN/AGENT only (useUserSearch enforces it). Picking a person writes nothing — the caller confirms.
 import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, Text, View, type ListRenderItem } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, Pressable, Text, View, type ListRenderItem } from 'react-native';
 
 import { useDebouncedValue, useStableCallback, useUserSearch } from '@/hooks';
 import { colors } from '@/theme';
@@ -10,6 +9,7 @@ import type { UserRole } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { SearchField } from './Filters';
 import { LookupError } from './Form';
+import { PageSheet } from './PageSheet';
 
 export interface Person {
   id: string;
@@ -42,7 +42,6 @@ const NO_EXTRAS: NonNullable<PersonPickerSheetProps['extraOptions']> = [];
 export function PersonPickerSheet({
   visible, title, people = NO_PEOPLE, searchRoles, extraOptions = NO_EXTRAS, excludeIds = NO_ONE, onPick, onClose,
 }: PersonPickerSheetProps) {
-  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const term = useDebouncedValue(query, 350);
   const remote = useUserSearch(term, { roles: searchRoles ?? [], enabled: visible && searchRoles !== undefined });
@@ -86,7 +85,7 @@ export function PersonPickerSheet({
   const renderRow = useCallback<ListRenderItem<PickerRow>>(
     ({ item }) =>
       item.kind === 'extra' ? (
-        <Pressable accessibilityRole="button" onPress={item.onPress} className="min-h-12 justify-center border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+        <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress} className="min-h-12 justify-center border-b border-border px-4 py-3 active:bg-gray-50">
           <Text className="text-base font-medium text-blue-700">{item.label}</Text>
         </Pressable>
       ) : (
@@ -95,14 +94,10 @@ export function PersonPickerSheet({
     [pick],
   );
 
-  // Same sheet frame as OptionSheet: grab handle, title, then the list.
+  // Same sheet frame as OptionSheet (iOS-4: a native page sheet), then search and the list.
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <Pressable accessibilityLabel="Close" onPress={close} className="flex-1 bg-black/40" />
-      <View style={{ paddingBottom: insets.bottom + 8 }} className="max-h-[80%] rounded-t-2xl bg-white pt-2">
-        <View className="mb-1 h-1 w-10 self-center rounded-full bg-gray-300" />
-        <Text className="px-4 py-3 text-base font-semibold text-gray-900" accessibilityRole="header">{title}</Text>
-        <View className="mx-4 mb-2">
+    <PageSheet visible={visible} title={title} onClose={close}>
+        <View className="mx-4 mb-2 mt-3">
           <SearchField
             value={query}
             onChangeText={setQuery}
@@ -133,8 +128,7 @@ export function PersonPickerSheet({
             </>
           }
         />
-      </View>
-    </Modal>
+    </PageSheet>
   );
 }
 
@@ -147,7 +141,12 @@ const pickerRowKey = (row: PickerRow) => row.key;
 /** Memoised (Phase P): typing filters the list, and only rows that change are redrawn. */
 const PersonRow = memo(function PersonRow({ person: p, onPick }: { person: Person; onPick: (person: Person) => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => onPick(p)} className="min-h-12 border-b border-gray-100 px-4 py-3 active:bg-gray-50">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${formatDisplayName(p.displayName) || p.email}${p.email ? `, ${p.email}` : ''}${p.note ? `, ${p.note}` : ''}`}
+      onPress={() => onPick(p)}
+      className="min-h-12 border-b border-border px-4 py-3 active:bg-gray-50"
+    >
       <Text className="text-base text-gray-900">{formatDisplayName(p.displayName) || p.email}</Text>
       <Text className="text-xs text-gray-500">
         {p.email}

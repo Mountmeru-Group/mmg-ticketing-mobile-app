@@ -32,7 +32,7 @@ export function RecentTicketRow({ ticket, showRequester, onPress, last = false }
       accessibilityRole="button"
       accessibilityLabel={`Ticket ${ticket.ticketNumber}: ${ticket.title}`}
       onPress={() => onPress(ticket.id)}
-      className={`flex-row items-center py-3 active:opacity-70 ${last ? '' : 'border-b border-gray-100'}`}
+      className={`min-h-11 flex-row items-center py-3 active:opacity-70 ${last ? '' : 'border-b border-border'}`}
     >
       <View className="flex-1">
         <View className="flex-row items-center">

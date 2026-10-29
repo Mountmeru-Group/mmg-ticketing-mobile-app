@@ -1,11 +1,15 @@
 // Progress and per-ticket results of a bulk action (08 §4.2). Cannot be dismissed while running; "Stop" lets the
 // request in flight finish and sends nothing more.
+// iOS-4: when a run finishes, one haptic says how it went (utils/haptics.ts): success when every ticket went through,
+// error when none did and some failed, warning for anything in between (bulkOutcomeHaptic).
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect, useRef } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { BulkOutcome, BulkProgress } from '@/hooks/useBulkRunner';
 import { palette } from '@/theme';
+import { bulkOutcomeHaptic, hapticOutcome } from '@/utils/haptics';
 
 const OUTCOME_STYLE: Record<BulkOutcome['state'], { icon: keyof typeof Ionicons.glyphMap; color: string; label: string }> = {
   done: { icon: 'checkmark-circle', color: palette.green[600], label: 'Done' },
@@ -16,8 +20,15 @@ const OUTCOME_STYLE: Record<BulkOutcome['state'], { icon: keyof typeof Ionicons.
 
 export function BulkProgressModal({ progress, onStop, onClose }: { progress: BulkProgress | null; onStop: () => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  // The run's end, once: running goes from true to false.
+  const wasRunning = useRef(false);
+  const running = progress?.running ?? false;
+  useEffect(() => {
+    if (wasRunning.current && !running && progress) hapticOutcome(bulkOutcomeHaptic(progress.outcomes));
+    wasRunning.current = running;
+  }, [running, progress]);
   if (!progress) return null;
-  const { running, sent, toSend, current, outcomes, stopReason, stopRequested, title } = progress;
+  const { sent, toSend, current, outcomes, stopReason, stopRequested, title } = progress;
   const percent = toSend > 0 ? Math.round((sent / toSend) * 100) : 100;
   const count = (state: BulkOutcome['state']) => outcomes.filter((o) => o.state === state).length;
 
@@ -41,7 +52,7 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
             {outcomes.map((o) => {
               const style = OUTCOME_STYLE[o.state];
               return (
-                <View key={o.id} className="flex-row items-start border-b border-gray-100 py-2">
+                <View key={o.id} className="flex-row items-start border-b border-border py-2">
                   <Ionicons name={style.icon} size={18} color={style.color} />
                   <View className="ml-2 flex-1">
                     <Text className="text-sm text-gray-900">
@@ -58,14 +69,16 @@ export function BulkProgressModal({ progress, onStop, onClose }: { progress: Bul
             {running ? (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={stopRequested ? 'Stopping' : 'Stop'}
+                accessibilityState={{ disabled: stopRequested }}
                 disabled={stopRequested}
                 onPress={onStop}
-                className={`h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''} active:bg-red-50`}
+                className={`min-h-12 items-center justify-center rounded-lg border border-red-300 ${stopRequested ? 'opacity-50' : ''} active:bg-red-50`}
               >
                 <Text className="text-base font-semibold text-red-700">{stopRequested ? 'Stopping…' : 'Stop'}</Text>
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" onPress={onClose} className="h-12 items-center justify-center rounded-lg bg-primary active:opacity-80">
+              <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} className="min-h-12 items-center justify-center rounded-lg bg-primary active:opacity-80">
                 <Text className="text-base font-semibold text-primary-foreground">Close</Text>
               </Pressable>
             )}

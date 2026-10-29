@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { describeActionWriteError, isSessionEndedError } from '@/api/errors';
 import {
   EmptyState, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
-  OutlineButton, PersonPickerSheet, SheetKeyboardView, StatusBadge, SubmitButton, type Person,
+  KeyboardDoneBar, OutlineButton, PersonPickerSheet, SheetKeyboardView, StatusBadge, SubmitButton, type Person,
 } from '@/components';
 import { fetchCurrentStatus, useDiscardGuard, useSingleFlight, useSubmitForApproval, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -29,6 +29,9 @@ import { submitApprovalMessage, submitApprovalOutcome } from '@/utils/approvals'
 import { confirmAction, notify } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
 import { canSubmitForApproval, navRole } from '@/utils/permissions';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const SUBMIT_APPROVAL_KEYBOARD = 'submit-approval-keyboard';
 
 type Props = SheetScreenProps<'SubmitApproval'>;
 
@@ -171,7 +174,7 @@ function SubmitApprovalForm({ navigation, route }: Props) {
                   disabled={busy}
                   onPress={() => setApprovers((prev) => prev.filter((x) => x.id !== p.id))}
                   hitSlop={6}
-                  className="m-0.5 h-8 flex-row items-center rounded-full bg-primary/10 px-2.5 active:opacity-70"
+                  className="m-0.5 min-h-8 flex-row items-center rounded-full bg-primary/10 px-2.5 py-1 active:opacity-70"
                 >
                   <Text className="text-xs font-medium text-primary">{names[i]}</Text>
                   <Ionicons name="close" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
@@ -199,6 +202,7 @@ function SubmitApprovalForm({ navigation, route }: Props) {
             placeholder="Context for the approver…"
             placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Comments for the approver"
+            inputAccessoryViewID={SUBMIT_APPROVAL_KEYBOARD}
             className="min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
         </FormCard>
@@ -225,6 +229,7 @@ function SubmitApprovalForm({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
+      <KeyboardDoneBar id={SUBMIT_APPROVAL_KEYBOARD} />
       <PersonPickerSheet
         visible={pickerOpen}
         title="Add an approver"

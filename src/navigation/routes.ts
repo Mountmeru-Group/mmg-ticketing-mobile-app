@@ -130,16 +130,15 @@ export function isStackRoot(tab: AppTab, name: string): boolean {
 }
 
 /**
- * Tab roots whose title stays standard. react-native-screens collapses a large title only against the scroll view on
- * the screen's first-subview chain, so a bar pinned above the list would leave it large for good. The ticket list keeps
- * its search and filters pinned, as on Android (iOS-3a), and so does the approvals inbox its type chips (iOS-3c); iOS-4
- * can move them into the navigation bar.
+ * Every tab root gets the iOS large title; pushed screens a standard one (HIG, Toolbars: "Use a large title to help
+ * people stay oriented as they navigate and scroll").
+ * react-native-screens collapses a large title only against the scroll view on the screen's first-subview chain, so
+ * nothing may be pinned above a root's list. iOS-4: the ticket list's search is the navigation bar's own, and its
+ * filters, and the approvals inbox's type chips, ride at the top of their lists (before iOS-4 both were pinned, with a
+ * standard title).
  */
-const PINNED_BAR_ROOTS: ReadonlySet<string> = new Set(['TicketList', 'ApprovalsInbox']);
-
-/** Tab roots get the iOS large title, unless a bar is pinned above their list; pushed screens a standard one (HIG). */
 export function hasLargeTitle(tab: AppTab, name: string): boolean {
-  return isStackRoot(tab, name) && !PINNED_BAR_ROOTS.has(name);
+  return isStackRoot(tab, name);
 }
 
 /** Header titles, as on Android. Screens that show a record's own title set it themselves (iOS-3). */

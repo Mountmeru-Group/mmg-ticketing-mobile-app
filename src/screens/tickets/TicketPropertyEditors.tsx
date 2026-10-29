@@ -16,11 +16,11 @@
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #11): copied unchanged in iOS-3a and opened in iOS-3b, when the phase gate went.
 // Impact and urgency are iOS action sheets; the category levels, countries and technicians stay scrollable sheets.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
 import {
-  Card, FieldLabel, HtmlText, LookupError, Notice, OptionSheet, OutlineButton, PersonPickerSheet, PriorityBadge, SelectField,
+  Card, FieldLabel, HtmlText, KeyboardDoneBar, LookupError, Notice, OptionSheet, OutlineButton, PersonPickerSheet, PriorityBadge, SelectField,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
@@ -55,6 +55,9 @@ type FieldEditorKey = Exclude<EditorKey, 'technician'>;
  * Wording per editor. Titles and success toasts are the web's (G1 §1, §3–§5); the field names the 403 message.
  * The technician's toast is M7's, naming the person (assignmentDoneMessage), so it has no fixed `saved`.
  */
+/** The resolution editor's keyboard bar (iOS-4, KeyboardDoneBar). */
+const RESOLUTION_KEYBOARD = 'resolution-keyboard';
+
 const COPY: Record<EditorKey, { field: string; failed: string; saved: string }> = {
   classification: { field: 'the impact and urgency', failed: 'Failed to update', saved: 'Updated' },
   category: { field: 'the category', failed: 'Failed to update category', saved: 'Category updated' },
@@ -155,7 +158,7 @@ export function usePropertyEditing(ticket: TicketDetail | undefined): PropertyEd
 /** A label / value line in a card (UI-STANDARDS S6): 112 dp label column, separators between rows. */
 export function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <View className="flex-row border-b border-gray-100 py-2">
+    <View className="flex-row border-b border-border py-2">
       <Text className="w-28 pr-2 text-sm text-gray-500">{label}</Text>
       <View className="flex-1">{typeof children === 'string' ? <Text className="text-sm text-gray-900">{children}</Text> : children}</View>
     </View>
@@ -208,7 +211,7 @@ function FieldAction({
 }) {
   if (access.mode === 'locked') {
     return (
-      <View className="flex-row items-start border-b border-gray-100 py-2">
+      <View className="flex-row items-start border-b border-border py-2">
         <Ionicons name="lock-closed-outline" size={14} color={colors.text.secondary} style={{ marginTop: 1 }} />
         <Text className="ml-1.5 flex-1 text-xs text-gray-500">{access.reason}</Text>
       </View>
@@ -216,9 +219,10 @@ function FieldAction({
   }
   if (access.mode !== 'edit') return null;
   return (
-    <View className="border-b border-gray-100">
+    <View className="border-b border-border">
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={label}
         accessibilityState={{ disabled: blocked }}
         accessibilityHint={blocked ? 'Finish or cancel the open change first' : undefined}
         disabled={blocked}
@@ -336,7 +340,7 @@ function ClassificationForm({
   }
 
   return (
-    <View className="border-b border-gray-100 py-3">
+    <View className="border-b border-border py-3">
       <SelectField
         label="Impact"
         value={staged.impact ? IMPACT_LABELS[staged.impact] : null}
@@ -386,6 +390,18 @@ export function PriorityPreviewBox({
   matrix: ReturnType<typeof usePriorityMatrix>;
 }) {
   const when = target.kind === 'create' ? 'when the ticket is created' : 'when you save';
+  // iOS-4: VoiceOver hears the priority impact × urgency gives whenever a change moves it. The box's
+  // accessibilityLiveRegion below is Android's only (TalkBack); iOS needs an announcement.
+  const preview = enabled && matrix.data !== undefined ? previewPriority(matrix.data, staged) : null;
+  const spoken = preview?.kind === 'computed' ? `Priority: ${PRIORITY_LABELS[preview.priority] ?? preview.priority}` : null;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (spoken) AccessibilityInfo.announceForAccessibility(spoken);
+  }, [spoken]);
 
   let body: ReactNode;
   if (!enabled) {
@@ -532,7 +548,7 @@ function CategoryForm({
   };
 
   return (
-    <View className="border-b border-gray-100 py-3">
+    <View className="border-b border-border py-3">
       <Text className="mb-3 text-xs text-gray-500">Now: {now}</Text>
       {categories.data === undefined ? (
         categories.isError && !categories.isFetching ? (
@@ -650,7 +666,7 @@ function TechnicianForm({
   const currentName = current ? technicianName(current) : '';
 
   return (
-    <View className="border-b border-gray-100 py-3">
+    <View className="border-b border-border py-3">
       {loading ? (
         <View className="mb-3 min-h-11 flex-row items-center">
           <ActivityIndicator size="small" color={colors.primary} />
@@ -740,7 +756,7 @@ function CountryForm({
   const chosen = options.find((o) => o.value === (countryId ?? NONE));
 
   return (
-    <View className="border-b border-gray-100 py-3">
+    <View className="border-b border-border py-3">
       {countries.data === undefined && !(countries.isError && !countries.isFetching) ? (
         <View className="mb-3 min-h-11 flex-row items-center">
           <ActivityIndicator size="small" color={colors.primary} />
@@ -830,8 +846,10 @@ function ResolutionForm({
         placeholder="How the issue was resolved"
         placeholderTextColor={colors.text.secondary}
         accessibilityLabel="Resolution"
+        inputAccessoryViewID={RESOLUTION_KEYBOARD}
         className="mb-3 min-h-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
       />
+      <KeyboardDoneBar id={RESOLUTION_KEYBOARD} />
       {/* Sent as typed, as on the web (G1 §5): no trim, and an empty text is allowed. */}
       <EditorActions canSave={dirty} saving={saving} onSave={() => onSave({ resolution: draft })} onCancel={onCancel} />
     </View>

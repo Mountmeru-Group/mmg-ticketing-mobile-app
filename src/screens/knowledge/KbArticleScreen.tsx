@@ -17,7 +17,7 @@ import {
   Card, EmptyState, ErrorState, HtmlText, LoadingSkeleton, OfflineBanner, OfflineState, OutlineButton, QueryBanner,
 } from '@/components';
 import { useKbArticle, useKbHelpfulVote, useKbVoted, useSingleFlight } from '@/hooks';
-import { colors, palette } from '@/theme';
+import { colors, maxTextScale, palette } from '@/theme';
 import type { MoreStackScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDate, formatDisplayName } from '@/utils/format';
@@ -90,7 +90,7 @@ export function KbArticleScreen({ route }: MoreStackScreenProps<'KbArticle'>) {
       >
         <Card>
           {article.category?.name ? <Text className="mb-1 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
-          <Text selectable className="text-lg font-bold text-gray-900">
+          <Text selectable className="text-lg font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title3}>
             {article.title || 'Untitled article'}
           </Text>
           <Text className="mt-1 text-xs text-gray-500">

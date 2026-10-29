@@ -1,15 +1,16 @@
 // iOS date picker (docs/ios/00-PORT-MANIFEST.md §7): replaces Android's system date dialog (DateTimePickerAndroid.open).
-// - The native inline calendar (UIDatePicker, @react-native-community/datetimepicker) in a bottom sheet, with Cancel and
-//   Done in its bar, as iOS presents a date choice that applies only when confirmed. Picking a day stages it; Done hands
-//   the Date to the caller, which turns it into the same calendar day the Android dialog gave (utils/tasks dayFromDate).
-// - Cancel, a tap outside the sheet or the system dismiss gesture changes nothing.
+// - The native inline calendar (UIDatePicker, @react-native-community/datetimepicker) in a page sheet (iOS-4: the native
+//   sheet, ./PageSheet.tsx), with Cancel and Done in its bar, as iOS presents a date choice that applies only when
+//   confirmed. Picking a day stages it; Done hands the Date to the caller, which turns it into the same calendar day the
+//   Android dialog gave (utils/tasks dayFromDate).
+// - Cancel or a swipe down changes nothing.
 // - Light only, as the app (decision D9); the accent is the brand colour, as the web's date inputs.
 import RNDateTimePicker from '@react-native-community/datetimepicker';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 import { colors } from '@/theme';
+import { PageSheet, SheetTextButton } from './PageSheet';
 
 interface DatePickerSheetProps {
   visible: boolean;
@@ -24,7 +25,6 @@ interface DatePickerSheetProps {
 }
 
 export function DatePickerSheet({ visible, title, value, minimumDate, maximumDate, onDone, onClose }: DatePickerSheetProps) {
-  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState(value);
   // Each opening starts from the caller's day, never from a day staged and cancelled before.
   useEffect(() => {
@@ -37,18 +37,14 @@ export function DatePickerSheet({ visible, title, value, minimumDate, maximumDat
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable accessibilityLabel="Cancel" onPress={onClose} className="flex-1 bg-black/40" />
-      <View style={{ paddingBottom: insets.bottom + 8 }} className="rounded-t-2xl bg-white pt-2">
-        <View className="mb-1 h-1 w-10 self-center rounded-full bg-gray-300" />
-        <View className="flex-row items-center px-2">
-          <BarButton label="Cancel" onPress={onClose} />
-          <Text className="flex-1 text-center text-base font-semibold text-gray-900" accessibilityRole="header" numberOfLines={1}>
-            {title}
-          </Text>
-          <BarButton label="Done" onPress={done} bold />
-        </View>
-        <View className="items-center px-2">
+    <PageSheet
+      visible={visible}
+      title={title}
+      onClose={onClose}
+      left={<SheetTextButton label="Cancel" onPress={onClose} />}
+      right={<SheetTextButton label="Done" onPress={done} bold />}
+    >
+        <View className="items-center px-2 pt-2">
           <RNDateTimePicker
             value={draft}
             mode="date"
@@ -60,16 +56,6 @@ export function DatePickerSheet({ visible, title, value, minimumDate, maximumDat
             onValueChange={(_event, date) => setDraft(date)}
           />
         </View>
-      </View>
-    </Modal>
-  );
-}
-
-/** A text button in the sheet's bar: the iOS Cancel / Done pair, 44 pt tall. */
-function BarButton({ label, onPress, bold = false }: { label: string; onPress: () => void; bold?: boolean }) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} className="min-h-11 min-w-16 justify-center px-2 active:opacity-60">
-      <Text className={`text-base text-primary ${bold ? 'text-right font-semibold' : ''}`}>{label}</Text>
-    </Pressable>
+    </PageSheet>
   );
 }
