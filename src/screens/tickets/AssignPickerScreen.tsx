@@ -3,7 +3,7 @@
 // - Group first (LKP-2, active only), then its members, filterable. USR-3 search when the group has no members.
 // - Recommended for the ticket's country (TKT-10). It may include INACTIVE users (05 B.30): anyone not found in an
 //   active group is listed last and flagged.
-// - "Assign to me" (hidden for a pre-check dev-token placeholder session), "Remove assignment", "Move to group".
+// - "Assign to me", "Remove assignment", "Move to group".
 // - Every assignment is TKT-5 POST /tickets/:id/assign with `teamId` when known (05 B.14, 08 S5); `teamId: null` is
 //   never sent (it can't clear a team). Each one asks for confirmation (the assignee is emailed).
 // - Bulk mode (2–20 tickets from M3): pick group + person, sequential, stop on 429/5xx, per-ticket results.
@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { assignTicket } from '@/api/tickets.api';
 import {
-  BulkProgressModal, EmptyState, ErrorState, FormCard, LoadingSkeleton, LookupError, Notice, OfflineBanner, OfflineState,
+  BulkProgressModal, EmptyState, ErrorState, FormCard, LoadingSkeleton, LookupError, OfflineBanner, OfflineState,
   OptionSheet, OutlineButton, PersonPickerSheet, ScreenHeader, SelectField, type Person, type SheetOption,
 } from '@/components';
 import {
@@ -31,7 +31,6 @@ import {
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
 import { canAssignTickets } from '@/utils/permissions';
-import { canAssignToSelf } from '@/utils/session';
 import { BULK_ACTION_LIMIT, isResolvedLocked } from '@/utils/ticket-rules';
 import { assignMessage, bulkAssignMessage, unassignMessage } from '@/utils/writeCopy';
 
@@ -156,7 +155,7 @@ function SingleAssign({ navigation, route }: Props) {
           </FormCard>
 
           <FormCard title="Quick actions">
-            {canAssignToSelf(user) && user ? (
+            {user ? (
               <ActionRow
                 label="Assign to me"
                 disabled={busy || ticket.assignedToId === user.id}
@@ -168,12 +167,7 @@ function SingleAssign({ navigation, route }: Props) {
                   })
                 }
               />
-            ) : (
-              <Notice>
-                "Assign to me" isn't available: this session was saved before the developer token was checked with the server.
-                Sign out and paste the token again.
-              </Notice>
-            )}
+            ) : null}
             {ticket.assignedToId ? (
               <ActionRow
                 label="Remove assignment"

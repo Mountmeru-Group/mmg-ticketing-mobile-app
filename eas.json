@@ -1,7 +1,7 @@
 // EAS Build profiles (JSON5: comments are allowed in eas.json). How to build, sign and distribute: docs/RELEASE.md.
 // Every profile sets EXPO_PUBLIC_APP_ENV, which src/config/env.ts turns into the API base URL. No URL lives here.
-// scripts/eas-build-guard.js runs first on the build server and refuses a production build while the PROD URL in
-// src/config/env.ts is empty, and refuses PROD on any other profile.
+// scripts/eas-build-guard.js runs first on the build server: it refuses a production build if the PROD URL in
+// src/config/env.ts is ever emptied again, and refuses PROD on any other profile.
 {
   "cli": {
     "version": ">= 24.8.0",
@@ -16,9 +16,8 @@
       "android": { "buildType": "apk" },
       "env": { "EXPO_PUBLIC_APP_ENV": "UAT" }
     },
-    // ⛔ PLACEHOLDER — NOT RUNNABLE. Ronit has not approved a production URL: the PROD entry in src/config/env.ts is
-    // empty, so the build guard stops this profile on the server, and the app itself refuses to start without it.
-    // Do not use until every item of the pre-release checklist in docs/RELEASE.md is done.
+    // Store AAB for Google Play, pointed at PRODUCTION (URL set 2026-10-29). Check the pre-release checklist in
+    // docs/RELEASE.md §5 before every build of this profile.
     "production": {
       "node": "24.18.0",
       "distribution": "store",

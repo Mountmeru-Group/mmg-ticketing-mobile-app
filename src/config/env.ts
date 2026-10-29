@@ -8,9 +8,11 @@ export type AppEnvironment = 'UAT' | 'PROD';
 
 const API_BASE_URLS: Record<AppEnvironment, string> = {
   UAT: 'https://uat-servicedesk.mountmerugroup.com/api/v1',
-  // ⛔ PROD — INTENTIONALLY EMPTY PLACEHOLDER. Do NOT add the production URL here.
-  // It is filled in only after Ronit signs off and the BLOCKING backend asks ship (00-OVERVIEW §3, 06).
-  PROD: '',
+  // PROD — set 2026-10-29 on Ronit's written instruction, for the first Google Play (internal testing) build.
+  // Matches the web repo's deploy configuration (00-OVERVIEW §3). Only a release build of the `production` EAS
+  // profile may select it: __DEV__ builds refuse it below, and scripts/eas-build-guard.js refuses PROD on every other
+  // profile. Keep it on one line in this form: the build guard reads it.
+  PROD: 'https://servicedesk.mountmerugroup.com/api/v1',
 };
 
 function resolveEnvironment(): AppEnvironment {

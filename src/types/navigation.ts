@@ -16,8 +16,6 @@ import type { TicketStatus } from './enums';
 // ── Auth ─────────────────────────────────────────────────────
 export type AuthStackParamList = {
   Login: undefined;
-  /** __DEV__ only — interim bridge until SSO (ask A2). Not registered in release builds. */
-  DevToken: undefined;
 };
 
 // ── Tickets tab (TicketStack) ────────────────────────────────
