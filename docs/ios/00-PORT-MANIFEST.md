@@ -2,7 +2,7 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b and iOS-3c with what each phase actually built (§4.1–§4.5, §4.9–§4.12).
+> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b, iOS-3c and iOS-4 with what each phase actually built (§4.1–§4.5, §4.9–§4.13).
 
 ## 0. Port source and fixed facts
 
@@ -56,7 +56,7 @@ Rules used:
 | iOS-1b | Port the non-screen foundation: every KEEP file marked iOS-1b, plus the iOS versions of `app.json`, `eas.json`, `package.json` (scripts only, no dependency changes) and `CLAUDE.md`. Then `npm ci`, `tsc`, the tests that can run, and `expo-doctor` |
 | **iOS-2** | **Navigation shell (tab bar + More):** the navigators, navigation types, the auth screens, the reinstall check, DEV placeholders for every route, and the navigation tests. Built 2026-10-27 (§4.5). `Notice` and `DatePickerSheet` moved to iOS-3, where the screens that use them arrive |
 | **iOS-3** | **Screens**, in the order of §6, each with the tests that read its source: **iOS-3a** read (built 2026-10-28, §4.9), **iOS-3b** write (built 2026-10-28, §4.11), **iOS-3c** modules (built 2026-10-28, §4.12) |
-| **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode |
+| **iOS-4** | **HIG polish:** Dynamic Type, VoiceOver, Reduce Motion, 44 pt targets, safe areas, keyboard, iPad compatibility mode. Built 2026-10-29 (§4.13), with the account-deletion request and the privacy link |
 | **iOS-5** | **Parity + tests:** feature-by-feature check against Android at the port source (and any newer Android commits being synced), and the full test suite green |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
@@ -980,10 +980,107 @@ The file name is kept, because code comments cite "docs/RELEASE.md §6".
 **Still to check on a device (iOS-7):** the Alerts large title collapsing with the banners in the list; "Mark all read" in the bar; every action sheet (task status, Impact, Urgency); the calendar sheet in the task editor and a catalogue date field; the request form, Profile and the approval comment with the keyboard up (iPhone SE included); the task editor's swipe-down with changes; the approvals inbox from the tab and from More; "Back to approvals" from Alerts; the KB article's links, images and tables; Announcements from Home's banner and from More.
 
 **Flagged for iOS-4 and later:**
-- Search and filters in the navigation bar for Tickets and Approvals, which would give both tabs a large title (Q3).
-- The privacy-policy link and account deletion on Profile (Q5; H1, H6).
+- Search and filters in the navigation bar for Tickets and Approvals, which would give both tabs a large title (Q3). **Done in iOS-4 (§4.13):** Tickets' search in the bar; both lists' chips in the list; both tabs have the large title. Approvals has no search (none on the web or Android).
+- The privacy-policy link and account deletion on Profile (Q5; H1, H6). **Built in iOS-4 (§4.13),** hidden until `src/config/legal.ts` has their values.
 - The KB "helpful" vote marker is a Keychain item without `keychainAccessible` (`useKnowledgeBase.ts`, KEEP): it survives a reinstall, unlike the session, which `installMarker.ts` wipes. Harmless (it records only that this device voted), but different from Android.
 - `dayFromDate()` (`utils/tasks.ts`, KEEP) writes years before 1000 without leading zeros, so a catalogue date in year 99, which the web accepts, would fail validation. As on Android; the iOS calendar makes it reachable only by scrolling back nineteen centuries.
+
+### 4.13 iOS-4: HIG polish (built 2026-10-28 to 2026-10-29)
+
+**Approved by Ronit** (the iOS-4 audit and plan; "continue"). Notes on how it was run:
+- **Plan questions:** Q1–Q4 were not answered, so the plan's defaults apply.
+  - Q1 and Q2: the deletion category and working days are empty in `src/config/legal.ts`.
+  - Q3: a row whose value is empty is hidden.
+  - Q4: Approvals gets no search.
+- **The `apple-look` skill was not used** (Ronit: "Option 3"). Every HIG rule was quoted from pages downloaded on 2026-10-28 from `developer.apple.com/tutorials/data/design/human-interface-guidelines/<page>.json`. The quotes are in `APP-STORE-COMPLIANCE.md` section E and `docs/brand/UI-STANDARDS.md` §9.
+- **Part 1 was committed early** as WIP `9e79994`, on Ronit's instruction.
+
+**Package:** `expo-haptics ~57.0.3` (approved; `npx expo install expo-haptics`). The lockfile gained only its entry; it has no dependencies of its own. No other package; `expo-symbols` was not needed, because icons scale with the text size instead.
+
+**What was built** (interface only; the standard is `UI-STANDARDS.md` §9):
+
+| Area | Change | Where |
+|---|---|---|
+| Type | Class sizes are iOS text styles (Body 17, Subhead 15, Caption 12, Title 3/2/1 20/22/28, Large Title 34). Titles of 20 pt and more stop growing at iOS's AX5 ratio (`maxTextScale`); body is never capped | `theme/typography.ts`, `HtmlText` |
+| Large text | At AX1+ (`fontScale` ≥ 1.786): KPI tiles 1 per row, ticket tabs 2 × 2, stacked card header, bulk bar and filter date rows, no shrink-to-fit. Minimum heights instead of fixed ones. Meaningful icons scale (×2 max). KB tables keep 120 pt columns × the text size and scroll sideways | `hooks/useTextSize.ts`, Home, TicketDetail, TicketCard, TicketList, TicketFilters, Form, Filters, `utils/html.ts` |
+| Targets | Every Pressable reaches 44 pt; icon buttons are 44 × 44 boxes (the hit slop is kept for chips only) | everywhere |
+| VoiceOver | 47 missing labels added. Nested controls become custom actions (ticket card; attachment row). Decorative initials hidden. The priority preview is announced | everywhere, TicketCard, TicketDetail, TicketPropertyEditors |
+| Haptics | Success (`notify()`, approval decision, deletion request), warning (`notifyWarning()`, created-but-files-failed, a partial bulk run), error (`reportWriteError*()`), selection (chips, segmented tabs, selecting a ticket) | `utils/haptics.ts`, `utils/dialogs.ts`, BulkProgressModal |
+| Feedback | The notice's warning tone (amber mark) for partial outcomes. A failed mark-read no longer shows the green tick | `SuccessNotice`, Notifications |
+| Sheets | The four picker sheets are native page sheets: swipe down to close, a fade under Reduce Motion, no drawn grabber | `components/PageSheet.tsx` |
+| Search, titles | Tickets: the navigation bar's search (`placement: 'stacked'`), Filters as a bar button, chips and banners in the list header, every state in `StateScroll`. Approvals: chips in the list header. Both now have the large title | TicketList, ApprovalsInbox, `routes.ts` |
+| Keyboard | Return is Next or Done on single-line fields. The Done bar on multiline fields and the phone pad. `textContentType` for name, phone and email | `components/KeyboardDoneBar.tsx`, 9 forms |
+| Separators, footers | `border-border` instead of gray-100. A failed next page shows the standard Retry button | everywhere; TicketList, Notifications, KB, My Requests |
+| Compliance | Profile › Account: Privacy Policy and Request Account Deletion (below). The build guard refuses `production` without them | `ProfileScreen`, `config/legal.ts`, `utils/accountDeletion.ts`, `scripts/eas-build-guard.js` |
+
+**Account deletion (H6), exactly as sent:**
+- **Confirmation Alert:** title "Request account deletion?". Buttons "Cancel" (cancel style) and "Send Request" (default style; the person chose this deliberately, HIG Alerts). The message:
+  > This asks Mount Meru IT to delete your Service Desk account and the personal data linked to it. IT completes it by hand within ‹N› working days and replies on the request ticket. Records Mount Meru must keep, such as tickets you raised, may be kept. Your Mount Meru work account (Microsoft) is not affected. If you sign in to Setu again, a new Service Desk account is created.
+- **After the OK:** an offline device gets the usual "You're offline. Nothing was sent" message. Otherwise LKP-1 (`GET /categories?flat=true`, fetched only now) gives the active category named `ACCOUNT_DELETION_CATEGORY`; if there is none, nothing is sent. Then TKT-2 through `useCreateTicket()`, with the same validation, guards and per-role allow-list as Create Ticket:
+  - `title`: "Account deletion request: ‹displayName or email›" (3–255).
+  - `description` (sent as `<p>` HTML):
+    ```
+    Please delete my Service Desk account and the personal data linked to it.
+
+    Name: ‹name›
+    Email: ‹email›
+    Role: ‹User | Technician | L2 Manager | Admin›
+    Service Desk user ID: ‹id›
+    Sent from: Setu for iPhone ‹version›, Profile › Request Account Deletion, ‹dd Mon yyyy, hh:mm›
+
+    This request was made in the app after a confirmation. Please reply on this ticket when the account has been deleted, or say what has to be kept and why.
+    ```
+  - `categoryId`, `source: "API"`. Never `priority`, `impact` or `urgency`, for any role: the server stores its default priority.
+- **Success:** the success haptic, then the Alert "Request Sent" / "Ticket #‹n› was created. IT will reply on it; updates appear in Alerts." with "View Ticket" (it opens in the More stack) and "OK".
+- **Hidden until configured:** the row shows only once `ACCOUNT_DELETION_CATEGORY` and `ACCOUNT_DELETION_WORKING_DAYS` are set; Privacy Policy only once `PRIVACY_POLICY_URL` is an https URL. All three are empty today, and a `production` build refuses them empty.
+
+**Behaviour that differs from before** (forced by the iOS interface; requests, guards, confirmations and roles are unchanged, and no role is more permissive):
+1. **Search:** a field emptied by backspace now clears the search too. The native bar can't tell backspace from its ⓧ, which cleared it before.
+2. **Filters scroll:** the ticket list's chips, sort, country and "Clear all", and the approvals chips, scroll with the list instead of staying pinned.
+3. **Picker sheets:** they are full page sheets that close with a swipe down or ✕. There is no dimmed area to tap.
+4. **Mark-read failure:** shows the amber notice with the same words, not the green one.
+5. **Text size:** text is larger everywhere (iOS Body is 17 pt; the web's was 14).
+
+**Tests: 920 → 961.**
+- New: `tests/screens/hig-polish.test.mjs` (41).
+- Updated: three assertions, for this phase's intended changes. In `read-screens`, the large-title test (TicketList and ApprovalsInbox now `true`). In `module-screens`, the inbox's large title and Profile's no-privacy/no-deletion check, which now checks only for no theme setting.
+- Support: a stub for `expo-haptics`, and `useWindowDimensions` in the React Native stub.
+
+**Safety rules → tests** (each broken on purpose, the tests failed, the file restored byte for byte, SHA-256 checked):
+
+| Broken on purpose | Caught by |
+|---|---|
+| The search field's ⓧ loses its label | every control has an accessibilityLabel |
+| The page sheet's ✕ made 32 pt | every Pressable reaches 44 pt (2 failures) |
+| The deletion request sent without waiting for the OK | nothing is sent without the confirmation |
+| The guard's privacy-URL rule removed | a production build fails with an empty privacy URL (3 failures) |
+| The page sheet always slides | the page sheets fade when Reduce Motion is on (2 failures) |
+| `notify()` without its haptic | a write that finished: success |
+
+**Verification:**
+- `tsc` 0 errors. `npm test` 961/961.
+- `expo-doctor`: 20/21 checks pass. The one failure is `react-native-render-html` "Unmaintained", known since iOS-1b.
+- `npm ci --dry-run`: up to date.
+- **Release bundle** (`npx expo export --platform ios --source-maps`, written outside the repo and deleted afterwards; Hermes, 4.2 MB, 2,236 modules; Latin-1 and UTF-16 searched):
+  - **0** of 4 placeholder strings, **0** of 10 developer-token strings, **0** of 4 test-login markers. `DevTokenScreen` and `PlaceholderScreen` are not bundled.
+  - **16 of 16** iOS-4 strings are present. `expo-haptics`, `PageSheet`, `KeyboardDoneBar`, `accountDeletion` and `legal` are bundled; so are 25 app screens (all but the two dev-only ones).
+  - The only Mount Meru host is `uat-servicedesk.mountmerugroup.com`. No Android-only API is in app code.
+
+**Still to check on a device (iOS-7):**
+- **Text size:** every screen at AX5 and at xSmall: KPI tiles, ticket tabs, card headers, the bulk bar, the filter date rows, KB tables scrolling sideways, the title caps.
+- **Search and titles:** the Tickets search in the navigation bar. Typing, search key, ⓧ, Cancel, a pasted link, "Clear all" emptying the bar. The large titles on Tickets and Approvals collapsing with the chips in the list.
+- **Picker sheets:** swipe down; a picker over a write sheet; a date picker over the task editor; with Reduce Motion on (fade).
+- **Haptics:** each type felt once, and none with System Haptics off.
+- **VoiceOver:** every screen, including the card's and attachment row's custom actions in the rotor, the priority announcement, and hidden avatars.
+- **Keyboard:** the Done bar and Next on every form, on an iPhone SE-size phone too.
+- **Dark mode:** a dark-mode phone shows the light app and light system controls.
+- **Account card:** Privacy Policy and Request Account Deletion, once `legal.ts` has the URL, category and days (a UAT build with test values): the confirmation, the ticket in the right category, "View Ticket".
+- **iPad:** compatibility mode.
+
+**Flagged, not fixed:**
+- **Missing script:** `package.json` has `verify:release-bundle`, but `scripts/verify-release-bundle.js` does not exist. The bundle checks were run by hand, as in iOS-3c.
+- **npm audit:** after the install, npm reported 13 vulnerabilities (6 low, 3 moderate, 4 high). `expo-haptics` adds no dependencies, so they predate it; not investigated.
+- **AUTH-P2 re-creates a deleted account** at the next sign-in. The confirmation says so; IT and the backend should know (A4, H6).
 
 ## 5. SKIP
 
@@ -1073,6 +1170,10 @@ Android-only parts of ADAPT files, not brought over:
 | `src/theme/shadows.ts` | iOS-3a (built) | `shadows.fab`: shadowColor, shadowOffset, shadowOpacity and shadowRadius from the palette, for the floating "+" button (Android: `shadow-lg` / elevation) |
 | `tests/screens/read-screens.test.mjs`, `tests/support/stubs/react-native.mjs` | iOS-3a (built), iOS-3b | No write reachable in iOS-3a; Reduce Motion (a stand-in for AccessibilityInfo); the 500 cap; Home tiles per role; no Android-only API or colour literal; registration and large titles (§4.9). **iOS-3b:** the gate checks became "the writes render from Android's answers"; `ToastAndroid` and `thumbColor` added to the Android-only list; the stub also records ActionSheetIOS, Alert and VoiceOver announcements |
 | `tests/auth/ios-sso.test.mjs` | iOS-6 (built) | Microsoft sign-in on iOS (§4.10):<br>- the exact redirect and its match with the `app.json` scheme;<br>- no `msauth://` in `src/`, and other platforms refused;<br>- PKCE S256, the scopes, the fixed IDs, and no client secret in `src/` or the requests;<br>- the ephemeral sheet, and every cancel path ending without a banner;<br>- the 401 and 403 copy;<br>- `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` on every Keychain call;<br>- sign-out: AUTH-3, then the Keychain, query cache and UI store wiped, even when logout fails or hangs;<br>- the `name` and `department` lessons, and the `__DEV__` gate on the developer-token screen.<br>`tests/support/stubs/react-native.mjs` gains `Platform.OS` ('ios', with a setter) |
+| `src/components/PageSheet.tsx`, `src/components/KeyboardDoneBar.tsx` | iOS-4 (built) | The native page-sheet frame of the four picker sheets (swipe down, a fade under Reduce Motion), and the keyboard's Done bar for multiline fields and the phone pad (§4.13) |
+| `src/hooks/useTextSize.ts`, `src/utils/haptics.ts` | iOS-4 (built) | The accessibility text sizes (`fontScale` ≥ 1.786) and icon scaling; the four haptics, one meaning each, over `expo-haptics` (§4.13) |
+| `src/config/legal.ts`, `src/utils/accountDeletion.ts` | iOS-4 (built) | The release values App Review needs (privacy URL, deletion category and working days; the build guard refuses `production` without them), and the deletion request's text and TKT-2 payload (§4.13; compliance H1, H6) |
+| `tests/screens/hig-polish.test.mjs`, `tests/support/stubs/expo-haptics.mjs` | iOS-4 (built) | 41 tests: 44 pt and a label on every control, Reduce Motion, haptics, Dynamic Type, VoiceOver actions, light only, brand yellow, the navigation-bar search, the deletion payload and its confirmation, the release guard (§4.13) |
 | `src/store/installMarker.ts` | iOS-2 (built) | **iOS Keychain items survive uninstall.** On the first launch after an install, no marker file exists in the app container yet. In that case, wipe the three `mmg.session.*` keys and write the marker. A reinstalled app then never starts signed in to a session from before it was deleted |
 
 **iOS identity and settings** (the values are in §4.2 and §4.3):

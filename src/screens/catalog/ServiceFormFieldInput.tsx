@@ -16,6 +16,9 @@ import { formatDate } from '@/utils/format';
 import { localDateFromDay, type ServiceField } from '@/utils/service-catalog';
 import { dayFromDate } from '@/utils/tasks';
 
+/** The request form's keyboard Done bar (iOS-4): every field opts in; ServiceRequestFormScreen mounts the bar. */
+export const REQUEST_FORM_KEYBOARD = 'request-form-keyboard';
+
 /** The sheet's value for the select's empty entry ("-- Select --"); never a real option value. */
 const EMPTY = '__EMPTY__';
 
@@ -130,6 +133,7 @@ function ServiceFormFieldInputImpl({ field, value, error, onChange, disabled }: 
           placeholder={field.placeholder}
           placeholderTextColor={colors.text.secondary}
           accessibilityLabel={a11yLabel}
+          inputAccessoryViewID={REQUEST_FORM_KEYBOARD}
           className={`min-h-24 ${INPUT_CLASS} ${border}`}
         />
       );
@@ -145,9 +149,12 @@ function ServiceFormFieldInputImpl({ field, value, error, onChange, disabled }: 
           autoCapitalize={field.type === 'email' ? 'none' : 'sentences'}
           autoCorrect={field.type !== 'email'}
           autoComplete={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : undefined}
+          textContentType={field.type === 'email' ? 'emailAddress' : field.type === 'phone' ? 'telephoneNumber' : undefined}
+          returnKeyType="done"
           placeholder={field.placeholder}
           placeholderTextColor={colors.text.secondary}
           accessibilityLabel={a11yLabel}
+          inputAccessoryViewID={REQUEST_FORM_KEYBOARD}
           className={`${INPUT_CLASS} ${border}`}
         />
       );

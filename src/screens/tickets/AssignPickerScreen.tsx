@@ -238,9 +238,11 @@ function SingleAssign({ navigation, route }: Props) {
               <Pressable
                 key={p.id}
                 accessibilityRole="button"
+                accessibilityLabel={`${formatDisplayName(p.displayName)}, ${p.email}${p.active ? '' : `, ${INACTIVE_TECHNICIAN_NOTE}`}`}
+                accessibilityState={{ disabled: busy || p.id === ticket.assignedToId }}
                 disabled={busy || p.id === ticket.assignedToId}
                 onPress={() => pickPerson(p, ticket)}
-                className={`min-h-12 justify-center py-3 ${i === recommended.length - 1 ? '' : 'border-b border-gray-100'} ${busy || p.id === ticket.assignedToId ? 'opacity-50' : 'active:bg-gray-50'}`}
+                className={`min-h-12 justify-center py-3 ${i === recommended.length - 1 ? '' : 'border-b border-border'} ${busy || p.id === ticket.assignedToId ? 'opacity-50' : 'active:bg-gray-50'}`}
               >
                 <Text className="text-base text-gray-900">{formatDisplayName(p.displayName)}</Text>
                 <Text className="text-xs text-gray-500">

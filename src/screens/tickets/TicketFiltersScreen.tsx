@@ -21,7 +21,7 @@ import {
   DatePickerSheet, ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, PersonPickerSheet, SelectField,
   SubmitButton, type SheetOption,
 } from '@/components';
-import { useCategories, useTeams, useTickets } from '@/hooks';
+import { useAccessibilityTextSize, useCategories, useTeams, useTickets } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
@@ -260,32 +260,38 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
   );
 }
 
-/** One end of the date range: opens the system date picker; ✕ clears it (the web's emptied date input). */
+/**
+ * One end of the date range: opens the system date picker; ✕ clears it (the web's emptied date input).
+ * iOS-4: at the accessibility text sizes the label sits above the field instead of in a fixed 56 pt column.
+ */
 function DayField({ label, day, onPress, onClear }: { label: string; day: string | null; onPress: () => void; onClear: () => void }) {
+  const largeText = useAccessibilityTextSize();
   return (
-    <View className="mb-2 flex-row items-center">
-      <Text className="w-14 text-sm text-gray-700">{label}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Created ${label.toLowerCase()}: ${day ? formatFilterDay(day) : 'any day'}`}
-        onPress={onPress}
-        className="min-h-11 flex-1 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2 active:bg-gray-50"
-      >
-        <Text className={`flex-1 text-base ${day ? 'text-gray-900' : 'text-gray-500'}`}>{day ? formatFilterDay(day) : 'Any day'}</Text>
-        <Ionicons name="calendar-outline" size={18} color={colors.text.secondary} />
-      </Pressable>
-      {day ? (
+    <View className={largeText ? 'mb-2' : 'mb-2 flex-row items-center'}>
+      <Text className={largeText ? 'mb-1 text-sm text-gray-700' : 'w-14 text-sm text-gray-700'}>{label}</Text>
+      <View className={largeText ? 'flex-row items-center' : 'flex-1 flex-row items-center'}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Clear the ${label.toLowerCase()} date`}
-          onPress={onClear}
-          className="h-11 w-11 items-center justify-center active:opacity-60"
+          accessibilityLabel={`Created ${label.toLowerCase()}: ${day ? formatFilterDay(day) : 'any day'}`}
+          onPress={onPress}
+          className="min-h-11 flex-1 flex-row items-center rounded-lg border border-gray-300 bg-white px-3 py-2 active:bg-gray-50"
         >
-          <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+          <Text className={`flex-1 text-base ${day ? 'text-gray-900' : 'text-gray-500'}`}>{day ? formatFilterDay(day) : 'Any day'}</Text>
+          <Ionicons name="calendar-outline" size={18} color={colors.text.secondary} />
         </Pressable>
-      ) : (
-        <View className="w-11" />
-      )}
+        {day ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Clear the ${label.toLowerCase()} date`}
+            onPress={onClear}
+            className="h-11 w-11 items-center justify-center active:opacity-60"
+          >
+            <Ionicons name="close-circle" size={18} color={colors.text.muted} />
+          </Pressable>
+        ) : (
+          <View className="w-11" />
+        )}
+      </View>
     </View>
   );
 }

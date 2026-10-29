@@ -21,7 +21,7 @@ import {
 } from '@/components';
 import { useDeleteTask, useSingleFlight, useTicket, useToggleTask } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { colors } from '@/theme';
+import { colors, maxTextScale } from '@/theme';
 import type { RecordScreenProps } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName } from '@/utils/format';
@@ -121,7 +121,7 @@ export function TaskDetailScreen({ navigation, route }: RecordScreenProps<'TaskD
           <View className="mb-2 self-start rounded-full bg-gray-100 px-2.5 py-0.5">
             <Text className="text-xs font-medium text-gray-700">{taskStatusLabel(task.status)}</Text>
           </View>
-          <Text selectable className={`text-lg font-bold ${done ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+          <Text selectable className={`text-lg font-bold ${done ? 'text-gray-500 line-through' : 'text-gray-900'}`} maxFontSizeMultiplier={maxTextScale.title3}>
             {task.title || '(untitled task)'}
           </Text>
           {task.description ? (
@@ -200,7 +200,7 @@ export function TaskDetailScreen({ navigation, route }: RecordScreenProps<'TaskD
 /** A label / value line in a card (UI-STANDARDS S6). */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <View className="flex-row border-b border-gray-100 py-2">
+    <View className="flex-row border-b border-border py-2">
       <Text className="w-28 pr-2 text-sm text-gray-500">{label}</Text>
       <View className="flex-1">{typeof children === 'string' ? <Text className="text-sm text-gray-900">{children}</Text> : children}</View>
     </View>

@@ -369,11 +369,12 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     for (const src of [stacks, root]) assert.doesNotMatch(src, /Placeholder/);
   });
 
-  test('large titles: on the tab roots, except the ticket list and the approvals inbox with their pinned bars', () => {
+  test('large titles: on every tab root (iOS-4: the ticket list and the approvals inbox no longer pin a bar)', () => {
     assert.equal(hasLargeTitle('HomeTab', 'Home'), true);
-    assert.equal(hasLargeTitle('TicketsTab', 'TicketList'), false);
-    // iOS-3c plan Q3: the inbox keeps Android's type chips pinned above the list, so a standard title, as the ticket list.
-    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), false);
+    // iOS-4: the search is the navigation bar's and the filters ride in the list, so the title collapses (was false).
+    assert.equal(hasLargeTitle('TicketsTab', 'TicketList'), true);
+    // iOS-4: the type chips ride in the list (iOS-3c plan Q3 had them pinned, with a standard title).
+    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), true);
     assert.equal(hasLargeTitle('AlertsTab', 'Notifications'), true);
     assert.equal(hasLargeTitle('MoreTab', 'More'), true);
     assert.equal(hasLargeTitle('HomeTab', 'TicketDetail'), false);

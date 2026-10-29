@@ -23,7 +23,7 @@ import type { UploadFile } from '@/api/attachments.api';
 import { describeError, describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
   AttachmentPicker, EmailChipsInput, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner,
-  OfflineState, OutlineButton, SheetKeyboardView, SubmitButton, TemplatePickerSheet,
+  KeyboardDoneBar, OfflineState, OutlineButton, SheetKeyboardView, SubmitButton, TemplatePickerSheet,
 } from '@/components';
 import { useDiscardGuard, useEmailRecipients, usePostComment, useSingleFlight, useTicket } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -31,9 +31,13 @@ import { colors } from '@/theme';
 import type { CannedResponse, SheetScreenProps } from '@/types';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { confirmAction, notify } from '@/utils/dialogs';
+import { hapticSelection } from '@/utils/haptics';
 import { composerPermissions, navRole, type ComposerMode } from '@/utils/permissions';
 import { isPlaceholderUser } from '@/utils/session';
 import { insertTemplate, templateHasImages } from '@/utils/templates';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const REPLY_KEYBOARD = 'reply-keyboard';
 
 type Mode = ComposerMode;
 
@@ -94,6 +98,7 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
       setFiles([]);
     }
     setMode(next);
+    hapticSelection();
   }
 
   // Quick-action pre-fill (05 §A.5): Reply → To = requester; Reply all → TKT-9, falling back to the requester.
@@ -173,6 +178,7 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
               <Pressable
                 key={m}
                 accessibilityRole="tab"
+                accessibilityLabel={MODE_LABELS[m]}
                 accessibilityState={{ selected: m === mode, disabled: post.isPending }}
                 disabled={post.isPending}
                 onPress={() => void selectMode(m)}
@@ -189,7 +195,12 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
             <>
               {mode === 'replyAll' && recipients.isFetching ? <Text className="mb-1 text-xs text-gray-500">Loading thread recipients…</Text> : null}
               {mode === 'replyAll' && recipients.isError && !recipients.isFetching ? (
-                <Pressable accessibilityRole="button" onPress={() => void recipients.refetch()} className="mb-3 min-h-11 justify-center rounded-lg bg-amber-50 p-3 active:opacity-70">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Couldn't load the thread's recipients. To is set to the requester only. Retry`}
+                  onPress={() => void recipients.refetch()}
+                  className="mb-3 min-h-11 justify-center rounded-lg bg-amber-50 p-3 active:opacity-70"
+                >
                   <Text className="text-xs text-amber-900">
                     Couldn't load the thread's recipients ({describeError(recipients.error)}). To is set to the requester only.{' '}
                     <Text className="font-semibold">Tap to retry.</Text>
@@ -210,6 +221,7 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
             textAlignVertical="top"
             placeholder={isPublic ? 'Type your reply…' : 'Type an internal note…'}
             placeholderTextColor={colors.text.secondary}
+            inputAccessoryViewID={REPLY_KEYBOARD}
             accessibilityLabel={isPublic ? 'Reply message' : 'Internal note'}
             className={`mb-3 min-h-40 rounded-lg border px-3 py-2 text-base text-gray-900 ${isPublic ? 'border-gray-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
           />
@@ -268,6 +280,7 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
           />
         </View>
       </ScrollView>
+      <KeyboardDoneBar id={REPLY_KEYBOARD} />
       {can.templates ? (
         <TemplatePickerSheet visible={templatesOpen} onPick={onPickTemplate} onClose={() => setTemplatesOpen(false)} />
       ) : null}

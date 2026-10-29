@@ -76,8 +76,9 @@ export function PlaceholderScreen({
               <Pressable
                 key={action.label}
                 accessibilityRole="button"
+                accessibilityLabel={action.label}
                 onPress={action.onPress}
-                className="mb-2 rounded-lg bg-blue-600 px-4 py-3 active:bg-blue-700"
+                className="mb-2 min-h-11 rounded-lg bg-blue-600 px-4 py-3 active:bg-blue-700"
               >
                 <Text className="text-center font-medium text-white">{action.label}</Text>
               </Pressable>

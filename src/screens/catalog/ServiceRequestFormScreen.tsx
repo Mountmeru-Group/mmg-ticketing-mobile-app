@@ -21,12 +21,12 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  Card, EmptyState, ErrorState, FormCard, InlineError, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
+  Card, EmptyState, ErrorState, FormCard, InlineError, KeyboardDoneBar, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
   OutlineButton, PriorityBadge, SelectField, SubmitButton,
 } from '@/components';
 import { useDiscardGuard, useServiceItem, useSingleFlight, useSubmitServiceRequest } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { colors, palette } from '@/theme';
+import { colors, maxTextScale, palette } from '@/theme';
 import type { MoreStackScreenProps, TicketImpact, TicketPriority } from '@/types';
 import { chooseForField, type SheetChoice } from '@/utils/actionSheet';
 import { notify } from '@/utils/dialogs';
@@ -36,7 +36,7 @@ import {
   REQUEST_IMPACT_OPTIONS, REQUEST_URGENCY_OPTIONS, buildServiceRequestBody, formErrors, initialFormValues, nextRequestPriority,
   normaliseFormFields, submittedMessage, type RequestUrgency, type ServiceFormValues,
 } from '@/utils/service-catalog';
-import { ServiceFormFieldInput } from './ServiceFormFieldInput';
+import { REQUEST_FORM_KEYBOARD, ServiceFormFieldInput } from './ServiceFormFieldInput';
 
 const NOT_SET = '__NOT_SET__';
 
@@ -177,7 +177,7 @@ export function ServiceRequestFormScreen({ navigation, route }: MoreStackScreenP
             </View>
             <View className="ml-3 flex-1">
               {item.category?.name ? <Text className="text-xs font-medium text-blue-700">{item.category.name}</Text> : null}
-              <Text className="text-lg font-bold text-gray-900">{item.name || 'Service'}</Text>
+              <Text className="text-lg font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title3}>{item.name || 'Service'}</Text>
               {item.description ? <Text className="mt-1 text-sm text-gray-700">{item.description}</Text> : null}
             </View>
           </View>
@@ -273,6 +273,7 @@ export function ServiceRequestFormScreen({ navigation, route }: MoreStackScreenP
                   placeholder="Add any additional notes for the resolver…"
                   placeholderTextColor={colors.text.secondary}
                   accessibilityLabel="Notes for the resolver"
+                  inputAccessoryViewID={REQUEST_FORM_KEYBOARD}
                   className="mt-4 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
                 />
               ) : null}
@@ -296,6 +297,7 @@ export function ServiceRequestFormScreen({ navigation, route }: MoreStackScreenP
           </>
         )}
       </ScrollView>
+      <KeyboardDoneBar id={REQUEST_FORM_KEYBOARD} />
     </View>
   );
 }

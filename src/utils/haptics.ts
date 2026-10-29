@@ -23,6 +23,17 @@ export function hapticOutcome(outcome: HapticOutcome): void {
   Haptics.notificationAsync(NOTIFICATION[outcome]).catch(() => undefined);
 }
 
+/**
+ * A finished bulk run's haptic: success when every ticket went through, error when none did and at least one failed,
+ * warning otherwise (some skipped, failed or not sent after a Stop).
+ */
+export function bulkOutcomeHaptic(outcomes: readonly { state: 'done' | 'failed' | 'skipped' | 'not-run' }[]): HapticOutcome {
+  const done = outcomes.filter((o) => o.state === 'done').length;
+  if (done === outcomes.length) return 'success';
+  if (done === 0 && outcomes.some((o) => o.state === 'failed')) return 'error';
+  return 'warning';
+}
+
 /** A selection changed: a filter chip, a segmented tab, a ticket added to or taken out of a selection. */
 export function hapticSelection(): void {
   Haptics.selectionAsync().catch(() => undefined);

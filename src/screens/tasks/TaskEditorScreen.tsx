@@ -16,13 +16,13 @@
 // (DatePickerSheet) instead of Android's date dialog; it fills the same calendar day, sent the same way. Status is an
 // iOS action sheet of the four task statuses. The form lifts above the keyboard (SheetKeyboardView); leaving with
 // changes asks first, the swipe down included (useDiscardGuard). Who may edit and pick a technician: taskPermissions().
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  DatePickerSheet, EmptyState, ErrorState, FieldLabel, FilterChip, FormCard, InlineError, LoadingSkeleton, OfflineBanner,
+  DatePickerSheet, EmptyState, ErrorState, FieldLabel, FilterChip, FormCard, InlineError, KeyboardDoneBar, LoadingSkeleton, OfflineBanner,
   OfflineState, PersonPickerSheet, SelectField, SheetKeyboardView, SubmitButton, type Person,
 } from '@/components';
 import { useDiscardGuard, useSaveTask, useSingleFlight, useTicket } from '@/hooks';
@@ -38,6 +38,9 @@ import { canAssignToSelf } from '@/utils/session';
 import {
   DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate, dayFromToday, dayToDueDate, dueDateToDay, formatDueDay,
 } from '@/utils/tasks';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const TASK_KEYBOARD = 'task-editor-keyboard';
 
 /** iOS: the status choices as an action sheet, in Android's order and labels. */
 const STATUS_CHOICES: readonly SheetChoice<TaskStatus>[] = TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABELS[s] }));
@@ -132,6 +135,9 @@ export function TaskEditorScreen({ navigation, route }: SheetScreenProps<'TaskEd
     navigation.setOptions({ title });
   }, [navigation, title]);
 
+  // iOS-4: Title's Return key moves to Description; Description (multiline) closes the keyboard with the Done bar.
+  const descriptionInput = useRef<TextInput>(null);
+
   if (!can.edit) {
     return (
       <View className="flex-1 bg-gray-50">
@@ -188,10 +194,15 @@ export function TaskEditorScreen({ navigation, route }: SheetScreenProps<'TaskEd
             placeholder="What needs doing"
             placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Title"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => descriptionInput.current?.focus()}
             className="mb-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
           <FieldLabel label="Description" />
           <TextInput
+            ref={descriptionInput}
+            inputAccessoryViewID={TASK_KEYBOARD}
             value={draft.description}
             onChangeText={(v) => update({ description: v })}
             editable={!save.isPending}
@@ -248,6 +259,7 @@ export function TaskEditorScreen({ navigation, route }: SheetScreenProps<'TaskEd
           />
         </View>
       </ScrollView>
+      <KeyboardDoneBar id={TASK_KEYBOARD} />
 
       <DatePickerSheet
         visible={duePickerDay !== null}

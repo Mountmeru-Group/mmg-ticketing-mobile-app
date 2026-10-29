@@ -15,7 +15,7 @@ import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, QueryBanner, SearchField,
+  OfflineState, OutlineButton, QueryBanner, SearchField,
 } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
 import { colors, palette } from '@/theme';
@@ -144,10 +144,10 @@ export function KnowledgeBaseScreen({ navigation }: MoreStackScreenProps<'Knowle
           ) : isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
           ) : isFetchNextPageError ? (
-            <Pressable accessibilityRole="button" onPress={() => void fetchNextPage()} className="items-center py-4 active:opacity-60">
-              <Text className="text-sm text-red-700">Couldn't load more articles.</Text>
-              <Text className="mt-1 text-sm font-semibold text-blue-700">Tap to retry</Text>
-            </Pressable>
+            <View className="items-center py-4">
+              <Text className="mb-2 text-sm text-red-700">Couldn't load more articles.</Text>
+              <OutlineButton label="Retry" icon="refresh" onPress={() => void fetchNextPage()} />
+            </View>
           ) : null
         }
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 24, flexGrow: 1 }}
@@ -194,7 +194,7 @@ export function KnowledgeBaseScreen({ navigation }: MoreStackScreenProps<'Knowle
                 accessibilityLabel={`Categories didn't load. ${describeError(categories.error)} Tap to retry.`}
                 onPress={() => void categories.refetch()}
                 hitSlop={4}
-                className="h-9 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3 active:opacity-70"
+                className="min-h-9 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3 py-1 active:opacity-70"
               >
                 <Ionicons name="refresh" size={14} color={palette.red[700]} />
                 <Text className="ml-1 text-sm text-red-800">Categories didn't load · Retry</Text>
@@ -232,7 +232,12 @@ const rowKey = (row: { id: string }) => row.id;
 
 const ArticleRow = memo(function ArticleRow({ article, onPress }: { article: KBArticleListItem; onPress: (slug: string) => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => onPress(article.slug)} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${article.title || 'Untitled article'}${article.category?.name ? `, ${article.category.name}` : ''}`}
+      onPress={() => onPress(article.slug)}
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:opacity-80"
+    >
       {article.category?.name ? <Text className="mb-0.5 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {article.title || 'Untitled article'}
@@ -253,7 +258,12 @@ const ArticleRow = memo(function ArticleRow({ article, onPress }: { article: KBA
 
 const SearchRow = memo(function SearchRow({ result, onPress }: { result: KBSearchResult; onPress: (slug: string) => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => onPress(result.slug)} className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:opacity-80">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={result.title || 'Untitled article'}
+      onPress={() => onPress(result.slug)}
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:opacity-80"
+    >
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {result.title || 'Untitled article'}
       </Text>

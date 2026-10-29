@@ -13,14 +13,14 @@
 // sheet closes and the new ticket opens in the tab underneath (Android's replace() can't cross a sheet). Impact and
 // urgency are iOS action sheets; the category levels, group and people stay scrollable sheets (server lists). The form
 // lifts above the keyboard (SheetKeyboardView); a tap outside an input or a drag down puts the keyboard away.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { UploadFile } from '@/api/attachments.api';
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import {
-  AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, LoadingSkeleton, LookupError, Notice, OfflineBanner,
+  AttachmentPicker, ErrorState, FieldLabel, FormCard, InlineError, KeyboardDoneBar, LoadingSkeleton, LookupError, Notice, OfflineBanner,
   OfflineState, OptionSheet, PersonPickerSheet, SelectField, SheetKeyboardView, SubmitButton, type Person, type SheetOption,
 } from '@/components';
 import {
@@ -36,8 +36,12 @@ import { chooseFromActionSheet, type SheetChoice } from '@/utils/actionSheet';
 import { CREATE_ASSIGNEE_ROLES } from '@/utils/assignment';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { IMPACT_LABELS, URGENCY_LABELS, formatDisplayName } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { createTicketPermissions } from '@/utils/permissions';
 import { PriorityPreviewBox } from './TicketPropertyEditors';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const CREATE_KEYBOARD = 'create-ticket-keyboard';
 
 const AUTO = '__AUTO__';
 const NOT_SET = '__NOT_SET__';
@@ -148,6 +152,8 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
         files,
       });
       if (result.uploadError) {
+        // iOS-4: created, but the files failed: the warning haptic with the Alert (utils/haptics.ts).
+        hapticOutcome('warning');
         Alert.alert('Ticket created', `Ticket created but some attachments failed to upload. ${describeWriteError(result.uploadError)}`);
       } else {
         notify('Ticket created successfully');
@@ -162,6 +168,8 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
   }
 
   const busy = create.isPending;
+  // iOS-4: Title's Return key moves to Description; Description (multiline) closes the keyboard with the Done bar.
+  const descriptionInput = useRef<TextInput>(null);
   const option = (c: Category): SheetOption<string> => ({ value: c.id, label: c.name });
   const teamOptions: SheetOption<string>[] = [{ value: AUTO, label: 'Auto (from category)' }, ...teams.map((t) => ({ value: t.id, label: t.name }))];
 
@@ -211,10 +219,14 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
             placeholder="Short summary of the issue"
             placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Title, required"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => descriptionInput.current?.focus()}
             className="mb-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
           <FieldLabel label="Description" required />
           <TextInput
+            ref={descriptionInput}
             value={description}
             onChangeText={setDescription}
             editable={!busy}
@@ -223,6 +235,7 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
             placeholder="What happened, and what do you need?"
             placeholderTextColor={colors.text.secondary}
             accessibilityLabel="Description, required"
+            inputAccessoryViewID={CREATE_KEYBOARD}
             className="min-h-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
           />
         </FormCard>
@@ -287,6 +300,7 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
           <SubmitButton label="Create ticket" onPress={() => void once(submit)} loading={busy} />
         </View>
       </ScrollView>
+      <KeyboardDoneBar id={CREATE_KEYBOARD} />
 
       <OptionSheet
         visible={sheet === 'top'}

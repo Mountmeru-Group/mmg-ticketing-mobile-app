@@ -57,7 +57,7 @@ export function Skeleton({ className }: { className: string }) {
 
 function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: number): ReactNode {
   const items = Array.from({ length: rows }, (_, i) => i);
-  const divider = (i: number) => (i === rows - 1 ? '' : 'border-b border-gray-100');
+  const divider = (i: number) => (i === rows - 1 ? '' : 'border-b border-border');
   switch (variant) {
     case 'approvals':
       return items.map((i) => (

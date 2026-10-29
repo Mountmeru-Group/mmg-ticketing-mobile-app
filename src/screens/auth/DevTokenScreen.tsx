@@ -129,7 +129,8 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
           importantForAutofill="no"
           spellCheck={false}
           secureTextEntry
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
+          accessibilityLabel="UAT session token"
+          className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
         />
         {error ? <Text className="mt-2 text-sm text-red-700">{error}</Text> : null}
       </Section>
@@ -143,10 +144,11 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
 
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={checking ? 'Checking token' : 'Use this token'}
         accessibilityState={{ disabled, busy: checking }}
         disabled={disabled}
         onPress={() => void submitToken()}
-        className={`rounded-lg px-4 py-3 ${disabled ? 'bg-gray-300' : 'bg-amber-600'}`}
+        className={`min-h-11 rounded-lg px-4 py-3 ${disabled ? 'bg-gray-300' : 'bg-amber-600'}`}
       >
         <Text className="text-center font-semibold text-white">{checking ? 'Checking token…' : 'Use this token'}</Text>
       </Pressable>

@@ -282,9 +282,11 @@ describe('approvals (M12, M13)', () => {
     for (const tab of ['ApprovalsTab', 'MoreTab']) assert.ok(STACK_ROUTES[tab].includes('ApprovalsInbox'), tab);
   });
 
-  test('the inbox: the Approvals tab\'s root for ADMIN and AGENT, pushed from More otherwise; chips pinned, a standard title', () => {
+  test('the inbox: the Approvals tab\'s root for ADMIN and AGENT, pushed from More otherwise; iOS-4: chips in the list, a large title', () => {
     assert.equal(STACK_ROUTES.ApprovalsTab[0], 'ApprovalsInbox');
-    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), false);
+    // iOS-4: the chips ride at the top of the list, so the tab root has the large title (iOS-3c had a standard one).
+    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), true);
+    assert.equal(hasLargeTitle('MoreTab', 'ApprovalsInbox'), false, 'pushed from More: a standard title');
     assert.match(code(read(INBOX)), /navigation\.navigate\('ApprovalDetail', \{ approvalId \}\)/);
   });
 });
@@ -521,7 +523,9 @@ describe('the catalogue and profile on iOS', () => {
     }]);
     const src = code(read(PROFILE));
     assert.match(src, /countrySelectorMode\(user\)/);
-    assert.doesNotMatch(src, /\bTheme\b|\bAppearance\b|Dark mode|[Pp]rivacy|[Dd]elete (my )?account/, 'not built in iOS-3c (D9; H1 and H6 wait for iOS-4)');
+    // No theme setting (D9: light only). The privacy link and the deletion request arrived in iOS-4 (H1, H6), pinned by
+    // tests/screens/hig-polish.test.mjs.
+    assert.doesNotMatch(src, /\bTheme\b|\bAppearance\b|Dark mode/, 'no theme setting (D9)');
   });
 
   test('a service request: no attachments, no confirmation, back to the catalogue\'s Home view (as the web; Q1)', () => {

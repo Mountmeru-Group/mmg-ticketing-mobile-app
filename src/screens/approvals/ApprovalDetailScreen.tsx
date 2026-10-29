@@ -24,7 +24,7 @@ import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import { ApiClientError } from '@/api/errors';
 import {
-  ApprovalStatusChip, Card, EmptyState, ErrorState, FieldLabel, HtmlText, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
+  ApprovalStatusChip, Card, EmptyState, ErrorState, FieldLabel, HtmlText, KeyboardDoneBar, LoadingSkeleton, Notice, OfflineBanner, OfflineState,
   OutlineButton, PriorityBadge, StatusBadge, SubmitButton,
 } from '@/components';
 import { useDecideApproval, useDiscardGuard, usePendingApprovals, useSingleFlight, useTicket, type ApprovalDecision } from '@/hooks';
@@ -33,7 +33,11 @@ import type { Approval, RecordScreenProps, TicketDetail } from '@/types';
 import { approvalOnScreen, decisionMessage, decisionOutcome, entityLabel, shortApprovalId } from '@/utils/approvals';
 import { confirmAction, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, statusLabel } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { htmlToDisplayText } from '@/utils/html';
+
+/** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
+const APPROVAL_KEYBOARD = 'approval-keyboard';
 
 export function ApprovalDetailScreen({ navigation, route }: RecordScreenProps<'ApprovalDetail'>) {
   const { approvalId } = route.params;
@@ -84,6 +88,8 @@ export function ApprovalDetailScreen({ navigation, route }: RecordScreenProps<'A
       try {
         const res = await decide.mutateAsync({ approval, decision, comments: comment });
         setResult(res);
+        // iOS-4: the decision went through (Approve or Reject alike); "What happened" below says what it did.
+        hapticOutcome('success');
       } catch (e) {
         reportWriteError(decision === 'approve' ? "Couldn't approve" : "Couldn't reject", e);
       }
@@ -173,6 +179,8 @@ export function ApprovalDetailScreen({ navigation, route }: RecordScreenProps<'A
               textAlignVertical="top"
               placeholder="Add a comment"
               placeholderTextColor={colors.text.secondary}
+              accessibilityLabel="Comment. Optional to approve, required to reject"
+              inputAccessoryViewID={APPROVAL_KEYBOARD}
               className="mb-3 min-h-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900"
             />
             <View className="flex-row gap-2">
@@ -204,6 +212,7 @@ export function ApprovalDetailScreen({ navigation, route }: RecordScreenProps<'A
           </Card>
         )}
       </ScrollView>
+      <KeyboardDoneBar id={APPROVAL_KEYBOARD} />
     </View>
   );
 }
@@ -344,7 +353,7 @@ function ServiceRequestContext({ approval }: { approval: Approval }) {
 /** A label / value line in a card (UI-STANDARDS S6). */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <View className="flex-row border-b border-gray-100 py-2">
+    <View className="flex-row border-b border-border py-2">
       <Text className="w-28 pr-2 text-sm text-gray-500" numberOfLines={2}>
         {label}
       </Text>

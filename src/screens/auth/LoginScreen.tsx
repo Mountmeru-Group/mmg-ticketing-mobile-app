@@ -19,7 +19,7 @@ import { getAuthRedirectUri } from '@/config/auth.config';
 import { ENVIRONMENT_LABEL } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
-import { palette } from '@/theme';
+import { maxTextScale, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
@@ -79,7 +79,7 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
         {/* The web's login card: logo centred, the app name as the heading, one line of help. */}
         <View className="mb-4 items-center rounded-xl border border-border bg-white px-4 py-6">
           <BrandLogo height={64} />
-          <Text accessibilityRole="header" className="mt-4 text-center text-2xl font-bold text-gray-900">
+          <Text accessibilityRole="header" className="mt-4 text-center text-2xl font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title1}>
             Setu
           </Text>
           <Text className="mt-1 text-center text-sm text-gray-500">Sign in with your Mount Meru work account.</Text>
@@ -143,6 +143,7 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
             </Text>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Developer: use a UAT session token"
               onPress={() => navigation.navigate('DevToken')}
               className="mt-3 min-h-11 justify-center rounded-lg border border-amber-500 bg-white px-4 py-2"
             >
