@@ -47,6 +47,15 @@ const tone = (bg: string, fg: string): BadgeTone => ({ bg, fg });
 const BRAND_RED = '#d21121'; // hsl(355 85% 44.5%)
 const BRAND_YELLOW = '#ffcc00'; // hsl(48 100% 50%)
 
+// App-only shades (no web counterpart), added with the login redesign (2026-10-30, docs/brand/UI-STANDARDS.md §10).
+// Contrast is WCAG 2.x on these exact values.
+/** Brand red a step lighter, hsl(355 85% 47%): the login card's decorative circles. White on it is 4.98:1. */
+const BRAND_RED_LIGHT = '#de1223';
+/** A pale red tint for text on the login card: 5.04:1 on brand red, 4.60:1 on BRAND_RED_LIGHT. */
+const BRAND_RED_TINT = '#fff3f4';
+/** Brand yellow at about 30 % on white: the sign-in spinner's ring. Decoration only (the label says what happens). */
+const BRAND_YELLOW_PALE = '#fff0b3';
+
 /** Ticket status pill. Web: frontend/src/components/ui/StatusBadge.tsx. */
 const status: Record<TicketStatus, BadgeTone> = {
   OPEN: tone(palette.blue[100], palette.blue[700]),
@@ -178,5 +187,39 @@ export const colors = {
     } satisfies Record<TicketPriority, string>,
     slaMet: palette.emerald[500],
     slaBreached: palette.red[500],
+  },
+
+  /** Login, "arc split" (2026-10-30, UI-STANDARDS.md §10). */
+  login: {
+    /** The top card, under the status bar. */
+    card: BRAND_RED,
+    /** The two decorative circles behind the card's content. */
+    circle: BRAND_RED_LIGHT,
+    /** Headline on the card. */
+    headline: palette.white,
+    /** Sub-line on the card. */
+    subline: BRAND_RED_TINT,
+    /** The white card around the logo. */
+    logoCard: palette.white,
+    /** The outlined sign-in pill: white fill, the S5 outline-button grey border, the label in heading grey. */
+    buttonFill: palette.white,
+    buttonBorder: palette.gray[300],
+    buttonPressed: palette.gray[50],
+    buttonLabel: palette.gray[900],
+  },
+
+  /** Microsoft's four-square logo, in Microsoft's own colours (the sign-in button only). */
+  microsoft: { red: '#f25022', green: '#7fba00', blue: '#00a4ef', yellow: '#ffb900' },
+
+  /**
+   * The motion palette (2026-10-30, docs/PERFORMANCE.md §12): every animation plays on a white ground with brand yellow
+   * as the working accent. Red appears only where the logo itself is red.
+   */
+  motion: {
+    ground: palette.white,
+    /** The spinner's arc, the start-up rule, the loading shimmer's sweep. */
+    accent: BRAND_YELLOW,
+    /** The spinner's ring under the arc. */
+    track: BRAND_YELLOW_PALE,
   },
 } as const;

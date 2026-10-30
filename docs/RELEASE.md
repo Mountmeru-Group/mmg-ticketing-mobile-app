@@ -323,8 +323,9 @@ Phase B (2026-10-20) replaced the Phase 5 placeholder artwork with the official 
 | `icon.png` | 1024×1024, opaque | Logo 640 px wide, centred on white | `expo.icon`: legacy launcher icon (Android 7.x) and store listing source |
 | `adaptive-icon.png` | 1024×1024, transparent | Logo 512 px wide, centred | `android.adaptiveIcon.foregroundImage`, and `monochromeImage` (Android 13 themed icons use its alpha) |
 | `adaptive-icon-background.png` | 1024×1024, flat white | — | `android.adaptiveIcon.backgroundImage` (`backgroundColor` is the same `#FFFFFF`) |
-| `splash-icon.png` | 1024×1024, transparent | Logo 640 px wide, then "Setu" on one centred line (Segoe UI Bold, 102 px, `colors.text.primary` #111827). Replaced in Phase C; regenerated with the new name on 2026-10-23 | `expo-splash-screen` image (`app.json` plugins: `imageWidth` 192, white background) |
-| `brand/meru-mark.png` | 566×346, transparent | The logo trimmed to its content | In-app logo (`src/components/BrandLogo.tsx`): login card (64 dp tall) and drawer header (44 dp tall, 72 dp wide) |
+| `splash-icon.png` | 1024×1024, transparent | **Since 2026-10-30: only the yellow drop**, where it sits in a 640 px logo whose top is at y 160, raised 96 px (18 dp): the start-up intro's first frame. Phase C to 2026-10-29: the logo 640 px wide, then "Setu" on one line (Segoe UI Bold, 102 px, #111827) | `expo-splash-screen` image (`app.json` plugins: `imageWidth` 192, white background) |
+| `brand/meru-mark.png` | 566×346, transparent background (the mark itself is 89 % opaque red, see below) | The logo trimmed to its content | In-app logo (`src/components/BrandLogo.tsx`): Login's logo card (contained in 92 × 60 dp), the drawer header (44 dp tall, 72 dp wide) and the start-up intro (120 × 73 dp) |
+| `brand/meru-drop.png` | 566×346, transparent | `meru-mark.png` with every pixel cleared except the drop's (the drop's pixels are byte-identical to the mark's). Added 2026-10-30 | The start-up intro (`src/navigation/SplashIntro.tsx`): the drop falls on its own, then the mark fades in over it in the same box |
 | `brand/meru-logo.png` | 689×478, RGB | The source, untouched | — |
 
 Splash geometry (Phase C):
@@ -335,6 +336,24 @@ Splash geometry (Phase C):
 - The splash stays until `RootNavigator` has read the stored session and navigation is ready (`src/navigation/splash.ts`); the crash screen also hides it.
 - The text is part of the image because the native splash can only show an image.
 - Segoe UI was used because no Roboto file was available to render it. Brand may want it redrawn in their own typeface together with the high-resolution logo.
+
+Splash since 2026-10-30 (start-up intro, `docs/PERFORMANCE.md` §12.2):
+- The image shows **only the drop**: the intro's first frame. The intro draws that same frame in the same place (a
+  192 dp box centred on the screen, `splashArt` in `src/theme/brand.ts`), and the native splash is hidden as soon as
+  it can, so the hand-over shows no change. The intro then drops it 18 dp into place, brings in the logo, then "Setu"
+  over a short yellow rule (drawn by the app in Roboto: there is no text in the image any more).
+- The drop sits where it ends up in a 120 × 73 dp logo whose top is 30 dp from the box's top, raised 18 dp. That is
+  left of and above the screen's centre: on a slow cold start, the lone drop is what shows until the app is loaded.
+- Its farthest drawn pixel is 493 px from the image's centre (bounding-box corner), inside the 512 px circle that
+  Android 12+ shows.
+- With "Remove animations" on, there is no intro: this image hides when the first screen is ready, as before.
+- Android always fades the native splash out as it hides (expo-splash-screen's `SplashScreenManager.kt`; `fade` is an
+  iOS option). The fade is set to 120 ms (`motion.intro.nativeFade`, through `SplashScreen.setOptions`); it was the
+  default 400 ms.
+- **To go back to the old splash** (logo and "Setu" in the image): restore `assets/splash-icon.png` from commit
+  `4063df3` and remove `<SplashIntro />` from `App.tsx`. Both together: the old image with the intro would show the logo
+  twice.
+- The native image only changes with a new build: EAS runs prebuild, which turns it into the splash drawables.
 
 How they were made (Pillow; the script is not in the repo, the steps are):
 1. Trim the source to the bounding box of its non-white pixels (x 120–685, y 8–353 → 566 × 346).
@@ -352,6 +371,20 @@ The rename to "Setu" (2026-10-23) changed only the splash text; the script is ag
 4. Checked: Windows OCR (`Windows.Media.Ocr`) reads the image, flattened on white, as "meru" / "Setu", and reads the
    Phase C image as "meru" / "Mount Meru" / "Service Desk" (the control). The logo rows compare identical to the
    Phase C image, and the text is the single colour #111827.
+
+The drop-only splash and `brand/meru-drop.png` (2026-10-30) are drawn by a script in the repo,
+`scripts/make-splash-assets.py` (Pillow; run from the repo root):
+1. The drop is the mark's connected shape that holds its yellowest pixel (8-connected over alpha > 0). The "m" and
+   "meru" are separate shapes. Every other pixel is cleared: that is `meru-drop.png`.
+2. That image is scaled to 640 × 391 px (LANCZOS, as Phase C scaled the logo) and placed at (192, 160 − 96).
+3. `tests/motion/start-up-and-login.test.mjs` decodes both files and fails if they drift from the app's geometry: the
+   drop's pixels must equal the mark's, the splash must hold only the drop, and its edges must sit within 3 px
+   (0.6 dp) of where the intro draws them.
+
+The mark's transparency (measured 2026-10-30): the background is fully transparent, but because the mark was made by
+"colour to alpha" against white, no pixel is fully opaque. The red is (208, 0, 15) at alpha 228 and the yellow
+(254, 202, 0) at alpha 252. On white that composites to the brand colours; on any other colour, the red takes some of it.
+So the mark belongs on white (as on Login's white logo card). An opaque vector mark from brand would remove the limit.
 
 Why white behind the logo:
 - The mark is red `#D51B28` and yellow `#FECB03`. On a red background the "m" disappears, and on a yellow one the

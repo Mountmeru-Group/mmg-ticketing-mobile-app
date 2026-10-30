@@ -48,9 +48,15 @@ describe('sign-in: Microsoft is the only way into the app', () => {
   });
 
   test('the Login screen navigates nowhere: its one action is "Sign in with Microsoft"', () => {
+    // Since the "arc split" layout (2026-10-30) the action is SignInButton; it was a SubmitButton labelled
+    // 'Signing in…' / 'Sign in with Microsoft' before.
     const login = read('src/screens/auth/LoginScreen.tsx');
-    assert.doesNotMatch(login, /navigation\.|navigate\(/);
-    assert.match(login, /label=\{signingIn \? 'Signing in…' : 'Sign in with Microsoft'\}/);
+    const button = read('src/screens/auth/SignInButton.tsx');
+    for (const source of [login, button]) assert.doesNotMatch(source, /navigation\.|navigate\(/);
+    assert.equal(login.split('<SignInButton').length - 1, 1);
+    assert.match(login, /<SignInButton busy=\{signingIn\} onPress=\{startSignIn\} \/>/);
+    assert.match(button, /const LABEL = 'Sign in with Microsoft';/);
+    assert.match(button, /accessibilityLabel=\{LABEL\}/);
   });
 });
 
