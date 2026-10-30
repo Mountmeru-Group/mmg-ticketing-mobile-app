@@ -25,6 +25,24 @@ export const fontWeight = {
   bold: '700',
 } as const;
 
+/**
+ * The login's "arc split" type (2026-10-30, docs/brand/UI-STANDARDS.md §10), in dp. These sizes are outside the web's
+ * scale above, so they are styles, not classes, and nothing else uses them; S0's "no arbitrary sizes" still holds
+ * everywhere else. Android draws weight 800 with the nearest weight the system font has (Roboto Black on most phones).
+ */
+export const loginType = {
+  /** "One portal / for all your / IT needs.": line height 1.05, tight tracking. */
+  headline: { fontSize: 42, lineHeight: 44, letterSpacing: -1.3, fontWeight: '800' },
+  /** It is already 42 dp: at most 1.3 × with large system text, so a line does not wrap on a 360 dp phone. */
+  headlineMaxScale: 1.3,
+  subline: { fontSize: 15, lineHeight: 22.5 },
+  /** "Setu" on Login, and on the start-up intro. */
+  wordmark: { fontSize: 21, lineHeight: 28, fontWeight: '800' },
+  prompt: { fontSize: 13, lineHeight: 18 },
+  button: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
+  footer: { fontSize: 12, lineHeight: 16 },
+} as const;
+
 /** How the web combines them (frontend/src: KPICard, AppLayout sidebar, the three badges, cards). Class names. */
 export const textRoles = {
   pageTitle: 'text-2xl font-bold',

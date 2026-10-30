@@ -7,7 +7,8 @@ defects found on a device, the Home KPI tiles and the drawer layout (§5), and u
 2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4. Phase A1 (2026-10-23) added
 motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
 property-editor pattern on the ticket, now that the technician has one too. §9 (2026-10-29) sets the rule for the
-time-of-day greeting on Home.
+time-of-day greeting on Home. §10 (2026-10-30) is the login's "arc split" layout and the motion palette (white
+ground, yellow accent); the motion itself is `docs/PERFORMANCE.md` §12.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -41,6 +42,8 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
 **S0 Scale.** `inlineRem: 16` in `metro.config.js`: 1rem = 16 dp, as on the web. Tokens are unchanged.
 - Sizes: `text-xs` 12, `text-sm` 14, `text-base` 16, `text-lg` 18, `text-xl` 20, `text-2xl` 24; `p-4` 16; `h-11` 44.
 - Nothing smaller than `text-xs`, and no arbitrary `text-[…]` sizes.
+- One exception, Login only (§10): its display sizes (42, 21, 15, 13 dp) are named styles in `src/theme/typography.ts`
+  (`loginType`), not classes.
 - This makes everything 14 % larger than before. To revert, delete `inlineRem: 16`; nothing else depends on it.
 
 **S1 Screen frame.**
@@ -120,7 +123,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 **S10 Callouts.** Notice, InlineError, LookupError and the Login failure box are `rounded-lg p-3`. Errors use an 18 dp icon with `text-sm`; information uses a 16 dp icon with `text-xs`.
 
 **S11 States.**
-- Loading: a skeleton that mirrors the layout, with a white band sweeping across it (Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
+- Loading: a skeleton that mirrors the layout, with a soft brand-yellow band sweeping across it (yellow since 2026-10-30, §10.3; white in Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
 - Empty: a 40 dp icon, a title, what would appear here, and an action where one helps. Examples: "Raise a ticket", "Show all tickets", "Clear search", "Show all articles", "Show all approvals", "Show all tasks".
   - An empty list screen shows an illustration instead of the icon (Phase A1, `EmptyState illustration`), 128 × 96 dp, flat, in brand tokens only (`assets/illustrations/`):
     - `empty` (an empty tray under the Meru drop): nothing here yet, or nothing matches. Tickets, tasks, knowledge base, announcements, the catalogue and My Requests.
@@ -141,7 +144,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
     - a gray-100 line;
     - **Sign out**, 48 dp, red-600 icon and label (the web's `text-red-600`), `red-50` when pressed. While signing out, the icon becomes a brand-red spinner and the label reads "Signing out…".
   - The version line under the card. The drawer pads by the top and bottom safe-area insets, so the line stays clear of the gesture bar.
-- Status bar: dark on white and grey screens; light on the red selection bar and the black image viewer.
+- Status bar: dark on white and grey screens; light on the red selection bar, the black image viewer and Login's red card (§10).
 
 ## 3. Contrast (WCAG AA: 4.5:1 for text, 3:1 for UI graphics)
 
@@ -303,6 +306,11 @@ Left as they were, on purpose:
   "Can't reach the Service Desk", "contact the Service Desk", "Open the Service Desk on the web".
 - "Mount Meru" as the organisation: "Sign in with your Mount Meru work account" and the logo's accessibility label.
 
+Superseded on 2026-10-30 by the "arc split" login (§10): the login card, its `text-2xl` heading and the line "Sign in
+with your Mount Meru work account" are gone. Login now says "Sign in with your work account" under a "Setu" wordmark,
+and "Mount Meru Group" in its sub-line and footer. The native splash shows only the drop (§10.4); the logo and "Setu"
+come in with the start-up intro.
+
 ## 7. Tab bar on every screen, back arrow on every non-root screen (2026-10-23)
 
 Found on a device: the bottom bar disappeared on the drawer screens (Approvals, Tasks, Knowledge base, Service
@@ -430,3 +438,133 @@ text-gray-900` header as the "Hello, Ronit" it replaces (S3), with the role unde
   - never on a timer or by polling: a screen nobody is looking at does no work;
   - keep the derived value (the greeting), not the time, in state, so a check that finds the same band does not
     re-render the screen.
+
+## 10. Login "arc split", and the motion palette (2026-10-30)
+
+The approved login design replaces the Phase C login card. Layout only: the sign-in flow, `auth.config.ts`, the
+redirect URI, the failure messages, navigation and every permission are unchanged. The motion that goes with it
+(start-up, sign-in, return to Home) is in `docs/PERFORMANCE.md` §12. **Not run on a device:** there was no build.
+
+### 10.1 Layout
+
+Reference phone 390 × 844 dp. Every value is a token: `loginLayout` in `src/theme/brand.ts`, `loginType` in
+`src/theme/typography.ts`, `colors.login` and `colors.microsoft` in `src/theme/colors.ts`.
+
+**Top: the red card.**
+- Brand red, at least **63 %** of the screen's height, from the top of the screen (under the status bar, whose icons
+  are white here) down. Only its bottom corners are rounded: **46 dp**.
+- Two decorative circles in a lighter red (`#de1223`, hsl 355 85 % 47 %) behind the content, clipped by the card:
+  - 260 dp, centred at (352, 36): it bleeds off the top right;
+  - 150 dp, centred at (−22, 372): smaller, off the left at the card's lower third.
+  - Their x and size scale with the screen's width, their y with its height.
+- The offline banner, when offline, at the top of the card (S1: on Login, at the top of the screen).
+- Padding 28 dp at the sides, 24 dp under the status bar, 44 dp above the rounded edge.
+- **Logo card:** white, 124 × 84 dp, radius 20, padding 12 dp top and bottom and 16 dp at the sides. The mark is
+  contained in the 92 × 60 dp inside (it is about 1.6 : 1, so it fills the width). Not a square: a square would leave
+  the mark floating.
+- **Headline:** white, 42 dp, weight 800, line height 44 (1.05), letter spacing −1.3 dp, three lines: "One portal /
+  for all your / IT needs." It is the screen's header for TalkBack. Its text size follows the system's up to 1.3 ×
+  (`maxFontSizeMultiplier`): at 42 dp it is already display text. Estimate: the widest line, "One portal", is about
+  200–210 dp at 42 dp, so about 270 dp at 1.3 ×, inside the 304 dp a 360 dp phone leaves. Check on a device.
+- **Sub-line:** 15 dp, line height 22.5 (1.5), at most 270 dp wide, 12 dp under the headline: "Raise, track and
+  resolve issues across the whole of Mount Meru Group." Colour `#fff3f4`, a pale red tint (see 10.2).
+- The space between the logo card and the headline grows; the card grows instead of clipping when its text needs more
+  room (large system text, the offline banner), and the page scrolls.
+
+**Bottom: white.**
+- Under the card, top to bottom, centred: the sign-out or failure message when there is one (unchanged, full
+  width), then:
+  - **"Setu"**, 21 dp, weight 800, `text.primary` (gray-900);
+  - **"Sign in with your work account"**, 13 dp, `text.secondary` (gray-500), 2 dp below;
+  - **the sign-in button**, 20 dp below (10.5);
+  - "Opening Microsoft…", 8 dp below the button. Its line is always reserved, so nothing moves when it appears;
+  - the **environment chip** (amber-100 / amber-800 pill, as before), 12 dp below, **only when the build is not
+    production** (10.6);
+  - in `__DEV__` builds only, the redirect-URI hint (unchanged).
+- **"Mount Meru Group IT"**, 12 dp, `text.secondary`, at the bottom, 20 dp above the bottom inset + 20.
+
+### 10.2 Colour and contrast (WCAG 2.x, on the exact values)
+
+| Text | On | Ratio | Need |
+|---|---|---|---|
+| Headline, white | brand red / the lighter circles | 5.47 / 4.98 | 3 (large) |
+| Sub-line `#fff3f4` | brand red / the lighter circles | 5.04 / 4.60 | 4.5 |
+| "Setu", gray-900 | white | 17.7 | 4.5 |
+| Prompt and footer, gray-500 | white | 4.83 | 4.5 |
+| Button label, gray-900 | white | 17.7 | 4.5 |
+| Environment chip, amber-800 | amber-100 | 6.37 | 4.5 |
+
+Two deviations from the design's words, both for AA:
+- **The sub-line is a very pale tint.** A visibly pink tint such as `#ffd6da` is 3.8 : 1 on brand red. The circle
+  overlaps the sub-line's first letters, so the tint must pass on the lighter red too: `#fff3f4` is the palest red tint
+  that passes on both with some margin.
+- **The footer is gray-500, not a lighter grey.** gray-400 is 2.5 : 1 on white (S4: never text). gray-500 is the
+  lightest grey that passes; the footer differs from the prompt by size (12 against 13 dp).
+
+### 10.3 The motion palette
+
+Every animation plays on a **white ground** with **brand yellow (`#ffcc00`) as the working accent**. Red appears only
+where the logo itself is red. Tokens: `colors.motion` (`ground` white, `accent` brand yellow, `track` `#fff0b3`, brand
+yellow at about 30 % on white).
+
+| Where | White | Yellow | Red |
+|---|---|---|---|
+| Start-up intro | the whole ground | the drop, the rule under "Setu" | the logo's own "m" and "meru" |
+| Sign-in spinner | the circle's fill | the arc (accent) on a pale ring (track) | none |
+| Loading shimmer | the cards it crosses | the sweeping band (S11) | none |
+| Login's red card | — | — | the card is a layout surface, not motion |
+
+The spinner's ring and arc are decoration: yellow on white is about 1.1–1.5 : 1, below the 3 : 1 for graphics, so the
+caption "Opening Microsoft…" says what is happening (and TalkBack announces it).
+
+### 10.4 The logo asset
+
+- `assets/brand/meru-mark.png` (566 × 346) **has a transparent background**: its corners and 51 % of its pixels are
+  fully transparent.
+- **The mark itself is not fully opaque.** It was made by "colour to alpha" against white (RELEASE.md §7), so the red is
+  at alpha 228 / 255 (89 %) and the yellow at 252 / 255. On white it composites back to the exact brand colours. On any
+  other background the red takes on that background's colour.
+- So the design works because the mark sits in a **white card**. On the red card directly, the "m" would disappear,
+  and a tinted card would tint the logo. A future change of the card's colour needs either the white card or an opaque
+  (vector) mark from brand: the same request as RELEASE.md §7's "Resolution".
+- New: `assets/brand/meru-drop.png`, the mark with everything but the drop cleared, same canvas (the start-up intro
+  animates the drop alone). The native splash, `assets/splash-icon.png`, now shows only the drop. Both are drawn by
+  `scripts/make-splash-assets.py`; RELEASE.md §7 has the details.
+
+### 10.5 The sign-in button
+
+- **Outlined pill, as wide as its content:** white fill, 1.5 dp gray-300 border (S5's outline grey), radius 26.
+- Padding 24 dp at the sides, then Microsoft's four-square logo (21 dp, Microsoft's red `#f25022`, green `#7fba00`, blue
+  `#00a4ef`, yellow `#ffb900`), 12 dp, then "Sign in with Microsoft", 15 dp weight 600, gray-900.
+- **Exactly 52 dp tall**, which is also its touch target. It never shrinks: its height is fixed, and the collapse
+  (PERFORMANCE.md §12.3) moves pieces drawn inside the button, never the button itself.
+- At 200 % system text on a 360 dp phone the label would be wider than the screen, so it shrinks to fit on one line
+  (`adjustsFontSizeToFit`), like the KPI labels (S2).
+- Pressed: the fill turns gray-50. While signing in it is disabled and announced as busy.
+
+### 10.6 The environment chip
+
+- Shown on every build **except production**: `SHOW_ENVIRONMENT_CHIP` in `src/config/env.ts` is `APP_ENV !== 'PROD'`.
+  `APP_ENV` is PROD only in a release build of the `production` EAS profile: development builds refuse PROD, and
+  `scripts/eas-build-guard.js` refuses PROD on every other profile.
+- Login renders it inside `{SHOW_ENVIRONMENT_CHIP ? (…) : null}`, so on production it is not in the tree at all, not
+  just hidden.
+- Profile (M10) still shows the environment line on every build; only Login's chip changed.
+- Tests: `tests/motion/start-up-and-login.test.mjs` evaluates `env.ts` as a production release build (false), a
+  preview release build, a build with nothing set and a development build (true), and checks the label is rendered
+  nowhere else on Login.
+
+### 10.7 Layout checks (arithmetic, not run on a device)
+
+The card's content at 100 % text: status bar (~32) + 24 + 84 + at least 24 + 132 (headline) + 12 + 45 (two sub-line
+lines) + 44 = **397 dp**. The white area's content, with the chip: about **282 dp** (including a 20 dp gesture-bar inset).
+
+| Phone | Card (63 %) | Card content | White area | White content | Result |
+|---|---|---|---|---|---|
+| 390 × 844 | 532 | 397 | 312 | 282 | Everything on one screen |
+| 360 × 640, preview build | 403 | 397 | 237 | 282 | Button fully visible (bottom at 551); chip and footer need a 45 dp scroll |
+| 360 × 640, production (no chip) | 403 | 397 | 237 | 250 | Footer needs a 13 dp scroll |
+| 360 × 640, 130 % text | 403 → grows to 480 | 480 | 160 | about 310 | The page scrolls; nothing is clipped |
+
+Check on the next build: 360 dp phones at 100 %, 130 % and 200 % text; the headline's weight (800 is drawn with the
+nearest system weight, Roboto Black on most phones); the offline banner on the red card.
