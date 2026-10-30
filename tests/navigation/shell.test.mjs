@@ -76,12 +76,15 @@ describe('More list', () => {
   const WORK_APPROVALS = { key: 'work', items: ['approvals', 'tasks', 'catalog', 'myRequests'] };
   const INFO = { key: 'information', items: ['knowledge', 'announcements'] };
   const SETTINGS = { key: 'settings', items: ['settings'] };
-  const PLAIN = [WORK, INFO, SETTINGS];
-  const WITH_APPROVALS = [WORK_APPROVALS, INFO, SETTINGS];
+  // iOS-5b (Android 2026-10-29): Knowledge base and Announcements are ADMIN only, so the "information" section is
+  // ADMIN's alone; for everyone else it is empty and left out (tests/rbac/kb-announcements.test.mjs).
+  const PLAIN = [WORK, SETTINGS];
+  const WITH_APPROVALS = [WORK_APPROVALS, SETTINGS];
+  const ADMIN = [WORK, INFO, SETTINGS];
 
   forEachPersona(
     'More rows with no pending approvals',
-    { END_USER: PLAIN, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: PLAIN, ADMIN: PLAIN },
+    { END_USER: PLAIN, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: PLAIN, ADMIN },
     (p) => moreSections(p.role, 0),
   );
 
@@ -89,7 +92,7 @@ describe('More list', () => {
   // it is never also a More row (one route per screen).
   forEachPersona(
     'More rows with 2 pending approvals',
-    { END_USER: WITH_APPROVALS, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: WITH_APPROVALS, ADMIN: PLAIN },
+    { END_USER: WITH_APPROVALS, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: WITH_APPROVALS, ADMIN },
     (p) => moreSections(p.role, 2),
   );
 

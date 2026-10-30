@@ -3,6 +3,8 @@
 // - A row pushes its module inside the More stack, so the module's first screen swipes back here.
 // - Approvals is a row only for END_USER and L2_MANAGER while APR-1 returns ≥ 1; ADMIN and AGENT have the tab.
 //   Badge = the APR-1 count: one cached query, shared with the tab bar, Home and the inbox. Never polled.
+// - Knowledge base, Announcements: ADMIN only (2026-10-29, a product decision; their routes are registered for ADMIN
+//   only too, routes.ts stackRoutes).
 // - At the bottom, as the drawer and the web's user block: the account card (avatar, name, role, and the locked country
 //   chip; it opens Profile & settings) and Sign out (confirmation, AUTH-3, then the local wipe: useSignOut).
 // - Footer: version and environment.

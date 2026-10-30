@@ -6,6 +6,11 @@
 > **Phase A1** added motion: four of the five approved animations, and two empty-state illustrations. §10 records
 > what was built, what was skipped, the bundle cost and what to watch on a device. §3's line on the skeleton pulse is
 > the Phase P state; §10 replaces it.
+>
+> **2026-10-29:** a third bundle pass, alongside the KB/announcements ADMIN-only change and the Home greeting. §11 has
+> the measurement and the per-package attribution, including `react-native-render-html`'s exact cost. **Little was
+> left to gain safely, and no bundle reduction was applied.** The release bundle grew by 2.7 KB of Hermes bytecode
+> (+0.05 %).
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -972,4 +977,135 @@ use `dumpsys gfxinfo`.
 - Release bundle built twice with the method above (§10.7). The native-driver trace is in §10.1.
 - The two illustrations were rendered in a desktop browser at 2× to check the drawing. That is not the phone's renderer: see §10.9 item 6.
 - No EAS build. No network call to the backend. The web repo was not opened.
+- Branch `dev`, nothing committed.
+
+---
+
+## 11. Third bundle pass (2026-10-29)
+
+Done alongside two other changes: Knowledge base and Announcements became ADMIN only (`docs/ROLE-MATRIX.md` §16), and
+Home greets by time of day (`docs/brand/UI-STANDARDS.md` §9).
+
+**Rules kept:**
+- no library added or replaced (`react-native-render-html`: report only);
+- no polling, no shorter `staleTime`;
+- no navigation-structure or transition change;
+- auth flow, `auth.config.ts` and the dev-token screen untouched;
+- no EAS build, nothing committed.
+
+**How it was measured.** The same method as §1.4, §9.3 and §10.7:
+- a release `expo export:embed` (`--dev false --minify true`, `EXPO_PUBLIC_APP_ENV=UAT`), then the project's `hermesc -O`;
+- into a scratch folder outside the repo;
+- with bytes attributed to packages through the source map.
+
+Two numbers below are new, and both are measured, not estimated:
+- **A package's exclusive cost** is every module reachable only through it in the bundle's dependency graph. It is counted as whole modules, including each module's `__d(…)` wrapper and data modules the source map does not attribute.
+- **Its Hermes cost** is measured directly: the release bundle is recompiled with exactly those modules emptied, and the two `.hbc` files are compared.
+
+### 11.1 Before and after
+
+| | Before (`c84d53a`) | After (this change) | Change |
+|---|---|---|---|
+| Release JS, minified | 3,609.6 KB | 3,610.7 KB | **+1.1 KB (+0.03 %)** |
+| gzip | 842.2 KB | 842.4 KB | +0.2 KB |
+| Hermes bytecode (what ships) | 5,304.9 KB | 5,307.6 KB | **+2.7 KB (+0.05 %)** (2,772 bytes) |
+| Modules | 2,300 | 2,301 | +1 (`utils/greeting.ts`) |
+| Bundled assets | 26 files, 407.4 KB | 26 files, 407.4 KB | none |
+
+- **No library code changed.** The whole difference is app code:
+  - `utils/greeting.ts` +0.5 KB;
+  - `utils/permissions.ts` +0.4 KB (the two rules and `drawerRoutes`);
+  - `HomeScreen` +0.3 KB;
+  - `useAnnouncements` +0.05 KB;
+  - `AppDrawer` −0.2 KB (the table replaced seven JSX screens).
+- **The ADMIN-only change removes no bytes.** ADMIN still uses every KB and announcements file, so all of it ships. It costs 22.6 KB of JS, 0.6 % (39.1 KB of Hermes), across 9 modules: `KnowledgeBaseScreen` 7.4, `KbArticleScreen` 4.1, `AnnouncementCard` 3.8, `useKnowledgeBase` 3.6, `AnnouncementsScreen` 1.8 and four small files.
+- **What it does save is at run time, for the other four personas:**
+  - **One request fewer on Home's first paint:** ANN-1 is no longer requested for END_USER, AGENT, triage AGENT or L2_MANAGER, or refreshed on pull-to-refresh. Home's parallel reads drop from five to four. This also lightens UAT, which shares its hardware with production.
+  - **No banner work:** no announcement banner is laid out, and no HTML-to-text pass is run on its body.
+
+### 11.2 Can the KB and announcements code load on demand? It already does
+
+Checked in the release bundle:
+- With `inlineRequires` (P2), each module is required at its use site.
+- **`KnowledgeBaseScreen` and `KbArticleScreen`** are required only inside `KnowledgeStack()`'s body. That function first runs when the Knowledge route first mounts (drawer screens are lazy).
+  - For ADMIN: on the first visit to the Knowledge base.
+  - For every other role: **never**, because the route is not registered.
+- **`AnnouncementsScreen`'s module** is required when the drawer's module first runs, after sign-in, never on Login. That is the same moment as before: its `component={…}` was evaluated on the drawer's first render.
+  - Running that module only defines one component function.
+  - Its imports (FlashList, `AnnouncementCard`, `HtmlText`…) are inline. They run only when the screen renders: for ADMIN on first open, for anyone else never.
+- Code splitting into separate files is not available here. Metro builds one bundle for Hermes; Hermes memory-maps the file and only touches what runs.
+- **Nothing to change.**
+
+### 11.3 Where the bytes are now
+
+**Largest packages** (KB of minified JS, attributed through the source map, after this change):
+
+| Package | KB | | Package | KB |
+|---|---|---|---|---|
+| react-native-reanimated | 741.5 | | @shopify/flash-list | 80.0 |
+| react-native | 568.0 | | ramda (render-html) | 77.6 |
+| **the app (`src/`)** | **437.0** | | axios | 51.1 |
+| module wrappers and unmapped data | 107.9 | | @tanstack/query-core | 50.4 |
+| react-native-gesture-handler | 104.6 | | react-native-render-html | 49.0 |
+| expo | 91.4 | | @react-native/virtualized-lists | 48.6 |
+| react-native-worklets | 90.9 | | react-native-css-interop | 46.2 |
+| entities (render-html) | 86.3 | | react-native-screens | 43.8 |
+| @react-navigation/core | 85.9 | | urijs (render-html) | 41.4 |
+
+The app's 437.0 KB: screens 215.2, components 63.0, hooks 50.0, utils 47.1, api 33.5, navigation 13.4, theme 5.8, types 4.4, store 2.9, config 1.7.
+
+### 11.4 `react-native-render-html`: its exact cost (report only, not replaced)
+
+| | Minified JS | Hermes bytecode |
+|---|---|---|
+| **The renderer and every module only it pulls in** (571 modules) | **486.7 KB, 13.5 %** | **665.7 KB, 12.5 %** |
+| What a replacement that keeps `htmlparser2` and `domhandler` would save (542 modules) | 314.7 KB, 8.7 % | 443.3 KB, 8.4 % |
+
+**The 486.7 KB, by package:**
+
+| Part | KB |
+|---|---|
+| `ramda` | 94.1 |
+| `entities` | 86.6 |
+| data modules the source map does not attribute: 37.1 are `entities`' tables (they stay with `htmlparser2`), 8.2 the renderer's own | 45.3 |
+| the renderer itself | 66.9 |
+| `urijs` | 42.3 |
+| `@native-html/transient-render-engine` | 38.5 |
+| `@native-html/css-processor` | 30.5 |
+| `htmlparser2` | 23.3 |
+| `domutils`, `@jsamr/counter-style` | 9.9 each |
+| `css-to-react-native` 9.2, `domhandler` 8.7, `dom-serializer` 5.8, `postcss-value-parser` 4.9, `@jsamr/react-native-li` 4.8, six smaller | 39.5 |
+
+**Why §9.3 said 388.5 KB.** That figure counted only the bytes the source map attributes to each package. This one counts whole modules: each module's wrapper, and the entity tables the map leaves unattributed. §9.3's Hermes figure (about 570 KB) was a proportional estimate; 665.7 KB is measured.
+
+**What replacing it would involve.** §9.3's plan still holds, with one correction:
+- **Keeping `htmlparser2` and `domhandler` also keeps `entities`, `domutils` and `dom-serializer`,** since the parser needs them. The saving is therefore **314.7 KB of JS and 443.3 KB of Hermes**, not the whole 486.7 KB.
+- **To save it all,** the renderer would need its own tokenizer for the sanitised element set, and its own entity decoding.
+- **`htmlparser2` would become a direct dependency.** Today it is only a dependency of the renderer.
+- **The work, as §9.3 lists it:**
+  - a small renderer mapping the sanitised element set to nested `Text` and `View`;
+  - keeping link routing, selectable text, the style allowlist, image sizing through expo-image, the "Show more" measurement and the plain-text fallback;
+  - regression testing against real UAT emails (no WebView: 05 §A.6).
+- **Estimate:** 2–4 days. It is the only large reduction left in the bundle.
+
+### 11.5 What else was checked
+
+| Candidate | Finding | Applied? |
+|---|---|---|
+| Unused code, now that two screens are ADMIN only | None: ADMIN uses all of it (§11.1). `src/screens/PlaceholderScreen.tsx` is still imported by nothing and is not in the bundle (§1.4) | No: nothing to remove |
+| Whole-library imports | 7 `import * as`, all small single-purpose expo modules (`expo-secure-store` ×2, `expo-auth-session`, `expo-document-picker`, `expo-image-picker`, `expo-sharing`, `expo-splash-screen`). Metro does not tree-shake, so a named import bundles the same code. Ionicons is already a deep import. `expo-file-system` (20.1 KB) is a named import from its root; the three classes used (`File`, `Directory`, `Paths`) are most of that entry | No: no saving |
+| `semver` (18.6 KB JS, **36.2 KB Hermes**, measured) | Pulled in at run time by NativeWind's `react-native-css-interop` (`css-to-rn/feature-flags.js`). It compares React Native's version with "<0.75" and "<0.74" | **No.** Only a Metro resolver alias to a hand-written stand-in could remove it, and every `className` in the app goes through that runtime. A mistake there breaks styling app-wide, and only a device run would show it. 0.7 % is not worth that risk |
+| Drift specs (`src/api/responseSpecs.ts`, 9.6 KB JS, at most **7.5 KB Hermes**, measured) | `checkFields()` returns at once unless `__DEV__`, so in release the specs are built and never read | **No.** Wrapping each of 36 specs in `__DEV__ ? […] : []` would let the minifier drop them. It is safe, but saves 0.14 % at the cost of a rule every new spec must follow. Ronit can approve it in one line |
+| Barrel files (`hooks/index.ts` 7.6 KB, `components/index.ts` 4.5 KB) | The cost of re-export getters | No: rewriting about 70 imports to save about 12 KB |
+| Assets | The Ionicons font is 380.6 KB of the 407.4 KB (§9.3: about 60 of ~1,300 glyphs used). The brand mark is 17.4 KB, decoded at view size by expo-image. Launcher and splash PNGs are 4.5–57 KB and are not in the JS bundle | No: subsetting the font needs a font tool that is not installed, and replacing the icon set is a UI change |
+| Work blocking a first paint | Home: for non-ADMIN roles one request and the banner's text pass are gone (§11.1). Already reported and unchanged: `HtmlRenderProvider` builds its engine at the root, before Login (§5.3, needs a Hermes profile); `KbArticleScreen` lays out a cached body during the push, now ADMIN only (§9.2) | Only the Part 1 effect |
+
+**Verdict.** After P, P2 and A1, the bundle has no safe saving left that is worth having. The one large lever is replacing `react-native-render-html` (443–666 KB of Hermes), which needs approval and 2–4 days. Everything else measured is under 1 % each and carries either risk or churn. This pass added 2.7 KB.
+
+### 11.6 Verification
+
+- `npx tsc --noEmit`: clean.
+- `npm test`: **661 / 661** passing (593 before; +56 in `tests/rbac/kb-announcements.test.mjs`, +12 in `tests/home/greeting.test.mjs`). Thirteen existing cases changed because of the ADMIN-only decision; why each one changed is in `docs/ROLE-MATRIX.md` §16.6.
+- Release bundle built twice with the method above (§11.1); the navigator modules were read in the release output (§11.2).
+- No EAS build. No call to the backend. The web repo was not opened.
 - Branch `dev`, nothing committed.

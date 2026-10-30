@@ -6,6 +6,9 @@
 //   (getId, docs/PERFORMANCE.md §9.7);
 // - freezeOnBlur (Phase P2): a screen that is not on show stops re-rendering until it is shown again.
 // Every route renders its real screen since iOS-3c: SCREENS is a complete table, so a route without one does not compile.
+// Which routes are registered is stackRoutes() (routes.ts, pinned per role by tests/rbac); this file only supplies
+// screens. The knowledge base and Announcements are registered for ADMIN only, so for every other role they do not
+// exist: nothing can navigate to them, not merely no More row (iOS-5b, as Android's drawer, 2026-10-29).
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
 
@@ -29,7 +32,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors } from '@/theme';
 import type { AppTab } from '@/utils/permissions';
 import { MoreScreen } from './MoreScreen';
-import { STACK_ROUTES, getIdFor, hasLargeTitle, routeTitle, type StackRoute } from './routes';
+import { getIdFor, hasLargeTitle, routeTitle, stackRoutes, type StackRoute } from './routes';
 
 /** Every stack route's screen (iOS-3a: the read screens; iOS-3c: the modules). Complete: no placeholder remains. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,10 +69,10 @@ export const STACK_SCREEN_OPTIONS: NativeStackNavigationOptions = {
 
 function createTabStack(tab: AppTab): ComponentType {
   const Stack = createNativeStackNavigator();
-  const routes: readonly StackRoute[] = STACK_ROUTES[tab];
 
   function TabStack() {
     const role = useAuthStore((s) => s.user?.role);
+    const routes = stackRoutes(tab, role);
     return (
       <Stack.Navigator initialRouteName={routes[0]} screenOptions={STACK_SCREEN_OPTIONS}>
         {routes.map((name) => (
