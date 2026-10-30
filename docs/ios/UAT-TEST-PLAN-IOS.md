@@ -6,7 +6,7 @@
   - G: iOS-only checks;
   - H: write safety, on one agreed UAT test ticket;
   - I: the account-deletion request and the privacy link.
-- **211 checks:** A–E 127, G 60 (22 screens at two text sizes among them), H 17, I 7.
+- **217 checks:** A–E 133, G 60 (22 screens at two text sizes among them), H 17, I 7. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2.
 - **F, the defect log, is at the end**, so that it follows every section.
 
 **How to use it**
@@ -63,7 +63,7 @@ Do this first with the **Admin** account.
 | B1.3 | Admin | Choose or type the work account; finish the password and MFA. If Conditional Access asks for an **Authenticator** approval, switch to Authenticator, approve, and come back | The sheet is still there, and continues | |
 | B1.4 | Admin | If Microsoft shows **"Permissions requested"**, note it in F, then accept | Normally it does not appear: IT granted admin consent | |
 | B1.5 | Admin | — | The sheet closes **by itself**. The button spins for a moment, then **Home** appears | |
-| B1.6 | Admin | Look at Home, then at the **More** tab | Home: **"Hello, <first name>"**, with the role under it. More: the account card shows your **real full name** and role, not "Signed in" or an email address. Home's counts and Recent tickets load (proof that the token works for later requests, BLOCKER B4) | |
+| B1.6 | Admin | Look at Home, then at the **More** tab | Home: **"Good morning, <first name>"** ("Good afternoon" from 12:00, "Good evening" from 17:00 to 04:59, by the phone's clock; iOS-5b), with the role under it. More: the account card shows your **real full name** and role, not "Signed in" or an email address. Home's counts and Recent tickets load (proof that the token works for later requests, BLOCKER B4) | |
 | B1.7 | Admin | Swipe the app away and reopen it. Then restart the phone and open it | Straight to Home both times, with no sign-in | |
 | B1.8 | Admin | Sign out (E15.4). Tap Sign in, then **Cancel** on the sheet | Back on Login, with **no error message** | |
 | B1.9 | User, Technician, L2 Manager | B1.1–B1.6 with each account | The same, each with its own name and role | |
@@ -98,7 +98,7 @@ Every failure **inside the app** shows a red box with a title, a message and a l
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo above the card, not cropped. More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Settings), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
+| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo above the card, not cropped. More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Settings; the middle group is the Admin account's only, since iOS-5b), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
 | C2 | Any | Look at More's account card and footer | Initials circle, **name**, **role** and a chevron; tapping it opens Settings. **Sign out** in red under it. The footer reads **`v0.1.0 · UAT`**, without "dev build" | |
 | C3 | Any | Set the largest text size (Settings › Accessibility › Display & Text Size › Larger Text, slider at the far right), then open More | The rows grow and the list scrolls. The account card and the version line are reached by scrolling, and nothing is clipped. (Android pinned the card; iOS's More is one scrolling list) | |
 | C4 | Any | Look at the tab bar, then switch tabs | The tab you are on has a **brand-red** icon and label; the others are grey. Badges are red with white text | |
@@ -119,7 +119,9 @@ Sign in as each account in turn and check every row. **✅** = must be there. **
 |---|---|---|---|---|---|---|
 | D1.1 | Tabs (iOS) | Home, **My Tickets**, Alerts, More | Home, **Tickets**, **Approvals**, Alerts, More | Home, Tickets, Alerts, More | Home, Tickets, Approvals, Alerts, More | |
 | D1.2 | More: Approvals row (iOS) | only while ≥ 1 approval is pending, with the count on the More tab | ❌ (it's a tab) | only while ≥ 1 is pending, with the count on More | ❌ (it's a tab) | |
-| D1.3 | More: Tasks, Service Request, My Requests, Knowledge base, Announcements, Settings | ✅ | ✅ | ✅ | ✅ | |
+| D1.3 | More: Tasks, Service Request, My Requests, Settings | ✅ | ✅ | ✅ | ✅ | |
+| D1.3a | More: Knowledge base, Announcements (Admin only since iOS-5b, as Android 2026-10-29) | ❌ | ❌ | ❌ | ✅ | |
+| D1.3b | Home: announcement banner, when one is active (Admin only since iOS-5b) | ❌ | ❌ | ❌ | ✅ | |
 | D1.4 | Badges (iOS) | Alerts: unread. More: pending approvals | Alerts; Approvals: pending | as User | as Technician | |
 | D1.5 | Account card: lock chip with the country | ❌ | ❌; **(CA)** ✅ | ❌ | ❌ | |
 | D1.6 | Home tiles | **Open, Resolved** (with numbers) | Open, In progress, On hold, SLA breached, Active, **Unassigned**; **(CA)** the same, without Unassigned | the same five **without numbers** ("View tickets"), with a blue notice saying why | all six | |
@@ -300,12 +302,13 @@ Setup: a `[MOBILE TEST]` ticket that has been **closed** (E7).
 | E13.3 | Technician | Tap the notification | The ticket opens **inside Alerts**; the back chevron returns to Alerts. The item is marked read | |
 | E13.4 | Technician | **Mark all read** (in the navigation bar), then confirm | The count clears | |
 
-### E14. Knowledge base
+### E14. Knowledge base (Admin account only, since iOS-5b)
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| E14.1 | Any | More › **Knowledge base**: use the category chips, "Search articles" (a word from a title), and open an article | Each works | |
-| E14.2 | Any | Tap **Yes, this helped**, then confirm | The vote is accepted and remembered on this phone | |
+| E14.1 | Admin | More › **Knowledge base**: use the category chips, "Search articles" (a word from a title), and open an article | Each works | |
+| E14.2 | Admin | Tap **Yes, this helped**, then confirm | The vote is accepted and remembered on this phone | |
+| E14.3 | User, Technician, Technician-CA, L2 Manager | Open the **More** tab | **No** Knowledge base row, and nothing else in the app opens one | |
 
 ### E15. Profile and sign out
 
@@ -324,12 +327,20 @@ Setup: a `[MOBILE TEST]` ticket that has been **closed** (E7).
 | E16.2 | Any | Turn Airplane Mode off; pull to refresh | The banner goes, and the refresh works | |
 | E16.3 | Any | Optional, long: wait 8 hours after signing in | Back to Login with "Your session has ended. Please sign in again." | |
 
-### E17. Announcements
+### E17. Announcements (Admin account only, since iOS-5b)
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| E17.1 | Any | If an announcement is active, look at Home; tap ✕ | Its banner shows; ✕ hides it for this session. Tapping the banner opens Announcements inside Home | |
-| E17.2 | Any | More › **Announcements** | The active announcements are listed | |
+| E17.1 | Admin | If an announcement is active, look at Home; tap ✕ | Its banner shows; ✕ hides it for this session. Tapping the banner opens Announcements inside Home | |
+| E17.2 | Admin | More › **Announcements** | The active announcements are listed | |
+| E17.3 | User, Technician, Technician-CA, L2 Manager | With an announcement active for that role on the web, look at Home and the **More** tab | Home shows **no** banner, and More has **no** Announcements row | |
+
+### E18. Home greeting (iOS-5b, Android 2026-10-29)
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| E18.1 | Any | Look at Home's first line at different times of day | "Good morning, <first name>" from 05:00, "Good afternoon" from 12:00, "Good evening" from 17:00 (until 04:59), by the phone's clock | |
+| E18.2 | Any | Leave the app open on Home across a band change (for example 11:55 → 12:05) with the screen locked; unlock. Then switch to another tab and back | The greeting has changed on unlock, and is current again after the tab switch | |
 
 ---
 
@@ -440,9 +451,9 @@ In each row, at both sizes:
 | G10.13 | Alerts | | |
 | G10.14 | More | | |
 | G10.15 | Tasks list, a task, the task editor | | |
-| G10.16 | Knowledge base and an article (tables scroll sideways) | | |
+| G10.16 | Knowledge base and an article (tables scroll sideways). Admin account | | |
 | G10.17 | Service Request: catalogue, a form with every field type, My Requests, a request | | |
-| G10.18 | Announcements | | |
+| G10.18 | Announcements. Admin account | | |
 | G10.19 | Settings (Profile) | | |
 | G10.20 | The ticket-link resolver | | |
 | G10.21 | Picker sheets (category, group, country, people, templates, date) | | |

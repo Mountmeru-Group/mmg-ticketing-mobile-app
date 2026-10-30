@@ -25,15 +25,35 @@ export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'anno
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
  * Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns ≥ 1 (08 S1).
+ * Knowledge base and Announcements: ADMIN only (2026-10-29, canUseKnowledgeBase, canReadAnnouncements).
  * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
  */
 export function drawerItems(role: UserRole, pendingApprovals: number): DrawerItem[] {
   const items: DrawerItem[] = [];
   if (isAgentOrAdmin(role) || pendingApprovals >= 1) items.push('approvals');
-  items.push('tasks', 'knowledge');
+  items.push('tasks');
+  if (canUseKnowledgeBase(role)) items.push('knowledge');
   if (canUseServiceCatalog(role)) items.push('catalog');
-  items.push('announcements', 'settings');
+  if (canReadAnnouncements(role)) items.push('announcements');
+  items.push('settings');
   return items;
+}
+
+// ── Knowledge base and announcements: ADMIN only (Ronit, 2026-10-29) ──
+// A product decision to simplify the mobile app, NOT a 🔒 SAFER case: on the web every role has both in the sidebar and
+// they work there (AppLayout.tsx:21, :31; WEB-VS-MOBILE-ROLES.md §5a). Each rule decides the drawer row (drawerItems)
+// AND the route (drawerRoutes), so for anyone else the screen is unreachable, not merely missing from the menu.
+// iOS (iOS-5b): the drawer row is a More row (moreSections reads drawerItems), and the routes are the tab stacks'
+// (navigation/routes.ts stackRoutes, the iOS form of Android's drawerRoutes).
+
+/** Knowledge base: the drawer row, the Knowledge stack (M14 list and search, M15 article and "Was this helpful?"). */
+export function canUseKnowledgeBase(role: UserRole): boolean {
+  return role === 'ADMIN';
+}
+
+/** Announcements (ANN-1): the drawer row, the M16 screen, the Home banner and the ANN-1 read itself (useAnnouncements). */
+export function canReadAnnouncements(role: UserRole): boolean {
+  return role === 'ADMIN';
 }
 
 export type MainTab = 'HomeTab' | 'TicketsTab' | 'AlertsTab';
@@ -166,6 +186,14 @@ export function homeTiles(viewer: Pick<AuthUser, 'role' | 'countryId'>): HomeTil
 /** "Pending approvals" shortcut on Home: the same rule as the drawer row (08 S1). */
 export function showApprovalsShortcut(role: UserRole, pendingApprovals: number): boolean {
   return drawerItems(role, pendingApprovals).includes('approvals');
+}
+
+/**
+ * The announcement banner on Home: the same rule as the Announcements route (ADMIN only). For anyone else there is no
+ * banner at all, rather than a banner whose "Read more" leads nowhere, and ANN-1 is not requested.
+ */
+export function showAnnouncementBanner(role: UserRole): boolean {
+  return canReadAnnouncements(role);
 }
 
 // ── Ticket detail (04 M4, 05 §A.1–§A.5) ──────────────────────

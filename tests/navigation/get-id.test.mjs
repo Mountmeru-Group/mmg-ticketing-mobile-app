@@ -139,7 +139,10 @@ describe('coverage', () => {
 
   test('the navigators are built from the table, with getIdFor on every screen', () => {
     const stacks = read('src/navigation/TabStacks.tsx');
-    assert.ok(stacks.includes('STACK_ROUTES[tab]'), 'TabStacks must build each stack from STACK_ROUTES');
+    // iOS-5b: through stackRoutes(), which keeps STACK_ROUTES' order and leaves out only the routes the role may not open
+    // (the knowledge base and Announcements, ADMIN only; tests/rbac/kb-announcements.test.mjs).
+    assert.ok(stacks.includes('const routes = stackRoutes(tab, role);'), 'TabStacks must build each stack from stackRoutes()');
+    assert.ok(read('src/navigation/routes.ts').includes('const routes: readonly StackRoute[] = STACK_ROUTES[tab];'), 'stackRoutes() must read STACK_ROUTES');
     assert.ok(stacks.includes('getId={getIdFor(name)}'), 'TabStacks must pass getIdFor to every screen');
     assert.equal(/<Stack\.Screen[^>]*name="/.test(stacks), false, 'TabStacks hard-codes a screen');
     const root = read('src/navigation/RootNavigator.tsx');

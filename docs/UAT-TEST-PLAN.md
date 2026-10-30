@@ -71,7 +71,8 @@ Do this first with the **Admin** account.
 - [ ] 5. The Chrome page closes **by itself** and you are back in the app.
   - The button keeps spinning for a moment, then **Home** appears.
 - [ ] 6. **Success looks like this:**
-  - Home says **"Hello, <your first name>"**, with your role under it (Admin / Technician / User / L2 Manager).
+  - Home says **"Good morning, <your first name>"** (or "Good afternoon" from 12:00, "Good evening" from 17:00 to
+    04:59, by the phone's clock), with your role under it (Admin / Technician / User / L2 Manager).
   - Open the menu (☰, top left). The **account card at the bottom** shows your **real full name** and **role**.
     It must not say "Signed in" and must not show an email address in place of the name.
   - Home's counts and Recent tickets load. This proves the session token works for later requests (BLOCKER B4).
@@ -141,7 +142,7 @@ Failures that happen on **Microsoft's page** show no red box in the app, so they
   - **two tiles per row**: Open, In progress / On hold, SLA breached / Active ("right now"), Unassigned;
   - each tile shows a coloured square with a white icon, the label **in full** (no single letters, no "…"), then the
     number;
-  - the tiles do **not** overlap the "Hello, …" greeting.
+  - the tiles do **not** overlap the "Good morning, …" greeting.
   - With the **Technician-with-country** or **L2 Manager** account there are five tiles, and the last one (Active) is
     **full width**.
 - [ ] **C6. Home tiles at the largest font size.**
@@ -158,7 +159,7 @@ Failures that happen on **Microsoft's page** show no red box in the app, so they
   - Links are blue.
 - [ ] **C8. Known items at 200 % font size** (pre-existing; just record what you see):
   - the drawer header text may be clipped;
-  - "Announcements" in the menu may split mid-word.
+  - "Announcements" in the menu may split mid-word (Admin account: only Admin has that row since 2026-10-29).
 
 ---
 
@@ -177,7 +178,9 @@ Sign in as each account in turn and check every row.
 |---|---|---|---|---|
 | Bottom tabs | Home, **My Tickets**, Alerts | Home, **Tickets**, Alerts | Home, Tickets, Alerts | Home, Tickets, Alerts |
 | Menu: Approvals | only while they have ≥ 1 pending approval | ✅ always, with a count badge | only while ≥ 1 pending | ✅ always |
-| Menu: Tasks, Knowledge base, Announcements, Settings | ✅ | ✅ | ✅ | ✅ |
+| Menu: Tasks, Service Request, Settings | ✅ | ✅ | ✅ | ✅ |
+| Menu: Knowledge base, Announcements (ADMIN only since 2026-10-29) | ❌ | ❌ | ❌ | ✅ |
+| Home announcement banner (when one is active) | ❌ | ❌ | ❌ | ✅ |
 | Account card: lock chip with country name | ❌ | ❌; **(CA)** ✅ | ❌ | ❌ |
 | Home tiles | **Open, Resolved** (with numbers) | Open, In progress, On hold, SLA breached, Active, **Unassigned**; **(CA)** the same without Unassigned | the same five **without numbers**: each says "View tickets", and a blue notice explains why | all six |
 | Home shortcuts | "Pending approvals" only while ≥ 1 | My open, Due soon, Pending approvals | My open, Due soon (+ Pending approvals while ≥ 1) | My open, Due soon, Pending approvals |
@@ -393,8 +396,9 @@ Setup: a `[MOBILE TEST]` ticket that has been **closed** (Section E7).
 - [ ] Tap the notification: the ticket opens, and the item is marked read.
 - [ ] Tap **Mark all read**: the badge clears.
 
-### E14. Knowledge base
-- [ ] Menu → **Knowledge base**:
+### E14. Knowledge base (Admin account only, since 2026-10-29)
+- [ ] With every other account, the menu has **no** Knowledge base row.
+- [ ] Admin: Menu → **Knowledge base**:
   - category chips filter the list;
   - "Search articles" finds an article by a word in its title;
   - open an article.
@@ -419,9 +423,18 @@ Setup: a `[MOBILE TEST]` ticket that has been **closed** (Section E7).
 - [ ] Optional, long: 8 hours after signing in, the app returns to Login with "Your session has ended. Please sign
   in again.".
 
-### E17. Announcements
-- [ ] If an announcement is active, Home shows its banner. ✕ hides it for this session.
-- [ ] Menu → **Announcements** lists the active ones.
+### E17. Announcements (Admin account only, since 2026-10-29)
+- [ ] Admin: if an announcement is active, Home shows its banner. ✕ hides it for this session. **Read more** opens
+  Announcements.
+- [ ] Admin: Menu → **Announcements** lists the active ones.
+- [ ] Every other account, with an announcement active for that role on the web: Home shows **no** banner, and the
+  menu has **no** Announcements row.
+
+### E18. Home greeting
+- [ ] Home's first line is "Good morning, <first name>" from 05:00, "Good afternoon" from 12:00 and "Good evening"
+  from 17:00 (until 04:59), by the phone's clock.
+- [ ] Leave the app open on Home across a band change (for example 11:55 → 12:05) with the screen off. Turn the screen
+  on: the greeting has changed. Switching to another tab and back does the same.
 
 ---
 

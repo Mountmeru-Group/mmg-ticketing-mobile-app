@@ -29,7 +29,7 @@ import {
   listServiceRequests,
 } from '../../src/api/serviceCatalog.api.ts';
 import { assertServiceRequest, wasRefusedOnDevice } from '../../src/hooks/writeGuards.ts';
-import { STACK_ROUTES } from '../../src/navigation/routes.ts';
+import { STACK_ROUTES, stackRoutes } from '../../src/navigation/routes.ts';
 import {
   canUseServiceCatalog, drawerItems, isOwnServiceRequest, myServiceRequestRows, serviceCatalogPermissions, serviceRequestProblem,
 } from '../../src/utils/permissions.ts';
@@ -113,9 +113,10 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
     (p) => serviceCatalogPermissions(p),
   );
 
+  // 2026-10-29: Knowledge base is ADMIN only, so for every other role the row follows Tasks directly.
   forEachPersona(
-    'the drawer row "catalog" sits after Knowledge base (web sidebar order)',
-    { END_USER: 2, AGENT: 3, TRIAGE_AGENT: 3, L2_MANAGER: 2, ADMIN: 3 },
+    'the drawer row "catalog" sits after Knowledge base (web sidebar order; ADMIN only has Knowledge base)',
+    { END_USER: 1, AGENT: 2, TRIAGE_AGENT: 2, L2_MANAGER: 1, ADMIN: 3 },
     (p) => drawerItems(p.role, 0).indexOf('catalog'),
   );
 
@@ -139,6 +140,9 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
     for (const screen of ['ServiceCatalog', 'ServiceRequestForm', 'ServiceRequestDetail']) {
       assert.ok(STACK_ROUTES.MoreTab.includes(screen), `${screen} is not in the More stack`);
       assert.match(stacks, new RegExp(`\\b${screen}: ${screen}Screen,`));
+      // 2026-10-29 (iOS-5b): the stacks register their routes from stackRoutes() (as Android's drawer from
+      // drawerRoutes()), so the catalogue is checked there too: registered for every role.
+      for (const p of Object.values(PERSONAS)) assert.ok(stackRoutes('MoreTab', p.role).includes(screen), `${p.role} ${screen}`);
     }
   });
 });

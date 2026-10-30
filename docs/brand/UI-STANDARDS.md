@@ -6,9 +6,10 @@ the one standard chosen for each finding (§2), the contrast report (§3) and th
 defects found on a device, the Home KPI tiles and the drawer layout (§5), and updated S2, S12 and §4 to match. On
 2026-10-23 the app was renamed "Setu" (§6), which changed S12's drawer header and §4. Phase A1 (2026-10-23) added
 motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
-property-editor pattern on the ticket, now that the technician has one too.
+property-editor pattern on the ticket, now that the technician has one too. §9 (2026-10-29) sets the rule for the
+time-of-day greeting on Home.
 
-**On iPhone, §9 (Phase iOS-4, 2026-10-29) is the standard.** It supersedes S0's sizes, S1's header, S12's navigation
+**On iPhone, §iOS-A (Phase iOS-4, 2026-10-29; §9 until iOS-5b, when Android's §9 arrived) is the standard.** It supersedes S0's sizes, S1's header, S12's navigation
 chrome, the large-text rules of §4 and the separator colour of S2 and §8, and adds targets, VoiceOver, haptics, sheets,
 search and keyboard rules from Apple's Human Interface Guidelines. Everything else here still applies.
 
@@ -63,7 +64,7 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
   - **No percentage widths in a wrapping row** (`w-[48%]` + `flex-wrap`) for a grid, anywhere. On a device the tiles came out as wide as their content (§5).
 
 **S3 Typography and avatars.**
-- Screen title: `text-lg font-semibold`. Home greeting: `text-xl font-bold`.
+- Screen title: `text-lg font-semibold`. Home greeting: `text-xl font-bold`. Its text is "Good morning, Ronit" (since 2026-10-29; "Hello, Ronit" before). §9 has the rule.
 - Record title: `text-lg font-bold`. Card/list title: `text-base font-semibold`. Row title: `text-sm font-semibold`.
 - Section caption: `text-xs font-semibold uppercase tracking-wide text-gray-500`. Sub-label: `text-xs font-semibold text-gray-500`.
 - Body `text-sm`, meta `text-xs`, IDs `text-xs font-semibold text-gray-500`.
@@ -138,7 +139,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 - Header left button: ☰ only on the three tab roots (Home, Tickets, Alerts). Every other screen, including the first screen of each drawer module, has the back arrow (44 dp button, 24 dp icon), which does exactly what Android back does. Sheets have ✕.
 - Drawer, top to bottom, as in the web sidebar:
   - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
-  - Nav rows (Approvals when shown, Tasks, Knowledge base, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls.
+  - Nav rows (Approvals when shown, Tasks, Knowledge base, Service Request, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), so other roles have four rows at most.
   - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
     - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
     - a gray-100 line;
@@ -415,13 +416,36 @@ the same pieces and adds no new styles.
   - Failure: the server's message (a 403 says the role can't change that field), the editor closes and the row shows
     the saved value. Nothing is optimistic.
 
-## 9. iOS (Phase iOS-4, 2026-10-29)
+## 9. Time-of-day text: the Home greeting (2026-10-29)
+
+Home's first line greets by the time of day: "Good morning, Ronit". Same place, same `text-xl font-bold
+text-gray-900` header as the "Hello, Ronit" it replaces (S3), with the role under it as before.
+
+- **Three greetings only,** from `src/utils/greeting.ts`: "Good morning" 05:00–11:59, "Good afternoon" 12:00–16:59,
+  "Good evening" 17:00–04:59. The small hours stay "evening", because there is no fourth greeting and "Good morning" at
+  2 a.m. reads as wrong to someone still on a late shift.
+- **Format:** the greeting, a comma, then the first word of the display name. With no name, the greeting alone ("Good
+  evening"). An e-mail-style display name gives the same first name the drawer shows.
+- **Clock:** the phone's local time. No server time, and not the timezone in the person's profile: the phone's clock is
+  what they see beside the app.
+- **When it is recomputed, and the pattern for any later time-dependent text:**
+  - read the clock on first render, when the screen gains focus, and when the app returns to the foreground on that
+    screen (`AppState` → `active`), so an app left open overnight shows the right greeting when it is picked up;
+  - never on a timer or by polling: a screen nobody is looking at does no work;
+  - keep the derived value (the greeting), not the time, in state, so a check that finds the same band does not
+    re-render the screen.
+
+## iOS-A. iOS (Phase iOS-4, 2026-10-29)
+
+> Numbered iOS-A, not 9, since iOS-5b (Ronit, 2026-10-30): Android's sections keep Android's numbers (Android's §9 is
+> the Home greeting, above), and the iOS-only sections take a letter Android never uses. The greeting's text and type
+> are Android's on iOS too; iOS-A.1 caps how far it grows (Title 2, `maxTextScale.title2`).
 
 The standard on iPhone. Each rule names the Human Interface Guidelines page it follows; the quotes are in
 `docs/ios/APP-STORE-COMPLIANCE.md` (section E). The tests that pin these rules are in
 `tests/screens/hig-polish.test.mjs`. pt and dp use the same numbers.
 
-### 9.1 Type: iOS text styles (HIG, Typography)
+### iOS-A.1 Type: iOS text styles (HIG, Typography)
 The `text-*` classes keep their names, but each one now resolves to an iOS text style at the default text size
 ("Large"). `src/theme/typography.ts` is the single source.
 
@@ -440,7 +464,7 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
 - **Dynamic Type:** React Native scales every size by the person's text size, up to ×3.571 at AX5.
 - **Caps (`maxFontSizeMultiplier`):** iOS's titles grow less than body text, so titles stop at iOS's own AX5 size (`maxTextScale`): Title 1 ×2.07, Title 2 ×2.55, Title 3 ×2.75. That applies only to text of 20 pt and more: the Home greeting, the KPI counts, and the ticket, task, article, request and Profile titles. Initials in avatars and badge counts stop at ×1.4 so they stay inside their circle. Body and caption text is never capped.
 
-### 9.2 Screen frame
+### iOS-A.2 Screen frame
 - **Header:** the native navigation bar (replaces S1's ScreenHeader).
   - Tab roots (Home, Tickets, Approvals, Alerts, More) have a large title that collapses as the content scrolls (HIG, Toolbars).
   - Pushed screens have a standard title and the back chevron with no label.
@@ -453,7 +477,7 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
   - The picker sheets (`OptionSheet`, `PersonPickerSheet`, `TemplatePickerSheet`, `DatePickerSheet`) are native page sheets through `PageSheet`: a swipe down closes them, and the title sits between ✕ (or Cancel) and an optional Done.
   - No drawn grabber (HIG, Sheets: a grabber means the sheet can be dragged to resize). Done always comes with Cancel.
 
-### 9.3 Large text (HIG, Typography: "Consider adjusting your layout at large font sizes")
+### iOS-A.3 Large text (HIG, Typography: "Consider adjusting your layout at large font sizes")
 - **Accessibility sizes:** these start at AX1 (`fontScale` ≥ 1.786, `useAccessibilityTextSize()`). From there:
   - Home's KPI tiles are one per row.
   - The ticket's four tabs are two rows of two.
@@ -466,11 +490,11 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
 - **Knowledge-base tables:** each column is at least 120 pt × the text size, and a table wider than the screen scrolls sideways (`utils/html.ts` `tableLayoutWidth`).
 - **Truncation:** keep it to text you can read in full elsewhere. The Profile email is never cut.
 
-### 9.4 Targets (HIG, Buttons: "a hit region of at least 44x44 pt")
+### iOS-A.4 Targets (HIG, Buttons: "a hit region of at least 44x44 pt")
 - **44 pt minimum:** every Pressable is at least 44 pt tall (and wide, when its width is set), from its own size or its hit slop. A test enforces this on every Pressable in `src/`.
 - **Icon buttons** (✕, mark read, remove, the task checkbox, the notification and announcement corners) are 44 × 44 pt boxes. A hit slop is only for chips in a row (36 pt + 4 pt slop).
 
-### 9.5 VoiceOver (HIG, VoiceOver)
+### iOS-A.5 VoiceOver (HIG, VoiceOver)
 - **Labels:** every Pressable, TextInput and Switch has an `accessibilityLabel` that says what is visible (and the state, e.g. "Filters, 2 on"). A test enforces this.
 - **No control inside another:** VoiceOver can't reach a control nested in another, so it is offered as one of the outer element's custom actions instead.
   - Ticket card: Change status, Select.
@@ -478,7 +502,7 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
 - **Decorative avatars:** initials circles are hidden from VoiceOver; the name is beside them.
 - **Announcements:** a success notice is read out (`SuccessNotice`). The ticket's priority preview announces a new priority, since its live region works on Android only.
 
-### 9.6 Haptics (HIG, Playing haptics: "Use system-provided haptic patterns according to their documented meanings")
+### iOS-A.6 Haptics (HIG, Playing haptics: "Use system-provided haptic patterns according to their documented meanings")
 Only `src/utils/haptics.ts` plays haptics, and each one has a single meaning:
 
 | Haptic | When |
@@ -490,25 +514,25 @@ Only `src/utils/haptics.ts` plays haptics, and each one has a single meaning:
 
 Nothing else plays one. iOS's System Haptics switch turns them all off.
 
-### 9.7 Motion (HIG, Motion; Accessibility)
+### iOS-A.7 Motion (HIG, Motion; Accessibility)
 - **Rules:** S7 and `docs/PERFORMANCE.md` §10 stand (timing curves, no springs or bounce, transform and opacity only).
 - **Reduce Motion:** every animation is skipped, the success notice appears without a fade, and the picker sheets fade instead of sliding.
 
-### 9.8 Keyboard (HIG, Virtual keyboards)
+### iOS-A.8 Keyboard (HIG, Virtual keyboards)
 - **Return key:** a single-line field's Return key is Next to the following field, and Done on the last one (Profile, the ticket's title, the task's title).
 - **Done bar:** multiline fields, and the phone pad (which has no Return key), get the Done bar above the keyboard (`KeyboardDoneBar`, one per form).
 - **Keyboard types:** match the content: email, phone, `numbers-and-punctuation` for a number.
 - **AutoFill:** name, phone and email fields set `textContentType`.
 
-### 9.9 Feedback
+### iOS-A.9 Feedback
 - **Success notice:** a non-modal notice for a write. Green tick for success, amber mark for a partial outcome; never the tick for anything that failed.
 - **Alerts:** confirmations name exactly what happens. Destructive style only for a destructive result the person didn't directly choose; the account-deletion request uses the default style (HIG, Alerts). Cancel is always "Cancel".
 
-### 9.10 Appearance and colour
+### iOS-A.10 Appearance and colour
 - **Light only (D9):** `userInterfaceStyle: "light"`. Nothing reads the system appearance: no `dark:` classes, no `useColorScheme`, a dark-content status bar, a light date picker. A dark-mode phone shows the light app and light system controls.
 - **Brand yellow:** `#FFCC00` (the web's CSS variable; the logo's sampled `#FECB03` is not in the app) is 1.5:1 on white, below the 4.5:1 text minimum and the 3:1 graphics minimum. It is never a text, icon or control colour; it appears only in the two decorative empty-state illustrations. Its accessible use is as a fill behind `#1A1A1A` text (11.5:1), as on the web's secondary button. A test enforces this.
 - **Brand red:** `#D21121` is 5.5:1 on white and passes for text either way.
 - **Separators:** `border-border` (`#e2e8f0`), the card edge, everywhere. gray-100 (S2, §8) was too faint on white (1.06:1).
 
-### 9.11 Empty, loading and error states
+### iOS-A.11 Empty, loading and error states
 S11 stands; the shared `EmptyState`, `ErrorState`, `OfflineState` and `LoadingSkeleton` are on every screen. A list footer whose next page failed shows its message and the same `OutlineButton` "Retry" as `ErrorState`, not a "Tap to retry" text.

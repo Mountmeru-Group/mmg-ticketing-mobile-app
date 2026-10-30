@@ -1,4 +1,6 @@
-// M14 Knowledge base (04 §2.1 M14, 08 1.59). Read only — authoring is out of scope.
+// M14 Knowledge base (04 §2.1 M14, 08 1.59). Read only — authoring is out of scope. ADMIN only since 2026-10-29: the
+// Knowledge routes are registered for ADMIN alone (utils/permissions.ts canUseKnowledgeBase; iOS: navigation/routes.ts
+// stackRoutes).
 // - Categories: KB-1, public ones only (05 B.26; KB-1 itself does not filter `isPublic`).
 // - Articles: KB-2, 20 per page, newest first, optionally one category. `published` is never sent (drafts, 05 C.15);
 //   rows that are not published AND public are not shown.

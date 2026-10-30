@@ -11,7 +11,7 @@ import type {
   TicketsStackParamList,
   UserRole,
 } from '@/types';
-import { appTabs, type AppTab } from '@/utils/permissions';
+import { appTabs, canReadAnnouncements, canUseKnowledgeBase, navRole, type AppTab } from '@/utils/permissions';
 
 /** Registered in every tab stack, so a record opens in the tab the person is in (Android switched to Tickets). */
 export const RECORD_ROUTES = ['TicketDetail', 'TaskDetail', 'ApprovalDetail', 'TicketLink'] as const;
@@ -64,6 +64,25 @@ void exact;
 
 export type StackRoute = Routes<AppTab>;
 export type SheetRoute = (typeof SHEET_ROUTES)[number];
+
+/**
+ * The routes a tab stack REGISTERS for this role, root first: the iOS form of Android's drawerRoutes() (iOS-5b, Android
+ * 2026-10-29). TabStacks.tsx registers exactly these. A route left out does not exist for that person: a navigate() to
+ * it is handled by no navigator, so no More row, banner, link, back history or stale state can open it. The knowledge
+ * base (KnowledgeBase, KbArticle: canUseKnowledgeBase) and Announcements (canReadAnnouncements) are ADMIN only; every
+ * other route is registered for every role, as before. No user yet: END_USER's (navRole).
+ */
+export function stackRoutes(tab: AppTab, role: UserRole | null | undefined): StackRoute[] {
+  const who = navRole(role);
+  const routes: readonly StackRoute[] = STACK_ROUTES[tab];
+  return routes.filter((name) => isRegisteredFor(name, who));
+}
+
+function isRegisteredFor(name: StackRoute, role: UserRole): boolean {
+  if (name === 'KnowledgeBase' || name === 'KbArticle') return canUseKnowledgeBase(role);
+  if (name === 'Announcements') return canReadAnnouncements(role);
+  return true;
+}
 
 /**
  * One screen per record (docs/PERFORMANCE.md §9.7): the param that names the record a route shows. React Navigation
