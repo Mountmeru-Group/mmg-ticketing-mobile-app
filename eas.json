@@ -6,17 +6,19 @@
 {
   "cli": {
     "version": ">= 24.8.0",
-    // app.json is the source of truth for version and ios.buildNumber; bump them by hand for each upload.
-    "appVersionSource": "local"
+    // EAS keeps the build number (iOS-7a): each preview build gets the next one (build.preview.ios.autoIncrement).
+    // The user-facing version stays app.json's "version"; its ios.buildNumber only seeds EAS's counter once.
+    "appVersionSource": "remote"
   },
   "build": {
     // TestFlight build for internal testers, pointed at UAT. Store-signed, because TestFlight requires it.
-    // The channel takes effect once expo-updates is added (iOS-7).
+    // expo-updates is installed (iOS-7a): updates to this channel follow docs/ios/RELEASE-IOS.md (fixes only).
     "preview": {
       "node": "24.18.0",
       "distribution": "store",
       "channel": "ios-preview",
-      "env": { "EXPO_PUBLIC_APP_ENV": "UAT" }
+      "env": { "EXPO_PUBLIC_APP_ENV": "UAT" },
+      "ios": { "autoIncrement": true }
     },
     // ⛔ PLACEHOLDER — NOT RUNNABLE. Ronit has not approved a production URL: the PROD entry in src/config/env.ts is
     // empty, so the build guard stops this profile on the server, and the app itself refuses to start without it.
