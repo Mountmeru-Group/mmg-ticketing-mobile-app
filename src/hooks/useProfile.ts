@@ -117,6 +117,7 @@ const LOGOUT_WAIT_MS = 5_000;
 /**
  * Sign out (02 §5.5), always after a confirmation: AUTH-3 (result ignored, waits at most 5 s), then the local wipe —
  * SecureStore token, the whole query cache and every store (endSession). The app then shows Login.
+ * The 15-day date goes too, so the next sign-in is challenged and starts a new 15 days (02 §5.8).
  */
 export function useSignOut() {
   const [signingOut, setSigningOut] = useState(false);
@@ -136,7 +137,7 @@ export function useSignOut() {
         new Promise((resolve) => setTimeout(resolve, LOGOUT_WAIT_MS)),
       ]);
     } finally {
-      await endSession(null);
+      await endSession(null, { forgetFullAuth: true });
       setSigningOut(false);
     }
   }, []);

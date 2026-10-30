@@ -43,8 +43,10 @@ describe('sign-in: Microsoft is the only way into the app', () => {
   test('only the Microsoft flow creates a session; the profile save re-stores the same token', () => {
     const callers = sourceFiles('src').filter((rel) => /\.setSession\(\{/.test(read(rel)));
     assert.deepEqual(callers.sort(), ['src/hooks/useProfile.ts', 'src/screens/auth/signInAttempt.ts']);
-    assert.match(read('src/screens/auth/signInAttempt.ts'), /setSession\(\{ token: result\.session\.token, user: result\.session\.user \}\)/);
+    // fullAuthAt (02 §5.8) is set only after a challenged sign-in; the profile save never passes it, so it keeps the date.
+    assert.match(read('src/screens/auth/signInAttempt.ts'), /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);
     assert.match(read('src/hooks/useProfile.ts'), /const \{ token, issuedAt, user: current \} = useAuthStore\.getState\(\);/);
+    assert.doesNotMatch(read('src/hooks/useProfile.ts'), /fullAuthAt/);
   });
 
   test('the Login screen navigates nowhere: its one action is "Sign in with Microsoft"', () => {

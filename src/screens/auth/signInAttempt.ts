@@ -8,7 +8,7 @@ import {
   type MicrosoftSignInFailure,
   type MicrosoftSignInResult,
 } from '@/api/auth.api';
-import { useAuthStore } from '@/store/auth.store';
+import { isReauthDue, useAuthStore } from '@/store/auth.store';
 
 /** `storage`: signed in, but SecureStore refused the session. */
 export type FailureReason = MicrosoftSignInFailure | 'storage';
@@ -25,11 +25,16 @@ export type SignInOutcome = { type: 'cancelled' } | { type: 'signed-in' } | { ty
 /**
  * Microsoft sign-in, then AUTH-P2, then setSession(). On `signed-in` the session is stored and RootNavigator switches
  * to the app. On `cancelled` (the person closed Microsoft's page) nothing happened and there is nothing to report.
+ *
+ * The 15-day re-authentication (02 §5.8) is decided here, before Microsoft's page opens. When it is due (no date, or
+ * the 15 days are up), Microsoft is told to challenge (prompt=login), and only that sign-in starts a new 15 days. An
+ * ordinary re-sign-in within them (after the 8-hour expiry or a 401) offers the account picker and keeps the date.
  */
 export async function attemptSignIn(): Promise<SignInOutcome> {
+  const challenge = isReauthDue(useAuthStore.getState().fullAuthAt);
   let result: MicrosoftSignInResult;
   try {
-    result = await signInWithMicrosoft();
+    result = await signInWithMicrosoft({ challenge });
   } catch (e) {
     return {
       type: 'failed',
@@ -43,7 +48,9 @@ export async function attemptSignIn(): Promise<SignInOutcome> {
 
   try {
     // The 8-hour rule runs from now (issuedAt), as before; AUTH-P2's expiresAt is not used yet (02 §5.4).
-    await useAuthStore.getState().setSession({ token: result.session.token, user: result.session.user });
+    // fullAuthAt only after a challenged sign-in; left undefined, setSession() keeps the stored date.
+    const fullAuthAt = challenge ? Date.now() : undefined;
+    await useAuthStore.getState().setSession({ token: result.session.token, user: result.session.user, fullAuthAt });
     return { type: 'signed-in' };
   } catch {
     return { type: 'failed', failure: { reason: 'storage', status: null, detail: 'SecureStore refused to save the session' } };
