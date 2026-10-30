@@ -47,6 +47,18 @@
           "backgroundColor": "#FFFFFF"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f7e5b2ae-0785-414d-b9c9-9e3e59b21be3"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f7e5b2ae-0785-414d-b9c9-9e3e59b21be3"
+    },
+    "android": {}
   }
 }
