@@ -139,6 +139,10 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
 5. **Log every update** in `docs/ios/UPDATES-LOG.md` (created with the first one): date, channel, runtime version, commit, reason.
 6. **Never publish to `production` before iOS-9.** From then on, only through the script that manifest §8 L5 describes: it sets `PROD`, checks the flags and runs `verify-release-bundle` first.
 7. **The phone hotspot** (§4) applies here too.
+8. **The launch screen and the start-up intro ship together, in a build, never by update** (iOS-5c, 2026-10-30; `docs/brand/UI-STANDARDS.md` §iOS-A.12, `docs/PERFORMANCE.md` §12):
+   - The launch screen is native: expo-splash-screen builds it from `assets/splash-icon.png` at build time. Since iOS-5c that image is the yellow drop alone, the first frame of the intro (`src/navigation/SplashIntro.tsx`, mounted in `App.tsx`). The first TestFlight build is the first to have it.
+   - An update can change the intro but never the launch image. So an update must not remove `<SplashIntro />` or change `splashArt` (`src/theme/brand.ts`) or `motion.intro.dropDistance`: on a build with the drop-only image, the lone drop would show, then jump.
+   - To go back to the old launch screen (the logo and "Setu"), restore `assets/splash-icon.png` from `4063df3` **and** remove `<SplashIntro />`, in one new build, as Android's release guide says (`docs/RELEASE.md` §7 at `c5c63ac`; not copied to iOS).
 
 ## 7. Before a `production` build (iOS-9)
 

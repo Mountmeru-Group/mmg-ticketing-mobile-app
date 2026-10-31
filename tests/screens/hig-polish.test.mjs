@@ -24,7 +24,8 @@ import { apiClient } from '../../src/api/client.ts';
 import { MOBILE_TICKET_SOURCE, createTicket } from '../../src/api/tickets.api.ts';
 import { ACCOUNT_DELETION_CATEGORY, ACCOUNT_DELETION_WORKING_DAYS, PRIVACY_POLICY_URL } from '../../src/config/legal.ts';
 import { ACCESSIBILITY_TEXT_SCALE, isAccessibilityTextScale } from '../../src/hooks/useTextSize.ts';
-import { fontSize, maxTextScale, textStylePoints } from '../../src/theme/typography.ts';
+import { loginLayout } from '../../src/theme/brand.ts';
+import { fontSize, loginType, maxTextScale, textStylePoints } from '../../src/theme/typography.ts';
 import {
   DELETION_CONFIRM_LABEL, DELETION_CONFIRM_TITLE, accountDeletionTicket, accountRows, deletionConfirmMessage,
   deletionTicketTitle, findDeletionCategory,
@@ -87,6 +88,15 @@ function expandConstants(src, text) {
 
 const TSX = sourceFiles('src', /\.tsx$/);
 
+/**
+ * iOS-5c: Pressables sized by a StyleSheet style from a theme token, not a class: the style, and its height and minimum
+ * width in pt. Login's sign-in pill is Android's design, a fixed 52 pt (tests/motion/start-up-and-login.test.mjs pins
+ * `pill: { height: H, minWidth: H, … }` with H = loginLayout.button.height).
+ */
+const TOKEN_SIZED = {
+  'src/screens/auth/SignInButton.tsx': { style: 'style={styles.pill}', height: loginLayout.button.height, width: loginLayout.button.height },
+};
+
 // ── 1. Targets and labels ────────────────────────────────────
 
 describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
@@ -99,6 +109,11 @@ describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
       for (const { text, line } of openingTags(src, 'Pressable')) {
         checked += 1;
         const attrs = expandConstants(src, text);
+        const sized = TOKEN_SIZED[rel];
+        if (sized && attrs.includes(sized.style)) {
+          if (sized.height < 44 || sized.width < 44) short.push(`${rel}:${line}`);
+          continue;
+        }
         const sizes = (prop) => [...attrs.matchAll(new RegExp(`(?:^|[\\s\`'"])(?:min-)?${prop}-(\\d+(?:\\.5)?)(?=[\\s\`'"])`, 'g'))].map((m) => PT(m[1]));
         const slop = Number(attrs.match(/hitSlop=\{(\d+)\}/)?.[1] ?? 0);
         const heights = sizes('h');
@@ -295,10 +310,14 @@ describe('Dynamic Type: the iOS text styles, the caps and the large-text layouts
     assert.equal(maxTextScale.title1, 58 / 28);
     assert.equal(maxTextScale.title2, 56 / 22);
     assert.equal(maxTextScale.title3, 55 / 20);
+    assert.ok(loginType.headline.fontSize >= textStylePoints.title3 && loginType.headlineMaxScale <= maxTextScale.largeTitle);
     for (const rel of TSX) {
       for (const { text, line } of openingTags(read(rel), 'Text')) {
         if (!/maxFontSizeMultiplier=/.test(text)) continue;
-        const capped = /text-(lg|xl|2xl|3xl)\b/.test(text) || /maxFontSizeMultiplier=\{1\.4\}/.test(text);
+        // iOS-5c: Login's 42 pt headline (Android's design, a style, not a class) is a title too; it stops at 1.3 ×,
+        // sooner than iOS's Large Title, so a line never wraps (UI-STANDARDS §10.1, §iOS-A.12).
+        const loginHeadline = /maxFontSizeMultiplier=\{loginType\.headlineMaxScale\}/.test(text) && /style=\{styles\.headline\}/.test(text);
+        const capped = /text-(lg|xl|2xl|3xl)\b/.test(text) || /maxFontSizeMultiplier=\{1\.4\}/.test(text) || loginHeadline;
         assert.ok(capped, `${rel}:${line}: a cap on text that isn't a title, an initial or a badge count`);
       }
     }

@@ -1,7 +1,8 @@
-# Android → iOS delta (iOS-5b)
+# Android → iOS delta (iOS-5b, iOS-5c)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **New port source: `origin/dev` @ `4063df30421407e040a7dccc9399bb38557dd702`.** To sync later Android work, diff `4063df3..origin/dev`.
+> **Port source since iOS-5c: `origin/dev` @ `c5c63acff8d7296244876020069884364864a99b`** (§7). To sync later Android work, diff `c5c63ac..origin/dev`: at the time of writing that is one commit, `f4fad10` (§7.3).
+> iOS-5b's port source was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
 > The build is in `00-PORT-MANIFEST.md` §4.15. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
 
 ## 1. The rule (Ronit, 2026-10-30)
@@ -149,12 +150,44 @@ Details are in manifest §4.15. In short:
 | # | Item | From | What iOS-9 does | Needs |
 |---|---|---|---|---|
 | 1 | Delete the developer-token screen, `PlaceholderScreen.tsx`, the route and the Login button (D4), together with the placeholder guards and `session.ts` (D5) | `4063df3` | Port as Android did. Update `ios-sso.test.mjs`, the release check's dev-token control, 02-AUTH §6, CLAUDE.md rule 5 and manifest §8 | The first real Microsoft sign-in on an iPhone (iOS-7), so a simulator can still sign in until then |
-| 2 | The PROD API URL in `env.ts` (D6), and the `eas.json` production comment | `4063df3` | Set it; the build guard then permits `production` | **Ronit's written sign-off** (CLAUDE.md I3); compliance A3 |
+| 2 | The PROD API URL in `env.ts` (D6), and the `eas.json` production comment | `4063df3` | Set it; the build guard then permits `production`. Then restore Android's chip assertion in `tests/motion/start-up-and-login.test.mjs` (a `PROD` build shows no chip; iOS-5c checks the refusal instead) | **Ronit's written sign-off** (CLAUDE.md I3); compliance A3 |
 | 3 | Version 1.0.0 (D7) | `4063df3` | `app.json` `version` (the iOS `buildNumber` follows App Store Connect) | Ronit, with the App Store Connect record |
 | 4 | The release check's PROD host (D8) | `4063df3` | Allow `servicedesk.mountmerugroup.com` in the `production` run only | Item 2 |
-| 5 | Production-readiness tests (D9) | `4063df3` | Port the part items 1–3 make true; leave out APK/AAB and `versionCode` | Items 1–3 |
+| 5 | Production-readiness tests (D9) | `4063df3`, `c5c63ac` | Port the part items 1–3 make true; leave out APK/AAB and `versionCode`. `c5c63ac` changed its "Login navigates nowhere" case for the new sign-in button; it becomes true on iOS with item 1 | Items 1–3 |
 | 6 | 02-AUTH §6 and the release guide | `4063df3` | Android's text about the deleted screen and the PROD build, in `RELEASE-IOS.md` | Items 1, 2 |
 
 ## 6. Not ported: not in Android `dev`
 
-R1–R5, S1–S6, P2–P4: see §3.2 and §3.3. **If Android merges any of them into `dev`, the next sync (`4063df3..origin/dev`) brings them across.** P1 is not needed: iOS has `dev`'s reply templates.
+R1–R5, S1–S6, P2–P4: see §3.2 and §3.3. **If Android merges any of them into `dev`, the next sync (`c5c63ac..origin/dev` since iOS-5c) brings them across.** P1 is not needed: iOS has `dev`'s reply templates.
+
+## 7. iOS-5c: the sync to `c5c63ac` (2026-10-30 to 2026-10-31)
+
+### 7.1 What came across
+
+At planning (`git fetch`, 2026-10-30), `4063df3..origin/dev` was **one commit**: `c5c63ac` "feat: arc-split Login and the four-stage open-and-sign-in motion" (2026-10-30 15:44 +0530). It changed 26 files (8 added, 18 modified) and no sign-in flow file. It changed no `app.json` and added no package. Ronit OK'd the plan with its defaults. The build is in `00-PORT-MANIFEST.md` §4.16.
+
+| ID | Change | Files | What it does for the user | In iOS before iOS-5c | Type | **Outcome** |
+|---|---|---|---|---|---|---|
+| L1 | Login, "arc split" | `LoginScreen.tsx`, `theme/brand.ts`, `colors.ts`, `typography.ts` (`loginType`), `BrandLogo.tsx`, `env.ts` (`SHOW_ENVIRONMENT_CHIP`) | A red card with the logo and "One portal for all your IT needs."; below it "Setu", the prompt, the sign-in pill and the footer. The environment chip is hidden on production builds | No (the Phase C card) | feature | **Ported.** One iOS difference, `__DEV__` only: the developer-token button stays until iOS-9 (§5, item 1) |
+| L2 | Sign-in motion | `SignInButton.tsx`, `motion.ts` (`signIn`) | The pill collapses into a turning yellow ring, "Opening Microsoft…"; it reverses on cancel or failure | No (`SubmitButton` with "Signing in…") | feature | **Ported** verbatim |
+| L3 | Start-up intro, and the drop-only launch image | `SplashIntro.tsx`, `splashSequence.ts`, `splash.ts`, `App.tsx`, `useReduceMotion.ts` (`reduceMotionSettled`), `motion.ts` (`intro`), `assets/splash-icon.png`, `assets/brand/meru-drop.png`, `scripts/make-splash-assets.py` | The drop falls into the logo, "Setu" rises over a yellow line, then it fades into the first screen. A tap skips it, and Reduce Motion removes it | No (logo-and-"Setu" launch image) | feature | **Ported** verbatim. JavaScript, plus one image that takes effect with the first build (`RELEASE-IOS.md` §6, rule 8) |
+| L4 | Yellow shimmer | `Shimmer.tsx`, `motion.ts`, `colors.ts` | The loading band is brand yellow | No (white) | feature | **Ported** verbatim |
+| L5 | KPI placeholder holds the count's line | `HomeScreen.tsx` | Home's tiles no longer jump when the counts arrive | No (a fixed 32 pt line, 2 pt short on iOS) | bug fix | **Ported**, with iOS's own `numberOfLines` and Title 1 cap on the placeholder |
+| L6 | Docs | `PERFORMANCE.md` §12, `UI-STANDARDS.md` §10, `RELEASE.md` §7 | Docs only | No | docs | PERFORMANCE: verbatim. UI-STANDARDS: merged, §10 before §iOS-A, plus §iOS-A.12. RELEASE.md: not on iOS; its iOS-relevant splash facts are in `RELEASE-IOS.md` §6 |
+| L7 | Tests | `start-up-and-login.test.mjs` (+26), `tests/support/png.mjs`, `production-readiness.test.mjs` | Tests only | No | release | `start-up-and-login`: ported, with 2 iOS changes (manifest §3.17). `production-readiness`: still iOS-9 (§5, item 5) |
+
+### 7.2 Section numbers (the iOS-5b rule)
+
+No clash. Android's new UI-STANDARDS §10 and PERFORMANCE §12 have no iOS counterpart. The iOS notes went into lettered sections: UI-STANDARDS §iOS-A.12 (new), §iOS-A.3 and §iOS-A.7.
+
+### 7.3 After the plan: `f4fad10`, not in iOS-5c
+
+On 2026-10-31 the brief's last check (`git fetch`; `origin/dev` must equal the port source) found one more commit on `dev`. It arrived after the iOS-5c plan had been OK'd: `f4fad10` "feat: 15-day forced re-authentication with prompt=login" (2026-10-30 16:59 +0530, 12 files).
+- **What it does:** every 15 days the user is signed out, and the next Microsoft sign-in uses `prompt=login`. A new SecureStore key, `mmg.auth.fullAuthAt`, is written only after a challenged sign-in. Login shows "Signed out for security".
+- **Why it is not in iOS-5c:** it changes the sign-in flow this brief kept untouched (`auth.api.ts`, `auth.store.ts`, `client.ts`, `signInAttempt.ts`, `RootNavigator.tsx`, `useProfile.ts`), and most of those files are iOS-adapted.
+- **iOS questions for its own plan:**
+  - the new Keychain key's accessibility (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, as `ios-sso.test.mjs` checks on every call);
+  - whether the reinstall wipe (`installMarker.ts` → `wipeStoredSession()`) also clears it;
+  - what `prompt=login` adds to iOS's private sheet, which already holds no Microsoft session (it matters on phones with Microsoft's SSO extension);
+  - the merge into iOS's `02-AUTH.md` (§5.8 is free; iOS's own section is §7.7).
+- **Status:** **pending Ronit's decision**, either a separate iOS-5d or folded into iOS-5c before its commit. Until then the port source is `c5c63ac`, one commit behind `origin/dev` (`f4fad10`).

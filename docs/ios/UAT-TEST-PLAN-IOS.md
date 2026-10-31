@@ -6,7 +6,7 @@
   - G: iOS-only checks;
   - H: write safety, on one agreed UAT test ticket;
   - I: the account-deletion request and the privacy link.
-- **217 checks:** A–E 133, G 60 (22 screens at two text sizes among them), H 17, I 7. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2.
+- **219 checks:** A–E 134, G 61 (22 screens at two text sizes among them), H 17, I 7. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
 - **F, the defect log, is at the end**, so that it follows every section.
 
 **How to use it**
@@ -45,8 +45,9 @@
 | A2 | Any | In TestFlight, tap **Install** | Setu installs. There is no "Untrusted Developer" prompt (TestFlight builds are signed) | |
 | A3 | Any | Look at the icon on the Home Screen, in the App Library and in the app switcher | The Meru logo: a red "m" with a yellow drop, on white, in iOS's rounded square. **Not** a blue square with "MMG"; no black or see-through corners | |
 | A4 | Any | Read the name under the icon, and under Settings › Apps | **Setu**, in full | |
-| A5 | Any | Swipe Setu away in the app switcher, then open it | The launch screen is the Meru logo with "Setu" under it, on white. Then Login, with **no white or blank flash** | |
-| A6 | Any | Look at Login | The amber badge reads **`UAT · uat-servicedesk.mountmerugroup.com`**, without "development build". There is **no** dashed amber box "Developer: use a UAT session token". If there is, stop: **Critical** | |
+| A5 | Any | Swipe Setu away in the app switcher, then open it (Reduce Motion **off**) | iOS-5c: the launch screen is **the yellow drop alone**, on white, a little above the centre. Without a jump, the drop falls into place, the red Meru logo appears around it, then **"Setu"** rises over a short yellow line, and all of it fades into Login (about 1 s). **No white or blank flash** at any point. Note in F whether the clock and battery at the top are visible during it (they may be white on white for about a second; UI-STANDARDS §iOS-A.12) | |
+| A5a | Any | Swipe Setu away, open it, and **tap the screen** as soon as the drop appears | iOS-5c: the animation stops at once and Login (or Home, if signed in) shows. Nothing blank in between | |
+| A6 | Any | Look at Login | iOS-5c layout: a **red card** over the top two thirds, with the logo in a white card and **"One portal for all your IT needs."**; below it on white, **"Setu"**, "Sign in with your work account", the outlined **Sign in with Microsoft** pill with Microsoft's four squares, and "Mount Meru Group IT". The amber badge reads **`UAT · uat-servicedesk.mountmerugroup.com`**, without "development build". There is **no** dashed amber box "Developer: use a UAT session token". If there is, stop: **Critical** | |
 
 ---
 
@@ -58,14 +59,14 @@ Do this first with the **Admin** account.
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| B1.1 | Admin | On Login, tap **Sign in with Microsoft** | The button reads **Signing in…** with a spinner. "Finish on the Microsoft page. Close it to cancel." appears | |
+| B1.1 | Admin | On Login, tap **Sign in with Microsoft** | iOS-5c: the pill **shrinks into a circle** at once, a **yellow ring** turns in it, and **"Opening Microsoft…"** appears under it. Nothing around the button moves | |
 | B1.2 | Admin | Watch what opens | A sign-in sheet slides up on `login.microsoftonline.com` and asks you to **pick an account**, every time, by design. **There is no "'Setu' Wants to Use 'microsoftonline.com' to Sign In" prompt**: the sheet is private (D5) | |
 | B1.3 | Admin | Choose or type the work account; finish the password and MFA. If Conditional Access asks for an **Authenticator** approval, switch to Authenticator, approve, and come back | The sheet is still there, and continues | |
 | B1.4 | Admin | If Microsoft shows **"Permissions requested"**, note it in F, then accept | Normally it does not appear: IT granted admin consent | |
-| B1.5 | Admin | — | The sheet closes **by itself**. The button spins for a moment, then **Home** appears | |
+| B1.5 | Admin | — | The sheet closes **by itself**. The yellow ring turns for a moment, then **Home** appears | |
 | B1.6 | Admin | Look at Home, then at the **More** tab | Home: **"Good morning, <first name>"** ("Good afternoon" from 12:00, "Good evening" from 17:00 to 04:59, by the phone's clock; iOS-5b), with the role under it. More: the account card shows your **real full name** and role, not "Signed in" or an email address. Home's counts and Recent tickets load (proof that the token works for later requests, BLOCKER B4) | |
 | B1.7 | Admin | Swipe the app away and reopen it. Then restart the phone and open it | Straight to Home both times, with no sign-in | |
-| B1.8 | Admin | Sign out (E15.4). Tap Sign in, then **Cancel** on the sheet | Back on Login, with **no error message** | |
+| B1.8 | Admin | Sign out (E15.4). Tap Sign in, then **Cancel** on the sheet | Back on Login, with **no error message**; the circle opens back into the **Sign in with Microsoft** pill | |
 | B1.9 | User, Technician, L2 Manager | B1.1–B1.6 with each account | The same, each with its own name and role | |
 | B1.10 | Any | Sign in to Microsoft in **Safari** first (office.com). Then sign out of Setu and sign in again | Setu asks for the account and password again: the private sheet doesn't reuse Safari's sign-in (D5). On a phone managed with Microsoft's SSO plug-in, note in F what happened. (Android's check, an "Open with" chooser for `msauth://` links, doesn't apply: iOS registers only `msauth.com.mountmeru.servicedesk`) | |
 
@@ -98,14 +99,14 @@ Every failure **inside the app** shows a red box with a title, a message and a l
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo above the card, not cropped. More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Settings; the middle group is the Admin account's only, since iOS-5b), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
+| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo whole in its white card on the red card, and the red reaching up behind the clock (iOS-5c). More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Settings; the middle group is the Admin account's only, since iOS-5b), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
 | C2 | Any | Look at More's account card and footer | Initials circle, **name**, **role** and a chevron; tapping it opens Settings. **Sign out** in red under it. The footer reads **`v0.1.0 · UAT`**, without "dev build" | |
 | C3 | Any | Set the largest text size (Settings › Accessibility › Display & Text Size › Larger Text, slider at the far right), then open More | The rows grow and the list scrolls. The account card and the version line are reached by scrolling, and nothing is clipped. (Android pinned the card; iOS's More is one scrolling list) | |
 | C4 | Any | Look at the tab bar, then switch tabs | The tab you are on has a **brand-red** icon and label; the others are grey. Badges are red with white text | |
 | C5 | Admin | Home, at the default text size | Tiles **two per row**: Open; In progress, On hold; SLA breached, Active; Unassigned. Each has a coloured square with a white icon, the label **in full** and the number, and none covers the "Hello, …" greeting. With **Technician-CA** or **L2 Manager** there are five tiles, and the last (Active) is **full width** | |
 | C6 | Admin | Home, at the largest accessibility size | Tiles **one per row**. Labels in full, numbers aligned, nothing cut off | |
 | C7 | Any | Look for the brand red | The active tab, "Raise a ticket", Save / Send, the **+** button, spinners and pull to refresh, the selected filter chips. Links are blue | |
-| C8 | Any | Login and the More list at the largest accessibility size | Login's card and its button stay readable. The More rows wrap, without breaking a word in the middle. (Android's C8 noted the drawer header at 200 %; iOS has no drawer header) | |
+| C8 | Any | Login and the More list at the largest accessibility size | Login's card and its button stay readable, and the page scrolls to the footer. iOS-5c: the headline stops growing early (three lines, none wrapped); the button stays 52 pt tall and its label stays on one line, getting smaller to fit the width (the one text that does, UI-STANDARDS §iOS-A.12). The More rows wrap, without breaking a word in the middle. (Android's C8 noted the drawer header at 200 %; iOS has no drawer header) | |
 
 ---
 
@@ -490,6 +491,7 @@ HIG, VoiceOver: *"Provide alternative labels for all key interface elements."*
 |---|---|---|---|---|
 | G14.1 | Any | Turn on Settings › Accessibility › Motion › **Reduce Motion**; open Tickets and a ticket | The list rows don't slide in, the loading shimmer and the status pulse are still, and the picker sheets **fade** instead of sliding. HIG, Motion: *"Make motion optional."* | |
 | G14.2 | Any | Turn Reduce Motion off again | The motion returns | |
+| G14.3 | Any | With Reduce Motion **on**, swipe Setu away and open it. Then sign out and tap **Sign in with Microsoft**, and cancel the sheet | iOS-5c: **no start-up animation**: the drop launch screen goes straight to the first screen, with no blank flash. On Login the pill becomes the circle **at once**, the yellow ring stands still, and "Opening Microsoft…" shows; after Cancel the pill is back at once | |
 
 ---
 

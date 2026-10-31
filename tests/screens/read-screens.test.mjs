@@ -189,6 +189,11 @@ describe('animations skip when iOS Reduce Motion is on', () => {
     'src/components/Shimmer.tsx': /if \(reduceMotion\) return;[\s\S]*\{reduceMotion \? null :/,
     // iOS-3b success notice: no fade in or out with Reduce Motion on; it appears and goes at once.
     'src/components/SuccessNotice.tsx': /reduceMotionEnabled\(\) \? null : fadeTo\(1\)[\s\S]*if \(reduceMotionEnabled\(\)\) \{\s*hide\(\);/,
+    // iOS-5c start-up intro: it asks first and plays only if motion is allowed (splashSequence.ts skips it otherwise;
+    // tests/motion/start-up-and-login.test.mjs runs those decisions).
+    'src/navigation/SplashIntro.tsx': /reduceMotionSettled\(\)\.then\(\(reduce\) => \{\s*if \(live\) splashSequence\.motionSetting\(reduce\);/,
+    // iOS-5c sign-in button: straight to the circle (or back to the pill), and the arc does not turn.
+    'src/screens/auth/SignInButton.tsx': /if \(reduceMotionEnabled\(\)\) \{\s*collapse\.setValue\(to\);\s*return;\s*\}[\s\S]*if \(!busy \|\| reduceMotion\) return;/,
   };
   for (const [file, check] of Object.entries(CHECKS)) {
     test(`${path.basename(file)} checks Reduce Motion before it animates`, () => {
@@ -199,7 +204,13 @@ describe('animations skip when iOS Reduce Motion is on', () => {
   test('every file that starts an animation checks Reduce Motion', () => {
     const animated = sourceFiles('src').filter((rel) => /Animated\.(timing|loop|spring|decay)\(|LayoutAnimation\./.test(code(read(rel))));
     assert.deepEqual(animated.sort(), Object.keys(CHECKS).sort());
-    for (const rel of animated) assert.match(read(rel), /reduceMotionEnabled\(\)|useReduceMotion\(\)/, rel);
+    for (const rel of animated) assert.match(read(rel), /reduceMotionEnabled\(\)|useReduceMotion\(\)|reduceMotionSettled\(\)/, rel);
+  });
+
+  test('the start-up intro decides on the system\'s first answer, never the default (iOS-5c)', async () => {
+    // After the first test above: Reduce Motion was on when the system first answered.
+    const { reduceMotionSettled } = await import('../../src/hooks/useReduceMotion.ts');
+    assert.equal(await reduceMotionSettled(), true, 'on at launch: no intro, the launch screen goes straight to the first screen');
   });
 
   test('the staggered entry still animates the first 8 rows only', () => {

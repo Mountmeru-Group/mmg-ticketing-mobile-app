@@ -43,4 +43,11 @@ export const API_HOST: string = API_BASE_URL.replace(/^https?:\/\//, '').split('
  */
 export const ENVIRONMENT_LABEL: string = `${APP_ENV} · ${API_HOST}${__DEV__ ? ' · development build' : ''}`;
 
+/**
+ * Login's environment chip (04 M1) is for testers: it shows on every build except production, where it does not
+ * render at all (2026-10-30). APP_ENV is PROD only in a release build of the `production` EAS profile (above, and
+ * scripts/eas-build-guard.js). Profile (M10) still shows ENVIRONMENT_LABEL on every build.
+ */
+export const SHOW_ENVIRONMENT_CHIP: boolean = APP_ENV !== 'PROD';
+
 export const APP_VERSION: string = appJson.expo.version;

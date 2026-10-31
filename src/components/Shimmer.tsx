@@ -1,6 +1,7 @@
-// The loading shimmer (Phase A1, docs/PERFORMANCE.md §10): a soft white band sweeps across the placeholder, left to
-// right, while it shows. One band per skeleton, drawn over all of it: on the white cards it is invisible, so it shows
-// only where it crosses the grey bars. Shared by LoadingSkeleton and Skeleton; no screen has its own.
+// The loading shimmer (Phase A1, docs/PERFORMANCE.md §10): a soft band sweeps across the placeholder, left to right,
+// while it shows. One band per skeleton, drawn over all of it. Since 2026-10-30 the band is brand yellow (the motion
+// palette, §12): a pale cream where it crosses the white cards, a warm beige over the grey bars. It was white before,
+// which showed only on the bars. Shared by LoadingSkeleton and Skeleton; no screen has its own.
 // - Native driver, `translateX` only: once started, the loop runs on the UI thread with no JavaScript per frame
 //   (Animated.loop hands a native-driven timing to native as one looping animation).
 // - "Remove animations" on: no band; the static bars are the end state.
@@ -9,7 +10,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { useReduceMotion } from '@/hooks';
-import { motion, palette } from '@/theme';
+import { colors, motion } from '@/theme';
 
 const { duration, curve, bandWidth, bandOpacities } = motion.shimmer;
 
@@ -50,5 +51,5 @@ export function Shimmer({ paddingTop = 0, children }: { paddingTop?: number; chi
 const styles = StyleSheet.create({
   clip: { overflow: 'hidden' },
   band: { position: 'absolute', top: 0, bottom: 0, left: 0, width: bandWidth, flexDirection: 'row' },
-  strip: { flex: 1, backgroundColor: palette.white },
+  strip: { flex: 1, backgroundColor: colors.motion.accent },
 });
