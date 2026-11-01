@@ -7,6 +7,7 @@
 > - **The contract is CONFIRMED, not assumed.** The backend team gave the real shape on **2026-10-19**; recorded here 2026-10-20 (§7.5).
 >   - Its `user` has **`name`**, not `displayName`, plus `department` and `phone`. It is **not** the `GET /auth/me` user shape (§7.5).
 > - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into every build.
+> - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
@@ -272,11 +273,13 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 - **On app foreground and before opening any long-form screen** (reply, create ticket, close ticket): if `now > expiresAt − 10 min`, ask the user to sign in again **before** they type.
 - **Drafts:** persist reply and create-ticket drafts locally (non-secret AsyncStorage), so a 401 on submit does not lose work. After re-login, offer to resubmit.
 - With option (b), re-login *could* be silent (auth library refresh token, then token exchange). **Not implemented in Phase 2:** Microsoft's refresh token is discarded (§7.3), so re-login is interactive. Still handle a 401 exactly as above.
+  - "Interactive" usually means only Microsoft's account picker, with no credentials. Every 15 days a re-login is a real challenge (§5.8).
 
 ### 5.5 Logout
 1. `POST /api/v1/auth/logout` with the Bearer header. It always returns 200; ignore network failures.
 2. Then, regardless of the result:
    - delete the token and `expiresAt` from SecureStore;
+   - delete the 15-day date `mmg.auth.fullAuthAt` (§5.8), so the next sign-in is challenged and starts a new 15 days. Only the user's own sign-out does this; a 401 or the 8-hour expiry keeps it;
    - `queryClient.clear()`;
    - reset every Zustand store, **including the country selection**. The web app forgets to clear `sd-country`; don't copy that.
 3. When push exists (A5), also `DELETE /api/v1/devices/:token` **before** step 1.
@@ -289,6 +292,100 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 - Attachment `download`/`view` URLs require the same Bearer header. There are **no signed or public URLs.**
 - Use `expo-image` `source={{ uri, headers: { Authorization } }}` or `FileSystem.downloadAsync(url, path, { headers })`.
 - **Never** append the token to a URL query string. The server doesn't support it, and it would leak into logs.
+
+### 5.8 Forced re-authentication every 15 days (2026-10-30)
+
+**Policy.**
+- Every 15 days the user is signed out and must sign in with Microsoft again.
+- Microsoft is told to **challenge** that sign-in (`prompt=login`). A live Microsoft browser session cannot sign the user straight back in.
+- This is an extra client-side layer. The 8-hour session (§5.4) is unchanged, and the server knows nothing about this rule.
+
+**Why it is needed: behaviour before this change** (read from the code on 2026-10-30)
+- At 8 hours the session ends. Any one of these ends it, with "Your session has ended. Please sign in again.":
+  - the request interceptor;
+  - the return to the foreground;
+  - a cold start;
+  - a server 401.
+- The re-sign-in sent `prompt=select_account`. Microsoft shows its account picker. While Microsoft's own SSO cookie in the system browser (Chrome Custom Tab) is valid, tapping the account signs the user in **without credentials**.
+- That comes from Microsoft's browser session, **not from `offline_access`**. The refresh token that scope produces is discarded (§7.3), so removing the scope would change nothing.
+- So after the first sign-in the app never asked for credentials again. Entra's own policies (MFA, Conditional Access, revoked sessions) could still do so; the tenant's policies were not checked.
+
+**The interval: one constant**
+- `REAUTH_INTERVAL_MS` in `src/store/auth.store.ts`, set to `15 * 24 * 60 * 60 * 1000`.
+- **To change it, edit that one line.** The checks, the decision to challenge, and the Login notice ("every 15 days") all read it.
+- Keep it a whole number of days, so the notice reads well.
+- `tests/auth/reauth.test.mjs` asserts 15 days: change the asserted value with it.
+
+**The timestamp**
+
+| | |
+|---|---|
+| Name | `fullAuthAt`: epoch ms of the last sign-in that Microsoft was told to challenge |
+| Where | `expo-secure-store`, key **`mmg.auth.fullAuthAt`**, a decimal string. A copy is kept in memory in the auth store |
+| Independent of the session | It is not one of the `mmg.session.*` keys, so the 8-hour sign-out and a 401 never touch it |
+| Written | Only by a **successful sign-in that was sent with `prompt=login`**, last, after the session is stored (`setSession({ …, fullAuthAt })`). The 15 days restart from it |
+| Never written by | An ordinary re-sign-in within the 15 days (`prompt=select_account`), the profile save that re-stores the same session (`useProfile.ts`), or a cancelled or failed sign-in |
+| Deleted by | The user's own sign-out (`useSignOut`, §5.5), and the 15-day sign-out itself |
+
+- It holds no secret: only a number is stored.
+- No token, ID token or code is stored for this rule, and none is logged.
+
+**When it is checked.** Only on start and on return to the foreground. There is no timer and no poll.
+
+| When | Where | What |
+|---|---|---|
+| Cold start | `restoreSession()` | If a session is stored and re-authentication is due, it deletes the session and the date, and Login shows the notice. This runs **before** the 8-hour check, so the notice wins when both are due |
+| Return to the foreground | `endSessionIfReauthDue()` (`src/api/client.ts`) | Called first in RootNavigator's AppState handler, before the unchanged 8-hour check |
+| Tap on "Sign in with Microsoft" | `attemptSignIn()` | Decides before Microsoft's page opens, from the in-memory date. Due: `prompt=login`, and a new date on success. Not due: `prompt=select_account`, and the date is kept |
+
+**When it is "due"** (`isReauthDue()`)
+- There is no date: the first sign-in on a phone, after the user's own sign-out, or after the 15-day sign-out.
+- The stored date is missing, corrupt or unreadable. "Corrupt" means anything other than a positive whole number of up to 15 digits.
+- `now − date ≥ REAUTH_INTERVAL_MS`. The boundary itself counts as due.
+- The date is more than `REAUTH_CLOCK_TOLERANCE_MS` (5 minutes) in the future.
+
+**Login notice**
+- Title: "Signed out for security". Text: "Please sign in again. Setu asks for a fresh Microsoft sign-in every 15 days."
+- It uses the existing message slot of the arc-split layout (`docs/brand/UI-STANDARDS.md` §10.1). It is styled as information (blue-50, lock icon), not as the red failure box.
+- It shows only when this rule ended a live session.
+- It stays through a cancelled attempt and goes once the user is signed in. A failed attempt replaces it, as it does any sign-out message.
+
+**Edge cases**
+
+| Case | What happens |
+|---|---|
+| Clock moved forward past the 15 days | Due: the user is signed out and challenged. The new date is written at the wrong (future) time. If the clock is then corrected, that date is more than 5 minutes in the future, so the rule is due once more. Safe, at the cost of one extra sign-in |
+| Clock moved back | Up to 5 minutes (a network-time correction) is ignored. Further back, the date is in the future and proves nothing, so the rule is due |
+| Clock **held** in the past | **Limitation.** A clock kept between the date and date + 15 days is never due. Closing this needs a trusted clock, such as server time; that is not built. The 8-hour session still ends on the server's own clock |
+| Date missing, including phones updated from a build before this change | Due. A signed-in user is signed out **once**, with the notice, after updating |
+| Date corrupt | Due. The bad value is deleted. No crash |
+| Expiry reached while the app is open | Caught on the next return to the foreground. An app kept in the foreground past the 15 days is not interrupted, because there is no timer. Its session still ends within 8 hours, and the sign-in after that is challenged, because the decision is made at sign-in |
+| User's own sign-out | The date is deleted. The next sign-in is challenged and starts a new 15 days. No notice |
+| Secure storage unavailable | **Read fails:** it counts as no date, so the rule is due. A stored session is signed out; otherwise the next sign-in is challenged. **Write fails** after a challenged sign-in: the reason is `storage` ("Couldn't save your sign-in") and the user is not signed in; the next cold start clears the partial session. **Delete fails:** the in-memory copy still says "no date" for the rest of that run |
+| Sign-in cancelled at Microsoft, or refused | Nothing is written, so the rule is still due |
+
+**`prompt=login`: how it was verified (2026-10-30)**
+- The installed `expo-auth-session` is **57.0.16**.
+  - `Prompt.Login = "login"` (`node_modules/expo-auth-session/build/AuthRequest.types.d.ts:53`).
+  - `AuthRequestConfig.prompt?: Prompt | Prompt[]` (`:139`).
+  - `makeAuthUrlAsync()` copies it into the authorize URL's query (`build/AuthRequest.js:209-211`).
+- The library's real `AuthRequest.makeAuthUrlAsync()` was **run** under Node, configured as `auth.api.ts` configures it.
+  - Only its native modules were stubbed: `expo-web-browser`, `expo-crypto`, `react-native` and `expo-modules-core`.
+  - The URL carried `prompt=login`, and `prompt=select_account` in the other case.
+  - The harness was throwaway, in the session scratchpad, and is not committed.
+- `tests/auth/reauth.test.mjs` asserts that the app passes `prompt: 'login'` to `AuthRequest` exactly when the rule is due, and `select_account` otherwise.
+- **Microsoft's side.** Microsoft's identity platform documentation says `prompt=login` makes the user enter credentials on that request, overriding single sign-on.
+  - This has **not** been seen on a device: no build was run.
+  - With passwordless or Authenticator sign-in, the challenge may be an approval rather than a password.
+
+**A server-side alternative.** IT can enforce the same rule in Entra with a Conditional Access "sign-in frequency" policy. It does not depend on the phone's clock, so it would also close the held-clock limitation above. The app's rule stays valid alongside it.
+
+**How to test on a device.** This needs a build. Turn off "automatic date & time" so you don't have to wait 15 days.
+1. Fresh install, then sign in. Microsoft asks for credentials, not just the account picker.
+2. Set the date 16 days ahead, then return to Setu. Login shows "Signed out for security", and signing in asks for credentials.
+3. Set the date back to today, then return. You are signed out once more, because the date is now in the future (expected). Sign in.
+4. Set the clock 9 hours ahead (within the 15 days), then return. Login shows "Your session has ended", and signing in shows only the account picker, with no credentials.
+5. Sign out from Profile, then sign in. Microsoft asks for credentials.
 
 ---
 
@@ -312,6 +409,7 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
   - While either ID is not a GUID, the app does not open Microsoft at all. It shows "Microsoft sign-in is not configured." (reason `not-configured`).
 - **Authority:** `https://login.microsoftonline.com/<TENANT_ID>`. The v2.0 `authorize` and `token` endpoints are fixed in the config, so there is no discovery request.
 - **Scopes:** `openid profile email offline_access`. Nothing else, and no Graph scope.
+  - `offline_access` only makes Microsoft return a refresh token, which is discarded (§7.3). It is not what lets a re-sign-in skip the password; Microsoft's browser session does that (§5.8).
 
 ### 7.2 Redirect URI per runtime
 The URI is built by `expo-auth-session`'s `makeRedirectUri({ scheme: 'com.mountmeru.servicedesk', path: 'auth' })`.
@@ -326,7 +424,8 @@ The URI is built by `expo-auth-session`'s `makeRedirectUri({ scheme: 'com.mountm
 
 ### 7.3 Sequence (`src/api/auth.api.ts`)
 1. **Login:** the user taps "Sign in with Microsoft". The button is disabled and shows a spinner until the flow ends.
-2. **Microsoft:** `AuthRequest` with `response_type=code`, PKCE `S256` and `prompt=select_account` (as the web flow does) opens in the system browser (Custom Tab).
+2. **Microsoft:** `AuthRequest` with `response_type=code` and PKCE `S256` opens in the system browser (Custom Tab).
+   - The prompt is `prompt=select_account`, as the web flow does, or `prompt=login` when the 15-day re-authentication is due (§5.8).
    - Closing the page, pressing Back, or pressing Cancel on Microsoft's page (`access_denied` + `error_subcode=cancel`) returns to Login with **no error**.
 3. **Code redemption:** the code goes to Microsoft's token endpoint (`exchangeCodeAsync`) with the PKCE verifier and no secret.
    - Only `id_token` is kept, in memory, for one request.
@@ -340,6 +439,7 @@ The URI is built by `expo-auth-session`'s `makeRedirectUri({ scheme: 'com.mountm
 6. **Store:** `setSession({ token, user })` is **unchanged**.
    - `user` is the AUTH-P2 user mapped onto `AuthUser` (§7.5): `name` becomes `displayName`; `department` and `phone` are dropped.
    - Token, user and `issuedAt = now` go to SecureStore.
+   - After a sign-in sent with `prompt=login`, `fullAuthAt = now` goes there too (§5.8). The call is then `setSession({ token, user, fullAuthAt })`.
    - The 8-hour rule runs from `issuedAt`. `expiresAt` from the response is checked but **not used** yet.
    - A 401 still means "sign in again". There is no refresh.
 7. **Done:** RootNavigator switches to the app.

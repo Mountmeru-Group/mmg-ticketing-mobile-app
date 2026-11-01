@@ -3,6 +3,7 @@
 //   browser, then AUTH-P2. The session goes to setSession(); RootNavigator then switches to the app.
 // - Every failure reason has its own message (05 §A.13 wording where one applies) and a Retry only where trying
 //   again can help. Closing Microsoft's page just returns here: no error, and the button is a button again.
+// - After the 15-day sign-out (02 §5.8) the message slot says why ("Signed out for security"), in the info tone.
 // - The attempt itself, the messages and the stale-banner rule are in ./signInAttempt.ts; the button and its motion
 //   are ./SignInButton.tsx; this file only lays out.
 // - The environment chip shows on every build except production (SHOW_ENVIRONMENT_CHIP, src/config/env.ts).
@@ -20,7 +21,7 @@ import { BrandLogo, OfflineBanner, OutlineButton } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
 import { ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
-import { useAuthStore } from '@/store/auth.store';
+import { REAUTH_NOTICE, useAuthStore } from '@/store/auth.store';
 import { colors, loginLayout, loginType, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { SignInButton } from './SignInButton';
@@ -111,9 +112,22 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
 
         <View style={[styles.bottom, { paddingBottom: insets.bottom + 20 }]}>
           {signOutMessage && !failure ? (
-            <View className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
-              <Text className="text-sm text-red-800">{signOutMessage}</Text>
-            </View>
+            signOutMessage === REAUTH_NOTICE.message ? (
+              // The 15-day sign-out (02 §5.8): says why, in the info tone. It is not a failure.
+              <View accessibilityRole="alert" className="mb-4 self-stretch rounded-lg bg-blue-50 p-3">
+                <View className="flex-row items-start">
+                  <Ionicons name="lock-closed" size={18} color={palette.blue[700]} />
+                  <View className="ml-2 flex-1">
+                    <Text className="text-sm font-semibold text-blue-900">{REAUTH_NOTICE.title}</Text>
+                    <Text className="mt-1 text-sm text-blue-800">{signOutMessage}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
+                <Text className="text-sm text-red-800">{signOutMessage}</Text>
+              </View>
+            )
           ) : null}
 
           {failure && copy ? (
