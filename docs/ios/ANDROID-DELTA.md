@@ -1,8 +1,8 @@
-# Android → iOS delta (iOS-5b, iOS-5c)
+# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5c: `origin/dev` @ `c5c63acff8d7296244876020069884364864a99b`** (§7). To sync later Android work, diff `c5c63ac..origin/dev`: at the time of writing that is one commit, `f4fad10` (§7.3).
-> iOS-5b's port source was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
+> **Port source since iOS-5d: `origin/dev` @ `f4fad10a1bd1aac9658f4c4be151b0172f683898`** (§8). To sync later Android work, diff `f4fad10..origin/dev`: on 2026-11-01 that is empty.
+> iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
 > The build is in `00-PORT-MANIFEST.md` §4.15. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
 
 ## 1. The rule (Ronit, 2026-10-30)
@@ -149,11 +149,11 @@ Details are in manifest §4.15. In short:
 
 | # | Item | From | What iOS-9 does | Needs |
 |---|---|---|---|---|
-| 1 | Delete the developer-token screen, `PlaceholderScreen.tsx`, the route and the Login button (D4), together with the placeholder guards and `session.ts` (D5) | `4063df3` | Port as Android did. Update `ios-sso.test.mjs`, the release check's dev-token control, 02-AUTH §6, CLAUDE.md rule 5 and manifest §8 | The first real Microsoft sign-in on an iPhone (iOS-7), so a simulator can still sign in until then |
+| 1 | Delete the developer-token screen, `PlaceholderScreen.tsx`, the route and the Login button (D4), together with the placeholder guards and `session.ts` (D5) | `4063df3` | Port as Android did. Update `ios-sso.test.mjs`, `ios-reauth.test.mjs` (the screen is a `setSession` caller and has a test of its own since iOS-5d), the release check's dev-token control, 02-AUTH §6, CLAUDE.md rule 5 and manifest §8 | The first real Microsoft sign-in on an iPhone (iOS-7), so a simulator can still sign in until then |
 | 2 | The PROD API URL in `env.ts` (D6), and the `eas.json` production comment | `4063df3` | Set it; the build guard then permits `production`. Then restore Android's chip assertion in `tests/motion/start-up-and-login.test.mjs` (a `PROD` build shows no chip; iOS-5c checks the refusal instead) | **Ronit's written sign-off** (CLAUDE.md I3); compliance A3 |
 | 3 | Version 1.0.0 (D7) | `4063df3` | `app.json` `version` (the iOS `buildNumber` follows App Store Connect) | Ronit, with the App Store Connect record |
 | 4 | The release check's PROD host (D8) | `4063df3` | Allow `servicedesk.mountmerugroup.com` in the `production` run only | Item 2 |
-| 5 | Production-readiness tests (D9) | `4063df3`, `c5c63ac` | Port the part items 1–3 make true; leave out APK/AAB and `versionCode`. `c5c63ac` changed its "Login navigates nowhere" case for the new sign-in button; it becomes true on iOS with item 1 | Items 1–3 |
+| 5 | Production-readiness tests (D9) | `4063df3`, `c5c63ac`, `f4fad10` | Port the part items 1–3 make true; leave out APK/AAB and `versionCode`. `c5c63ac` changed its "Login navigates nowhere" case for the new sign-in button; it becomes true on iOS with item 1. `f4fad10` changed its sign-in case (`setSession` with `fullAuthAt`; the profile save never passes it). iOS-5d checks the same in `ios-reauth.test.mjs`, with the developer-token screen as a third caller until item 1 | Items 1–3 |
 | 6 | 02-AUTH §6 and the release guide | `4063df3` | Android's text about the deleted screen and the PROD build, in `RELEASE-IOS.md` | Items 1, 2 |
 
 ## 6. Not ported: not in Android `dev`
@@ -190,4 +190,33 @@ On 2026-10-31 the brief's last check (`git fetch`; `origin/dev` must equal the p
   - whether the reinstall wipe (`installMarker.ts` → `wipeStoredSession()`) also clears it;
   - what `prompt=login` adds to iOS's private sheet, which already holds no Microsoft session (it matters on phones with Microsoft's SSO extension);
   - the merge into iOS's `02-AUTH.md` (§5.8 is free; iOS's own section is §7.7).
-- **Status:** **pending Ronit's decision**, either a separate iOS-5d or folded into iOS-5c before its commit. Until then the port source is `c5c63ac`, one commit behind `origin/dev` (`f4fad10`).
+- **Status:** ~~pending Ronit's decision~~ **Ported in iOS-5d** (2026-11-01, §8). Ronit chose a separate phase. The four questions were answered in its brief:
+  - **Keychain class:** `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, the token's. Tested on every call on the key.
+  - **Reinstall:** the wipe clears it too (`installMarker.ts` → `forgetStoredFullAuth()`). A reinstall means a fresh login.
+  - **`prompt=login`:** kept exactly as Android, alongside the private sheet. On a plain iPhone it adds nothing visible; it matters with Microsoft's SSO plug-in, or if D5 is reversed (02-AUTH §iOS-A).
+  - **02-AUTH:** Android's §5.8 verbatim; the iOS notes in a new lettered §iOS-A.
+
+## 8. iOS-5d: the sync to `f4fad10` (2026-11-01)
+
+### 8.1 What came across
+
+At planning (`git fetch`, 2026-11-01), `c5c63ac..origin/dev` was **one commit**: `f4fad10` "feat: 15-day forced re-authentication with prompt=login" (2026-10-30 16:59 +0530, 12 files: 11 modified, 1 added). It added no package and changed no `app.json`. Ronit OK'd the plan with its default for Q1. The build is in `00-PORT-MANIFEST.md` §4.17.
+
+| ID | Change | Files | What it does for the user | In iOS before iOS-5d | Type | **Outcome** |
+|---|---|---|---|---|---|---|
+| F1 | 15-day forced re-authentication | `auth.store.ts`, `client.ts`, `signInAttempt.ts`, `auth.api.ts`, `RootNavigator.tsx`, `useProfile.ts` | Every 15 days the user is signed out (on a cold start, or on return to the foreground), and the next Microsoft sign-in is challenged (`prompt=login`) | No | feature (security) | **Ported.** `client.ts` and `signInAttempt.ts` verbatim. The rest merged by hand: the Keychain option on the new key's three calls; the user's sign-out option in `signOutAndWipe()` (iOS's sign-out, since iOS-6). Two iOS additions: the reinstall wipe also clears the date (`installMarker.ts`), and the `__DEV__` developer-token screen starts the 15 days (Q1) |
+| F2 | "Signed out for security" on Login | `LoginScreen.tsx` | A blue information box in the message slot says why | No | feature | **Ported**, the same hunk. The `__DEV__` developer-token block is untouched |
+| F3 | Tests | `reauth.test.mjs` (+47), `mobile-sso.test.mjs`, the SecureStore stub, `production-readiness.test.mjs` | Tests only | No | release | `reauth`: ported, with 2 wiring checks adapted. `mobile-sso` and the stub: merged. `production-readiness`: still iOS-9 (§5, item 5); its two `f4fad10` assertions are covered in `ios-reauth.test.mjs` |
+| F4 | Docs | `02-AUTH.md` (header, §5.4, §5.5, **§5.8**, §7.1, §7.3) | Docs only | No | docs | **Merged**: every line Android added is present (checked by script). iOS notes in the new §iOS-A and two lines in §7.7 |
+
+### 8.2 iOS decisions (Ronit's brief, 2026-11-01)
+
+- Same behaviour as Android in every case: launch, return from the background, during a request (not checked), the message, and the sign-out side effects.
+- The date sits in the Keychain with the token's class. A reinstall wipes it, so it is a fresh login.
+- `prompt=login` is kept as on Android, next to the private sheet. No change to the iOS redirect, PKCE or the exchange.
+- **Q1** (the only open point in the plan): the developer-token screen passes `fullAuthAt: Date.now()`. Default (a), OK'd with the plan.
+- **Recorded, not changed:** the 15-day sign-out doesn't call AUTH-3, so the server token lives until its own 8 hours, as on Android.
+
+### 8.3 Section numbers
+
+No clash. Android's new §5.8 is free on iOS. The iOS notes are 02-AUTH's first lettered section, **§iOS-A**, at the end; §7.7 keeps its number.

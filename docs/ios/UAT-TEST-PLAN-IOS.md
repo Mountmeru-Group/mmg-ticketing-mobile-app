@@ -6,7 +6,7 @@
   - G: iOS-only checks;
   - H: write safety, on one agreed UAT test ticket;
   - I: the account-deletion request and the privacy link.
-- **219 checks:** A–E 134, G 61 (22 screens at two text sizes among them), H 17, I 7. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
+- **225 checks:** A–E 134, G 67 (22 screens at two text sizes among them), H 17, I 7. iOS-5d (2026-11-01) added six for Android's `f4fad10` 15-day re-authentication, G15.1–G15.6, and extended G1.3. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
 - **F, the defect log, is at the end**, so that it follows every section.
 
 **How to use it**
@@ -355,7 +355,7 @@ Each HIG line quoted here was read on developer.apple.com on 2026-10-29.
 |---|---|---|---|---|
 | G1.1 | Any | In TestFlight, open Setu | The build number matches the release notes. The expiry date is about 90 days after upload | |
 | G1.2 | Any | In Setu, take a screenshot, then tap **Share Beta Feedback** and send a test note | The feedback reaches App Store Connect (the release owner confirms) | |
-| G1.3 | Admin | While signed in, delete Setu, then install it again from TestFlight | Setu opens on **Login**, not signed in: a reinstall wipes the Keychain session (`installMarker.ts`) | |
+| G1.3 | Admin | While signed in, delete Setu, then install it again from TestFlight | Setu opens on **Login**, not signed in: a reinstall wipes the Keychain session (`installMarker.ts`). iOS-5d: it also wipes the 15-day date, so Login shows **no** message, and the next sign-in is a full one (G15) | |
 
 ### G2. Microsoft sign-in, sign-out and cancel on iOS
 
@@ -492,6 +492,19 @@ HIG, VoiceOver: *"Provide alternative labels for all key interface elements."*
 | G14.1 | Any | Turn on Settings › Accessibility › Motion › **Reduce Motion**; open Tickets and a ticket | The list rows don't slide in, the loading shimmer and the status pulse are still, and the picker sheets **fade** instead of sliding. HIG, Motion: *"Make motion optional."* | |
 | G14.2 | Any | Turn Reduce Motion off again | The motion returns | |
 | G14.3 | Any | With Reduce Motion **on**, swipe Setu away and open it. Then sign out and tap **Sign in with Microsoft**, and cancel the sheet | iOS-5c: **no start-up animation**: the drop launch screen goes straight to the first screen, with no blank flash. On Login the pill becomes the circle **at once**, the yellow ring stands still, and "Opening Microsoft…" shows; after Cancel the pill is back at once | |
+
+### G15. 15-day re-authentication (iOS-5d, Android 2026-10-30)
+
+Every 15 days Setu signs you out and Microsoft must ask for your sign-in again (02-AUTH §5.8, §iOS-A). To avoid waiting 15 days, change the phone's date: Settings › General › Date & Time › turn off **Set Automatically**. **Turn it back on when you finish G15.** On iOS the sign-in sheet always asks for the password (D5), so the visible sign of this rule is the Login message, not the password prompt.
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| G15.1 | Admin | Signed out (or a fresh install), tap **Sign in with Microsoft** and finish | Microsoft asks for the account and password, then Home appears. On a phone with Microsoft's SSO plug-in (Authenticator or Company Portal, managed by IT), note in F whether it asked | |
+| G15.2 | Admin | Signed in, press Home. Set the date **16 days ahead**. Return to Setu | Login, with a **blue** box and a lock: **"Signed out for security"**, "Please sign in again. Setu asks for a fresh Microsoft sign-in every 15 days." It is not the red box. Signing in works and the box goes | |
+| G15.3 | Admin | Turn **Set Automatically** back on (today's date). Return to Setu | Signed out **once more**, with the same blue box. Expected: the last sign-in now looks like it was in the future. Sign in | |
+| G15.4 | Admin | Signed in, set the time **9 hours ahead** (still within the 15 days). Return to Setu | Login says "Your session has ended. Please sign in again." in the **red** box, not the blue one. Signing in asks for the password too (the private sheet; on Android only the account picker shows). Then turn Set Automatically back on | |
+| G15.5 | Admin | Signed in, set the date **16 days ahead**. Swipe Setu away in the app switcher, then open it | Login with the blue "Signed out for security" box (the cold-start path). Turn Set Automatically back on, return, and sign in (you may be signed out once more, as in G15.3) | |
+| G15.6 | Admin | More › **Sign out**, confirm. Tap Sign in | Login shows **no** message after the sign-out. Microsoft asks for the password, and Home appears | |
 
 ---
 

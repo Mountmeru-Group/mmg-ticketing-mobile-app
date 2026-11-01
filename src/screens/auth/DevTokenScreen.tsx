@@ -96,7 +96,9 @@ function DevTokenForm(_props: AuthStackScreenProps<'DevToken'>) {
     }
     try {
       // On success the root navigator switches to the app; this screen unmounts.
-      await setSession({ token, user });
+      // iOS-5d (Q1): the pasted token comes from a fresh UAT web sign-in, so it starts the 15 days (02 §5.8). Without a
+      // date the session would count as due and end at the first return to the foreground.
+      await setSession({ token, user, fullAuthAt: Date.now() });
     } catch {
       setError('Could not save the token to secure storage.');
       setChecking(false);
