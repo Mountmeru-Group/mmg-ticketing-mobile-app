@@ -23,7 +23,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type ReactNode } from 'react';
-import { AppState, Pressable, RefreshControl, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { useIsOffline } from '@/api/network';
 import {
@@ -398,8 +398,18 @@ function KpiTile({ tile: t, width, loading }: { tile: Tile; width: number; loadi
           {t.value}
         </Text>
       ) : loading ? (
-        <View className="mt-1 h-8 justify-center">
-          <Skeleton className="h-6 w-12" />
+        // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the tile
+        // keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a fixed
+        // 32 dp line, which matched only at 100 %.
+        // iOS (iOS-5c): the "0" also takes the count's one line and its Title 1 cap, so the two lines are the same at
+        // every text size. On iOS the old 32 pt line was short even at the default size (`text-2xl` is 28 / 34 pt).
+        <View className="mt-1 justify-center">
+          <Text className="text-2xl font-bold" numberOfLines={1} maxFontSizeMultiplier={maxTextScale.title1} style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            0
+          </Text>
+          <View style={StyleSheet.absoluteFill} className="justify-center">
+            <Skeleton className="h-6 w-12" />
+          </View>
         </View>
       ) : (
         <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>

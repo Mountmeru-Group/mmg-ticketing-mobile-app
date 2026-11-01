@@ -8,6 +8,7 @@ import { AccessibilityInfo } from 'react-native';
 
 let enabled = false;
 let started = false;
+let firstAnswer: Promise<boolean> | null = null;
 const listeners = new Set<() => void>();
 
 function update(value: boolean) {
@@ -20,7 +21,22 @@ function start() {
   if (started) return;
   started = true;
   AccessibilityInfo.addEventListener('reduceMotionChanged', update);
-  AccessibilityInfo.isReduceMotionEnabled().then(update, () => undefined);
+  firstAnswer = AccessibilityInfo.isReduceMotionEnabled().then(
+    (value) => {
+      update(value);
+      return value;
+    },
+    () => false,
+  );
+}
+
+/**
+ * The setting once the system has answered, for a decision that must not be taken on the default: the start-up intro,
+ * which would otherwise play its first frames before knowing. If the system cannot answer, motion counts as allowed.
+ */
+export function reduceMotionSettled(): Promise<boolean> {
+  start();
+  return firstAnswer ?? Promise.resolve(enabled);
 }
 
 function subscribe(listener: () => void) {

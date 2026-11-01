@@ -11,6 +11,7 @@ import { startConnectivityMonitoring } from '@/api/network';
 import { queryClient } from '@/api/queryClient';
 import { ErrorBoundary, HtmlRenderProvider } from '@/components';
 import { RootNavigator } from '@/navigation/RootNavigator';
+import { SplashIntro } from '@/navigation/SplashIntro';
 
 // Offline → queries pause instead of failing (src/api/network.ts). Must run before the first query.
 startConnectivityMonitoring();
@@ -27,6 +28,8 @@ export default function App() {
             {/* A render crash below shows a recoverable screen, not a white screen or a redbox. */}
             <ErrorBoundary>
               <RootNavigator />
+              {/* The start-up intro, over the first screen while it mounts; then gone (docs/PERFORMANCE.md §12). */}
+              <SplashIntro />
             </ErrorBoundary>
           </HtmlRenderProvider>
         </QueryClientProvider>

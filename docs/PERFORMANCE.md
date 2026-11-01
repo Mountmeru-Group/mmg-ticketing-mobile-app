@@ -11,6 +11,10 @@
 > the measurement and the per-package attribution, including `react-native-render-html`'s exact cost. **Little was
 > left to gain safely, and no bundle reduction was applied.** The release bundle grew by 2.7 KB of Hermes bytecode
 > (+0.05 %).
+>
+> **2026-10-30:** the login's "arc split" layout and a four-stage motion sequence (start-up, sign-in, return to Home).
+> §12 records it. **Bundle +22.1 KB of Hermes (+0.42 %), no JavaScript per frame, but the start-up intro adds up to
+> about 1.1 s before the first screen on a cold start** (§12.2): that is the item to weigh.
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -1108,4 +1112,296 @@ The app's 437.0 KB: screens 215.2, components 63.0, hooks 50.0, utils 47.1, api 
 - `npm test`: **661 / 661** passing (593 before; +56 in `tests/rbac/kb-announcements.test.mjs`, +12 in `tests/home/greeting.test.mjs`). Thirteen existing cases changed because of the ADMIN-only decision; why each one changed is in `docs/ROLE-MATRIX.md` §16.6.
 - Release bundle built twice with the method above (§11.1); the navigator modules were read in the release output (§11.2).
 - No EAS build. No call to the backend. The web repo was not opened.
+- Branch `dev`, nothing committed.
+
+---
+
+## 12. Login "arc split" and the motion sequence (2026-10-30)
+
+Approved by Ronit: the login redesign (`docs/brand/UI-STANDARDS.md` §10) and four motion stages, under the same rules as
+Phase A1 (§10.1): native driver; transform and opacity only; never blocking a press; no animation library; skipped
+under "Remove animations"; stopped on unmount; every value in `src/theme/motion.ts`.
+
+| Stage | What | Result |
+|---|---|---|
+| 1 | App open: on white, the yellow drop falls in and settles | **Built** (§12.2). Needed a new native splash image: the drop alone |
+| 2 | The full logo resolves, "Setu" fades up over a yellow rule, hand-off to the first screen | **Built** (§12.2) |
+| 3 | Sign-in pressed: the pill collapses to a spinning circle, "Opening Microsoft…" | **Built** (§12.3) |
+| 4 | Home lays out as skeletons; the shimmer sweeps yellow; tiles fill without a jump | **Built** (§12.4). Home already did the first; one tile fix for large text |
+
+Nothing in the brief was skipped. Deviations, each explained where it is described:
+- the native splash image changed (§12.2);
+- two colours are paler than the design's words, for WCAG AA (UI-STANDARDS §10.2);
+- "Opening Microsoft…" stays up while the sign-in completes after Microsoft (§12.3).
+
+Rules kept:
+- No library added: React Native's `Animated` only (Reanimated is installed but not used for this).
+- No change to the auth flow, `auth.config.ts`, the redirect URI, screen transitions, the navigation structure or any
+  permission.
+- No EAS build; nothing committed.
+
+**Not run on a device:** there was no build. Frame rates and start-up times are not measured; §12.6 says what to
+check. Everything marked **estimate** is arithmetic.
+
+### 12.1 The rules, and how each was verified
+
+| Animation | File | Driver | What is animated | JS per frame | Stops |
+|---|---|---|---|---|---|
+| Start-up intro | `navigation/SplashIntro.tsx` | native: one 900 ms timeline, then one 220 ms fade | the drop's `translateY`; the logo's `opacity`; the rule's `scaleX`; "Setu"'s `opacity` and `translateY`; the whole intro's `opacity` | none | on unmount, and when its phase moves on |
+| Sign-in collapse | `screens/auth/SignInButton.tsx` | native: one 240 ms timing per press, and per return | the half-circles' `translateX`; the middle's `scaleX`; the label's, ring's and caption's `opacity`; the caption's `translateY` | none | on unmount |
+| Sign-in arc | same | native: `Animated.loop` of one timing (900 ms a turn) | the arc's `rotate` | none: a loop of one native timing runs entirely on the UI thread (§10.1) | when the attempt ends, or Login unmounts (signed in) |
+| Shimmer | `components/Shimmer.tsx` | unchanged (§10.2) | unchanged: the band's `translateX`. Only its colour and opacities changed | none | unchanged |
+
+**Native driver, verified three ways.**
+- **Source:** `src/` has seven `Animated.timing` calls, each with `useNativeDriver: true`: the three from §10.1, plus
+  `SplashIntro.tsx` ×2 and `SignInButton.tsx` ×2.
+- **Release bundle:** every `useNativeDriver` literal in the release JS was traced to its source through the source map.
+  - Before (`4063df3`): three app literals, all `!0` (true): `ListEntry.tsx:57`, `Shimmer.tsx:24`, `StatusBadge.tsx:55`.
+  - After: seven, all `!0`: those three (Shimmer now line 25) plus `SplashIntro.tsx:88` (timeline) and `:98` (hand-off),
+    `SignInButton.tsx:60` (collapse) and `:79` (arc).
+  - The 18 library literals are identical before and after. The only `!1` are React Native's two defaults
+    (`AnimatedImplementation.js:442`, `AnimatedEvent.js:160`), as in §10.1.
+  - No `LayoutAnimation` traces to `src/`.
+- **Test:** `tests/motion/start-up-and-login.test.mjs` fails on any `useNativeDriver: false` anywhere in `src/`, on any
+  `Animated.timing` without `useNativeDriver: true`, and on `LayoutAnimation`, a Reanimated import, `spring`, `decay`,
+  `sequence`, `parallel`, `stagger` or `delay`.
+
+**Transform and opacity only, verified two ways.**
+- **Read file by file:** the five animating files bind animated values only to `opacity`, `translateX`, `translateY`,
+  `scaleX`, `scale` and `rotate`. The animated views' other styles (positions, sizes, borders) are static `StyleSheet`
+  values. The native driver also rejects anything it cannot animate natively, at run time.
+- **Test:** it reads every interpolation in the five files and fails unless each lands on one of those keys (directly,
+  or through a shared progress value that does). It also fails if any layout property (`width`, `height`, `top`,
+  `left`, `margin…`, `padding…`, `flex…`, `borderWidth`…) is bound to an animated value.
+- **The checks were tested by breaking them.** Seven deliberate violations were made one at a time, the suite run, and
+  each file restored byte for byte (hash compared). Every one failed the suite:
+  - an animated `width` on the button;
+  - an animated `height` through the intro's helper;
+  - `useNativeDriver: false` in the shimmer;
+  - the button ignoring "Remove animations";
+  - the environment label rendered outside its gate;
+  - the chip turned on for production;
+  - the native splash never hidden.
+
+**How the collapse avoids an animated width.** The pill is drawn as three pieces behind its content: a left
+half-circle, a straight middle and a right half-circle (each half is a 52 dp circle clipped to half). The middle shrinks
+to nothing with `scaleX` while the halves slide in with `translateX` until they meet as a 52 dp circle. The middle runs
+1 dp under each half, so no hairline shows where they join. The button's own box never changes, so nothing around it
+is laid out again.
+
+**Never blocks a press.**
+- The sign-in press starts the collapse in its own handler, then starts the sign-in, exactly as before. The button is
+  disabled while signing in, as `SubmitButton` was.
+- The intro covers the screen for at most 1.1 s. A touch on it skips the rest: to the first screen at once if that is
+  ready, otherwise to the intro's end state until it is. During the hand-off fade, touches go to the first screen.
+- The intro is hidden from TalkBack, which reads the screen underneath.
+
+**"Remove animations".**
+- Start-up: no intro. The intro waits for the system's answer (`reduceMotionSettled()`, new in `useReduceMotion.ts`)
+  before it does anything, under the native splash. With the setting on it removes itself, and the native splash hides
+  when the first screen is ready, exactly as before. Its end state is the first screen itself.
+- Sign-in: the button switches straight to the circle (and back); the arc stands still; "Opening Microsoft…" shows, and
+  TalkBack announces it.
+- Shimmer, list entry, status badge: unchanged (§10.1).
+- Tested: the start-up sequence's decisions run under Node (`src/navigation/splashSequence.ts`). The other four are
+  checked in their source (no React Native renderer is installed). §12.7.
+
+**Cleanup.** Every timing and the loop are stopped in an effect cleanup. The test pins each cleanup line.
+
+**What still runs JavaScript, and why (none of it per frame).**
+- **Starting the intro.** React renders it in the app's first render; two image loads report back (`onDisplay`); the
+  system answers "Remove animations"; then one `start()`. Native animations need JavaScript to start. If the JS thread
+  is busy, the native splash simply stays up longer (it shows the same picture), so nothing blank appears.
+- **Its two ends.** The timeline's end and the fade's end call back into JavaScript once each, and the intro then
+  unmounts.
+- **Building the interpolation tables:** the intro's five, at 11 points each, once at start-up; the button's eight, once
+  when it is first laid out. The curves are sampled in JavaScript because native interpolation cannot run an easing
+  function (§10.1).
+- **The button:** the press handler starts the collapse; an effect starts the arc's loop after the re-render; an effect
+  starts the return on cancel. Once per attempt each.
+- **The first screen mounting underneath the intro.** That work existed before. It now overlaps the intro instead of
+  the native splash; it does not slow the intro, which runs on the UI thread once started.
+
+### 12.2 Start-up intro (stages 1 and 2)
+
+| ms after the intro starts | What |
+|---|---|
+| 0–120 | The drop holds still while the native splash fades out over the same picture |
+| 120–400 | The drop falls 18 dp under gravity, runs 0.8 dp past its place and settles (`curve.fall`) |
+| 400–620 | The full logo fades in over the drop (opacity only, so the two drops stay one) |
+| 560–760 | The yellow rule draws out from its centre (`scaleX`) |
+| 620–900 | "Setu" fades up 8 dp into place, over the rule |
+| after 900, once the first screen is ready | The intro fades out over the first screen in 220 ms, then unmounts |
+
+These times count from the intro's start, which is when the app's JavaScript has loaded. Before that, from the
+icon tap, the native splash shows the same first frame.
+
+**How the native splash hands over, read in `expo-splash-screen` 57's Android code** (`SplashScreenManager.kt`):
+- While the splash is kept, the app's views are laid out but **not drawn at all**: a pre-draw listener cancels every
+  draw. When it is hidden, the app draws, and the splash view fades out on top. Android always fades it (the `fade`
+  option is iOS only); the default is 400 ms.
+- So the intro cannot draw anything before the native splash hides. Its first frame must be the native splash's
+  picture: the native image is now **only the drop**, raised 18 dp (RELEASE.md §7).
+- The intro draws that frame in the same place: a 192 dp box centred on the screen, as the splash plugin places its
+  image (`splashArt` in `src/theme/brand.ts`).
+- It hides the native splash when both of its images are on their views, and the system has answered "Remove
+  animations". expo-image's `onDisplay` fires when the drawable is set on the view, not when it is drawn
+  (`ExpoImageViewWrapper.kt:302`), so it fires while the native splash still blocks drawing.
+- The fade-out is set to 120 ms (`setOptions`). It runs over an identical picture, so it is not seen, and the drop
+  waits for it before falling.
+
+**Never a blank screen, never a white flash.**
+- The intro hands off only when its timeline has ended **and** the first screen is ready (`NavigationContainer`'s
+  `onReady`, which already hid the native splash before). Until then it holds its end state: the logo, "Setu" and the
+  rule. RootNavigator's blank view, shown while the stored session is read, is never revealed.
+- The hand-off is a crossfade onto a screen already mounted under the intro.
+- If the first screen is ready before the intro can draw its first frame, the native splash waits at most 300 ms
+  (`paintWait`), then the intro is skipped and the first screen shows, as before. A failed image skips it too.
+- The crash screen hides the native splash as before. The intro unmounts with the rest of the tree.
+
+**Once per launch.** If Android recreates the activity while the JavaScript runtime lives on, there is no intro and
+the native splash behaves as before.
+
+**The cost in time, stated plainly (estimate: not measured on a device).**
+- **Before:** the native splash hid as soon as the first screen was ready.
+- **After:** the first screen starts to show at the later of (intro start + 900 ms) and (first screen ready), and is
+  fully shown 220 ms after that.
+- So a cold start reaches a usable screen **up to about 1.1 s later**, less the time the first screen takes to mount
+  (it mounts underneath, and Home's requests start meanwhile).
+  - Login on a fast phone: close to the full 0.9–1.1 s.
+  - Home on a slow phone that needs a second to mount: close to nothing.
+- A tap skips it.
+- This is a UX cost, not a rendering cost, and **it is the item to weigh**.
+- **To drop it:** remove `<SplashIntro />` from `App.tsx` and restore the old `assets/splash-icon.png` (RELEASE.md §7).
+  Both together, or the native splash shows the lone drop.
+
+**What people see on a slow cold start.** The native splash now shows only the drop, left of and above the centre
+(where it lands in the logo), not the logo and "Setu". On a phone that takes 2–3 s to load the JavaScript, that lone
+drop is what they see for that long.
+
+### 12.3 Sign-in (stage 3)
+
+- **Press:** the label fades out in the first 40 % of the collapse (240 ms in all); the half-circles meet as a 52 dp
+  circle. In the last 40 %, a pale yellow ring with a brand-yellow quarter arc fades in over it, and "Opening
+  Microsoft…" rises 6 dp into place beneath. The arc turns once every 900 ms.
+- **The same frame as the press, before the browser opens:**
+  - the collapse starts inside the press handler, before the sign-in call;
+  - Microsoft's page opens several asynchronous steps later: building the request with its PKCE challenge, then
+    `promptAsync` (`src/api/auth.api.ts`).
+  - Not measured: whether the first frames are on screen before the Custom Tab covers the app is a device check
+    (§12.6).
+- **Cancel at Microsoft, or a failure:** the circle opens back into the pill in 240 ms. A failure also shows its box
+  above, as before. "Try again" in that box collapses the pill again.
+- **Signed in:** the spinner turns until Login unmounts.
+- **"Opening Microsoft…" stays up** after Microsoft's page closes, while the app exchanges the token (AUTH-P2). Telling
+  "back from Microsoft" apart would need a signal from inside the sign-in flow, which this phase must not change. The
+  caption is the brief's wording; it is accurate for most of the wait.
+- The old helper line ("Finish on the Microsoft page. Close it to cancel.") is gone, by the design.
+
+### 12.4 Return to Home (stage 4)
+
+- **Home already lays out at once as skeletons in its real layout** (S11, Phases P and A1): the greeting from the stored
+  user, every tile with a skeleton in place of its count, and skeleton rows for recent tickets. Nothing changed there.
+- **Shimmer: brand yellow, still one shared component.**
+  - `Shimmer.tsx` is still the only shimmer. It is used by `LoadingSkeleton` and `Skeleton`, so every skeleton in the
+    app sweeps yellow.
+  - The band's strips are brand yellow (`colors.motion.accent`) at opacities 0.08–0.26, instead of white at 0.12–0.45.
+  - A white band showed only on the grey bars. A yellow band also shows on the white cards, as a pale cream, so the
+    sweep reads as warm. Over the grey bars it is a warm beige.
+  - Same cost: the band was always blended over the whole skeleton.
+- **Tiles fill without a jump, now at every text size.**
+  - The count's placeholder was a fixed 32 dp line. At 130 % system text the count's own line is 41.6 dp, so a tile
+    grew about 10 dp when its number arrived.
+  - Now an invisible "0" in the count's style holds the line, and the skeleton bar sits over it.
+  - At 100 % nothing changes.
+- **Reported, not changed (they existed before):**
+  - ADMIN's announcement banner, and the "Pending approvals" shortcut for END_USER and L2_MANAGER, appear only when
+    their data arrives, and push the sections below them down.
+  - Reserving their space would show an empty slot to everyone who has nothing there.
+  - Recent tickets show 3 skeleton rows and up to 5 real ones. That section is last, so it only grows downwards.
+
+### 12.5 Bundle (measured, `4063df3` → this change)
+
+The same method as §10.7 and §11: release `export:embed` (`EXPO_PUBLIC_APP_ENV=UAT`), then `hermesc -O`, with bytes
+attributed through the source map. The "before" is this branch's head, which already includes the production-build
+commit after §11.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Release JS, minified | 3,608.9 KB | 3,623.8 KB | **+14.9 KB (+0.41 %)** |
+| gzip | 841.9 KB | 846.6 KB | +4.7 KB |
+| Hermes bytecode (what ships) | 5,305.2 KB | 5,327.4 KB | **+22.1 KB (+0.42 %)** (22,679 bytes) |
+| Modules | 2,300 | 2,305 | +5: `brand.ts`, `splashSequence.ts`, `SplashIntro.tsx`, `SignInButton.tsx`, the drop image |
+| Bundled assets | 26 files, 407.4 KB | 27 files, 415.3 KB | +`meru-drop.png` (8.0 KB), and 32 bytes in the resource keep list |
+
+- **No library code changed.** Every byte is app code (14.2 KB mapped to source) or module wrappers (0.7 KB):
+  - `SignInButton` 4.8 KB;
+  - `SplashIntro` 3.7 KB;
+  - `LoginScreen` +2.1 KB;
+  - `splashSequence` 0.8 KB;
+  - theme +2.0 KB (`brand.ts` 0.6, `motion.ts` +0.4, `typography.ts` +0.4, `colors.ts` +0.3, `index.ts` +0.3);
+  - `splash.ts` +0.3 KB, `HomeScreen` +0.3 KB;
+  - `hooks/index`, `env.ts`, `useReduceMotion` +0.3 KB together;
+  - `BrandLogo` and `Shimmer` under 0.1 KB.
+- **The native splash image** is not in the JS bundle; the build turns it into drawables. Its source PNG went from
+  57,000 to 22,384 bytes.
+- **Verdict:** not meaningful weight, and no per-frame JavaScript. The real costs are the start-up time in §12.2, and
+  GPU blending during the intro's hand-off (§12.6, item 2).
+
+### 12.6 What to watch on a real low-end phone
+
+Use the same phone and method as §6 and §10.9 (Developer options → Profile HWUI rendering → bars, or
+`dumpsys gfxinfo`), against a build of `4063df3`.
+
+1. **Cold start, ten times** (swipe the app away first). Native splash (the drop), then the intro, then the first
+   screen.
+   - The drop must not jump at the hand-over. If it shifts by a few dp, the native splash and the intro are not
+     centred on the same point: note which way and how far.
+   - No white or blank frame anywhere.
+   - Time from the icon tap to a usable first screen, signed out (Login) and signed in (Home): screen-record both
+     builds. This is §12.2's cost; decide with the number.
+2. **Frames during the intro while Home mounts underneath.**
+   - The intro runs on the UI thread, but Home's views are created there at the same time.
+   - The 220 ms hand-off is a full-screen alpha blend: on a weak GPU it is the most expensive moment of the sequence.
+3. **"Remove animations" on.**
+   - No intro: the drop, then the first screen.
+   - The button jumps to the circle; the arc stands still; no shimmer band.
+4. **Tap during the intro:** the first screen comes at once (or the logo holds until it is ready).
+5. **Sign-in.**
+   - Press: the pill must visibly start collapsing before Chrome's tab covers the app.
+   - Close Microsoft's page: the pill comes back.
+   - Airplane mode: the failure box shows, and "Try again" collapses the pill again.
+   - With the network slowed: the arc keeps turning smoothly while the token exchange runs.
+6. **Shimmer** on Tickets and Alerts over a slow network.
+   - The cream band on the white cards must not read as a stain or a highlight.
+   - **If it does:** lower `motion.shimmer.bandOpacities`.
+7. **Login** on a 360 × 640 phone at 100 %, 130 % and 200 % text.
+   - Three headline lines; the button label on one line.
+   - The page scrolls rather than clipping (UI-STANDARDS §10.7).
+8. **The native splash on Android 12+ and on Android 11 or older:** the drop inside the visible circle, in the same
+   place as the intro's first frame.
+9. **Weight 800:** Android draws it with the nearest weight the system font has. Check that the headline looks like the
+   design.
+
+### 12.7 Verification
+
+- `npx tsc --noEmit`: clean.
+- `npm test`: **701 / 701** passing (675 before; +26 in `tests/motion/start-up-and-login.test.mjs`). **One existing
+  case was updated:** `tests/release/production-readiness.test.mjs`, "the Login screen navigates nowhere". It pinned
+  the old `SubmitButton` label (`'Signing in…' : 'Sign in with Microsoft'`). It now pins the one `SignInButton`, its
+  label, and that neither file navigates.
+- The 26 new cases cover:
+  - the environment chip, with `env.ts` evaluated as a production release, a preview release, nothing set and a
+    development build;
+  - the start-up sequence's decisions (plays, holds, skips under "Remove animations", image failure, the 300 ms wait,
+    touch, crash, hide once);
+  - the two start-up images, decoded and measured against the intro's geometry (`tests/support/png.mjs`, Node's zlib
+    only);
+  - the login's design values;
+  - the motion rules in every animating file.
+- Seven deliberate violations each failed the suite (§12.1).
+- Release bundle built before and after with the method above; the native-driver trace is in §12.1.
+- `npm run verify:release-bundle`: **PASS** in both modes (UAT, and `--prod`). "Sign in with Microsoft", its control
+  string, is still found.
+- No EAS build. No call to the backend. The web repo was not opened, and no database was touched.
 - Branch `dev`, nothing committed.
