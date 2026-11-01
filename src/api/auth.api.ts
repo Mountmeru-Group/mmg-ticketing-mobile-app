@@ -4,6 +4,7 @@
 // 1. signInWithMicrosoft() opens Microsoft's sign-in page in Apple's sign-in sheet (expo-auth-session →
 //    ASWebAuthenticationSession, 02 §7.7): authorization code + PKCE (S256) against the PUBLIC-client app registration
 //    in src/config/auth.config.ts. There is no client secret.
+//    `prompt=select_account`, or `prompt=login` when the 15-day re-authentication is due (02-AUTH.md §5.8).
 // 2. The code is redeemed at Microsoft's token endpoint with the PKCE verifier. Only the ID token is kept, in memory,
 //    for one request. Microsoft's access and refresh tokens are dropped unused: there is no refresh in this app (02 §1.1).
 // 3. exchangeMicrosoftIdToken() posts the ID token to AUTH-P2 and reads the MMG session `{ token, expiresAt, user }`
@@ -91,6 +92,7 @@ export const LOGOUT_WAIT_MS = 5_000;
  * Sign out (02 §5.5), after the person has confirmed it (useSignOut): AUTH-3 first, while the token is still there to
  * send. Its result is ignored and it is waited for at most `waitMs`. Then, whatever happened, the local wipe: Keychain
  * session, the whole query cache and every store (endSession). The app then shows Login.
+ * The 15-day date goes too, so the next sign-in is challenged and starts a new 15 days (02 §5.8).
  */
 export async function signOutAndWipe(waitMs: number = LOGOUT_WAIT_MS): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -103,7 +105,7 @@ export async function signOutAndWipe(waitMs: number = LOGOUT_WAIT_MS): Promise<v
     ]);
   } finally {
     clearTimeout(timer);
-    await endSession(null);
+    await endSession(null, { forgetFullAuth: true });
   }
 }
 
@@ -157,11 +159,20 @@ export class MicrosoftSignInError extends Error {
 
 export type MicrosoftSignInResult = { type: 'cancelled' } | { type: 'signed-in'; session: MobileLoginResponse };
 
+export interface MicrosoftSignInOptions {
+  /**
+   * true: `prompt=login`. Microsoft asks for the user's credentials even when its own browser session could let them
+   * straight through: the 15-day re-authentication (auth.store.ts, 02-AUTH.md §5.8).
+   * false: `prompt=select_account`, as the web flow does: Microsoft's account picker, so a shared phone can switch account.
+   */
+  challenge: boolean;
+}
+
 /**
  * Steps 1–3. Resolves `cancelled` when the person closes Microsoft's page or presses Cancel there; otherwise resolves
  * the session or rejects with a MicrosoftSignInError. Stores nothing: the caller passes `session` to setSession().
  */
-export async function signInWithMicrosoft(): Promise<MicrosoftSignInResult> {
+export async function signInWithMicrosoft({ challenge }: MicrosoftSignInOptions): Promise<MicrosoftSignInResult> {
   if (!isMicrosoftSignInConfigured()) {
     throw new MicrosoftSignInError(
       'not-configured',
@@ -169,7 +180,7 @@ export async function signInWithMicrosoft(): Promise<MicrosoftSignInResult> {
         'placeholder or not a GUID (src/config/auth.config.ts, or EXPO_PUBLIC_AZURE_CLIENT_ID / _TENANT_ID).',
     );
   }
-  const idToken = await getMicrosoftIdToken();
+  const idToken = await getMicrosoftIdToken(challenge);
   if (idToken === null) return { type: 'cancelled' };
   return { type: 'signed-in', session: await exchangeMicrosoftIdToken(idToken) };
 }
@@ -191,7 +202,7 @@ function isFetchNetworkFailure(error: unknown): boolean {
 }
 
 /** Steps 1–2. The ID token, or null when the person closed Microsoft's page or pressed Cancel on it. */
-async function getMicrosoftIdToken(): Promise<string | null> {
+async function getMicrosoftIdToken(challenge: boolean): Promise<string | null> {
   const redirectUri = getAuthRedirectUri();
   const request = new AuthSession.AuthRequest({
     clientId: AZURE_CLIENT_ID,
@@ -200,7 +211,8 @@ async function getMicrosoftIdToken(): Promise<string | null> {
     responseType: AuthSession.ResponseType.Code,
     usePKCE: true,
     codeChallengeMethod: AuthSession.CodeChallengeMethod.S256, // the library's default, stated; it refuses `plain`
-    prompt: AuthSession.Prompt.SelectAccount, // as the web flow does, so a shared phone can switch account
+    // Login: credentials even with a live Microsoft session (15-day rule). SelectAccount: as the web flow does.
+    prompt: challenge ? AuthSession.Prompt.Login : AuthSession.Prompt.SelectAccount,
   });
 
   let result: AuthSession.AuthSessionResult;

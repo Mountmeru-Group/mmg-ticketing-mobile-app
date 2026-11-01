@@ -2,6 +2,7 @@
 const items = new Map();
 const calls = [];
 let failOnKey = null;
+let failReadsOn = new Set();
 
 export async function setItemAsync(key, value, options) {
   calls.push({ op: 'set', key, options });
@@ -11,6 +12,7 @@ export async function setItemAsync(key, value, options) {
 
 export async function getItemAsync(key, options) {
   calls.push({ op: 'get', key, options });
+  if (failReadsOn.has(key)) throw new Error('SecureStore could not decrypt (test)');
   return items.has(key) ? items.get(key) : null;
 }
 
@@ -29,11 +31,17 @@ export function __reset() {
   items.clear();
   calls.length = 0;
   failOnKey = null;
+  failReadsOn = new Set();
 }
 
 /** Makes setItemAsync(key) throw, like a Keychain failure on a real device. */
 export function __failOn(key) {
   failOnKey = key;
+}
+
+/** Makes getItemAsync throw for each of these keys, like a Keychain that cannot decrypt after a device restore. */
+export function __failReadsOn(...keys) {
+  failReadsOn = new Set(keys);
 }
 
 /** A copy of everything stored, as `{ key: value }`. */

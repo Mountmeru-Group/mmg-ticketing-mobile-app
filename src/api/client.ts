@@ -2,7 +2,14 @@
 import axios, { type AxiosResponse } from 'axios';
 
 import { API_BASE_URL } from '@/config/env';
-import { SESSION_ENDED_MESSAGE, isSessionExpired, useAuthStore } from '@/store/auth.store';
+import {
+  REAUTH_NOTICE,
+  SESSION_ENDED_MESSAGE,
+  isReauthDue,
+  isSessionExpired,
+  useAuthStore,
+  type ClearSessionOptions,
+} from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import type { ApiError } from '@/types';
 import { ApiClientError } from './errors';
@@ -31,7 +38,7 @@ export const apiClient = axios.create({
   headers: { Accept: 'application/json' },
 });
 
-// ── Session end (401, 8 h expiry, sign-out) ──────────────────
+// ── Session end (401, 8 h expiry, 15-day re-authentication, sign-out) ──
 
 const UNAUTHORIZED_MESSAGES: Record<string, string> = {
   'Session expired': SESSION_ENDED_MESSAGE,
@@ -42,11 +49,25 @@ const UNAUTHORIZED_MESSAGES: Record<string, string> = {
  * Wipe everything tied to the session (02 §5.3 step 2, §5.5): token, cached server data, UI state.
  * Flipping the auth store to logged out makes RootNavigator switch to the Login stack.
  * There is no refresh token, so there is nothing to retry.
+ * `forgetFullAuth` also deletes the 15-day date, so the next sign-in is challenged (02 §5.8).
  */
-export async function endSession(message: string | null): Promise<void> {
+export async function endSession(message: string | null, options?: ClearSessionOptions): Promise<void> {
   queryClient.clear();
   useUiStore.getState().reset();
-  await useAuthStore.getState().clearSession(message);
+  await useAuthStore.getState().clearSession(message, options);
+}
+
+/**
+ * The 15-day re-authentication for a session that is already open (02 §5.8). RootNavigator runs it each time the app
+ * returns to the foreground; restoreSession() covers a cold start. There is no timer: an app left open in the
+ * foreground past the 15 days is caught on its next return, and its next sign-in is challenged in any case.
+ * True when it ended the session.
+ */
+export function endSessionIfReauthDue(now: number = Date.now()): boolean {
+  const { isAuthenticated, fullAuthAt } = useAuthStore.getState();
+  if (!isAuthenticated || !isReauthDue(fullAuthAt, now)) return false;
+  void endSession(REAUTH_NOTICE.message, { forgetFullAuth: true });
+  return true;
 }
 
 function handleUnauthorized(serverMessage: string): void {

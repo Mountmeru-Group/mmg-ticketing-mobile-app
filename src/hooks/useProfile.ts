@@ -115,6 +115,7 @@ export function useUpdateProfile() {
 /**
  * Sign out (02 §5.5), always after a confirmation, then signOutAndWipe(): AUTH-3 (result ignored, waits at most 5 s),
  * then the local wipe — Keychain session, the whole query cache and every store. The app then shows Login.
+ * The 15-day date goes too, so the next sign-in is challenged and starts a new 15 days (02 §5.8).
  */
 export function useSignOut() {
   const [signingOut, setSigningOut] = useState(false);

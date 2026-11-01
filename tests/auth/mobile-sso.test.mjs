@@ -110,7 +110,8 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
   };
 }
 
-const LOGGED_OUT = { user: null, token: null, issuedAt: null, isAuthenticated: false, isLoading: false, signOutMessage: null };
+// fullAuthAt null: every test starts as a fresh phone, so its first sign-in is a challenged one (02 §5.8).
+const LOGGED_OUT = { user: null, token: null, issuedAt: null, fullAuthAt: null, isAuthenticated: false, isLoading: false, signOutMessage: null };
 
 beforeEach(() => {
   secureStore.__reset();
@@ -158,7 +159,8 @@ describe('what the app sends', () => {
     assert.equal(config.redirectUri, 'msauth.com.mountmeru.servicedesk://auth'); // iOS (iOS-6); Android's is on dev
     assert.equal(config.responseType, 'code');
     assert.equal(config.usePKCE, true);
-    assert.equal(config.prompt, 'select_account');
+    // A fresh phone has no 15-day date, so Microsoft is told to challenge. select_account: tests/auth/reauth.test.mjs.
+    assert.equal(config.prompt, 'login');
     assert.deepEqual(config.scopes, [...AZURE_SCOPES]);
     assert.deepEqual(prompts, [AZURE_ENDPOINTS]);
     assert.deepEqual(promptOptions, [AUTH_SESSION_OPTIONS]);

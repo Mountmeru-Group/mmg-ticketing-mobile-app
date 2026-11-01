@@ -1,13 +1,14 @@
 // iOS keeps Keychain items after an app is deleted (docs/ios/00-PORT-MANIFEST.md §7). Without this check, deleting Setu
 // and installing it again would start in the session from before, because the token is still in the Keychain. The app
 // container IS deleted with the app, so a marker file there tells a fresh install (no marker) from a normal launch.
-// - First launch after an install: wipe the three mmg.session.* Keychain items, then write the marker.
+// - First launch after an install: wipe the three mmg.session.* Keychain items and the 15-day date
+//   (mmg.auth.fullAuthAt, 02-AUTH.md §5.8), then write the marker. A reinstall means a fresh, challenged sign-in.
 // - Every later launch: the marker is there and nothing happens.
-// - Restored onto another device from a backup: the marker may come back, but the session items are
+// - Restored onto another device from a backup: the marker may come back, but the session items and the date are
 //   AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY (auth.store.ts) and never do, so the app still starts signed out.
 import { File, Paths } from 'expo-file-system';
 
-import { wipeStoredSession } from './auth.store';
+import { forgetStoredFullAuth, wipeStoredSession } from './auth.store';
 
 const MARKER_NAME = 'setu-install-marker';
 
@@ -25,6 +26,7 @@ export async function wipeSessionLeftByPreviousInstall(): Promise<void> {
     return;
   }
   await wipeStoredSession();
+  await forgetStoredFullAuth();
   try {
     marker.create();
   } catch {

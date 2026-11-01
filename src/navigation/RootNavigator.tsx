@@ -11,7 +11,7 @@ import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@
 import { useEffect, type ComponentType } from 'react';
 import { AppState, Pressable, View } from 'react-native';
 
-import { endSession } from '@/api/client';
+import { endSession, endSessionIfReauthDue } from '@/api/client';
 import { SuccessNoticeHost } from '@/components';
 import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { AssignPickerScreen } from '@/screens/tickets/AssignPickerScreen';
@@ -45,11 +45,13 @@ const SHEETS: Record<SheetRoute, ComponentType<any>> = {
   TicketFilters: TicketFiltersScreen,
 };
 
-/** 8-hour hard expiry also applies while the app sits in the background (02 §5.4). */
+/** The 15-day re-authentication and the 8-hour hard expiry also apply while the app sits in the background (02 §5.4, §5.8). */
 function useExpireSessionOnForeground() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
+      // 15 days first: when both are due, Login says why and Microsoft challenges the next sign-in.
+      if (endSessionIfReauthDue()) return;
       const { isAuthenticated, issuedAt } = useAuthStore.getState();
       if (isAuthenticated && (issuedAt === null || isSessionExpired(issuedAt))) {
         void endSession(SESSION_ENDED_MESSAGE);

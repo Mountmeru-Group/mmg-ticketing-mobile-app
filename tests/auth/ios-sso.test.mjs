@@ -119,7 +119,8 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
   };
 }
 
-const LOGGED_OUT = { user: null, token: null, issuedAt: null, isAuthenticated: false, isLoading: false, signOutMessage: null };
+// fullAuthAt null (iOS-5d): every test starts as a fresh phone, so its first sign-in is a challenged one (02 §5.8).
+const LOGGED_OUT = { user: null, token: null, issuedAt: null, fullAuthAt: null, isAuthenticated: false, isLoading: false, signOutMessage: null };
 
 beforeEach(() => {
   reactNative.__setPlatformOS('ios');
