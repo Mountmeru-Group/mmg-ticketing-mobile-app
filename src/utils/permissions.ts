@@ -97,14 +97,45 @@ export function homeVariant(role: UserRole): HomeVariant {
   return 'staff';
 }
 
-export type HomeTile = 'open' | 'resolved' | 'inProgress' | 'onHold' | 'slaBreached' | 'totalOpen' | 'unassigned';
+/** The KPI tiles: the web's first row of KPICards (G6, docs/G6-WEB-DASHBOARD.md §4). What each counts: utils/home-kpis.ts. */
+export type HomeTile = 'total' | 'open' | 'inProgress' | 'resolved' | 'slaBreached';
 
-/** KPI tiles in order. `unassigned` only for ADMIN and the UI's triage AGENT (04 M2; the count is mis-scoped otherwise). */
+/**
+ * The status chips under the tiles: the web's second row (Closed, Unassigned, the pending-reason mini-cards, On hold),
+ * plus Active, which the web dashboard does not show and which left the tile grid in G6.
+ */
+export type HomeChip =
+  | 'closed' | 'unassigned' | 'pendingMgmtReview' | 'pendingPartner' | 'pendingUserConfirm' | 'pendingUserInfo'
+  | 'pendingMasterData' | 'onHold' | 'active';
+
+/**
+ * KPI tiles in order. Staff: the web's five (FE:DashboardPage.tsx:341-375). END_USER keeps its own, narrower set
+ * (04 M2 decision): Open and Resolved, counted as the web counts "My Open Requests" and "Resolved".
+ */
 export function homeTiles(viewer: Pick<AuthUser, 'role' | 'countryId'>): HomeTile[] {
   if (viewer.role === 'END_USER') return ['open', 'resolved'];
-  const tiles: HomeTile[] = ['open', 'inProgress', 'onHold', 'slaBreached', 'totalOpen'];
-  if (viewer.role === 'ADMIN' || isTriageAgent(viewer)) tiles.push('unassigned');
-  return tiles;
+  return ['total', 'open', 'inProgress', 'resolved', 'slaBreached'];
+}
+
+/**
+ * Status chips in the web's order (FE:DashboardPage.tsx:379-417), then Active. None for END_USER (the web hides the
+ * row from them, :379). `unassigned` only for ADMIN and the UI's triage AGENT (04 M2): for anyone else the count can
+ * drop the scope (05 B.20). The screen hides a pending-reason or On hold chip whose count is 0, as the web does (:405).
+ */
+export function homeChips(viewer: Pick<AuthUser, 'role' | 'countryId'>): HomeChip[] {
+  if (viewer.role === 'END_USER') return [];
+  const chips: HomeChip[] = ['closed'];
+  if (viewer.role === 'ADMIN' || isTriageAgent(viewer)) chips.push('unassigned');
+  chips.push('pendingMgmtReview', 'pendingPartner', 'pendingUserConfirm', 'pendingUserInfo', 'pendingMasterData', 'onHold', 'active');
+  return chips;
+}
+
+/**
+ * The PERIOD row: every role the web shows it to (all, FE:DashboardPage.tsx:290), except L2_MANAGER, whose Home shows
+ * no counts (DSH-1 is never called for L2, 05 C.19), so a period would change nothing.
+ */
+export function showHomePeriod(role: UserRole): boolean {
+  return homeVariant(role) !== 'l2';
 }
 
 /** "Pending approvals" shortcut on Home: the same rule as the drawer row (08 S1). */

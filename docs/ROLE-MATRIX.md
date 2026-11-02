@@ -16,6 +16,17 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**Updated for Phase G6, 2026-11-02: Home's period row, and the KPI tiles at parity with the web dashboard.**
+- Staff tiles are now the web's five: Total, Open, In progress, Resolved, SLA breached.
+- The web's status chips sit beneath them. On hold, Active and Unassigned moved there from the grid; none was dropped.
+- A PERIOD row offers the web's ten ranges.
+- Who sees what is unchanged in substance:
+  - END_USER keeps Open and Resolved;
+  - Unassigned stays ADMIN / triage AGENT;
+  - L2 still gets no counts, and no period row.
+- §1.3, §2.2 (H2–H5, new H10–H12) and §7 are updated; §17 lists what G6 changed.
+- Web behaviour with sources: `docs/G6-WEB-DASHBOARD.md`.
+
 **Sources**
 - Web repo clone, read-only, at HEAD `d7f3887` (2026-10-09). It was byte-for-byte unchanged before and after this audit.
 - Path prefixes:
@@ -42,7 +53,7 @@
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **31** of the 95 rows in §2 (30 before 2026-10-29; 31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
+| Elements whose role gating differs from the web portal | **31** of the 98 rows in §2 (31 of 95 before G6; 30 before 2026-10-29; 31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
 | More permissive than the web UI | **2**, both deliberate and documented (N1, CR4). None exposes data or actions beyond what the server already scopes to the user. N4 was the third until 2026-10-29; it is now narrower. **G5 audit:** two too-permissive cases below the UI were fixed (§14.3); neither was reachable from a screen |
 | More restrictive than the web UI | **29**. Of these: **15** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **2** are *simplified* (2026-10-29): N3 Knowledge base and N4 Announcements, ADMIN only by Ronit's decision to simplify the app, although both work on the web for every role that has them (§16). **0** are undocumented. G5: SC7 (My Requests for staff) is now a MATCH, settled against the web's source (§14.2). G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
@@ -84,8 +95,9 @@
 ### 1.3 Dashboard (`FE:pages/dashboard/DashboardPage.tsx`)
 | KPI / widget | END_USER | AGENT | L2 | ADMIN | Source | Server scoping (05 §B.20, §C.19) |
 |---|---|---|---|---|---|---|
-| Total, Open, In Progress, Resolved, SLA Breached | ✅ ("My …" labels) | ✅ | ✅ | ✅ | `:342-375` | Correct. **L2: the cache is shared across all L2 managers** (`BE:modules/dashboard/dashboard.controller.ts:246-248`) |
-| Closed, **Unassigned**, pending sub-status cards | ❌ | ✅ | ✅ | ✅ | `:379-405` | Unassigned drops the scope for a non-triage AGENT |
+| Range selector: Today, Yesterday, Last 7 Days, Last 30 Days, This Week, This Month (default), Quarterly, This Year, All Time, Custom | ✅ | ✅ | ✅ | ✅ | `:61, :290-337` | n/a. Rolling windows under calendar names (05 B.36) |
+| Total, Open, In Progress, Resolved, SLA Breached | ✅ ("My …" labels) | ✅ | ✅ | ✅ | `:342-375`. Open reads `currentlyOpen` (any date, `:350`); Resolved reads `resolvedToday` for Today (`:364`) | Correct. **L2: the cache is shared across all L2 managers** (`BE:modules/dashboard/dashboard.controller.ts:246-248`) |
+| Closed, **Unassigned**, pending sub-status cards (Mgmt Review, With Partner, User Confirm, More Info, Master Data, On Hold; each hidden at 0) | ❌ | ✅ | ✅ | ✅ | `:379-417` | Unassigned drops the scope for an AGENT with no team who is not on the server's triage list (G6 re-check: `BE:dashboard.controller.ts:272-275, :339`). The others are correct |
 | Status / priority charts, technician breakdowns, workload, SLA trend | ❌ | ✅ | ✅ | ✅ | `:421-545` | Mixed |
 | Technician matrix, team matrix, Ticket Mode, **Country × Group** | ❌ | ✅ | ✅ | ✅ | `:550-660` | `countryGroupRows` is **unscoped** (`BE:dashboard.controller.ts:381-393`) |
 | Monthly trends, technician performance | ❌ | ✅ | ✅ | ✅ | `:668, :724` | Global for AGENT/L2 when no country is sent |
@@ -204,7 +216,7 @@ Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.m
 **Role gating source.** All gating now comes from `src/utils/permissions.ts`, abbreviated **perm**. Its functions:
 - `drawerItems`, `drawerRoutes`, `mainTabs` (2026-10-29: `drawerRoutes` decides which drawer routes are registered at all)
 - `canUseKnowledgeBase`, `canReadAnnouncements`, `showAnnouncementBanner` (2026-10-29: ADMIN only)
-- `homeVariant`, `homeTiles`
+- `homeVariant`, `homeTiles`, `homeChips`, `showHomePeriod` (G6: the status chips and the PERIOD row)
 - `ticketDetailPermissions`, `composerPermissions`
 - `ticketFieldPermissions`, `fieldEditProblem` (G1: the M4 property editors and their write guard)
 - `bulkActions`, `inlineStatusTransitions`
@@ -230,15 +242,18 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 ### 2.2 Home (M2) vs Dashboard
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
 |---|---|---|---|---|---|
-| H1 | Raise a ticket (END_USER) / "+" FAB (staff) | all | all (New Ticket) | MATCH | `src/screens/dashboard/HomeScreen.tsx:133, :192-200` |
-| H2 | END_USER KPIs | Open, Resolved | Total, Open, In Progress, Resolved, SLA Breached | **NARROWER**, *decision* 04 M2 | perm `homeTiles` |
-| H3 | Staff KPIs open, inProgress, onHold, slaBreached, totalOpen | AGENT, L2 (no counts), ADMIN | AGENT, L2, ADMIN | MATCH | perm `homeTiles` |
-| H4 | Unassigned KPI | ADMIN, triage AGENT | AGENT, L2, ADMIN | **NARROWER**, *decision* 04 M2: the count drops the scope for anyone else (05 B.20) | perm `homeTiles` |
-| H5 | KPI numbers for L2 | none: tiles without counts, plus a notice | all | **NARROWER**, *defect avoided*: DSH-1 is cached per role for L2, so the numbers can be another manager's (05 C.19) | `HomeScreen.tsx:102, :147` |
+| H1 | Raise a ticket (END_USER) / "+" FAB (staff) | all | all (New Ticket) | MATCH | `src/screens/dashboard/HomeScreen.tsx:208, :276-287` |
+| H2 | END_USER KPIs | Open (G6: `currentlyOpen`, as the web's "My Open Requests"), Resolved | Total, Open, In Progress, Resolved, SLA Breached | **NARROWER**, *decision* 04 M2 (kept in G6) | perm `homeTiles` |
+| H3 | Staff KPI tiles (G6): Total, Open, In progress, Resolved, SLA breached, in the web's order and colours | AGENT, L2 (no counts), ADMIN | AGENT, L2, ADMIN | MATCH. Before G6: open, inProgress, onHold, slaBreached, totalOpen | perm `homeTiles` |
+| H4 | Unassigned count (G6: a status chip, no longer a tile) | ADMIN, triage AGENT | AGENT, L2, ADMIN | **NARROWER**, *decision* 04 M2: the count drops the scope for anyone else (05 B.20) | perm `homeChips` |
+| H5 | KPI numbers for L2 | none: tiles and chips without counts, plus a notice | all | **NARROWER**, *defect avoided*: DSH-1 is cached per role for L2, so the numbers can be another manager's (05 C.19) | `HomeScreen.tsx:172-176, :217-223` |
 | H6 | Matrices, Country × Group, trends, workload | none | AGENT, L2, ADMIN | **NARROWER**, *defect avoided* (unscoped or mis-scoped, 05 B.20) | `src/hooks/useHome.ts` `pickSafe` |
 | H7 | Pending approvals shortcut | as N1 | – | as N1 | perm `showApprovalsShortcut` |
-| H8 | Recent tickets | all, own scope | all | MATCH | `HomeScreen.tsx:180-188` |
-| H9 | My open / Due soon shortcuts | staff | – | N/A | `HomeScreen.tsx:167-168` |
+| H8 | Recent tickets | all, own scope | all | MATCH | `HomeScreen.tsx:264-272` |
+| H9 | My open / Due soon shortcuts | staff | – | N/A | `HomeScreen.tsx:252-253` |
+| H10 | Status chips (G6): Closed, the five pending reasons, On hold (each of the last six hidden at 0) | AGENT, L2 (no counts, all shown), ADMIN | AGENT, L2, ADMIN | MATCH | perm `homeChips` |
+| H11 | PERIOD row (G6): the web's ten ranges, default This month | END_USER, AGENT, ADMIN | all | MATCH, except L2: **NARROWER**, *defect avoided*. L2 has no counts (H5), so a period would change nothing | perm `showHomePeriod` |
+| H12 | Active count (G6: a chip; a tile before) | AGENT, L2 (no count), ADMIN | – (the web dashboard never shows `totalOpen`) | MOBILE ONLY | perm `homeChips` |
 
 ### 2.3 Ticket list (M3)
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -342,8 +357,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role; only one's own rows are links | none (rows are not links) | N/A (mobile addition, ➕). Never another person's answers, as on the web | `src/screens/catalog/ServiceRequestDetailScreen.tsx`, `ServiceCatalogScreen.tsx` `canOpen` → perm `isOwnServiceRequest` |
 | SC9 | Cancel, edit, comment on, assign or change the status of a request | none | none | MATCH (the server's routes are staff-only and no web page calls them) | – |
 
-**Totals** (2026-10-29)
-- 95 rows (94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12). 2026-10-29 added no row.
+**Totals** (G6, 2026-11-02)
+- 98 rows (95 before G6, which added H10–H12; 94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12). 2026-10-29 added no row.
+- G6: H10 (status chips) is a new MATCH. H11 (PERIOD row) is a new MATCH; its L2 exception follows H5 and, like K1 and AN1, is not counted a second time. H12 (Active) is a mobile addition (N/A), like SC8. H3 now names the web's five tiles (still MATCH); H4 is a chip now (still a *decision*). Mismatches unchanged at 31.
 - **31 mismatches** (30 after G5, 31 after G4, 28 after G3, 29 after G2, 28 after G1, 30 before it):
   - 2 WIDER: N1, CR4.
   - 29 NARROWER:
@@ -515,11 +531,11 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 ## 7. Tests
 
 **`tests/rbac/role-gating.test.mjs`**
-- 122 tests, using the existing `node:test` harness. No new framework and no new library.
+- 139 tests (129 before G6), using the existing `node:test` harness. No new framework and no new library.
 - They cover the five personas: END_USER, AGENT, triage AGENT, L2_MANAGER and ADMIN.
 
 **What they assert**
-- Drawer rows (0 and 2 pending approvals), bottom tabs and their titles, Home variant and KPI tiles.
+- Drawer rows (0 and 2 pending approvals), bottom tabs and their titles, Home variant, KPI tiles, status chips and the PERIOD row (G6).
 - The ticket-detail action set:
   - for an OPEN and a CLOSED ticket, for every persona;
   - from every status, END_USER and L2 never get Pick up, Assign or Note.
@@ -1141,3 +1157,53 @@ Authoring (KB articles, announcements) was already out of scope for every role (
 - Every other row, route and permission; the KB and announcements screens themselves (ADMIN sees exactly what everyone saw before).
 - The auth flow, `auth.config.ts`, the dev-token screen; no library; no EAS build; nothing committed.
 - The web repo: not opened in this phase; `git status` clean at HEAD `d7f3887`.
+
+## 17. What Phase G6 changed (2026-11-02, uncommitted)
+
+The Home PERIOD row and the KPI tiles at parity with the web dashboard. Web behaviour, with a source for every statement:
+`docs/G6-WEB-DASHBOARD.md`.
+
+### 17.1 Per persona
+
+| Persona | Tiles before | Tiles now | Status chips (new) | PERIOD row |
+|---|---|---|---|---|
+| END_USER | Open (`open`), Resolved | Open (`currentlyOpen`), Resolved (Resolved today on Today) | none | yes |
+| AGENT | Open, In progress, On hold, SLA breached, Active | Total, Open, In progress, Resolved, SLA breached | Closed, 5 pending reasons, On hold, Active | yes |
+| triage AGENT | as AGENT + Unassigned | as AGENT | as AGENT + Unassigned (2nd) | yes |
+| L2_MANAGER | as AGENT, no counts | as AGENT, no counts | as AGENT, no counts, every chip shown | **no** (no counts) |
+| ADMIN | as triage AGENT | as AGENT | as triage AGENT | yes |
+
+- **Nothing was dropped.** On hold, Active and Unassigned moved from the tile grid to the chip row.
+  - Unassigned keeps its audience (ADMIN, triage AGENT; 05 B.20).
+  - Active is still the only count the web dashboard does not have.
+- **New counts, no new risk.** ADMIN and AGENT now also see Total, Resolved, Closed and the five pending reasons, as on the web. Each is a count the server scopes correctly for them (`docs/G6-WEB-DASHBOARD.md` §7). No role gained a count the server mis-scopes for it. L2 still gets none.
+- **No navigation, route or permission changed.** Each tile and chip opens the Tickets tab with a named filter, as tiles did. Five Home-only filters were added for the pending-reason chips (`ticket-filters.ts`, `MGMT_REVIEW_KPI` … `MASTER_DATA_KPI`). Each sends one status, and the list accepts them for every role (`isHomeTileFilter`).
+
+### 17.2 Where
+
+- `src/utils/permissions.ts`: `homeTiles` (new set), `homeChips` and `showHomePeriod` (new).
+- `src/utils/home-kpis.ts` (new): what each tile and chip counts, its label, and the list it opens.
+- `src/utils/dashboard-period.ts` (new): the ten periods, the default, the DSH-1 params, Custom validation.
+- `src/store/ui.store.ts`: `homePeriod`, `homeCustomRange`. In memory only, wiped on sign-out.
+- `src/hooks/useHome.ts`: DSH-1 for the period; `SafeDashboard.kpis` is now `HomeKpis`.
+- `src/api/dashboard.api.ts`: `range` is not sent alongside `from`.
+- `src/screens/dashboard/HomeScreen.tsx`: the PERIOD row, the Custom From and To, the tiles with a left edge, the chips. The two "last 30 days" captions are removed.
+
+### 17.3 Tests
+
+- `tests/rbac/role-gating.test.mjs`: KPI tiles re-pinned for all five personas; status chips and PERIOD row pinned (+10). The wiring check requires `homeChips(` and `showHomePeriod(` in HomeScreen.
+- `tests/home/dashboard.test.mjs` (new, 53):
+  - the request each period sends, through the real axios client;
+  - Custom validation;
+  - which KPI each tile and chip reads;
+  - the zero-hiding rule;
+  - each tile and chip's list filter, and that the list accepts it for each persona who sees it;
+  - the period's lifetime;
+  - the stale captions gone, and no timers.
+- `npm test`: 811 (748 before).
+
+**Not touched**
+- Auth, `auth.config.ts` and the 15-day re-auth.
+- Navigation structure, every permission outside Home, staleTime and polling.
+- No library added, no EAS build run, nothing committed.
+- The web repo was read only and is byte-for-byte unchanged at HEAD `d7f3887`.
