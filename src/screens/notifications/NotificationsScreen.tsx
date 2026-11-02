@@ -6,29 +6,36 @@
 //   (APR-1, already cached for the drawer), the approval opens instead: an approver may not be allowed to open the
 //   ticket itself (08 1.49). A row with no ticketId just becomes read.
 // - "Mark all read" (NTF-4) asks first: there is no "mark unread".
-// - No live updates (SSE is broken, 05 B.3) and no push (05 B.4); this phase also forbids polling. The screen says so,
-//   and pull-to-refresh reloads the newest page and the badge. Details: hooks/useNotifications.ts.
+// - No live updates (SSE is broken, 05 B.3) and no polling. Pull-to-refresh reloads the newest page and the badge.
+//   Details: hooks/useNotifications.ts.
+// - Push (G7): the notice at the top says what push is doing on this phone, from the push store (utils/push.ts
+//   pushNotice), never a fixed sentence: on, off (with "Turn on notifications" or "Open settings"), not switched on at
+//   the Service Desk yet (NTF-5 404), or not possible in this build. The first visit asks for the permission, once.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState,
-  QueryBanner, ScreenHeader,
+  OutlineButton, QueryBanner, ScreenHeader,
 } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
   useUnreadCount,
 } from '@/hooks';
+import { requestPushOnAlertsOpen, syncPushRegistration } from '@/push/registration';
+import { usePushStore } from '@/store/push.store';
 import { colors, palette } from '@/theme';
 import type { MainTabScreenProps, Notification } from '@/types';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatRelative } from '@/utils/format';
 import { htmlToDisplayText } from '@/utils/html';
+import { pushNotice } from '@/utils/push';
 
 const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   TICKET_ASSIGNED: 'person-add-outline',
@@ -61,6 +68,14 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
 
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = list;
   const hasData = list.data !== undefined;
+
+  // G7: the first visit to Alerts is where the notification permission is asked, once, and only if Android has never
+  // asked (src/push/registration.ts). Every later visit changes nothing.
+  useFocusEffect(
+    useCallback(() => {
+      void requestPushOnAlertsOpen();
+    }, []),
+  );
 
   const items = useMemo<AlertItem[]>(() => {
     const unreadRows = list.items.filter((n) => !n.isRead);
@@ -194,13 +209,7 @@ export function NotificationsScreen({ navigation }: MainTabScreenProps<'AlertsTa
         getItemType={alertItemType}
         renderItem={renderItem}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
-        ListHeaderComponent={
-          <View className="mx-4">
-            <Notice>
-              Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
-            </Notice>
-          </View>
-        }
+        ListHeaderComponent={<PushNoticeBlock />}
         ListEmptyComponent={
           <EmptyState illustration="clear" title="No notifications" message="Updates on your tickets will appear here. Pull down to refresh." />
         }
@@ -321,4 +330,48 @@ function Footer({
     );
   }
   return null;
+}
+
+/**
+ * The notice at the top of the list (G7): what push is doing on this phone, from the push store. "Turn on
+ * notifications" asks again while Android allows it; after a permanent refusal only Settings can, so it opens them.
+ * Coming back from Settings re-checks the permission (PushBridge). A refusal never limits this screen.
+ */
+function PushNoticeBlock() {
+  const status = usePushStore((s) => s.status);
+  const canAskAgain = usePushStore((s) => s.canAskAgain);
+  const [asking, setAsking] = useState(false);
+  const notice = pushNotice(status, canAskAgain);
+
+  const onAction = async () => {
+    if (notice.action?.kind === 'settings') {
+      await Linking.openSettings().catch(() => notify("Couldn't open Settings."));
+      return;
+    }
+    setAsking(true);
+    try {
+      await syncPushRegistration({ prompt: 'button' });
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  return (
+    <View className="mx-4">
+      <Notice tone={notice.tone}>{notice.text}</Notice>
+      {notice.action ? (
+        <View className="-mt-1 mb-3">
+          <OutlineButton
+            label={notice.action.label}
+            icon={notice.action.kind === 'settings' ? 'settings-outline' : 'notifications-outline'}
+            onPress={() => void onAction()}
+            loading={asking}
+            disabled={asking}
+            compact
+            align="start"
+          />
+        </View>
+      ) : null}
+    </View>
+  );
 }

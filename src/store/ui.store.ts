@@ -11,7 +11,7 @@ import {
 } from '@/utils/dashboard-period';
 import {
   NO_ADVANCED_FILTERS, withAdvancedFilters, withNamedFilter,
-  type TicketAdvancedFilters, type TicketNamedFilter, type TicketSortOption,
+  type TicketAdvancedFilters, type TicketListPeriod, type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
 
 interface UiState {
@@ -26,6 +26,8 @@ interface UiState {
   /** M3 search box as typed, and the search applied (on the keyboard's search key, normalised). */
   ticketSearchText: string;
   ticketSearch: string | undefined;
+  /** G7: the Home period a tile put on the list (its dates are in ticketAdvanced). Shown and cleared as one chip. */
+  ticketPeriod: TicketListPeriod | null;
   /** Announcements hidden from the Home banner for this session only — no server state (ANN-1 is read-only). */
   dismissedAnnouncementIds: readonly string[];
   /** Home PERIOD row (G6): which window the DSH-1 counts cover. */
@@ -41,8 +43,13 @@ interface UiState {
   setTicketSearch: (search: string | undefined) => void;
   /** The web's "Clear" (TicketsListPage.tsx:284-295): named filter, search, the five filters and the sort. Not the country. */
   clearTicketFilters: () => void;
-  /** A Home tile, like a web dashboard link: that filter alone, nothing else carried over (TicketsListPage.tsx:89-90). */
-  openTicketList: (filter: TicketNamedFilter) => void;
+  /**
+   * A Home tile, like a web dashboard link: that filter alone, nothing else carried over (TicketsListPage.tsx:89-90),
+   * plus the Home period as the created-date filter when the tile carries it (G7; the web's link sets fromDate/toDate).
+   */
+  openTicketList: (filter: TicketNamedFilter, period?: TicketListPeriod | null) => void;
+  /** The period chip's ✕ (G7): drops the created-date filter the tile set. Nothing else changes. */
+  clearTicketPeriod: () => void;
   dismissAnnouncement: (id: string) => void;
   restoreAnnouncement: (id: string) => void;
   setHomePeriod: (period: DashboardPeriod) => void;
@@ -56,7 +63,8 @@ const CLEARED_TICKET_FILTERS = {
   ticketAdvanced: NO_ADVANCED_FILTERS,
   ticketSearchText: '',
   ticketSearch: undefined,
-} as const satisfies Pick<UiState, 'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch'>;
+  ticketPeriod: null,
+} as const satisfies Pick<UiState, 'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch' | 'ticketPeriod'>;
 
 const INITIAL = {
   ...CLEARED_TICKET_FILTERS,
@@ -67,7 +75,7 @@ const INITIAL = {
 } as const satisfies Pick<
   UiState,
   | 'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch' | 'ticketCountryId' | 'dismissedAnnouncementIds'
-  | 'homePeriod' | 'homeCustomRange'
+  | 'homePeriod' | 'homeCustomRange' | 'ticketPeriod'
 >;
 
 export const useUiStore = create<UiState>()((set) => ({
@@ -88,7 +96,16 @@ export const useUiStore = create<UiState>()((set) => ({
   setTicketSearchText: (ticketSearchText) => set({ ticketSearchText }),
   setTicketSearch: (ticketSearch) => set({ ticketSearch }),
   clearTicketFilters: () => set({ ...CLEARED_TICKET_FILTERS }),
-  openTicketList: (filter) => set({ ...CLEARED_TICKET_FILTERS, ticketFilter: filter }),
+  openTicketList: (filter, period = null) =>
+    set({
+      ...CLEARED_TICKET_FILTERS,
+      ticketFilter: filter,
+      ...(period
+        ? { ticketAdvanced: { ...NO_ADVANCED_FILTERS, fromDate: period.fromDate, toDate: period.toDate }, ticketPeriod: period }
+        : {}),
+    }),
+  clearTicketPeriod: () =>
+    set((s) => ({ ticketAdvanced: { ...s.ticketAdvanced, fromDate: null, toDate: null }, ticketPeriod: null })),
   dismissAnnouncement: (id) =>
     set((s) => (s.dismissedAnnouncementIds.includes(id) ? s : { dismissedAnnouncementIds: [...s.dismissedAnnouncementIds, id] })),
   restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),

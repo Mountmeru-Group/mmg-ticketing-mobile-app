@@ -41,27 +41,26 @@ const targets = (transitions) => transitions.map((t) => t.target);
 describe('drawer and tab bar', () => {
   // G4: "Service Request" (the catalogue) for every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
   // 2026-10-29: Knowledge base and Announcements are ADMIN only (a product decision; tests/rbac/kb-announcements.test.mjs).
-  const ALWAYS = ['tasks', 'catalog', 'settings'];
-  const WITH_APPROVALS = ['approvals', ...ALWAYS];
+  // G7 (Ronit, 2026-11-02): Approvals for every role, always. Before: END_USER and L2_MANAGER only while APR-1 had one.
+  const ROWS = ['approvals', 'tasks', 'catalog', 'settings'];
   const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
 
   forEachPersona(
-    'drawer rows with no pending approvals',
-    { END_USER: ALWAYS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: ALWAYS, ADMIN: ADMIN_ROWS },
-    (p) => drawerItems(p.role, 0),
+    'drawer rows (whatever is pending)',
+    { END_USER: ROWS, AGENT: ROWS, TRIAGE_AGENT: ROWS, L2_MANAGER: ROWS, ADMIN: ADMIN_ROWS },
+    (p) => drawerItems(p.role),
   );
 
-  // 08 S1: END_USER and L2_MANAGER see Approvals only while APR-1 (scoped to them as approver) returns something.
+  // The Home shortcut keeps the old rule (08 S1): a requester's Home gains no shortcut that almost always reads 0.
   forEachPersona(
-    'drawer rows with 2 pending approvals',
-    { END_USER: WITH_APPROVALS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: WITH_APPROVALS, ADMIN: ADMIN_ROWS },
-    (p) => drawerItems(p.role, 2),
-  );
-
-  forEachPersona(
-    'Home "Pending approvals" shortcut follows the drawer rule (0 pending)',
+    'Home "Pending approvals" shortcut (0 pending)',
     { END_USER: false, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: false, ADMIN: true },
     (p) => showApprovalsShortcut(p.role, 0),
+  );
+  forEachPersona(
+    'Home "Pending approvals" shortcut (2 pending)',
+    { END_USER: true, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: true, ADMIN: true },
+    (p) => showApprovalsShortcut(p.role, 2),
   );
 
   const STAFF_TABS = [

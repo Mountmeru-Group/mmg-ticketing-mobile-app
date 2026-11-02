@@ -674,3 +674,28 @@ Order on Home:
   - the chips' wrap;
   - the full-width SLA breached tile;
   - the From → To flow.
+
+## 12. G7 (2026-11-02): the period on the list, Approvals, the push notice
+
+**The period chip on the ticket list.**
+- **When:** a tile that carries the Home period opens M3 with it as the Created filter (§11; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1). The quick-filter row then starts with a **period chip**.
+- **Look:** the active `FilterChip` look (36 dp, `rounded-full`, `bg-primary`, white `text-sm font-medium`). Inside: a 14 dp calendar icon, the period's name ("This month", "Custom"), and a 14 dp ✕. Hit slop 4 dp (S8).
+- **Tap:** clears the period (the Created days) and nothing else.
+- **Order:** it sits before the "from Home" filter chip, which keeps its home icon.
+- **Screen reader:** "Period from Home: This month, Created 03 Oct 2026 – 02 Nov 2026. Clear the period".
+- **When it goes:** it shows only while the Created days are still the tile's. Changing a day in the Filters sheet removes the chip; the days stay as the person's own. The summary line under the row still lists "Created … – …", and Clear all clears everything.
+
+**Approvals on every drawer.** The row is the first drawer row for every role (it was already first for ADMIN and AGENT), with the pending count as its badge. Its empty inbox is the S11 "clear" state: "Nothing waiting for you". No new component.
+
+**The Alerts push notice.**
+- **What changed:** the fixed sentence ("the Service Desk has no push yet") is replaced by the state of push on this phone (`src/utils/push.ts` `pushNotice`).
+- **Look:** the S10 info `Notice` (blue-50, a 16 dp icon, `text-xs`).
+- **Its button:** "Turn on notifications" or "Open settings", an `OutlineButton` in its `compact`, `align="start"` form (44 dp, S5) with an 18 dp icon. It shows only for the "off" and "not asked yet" states.
+- **Tone:** never the warning tone. "Not switched on at the Service Desk yet" is a fact, not a fault, and nothing on the screen is broken by it.
+- **Permission timing:** the system dialog for the permission appears on the first visit to Alerts only, never at launch (Android 13+; Android 12 and older grant it at install).
+
+**A notification in the status bar.**
+- **Icon:** the logo silhouette from `assets/adaptive-icon.png`. Android draws only its alpha channel, and the file is 92 % transparent around the logo.
+- **Tint:** `#D21121`.
+- **Channel:** "Ticket alerts" (`setu_tickets`, high importance).
+- **Device check:** check the icon's size on the next build. The adaptive-icon artwork keeps a safe-zone margin, so the logo may look small; a dedicated 24 dp white-on-transparent asset would fill the space.

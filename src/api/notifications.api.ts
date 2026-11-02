@@ -1,6 +1,6 @@
 // In-app notification endpoints (01 §9). Every route is scoped to the caller.
-// No push (05 B.4) and no working SSE (05 B.3): poll NTF-2 on foreground and at most every 60 s while
-// foregrounded, never in the background (01 §0.4).
+// No working SSE (05 B.3). Push: the app side is built (G7, src/push/); the server side, NTF-5/NTF-6 and the FCM send, is
+// not deployed yet (05 B.4). The app does not poll NTF-2 (useNotifications.ts).
 import type { Notification, Paginated, UnreadCount } from '@/types';
 import { apiClient, type MessageResponse } from './client';
 import { seg, toPositiveInt } from './helpers';
@@ -39,4 +39,26 @@ export async function markNotificationRead(id: string): Promise<MessageResponse>
 export async function markAllNotificationsRead(): Promise<MessageResponse> {
   const res = await apiClient.post<MessageResponse>('/notifications/read-all');
   return res.data;
+}
+
+// ── Push device tokens (G7) — ⚠ NOT YET DEPLOYED ─────────────
+// Specified by Ronit in MOBILE-BACKEND-REQUIREMENTS.md §1.5 (sent to the backend team, 2026-11-02); 01 NTF-5 / NTF-6.
+// Until the backend ships them both answer 404 (Express's HTML "Cannot POST"), which src/push/registration.ts treats as
+// "not deployed yet": silent for the person, logged for us. Android only, so `platform` is always "android".
+
+/** The body of NTF-5 and the platform this app reports. */
+export interface DeviceTokenBody {
+  token: string;
+  platform: 'android';
+}
+
+/** NTF-5 — POST /api/v1/notifications/device-token `{ token, platform }`. Upsert on token, reassigned to the caller. */
+export async function registerDeviceToken(token: string): Promise<void> {
+  const body: DeviceTokenBody = { token, platform: 'android' };
+  await apiClient.post('/notifications/device-token', body);
+}
+
+/** NTF-6 — DELETE /api/v1/notifications/device-token `{ token }` (a JSON body, as the requirements specify). */
+export async function unregisterDeviceToken(token: string): Promise<void> {
+  await apiClient.delete('/notifications/device-token', { data: { token } });
 }

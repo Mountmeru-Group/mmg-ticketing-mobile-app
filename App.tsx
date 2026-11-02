@@ -12,6 +12,7 @@ import { queryClient } from '@/api/queryClient';
 import { ErrorBoundary, HtmlRenderProvider } from '@/components';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { SplashIntro } from '@/navigation/SplashIntro';
+import { PushBridge } from '@/push/PushBridge';
 
 // Offline → queries pause instead of failing (src/api/network.ts). Must run before the first query.
 startConnectivityMonitoring();
@@ -27,6 +28,8 @@ export default function App() {
             <StatusBar barStyle="dark-content" />
             {/* A render crash below shows a recoverable screen, not a white screen or a redbox. */}
             <ErrorBoundary>
+              {/* Push (G7): registration, taps and the channel, driven by events only. Renders nothing. */}
+              <PushBridge />
               <RootNavigator />
               {/* The start-up intro, over the first screen while it mounts; then gone (docs/PERFORMANCE.md §12). */}
               <SplashIntro />

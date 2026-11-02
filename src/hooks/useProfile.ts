@@ -13,6 +13,7 @@ import { assertObject, checkFields } from '@/api/drift';
 import { ApiClientError } from '@/api/errors';
 import { USER_PROFILE_SPEC, USER_PROFILE_UPDATED_SPEC } from '@/api/responseSpecs';
 import { getUser, updateOwnProfile, type UpdateOwnProfileBody } from '@/api/users.api';
+import { unregisterPushForSignOut } from '@/push/registration';
 import { useAuthStore } from '@/store/auth.store';
 import type { UserProfile, UserProfileUpdated } from '@/types';
 import { confirmAction } from '@/utils/dialogs';
@@ -115,8 +116,10 @@ export function useUpdateProfile() {
 const LOGOUT_WAIT_MS = 5_000;
 
 /**
- * Sign out (02 §5.5), always after a confirmation: AUTH-3 (result ignored, waits at most 5 s), then the local wipe —
+ * Sign out (02 §5.5), always after a confirmation: NTF-6 for this phone's push token (G7; result ignored, waits at most
+ * 3 s, silent while the endpoint is not deployed), then AUTH-3 (result ignored, waits at most 5 s), then the local wipe —
  * SecureStore token, the whole query cache and every store (endSession). The app then shows Login.
+ * NTF-6 goes first because it needs the session token that AUTH-3 ends.
  * The 15-day date goes too, so the next sign-in is challenged and starts a new 15 days (02 §5.8).
  */
 export function useSignOut() {
@@ -132,6 +135,7 @@ export function useSignOut() {
     if (!ok) return;
     setSigningOut(true);
     try {
+      await unregisterPushForSignOut(); // never throws; bounded by UNREGISTER_WAIT_MS
       await Promise.race([
         logout().catch(() => undefined),
         new Promise((resolve) => setTimeout(resolve, LOGOUT_WAIT_MS)),

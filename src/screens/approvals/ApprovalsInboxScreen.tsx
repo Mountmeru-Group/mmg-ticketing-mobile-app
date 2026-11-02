@@ -4,7 +4,9 @@
 //   Ticket approvals carry no ticket data (01 §10.1): the first 10 are looked up with TKT-3 (cached, shared with the
 //   ticket screen) and show subject + requester only on a 200; otherwise "Details on open". Never relies on the AGENT
 //   scope gap (05 C.6) — a 403 just leaves the card generic.
-// - Visibility (08 S1): the drawer shows this module to ADMIN/AGENT always, to END_USER/L2 only while they have one.
+// - Visibility (G7): the drawer shows this module to every role, always, and the route is registered for every role
+//   (permissions.ts drawerItems, drawerRoutes). APR-1 never refuses a role: with nothing pending it returns `[]`
+//   (approvals.controller.ts:105-112), which is the "Nothing waiting for you" state below, not an error.
 // - No delegation: the backend has none (A26). Never the unscoped GET /approvals (05 C.16).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from '@react-navigation/native';

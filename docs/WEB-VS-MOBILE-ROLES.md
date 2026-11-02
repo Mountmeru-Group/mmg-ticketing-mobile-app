@@ -1,5 +1,16 @@
 # Web portal vs mobile app: who can do what
 
+**2026-11-02 (G7): no row or figure changed.** Three behaviours changed within existing rows:
+- **Approvals is on every role's drawer, always** (Ronit's decision).
+  - Before, END_USER and L2_MANAGER saw it only while something waited for them.
+  - The row "See my pending approvals" already counted every role on mobile, so its status (➕) and every figure stay.
+  - The web's sidebar still shows it to ADMIN and AGENT only.
+- **A Home tile carries the selected period to the ticket list** as its created-date filter, as the web's dashboard links do. The pending-reason and On hold chips also carry it, unlike the web's links, so the number and the list agree (`05` B.37).
+- **Push notifications: the app side is built, and not counted as a capability.**
+  - The server half does not exist yet (`01` NTF-5/NTF-6, ⚠ NOT YET DEPLOYED), so nobody receives a push today.
+  - When it ships, push becomes a ➕ MOBILE ONLY row for every role. The web has no push.
+- Sources: `docs/G7-PERIOD-APPROVALS-PUSH.md`; evidence and tests: `docs/ROLE-MATRIX.md` §18.
+
 **2026-11-02 (G6): Home's period row and KPI tiles match the web dashboard. Parity is unchanged; the counts moved.**
 - **What changed:**
   - Home has the web's ten period ranges.
@@ -204,7 +215,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
-| See my pending approvals | ADMIN, AGENT | All roles (END_USER, L2_MANAGER: only while something waits for them) | ➕ MOBILE ONLY | On the web the others reach the page only by typing its address. Awaiting Ronit's confirmation. |
+| See my pending approvals | ADMIN, AGENT | All roles, always (G7) | ➕ MOBILE ONLY | On the web the others reach the page only by typing its address (the route has no role guard, `FE:router/index.tsx:141`). Ronit decided in G7 that the drawer shows Approvals to every role, always, not only while something waits. Any active user can be named an approver (`FE:TicketDetailPage.tsx:418-421`, no role filter), and the server answers every role, `[]` when nothing waits. Before G7 END_USER and L2_MANAGER saw it only while something waited for them. |
 | Approve or reject | All roles (the named approver only) | All roles (the named approver only) | ✅ SAME | Web: Approvals page or the ticket. Mobile: the Approvals inbox. |
 | Rejecting requires a reason | All roles | All roles | ✅ SAME | |
 | See everyone's approvals | ADMIN, AGENT | Nobody | 🔒 SAFER | |
@@ -478,7 +489,7 @@ None of them changes who can do what, or what the server stores.
 | 3b | | The browser's bubble, then the field messages → every message at once, plus a line naming the fields | No (same rules, same blocking) | `:246`; `ServiceRequestFormScreen.tsx:86-91` | G4 §9 |
 | 4a | Submit for approval, then approve | Submit: a confirmation; blank comments left out instead of sent as ""; a result card with the status re-read | No | `TicketDetailPage.tsx:442-460`; `SubmitApprovalScreen.tsx:82-98` | G3 §4 |
 | 4b | | Approve on the web's Approvals page: one click, no comment (the ticket's own tab asks for an optional comment) → the inbox's detail screen: optional comment, then a confirmation | No | `ApprovalsPage.tsx:83`, `TicketDetailPage.tsx:1625-1633`; `ApprovalDetailScreen.tsx:54-64` | New (G5) |
-| 4c | | The approver reaches it from the web sidebar (ADMIN, AGENT) or the ticket → from the Approvals inbox, for anyone with a pending approval | No | `AppLayout.tsx:32`; `permissions.ts` `drawerItems` | Section 3 (Approvals); 08 S1 |
+| 4c | | The approver reaches it from the web sidebar (ADMIN, AGENT) or the ticket → from the Approvals inbox, on every role's drawer (G7; before, only while something waited) | No | `AppLayout.tsx:32`; `permissions.ts` `drawerItems` | Section 3 (Approvals); G7 |
 | 5a | Change impact, urgency and category | The web saves on each selection → one explicit Save | No | `TicketDetailPage.tsx:1744, :1761, :1981-2000`; `TicketPropertyEditors.tsx` | G1 §6 |
 | 5b | | Impact **and** urgency changed: the web sends two updates (each with the priority of its moment) → mobile sends one with both | **Side effects only:** the web can write two History lines and send two "priority changed" emails where mobile sends at most one; the stored values are the same | `:304-317`, `BE:tickets.controller.ts:719, :775-784`; `ticket-properties.ts` `classificationChanges` | New (G5): a consequence of G1's explicit Save |
 | 5c | | Category: one update per level (each can re-route) → one update with the deepest level | Fewer re-routing runs; same final category | `:1981-2000`; `TicketPropertyEditors.tsx` | G1 §6 |

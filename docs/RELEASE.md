@@ -101,6 +101,37 @@ Prepared on 2026-10-29 and **not built**: Ronit runs it after review. Use PowerS
 
 For every later upload, raise `android.versionCode` by 1. Play rejects a versionCode that isn't higher than the last one it received.
 
+## 2b. Push notifications (G7, 2026-11-02): what the next build needs
+
+**The next build must be a full EAS build** (`preview` or `production`), because G7 added a native module.
+- `expo-notifications` ~57.0.24 was installed with `npx expo install`, and its config plugin was added to `app.json`:
+  - icon `assets/adaptive-icon.png`;
+  - colour `#D21121`;
+  - default channel `setu_tickets`.
+- An over-the-air JavaScript update cannot add native code. Setu has no OTA channel anyway (no `expo-updates`).
+- A build made before G7 has no push code at all.
+
+**Firebase configuration (Ronit / backend team)**
+1. Someone creates MMG's Firebase project with Cloud Messaging on (MOBILE-BACKEND-REQUIREMENTS.md §1.3). The backend uses the same project's service account to send.
+2. Download its `google-services.json` for the Android app `com.mountmeru.servicedesk`. Put it at the repo root and add `"googleServicesFile": "./google-services.json"` under `expo.android` in `app.json`.
+3. **Decide how it reaches EAS.**
+   - Committed: Google treats this file as configuration, not a secret; its API key is restricted to the app.
+   - Or an EAS file environment variable: EAS does not upload git-ignored files.
+4. **Without it, the build still succeeds, but push stays off, silently.** Firebase gives no token, and the Alerts notice says "This version of Setu can't receive notifications". Nothing else changes.
+
+**Behaviour until the server half ships** (01 NTF-5/NTF-6, ⚠ NOT YET DEPLOYED)
+- After sign-in the app tries to register the phone. NTF-5 answers 404.
+- The Alerts notice says notifications "aren't switched on at the Service Desk yet", and logcat shows `[push] register: 404, NTF-5 not deployed yet`.
+- No banner, no dialog. The app retries on each sign-in and app start, and when Firebase rotates the token: no polling.
+- The permission dialog appears **only on the first visit to Alerts**, and only on Android 13+ (older versions grant it at install).
+- Expo Go never receives push on Android (SDK 53 and later). Test push on an installed APK.
+
+**For the backend team** (from the payload suggested in MOBILE-BACKEND-REQUIREMENTS.md §1.6)
+- `android.notification.icon: "ic_notification"` names a drawable the app does not have. The plugin's drawable is `notification_icon`, and it is also the manifest default that FCM falls back to. Either omit `icon` or send `notification_icon`.
+- `color: "#C4161F"` differs from the brand red `#D21121` in `app.json`. The payload wins per notification, so send `#D21121` or omit it.
+
+**Checks before that build:** `npx tsc --noEmit`, `npm test`, and `npm run verify:release-bundle` in both modes (§6). The bundle check was not run for G7.
+
 ## 3. Signing hash for IT (Entra ID app registration, ask A2)
 
 IT needs the release signing certificate's fingerprint to register the Android app. EAS generated the keystore in §2 step 5 and keeps it.
@@ -412,6 +443,7 @@ Resolution:
 ## 8. Packages waiting for approval
 
 `expo-splash-screen` was approved and installed in Phase C (~57.0.10, via `npx expo install`); its configuration is in §7.
+`expo-notifications` was approved and installed in G7 (~57.0.24, via `npx expo install`) for push; its configuration is in §2b. `expo-device` was not needed: a phone without push support simply gets no token, which the app already handles silently.
 
 | Package | Why | After approval |
 |---|---|---|
