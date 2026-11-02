@@ -98,6 +98,8 @@ export type AppDrawerParamList = {
   Catalog: NavigatorScreenParams<CatalogStackParamList>;
   /** M16 */
   Announcements: undefined;
+  /** M20 Audit log (G8), ADMIN only: registered for ADMIN alone (drawerRoutes). */
+  AuditLog: undefined;
   /** M10 — opened from the drawer's account card and the "Settings" item. */
   Profile: undefined;
 };

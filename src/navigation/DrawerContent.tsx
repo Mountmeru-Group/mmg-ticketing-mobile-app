@@ -9,6 +9,8 @@
 // - Knowledge base, Announcements: ADMIN only (2026-10-29, a product decision; their routes are registered for ADMIN
 //   only too, AppDrawer.tsx).
 // - Service Request (Phase G4): every role, the service catalogue and My Requests (docs/G4-WEB-CATALOGUE.md).
+// - Audit log (G8): ADMIN only, after Announcements below a divider, before Settings. Its route is registered for ADMIN
+//   only (AppDrawer.tsx), and the server answers 403 to anyone else (docs/G8-WEB-AUDIT.md).
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
 // - Layout follows the web sidebar (frontend/src/layouts/AppLayout.tsx), top to bottom:
 //   - a white header band with the logo (44 dp tall, 72 dp wide) and the app name beside it;
@@ -39,17 +41,24 @@ interface DrawerRow {
   icon: keyof typeof Ionicons.glyphMap;
   route?: keyof AppDrawerParamList;
   badge?: number;
+  /** A line above the row, setting it apart from the modules above. */
+  dividerBefore?: boolean;
   onPress: () => void;
 }
 
 /** Label, icon and destination of each drawer row; which rows show is decided by drawerItems() alone. */
-const DRAWER_ROWS: Record<DrawerItem, { label: string; icon: keyof typeof Ionicons.glyphMap; route: keyof AppDrawerParamList }> = {
+const DRAWER_ROWS: Record<
+  DrawerItem,
+  { label: string; icon: keyof typeof Ionicons.glyphMap; route: keyof AppDrawerParamList; dividerBefore?: boolean }
+> = {
   approvals: { label: 'Approvals', icon: 'checkmark-done-outline', route: 'Approvals' },
   tasks: { label: 'Tasks', icon: 'checkbox-outline', route: 'Tasks' },
   knowledge: { label: 'Knowledge base', icon: 'book-outline', route: 'Knowledge' },
   // The web sidebar's label (AppLayout.tsx:30); its phone bottom tab says "Requests" (:266). Phase G4.
   catalog: { label: 'Service Request', icon: 'clipboard-outline', route: 'Catalog' },
   announcements: { label: 'Announcements', icon: 'megaphone-outline', route: 'Announcements' },
+  // G8: an administrator's tool, below a divider so it does not read as one of the modules everyone has.
+  auditLog: { label: 'Audit log', icon: 'document-text-outline', route: 'AuditLog', dividerBefore: true },
   settings: { label: 'Settings', icon: 'settings-outline', route: 'Profile' },
 };
 
@@ -111,7 +120,10 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
       <ScrollView className="flex-1">
         <View className="py-2">
           {rows.map((row) => (
-            <Row key={row.key} row={row} active={row.route === activeRoute} />
+            <View key={row.key}>
+              {row.dividerBefore ? <View className="mx-4 my-2 border-t border-border" /> : null}
+              <Row row={row} active={row.route === activeRoute} />
+            </View>
           ))}
         </View>
       </ScrollView>

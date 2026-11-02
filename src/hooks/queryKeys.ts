@@ -31,11 +31,14 @@
 //   ['service-catalog', 'item', id]                   SCR-3   one item and its form (G4)
 //   ['service-catalog', 'requests']                   SCR-4   infinite, 50 per page; My Requests keeps own rows (G4)
 //   ['service-catalog', 'request', id]                SCR-6   one request (G4)
+//   ['audit-log', 'list', query]                      AUD-1   infinite, 50 per page, capped at 500 (G8; ADMIN only)
+//   ['audit-log', 'ticket', number]                   TKT-1   ticket number → id for the audit log's ticket filter
 //
 // Keys nest by prefix: invalidating ['tickets', 'detail', id] also hits that ticket's comments, attachments
 // and history. Writes invalidate the narrowest key that changed; the whole cache is cleared ONLY on sign-out (02 §5.5).
 // ['tickets', 'list'] holds infinite data only (cache.ts maps its `pages`): one-page lists live under other keys.
 import type { TicketListQuery } from '@/types';
+import type { AuditLogKeyParams } from '@/utils/audit-log';
 
 export type TicketListKeyParams = Omit<TicketListQuery, 'page' | 'limit'>;
 
@@ -102,5 +105,11 @@ export const queryKeys = {
     item: (id: string) => ['service-catalog', 'item', id] as const,
     requests: () => ['service-catalog', 'requests'] as const,
     request: (id: string) => ['service-catalog', 'request', id] as const,
+  },
+
+  auditLog: {
+    all: () => ['audit-log'] as const,
+    list: (params: AuditLogKeyParams) => ['audit-log', 'list', params] as const,
+    ticket: (ticketNumber: number) => ['audit-log', 'ticket', ticketNumber] as const,
   },
 } as const;

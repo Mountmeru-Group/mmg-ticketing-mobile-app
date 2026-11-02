@@ -123,7 +123,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 **S10 Callouts.** Notice, InlineError, LookupError and the Login failure box are `rounded-lg p-3`. Errors use an 18 dp icon with `text-sm`; information uses a 16 dp icon with `text-xs`.
 
 **S11 States.**
-- Loading: a skeleton that mirrors the layout, with a soft brand-yellow band sweeping across it (yellow since 2026-10-30, §10.3; white in Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
+- Loading: a skeleton that mirrors the layout, with a soft brand-yellow band sweeping across it (yellow since 2026-10-30, §10.3; white in Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `audit` (G8, §13), `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
 - Empty: a 40 dp icon, a title, what would appear here, and an action where one helps. Examples: "Raise a ticket", "Show all tickets", "Clear search", "Show all articles", "Show all approvals", "Show all tasks".
   - An empty list screen shows an illustration instead of the icon (Phase A1, `EmptyState illustration`), 128 × 96 dp, flat, in brand tokens only (`assets/illustrations/`):
     - `empty` (an empty tray under the Meru drop): nothing here yet, or nothing matches. Tickets, tasks, knowledge base, announcements, the catalogue and My Requests.
@@ -138,7 +138,8 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 - Header left button: ☰ only on the three tab roots (Home, Tickets, Alerts). Every other screen, including the first screen of each drawer module, has the back arrow (44 dp button, 24 dp icon), which does exactly what Android back does. Sheets have ✕.
 - Drawer, top to bottom, as in the web sidebar:
   - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
-  - Nav rows (Approvals when shown, Tasks, Knowledge base, Service Request, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), so other roles have four rows at most.
+  - Nav rows (Approvals, Tasks, Knowledge base, Service Request, Announcements, Audit log, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), and since G8 the Audit log too (§13), so other roles have four rows. Approvals is on every drawer since G7 (§12).
+  - **Audit log (G8)** sits below a divider (`border-border`, 16 dp side margins, 8 dp above and below), after Announcements and before Settings: an administrator's tool, set apart from the modules everyone has.
   - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
     - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
     - a gray-100 line;
@@ -360,14 +361,14 @@ API call, query or permission changed. **Not run on a device:** there was no bui
   browser does. For example, back to a MainTabs visit that a drawer-screen tab press opened on Tickets lands on
   Tickets, even if the user had switched tabs after that press.
 
-### 7.3 Every route checked (25)
+### 7.3 Every route checked (26; AuditLog added in G8)
 
 | Host of the bar | Routes | Header left |
 |---|---|---|
 | Tab navigator (`tabBar`) | HomeTab, AlertsTab, TicketList | ☰ |
 | Tab navigator (`tabBar`) | TicketDetail, CreateTicket, TaskDetail, TicketLink | back |
 | Tab navigator (`tabBar`) | ReplyComposer, StatusClosure, AssignPicker, SubmitApproval, TaskEditor, TicketFilters (sheets) | ✕ |
-| Drawer (`screenLayout`) | ApprovalsInbox, TaskList, KnowledgeBase, ServiceCatalog, Announcements, Profile | back (was ☰) |
+| Drawer (`screenLayout`) | ApprovalsInbox, TaskList, KnowledgeBase, ServiceCatalog, Announcements, AuditLog (G8), Profile | back (was ☰) |
 | Drawer (`screenLayout`) | ApprovalDetail, TaskDetail, KbArticle, ServiceRequestForm, ServiceRequestDetail | back |
 | Drawer (`screenLayout`) | TaskEditor (sheet) | ✕ |
 
@@ -699,3 +700,76 @@ Order on Home:
 - **Tint:** `#D21121`.
 - **Channel:** "Ticket alerts" (`setu_tickets`, high importance).
 - **Device check:** check the icon's size on the next build. The adaptive-icon artwork keeps a safe-zone margin, so the logo may look small; a dedicated 24 dp white-on-transparent asset would fill the space.
+
+## 13. The audit log, M20 (G8, 2026-11-02; ADMIN only)
+
+**Why cards.** The web page is a six-column table (as Ronit describes it). At 390 dp that leaves about 60 dp per column, so the app stacks each entry into a card and groups the cards by day. The web page itself is not in the analysed clone (`docs/G8-WEB-AUDIT.md` §1), so there is no web file to copy its look from.
+
+**Frame (S1).** The standard screen frame:
+- ScreenHeader "Audit log" with the back arrow (a drawer screen, §7), then OfflineBanner;
+- a white filter bar (`px-4 py-2`), then QueryBanner;
+- the list, 12 dp below the bar, with insets + 24 at the bottom (no FAB).
+
+**The filter bar, top to bottom:**
+- **SearchField** (44 dp, S5): "Ticket number, e.g. 1234". It takes a number, "#1234" or a ticket link. On the keyboard's search key it looks the ticket up.
+- **The line under it**, while or after looking up (S10's info size: a 16 dp icon, `text-xs`):
+  - a brand-red spinner and "Finding ticket #1234…";
+  - "No ticket #1234." or "Couldn't look up ticket #1234. Try again." in red-700, read out as an alert;
+  - grey help when the text is not a number.
+- **The chip row** (S5 FilterChip, 36 dp + hit slop):
+  - when a ticket is set, a filled brand-red chip first (a ticket icon, "#1234" and ✕), the period chip's look from §12; tapping it clears the ticket;
+  - then "All types" (or the chosen type), which opens the Entity type sheet;
+  - then "Person" (or the person's name), which opens the people picker, with "Anyone" to clear.
+  - Active chips are brand red (S4).
+- **The count line:** "1,234 entries" (`text-xs gray-500`), and "Clear all" as a text link (S5) when any filter is on.
+
+**A day heading** sits above each day's cards. It uses the section caption (S3: `text-xs font-semibold uppercase tracking-wide text-gray-500`) and reads "Today", "Yesterday" or "Mon 02 Nov 2026", on the phone's calendar.
+
+**The card** (S2: `rounded-xl border-border bg-white p-4`, `mx-4 mb-3`):
+1. **The action pill**, then the entity ("Comment", `text-xs gray-500`), then the time on the right ("14:05", `text-xs gray-500`).
+2. **The ticket**, a 44 dp row (S8):
+   - "#1234" as a link (`text-sm font-semibold text-blue-700`, S4 links), then the title (`text-sm gray-700`, one line), then an 18 dp chevron;
+   - it opens the ticket through the deep-link resolver;
+   - no ticket: "No ticket linked" (`text-sm gray-500`).
+3. **The person:** the name (`text-sm font-semibold gray-900`; "System" for the auto-close job), and the email under it (`text-xs gray-500`). Never the IP address.
+4. **The details box**, tinted (`rounded-lg border-gray-100 bg-gray-50 p-3`, 12 dp below):
+   - readable lines in `text-sm gray-700`, 4 dp apart;
+   - anything shown raw in `font-mono text-xs gray-700`, selectable;
+   - no box when nothing was recorded.
+
+**The action pill.** S9's pill (`rounded-full px-2.5 py-0.5`, `text-xs font-medium`) with a 12 dp icon before the label. Every pill has a 1 dp border in its own fill colour, so all are the same height; the white one's border is gray-300.
+
+**Colours are told apart by lightness, not hue alone.**
+- The five actions the server writes most each have their own lightness band, at least 15 CIELAB L* from every other.
+- The bands are pinned by `tests/audit/audit-details.test.mjs`. Values from `src/theme/colors.ts` `auditAction`; contrast is WCAG 2.x on the exact values.
+
+| Action | Label | Icon | Fill (L*) | Text | Contrast |
+|---|---|---|---|---|---|
+| UPDATED | Updated | create | blue-900 (27) | white | 10.4:1 |
+| CREATED | Created | add-circle | green-700 (47) | white | 5.0:1 |
+| ASSIGNED | Assigned | person-add | orange-500 (64) | gray-900 | 6.3:1 |
+| STATUS_CHANGED | Status Changed | swap-horizontal | sky-300 (81) | blue-900 | 6.2:1 |
+| COMMENTED | Commented | chatbubble | white (100) + gray-300 outline | gray-700 | 10.3:1 |
+| ATTACHMENT_ADDED | Attachment Added | attach | purple-100 (93) | purple-700 | 5.9:1 |
+| DELETED | Deleted | trash | zinc-700 (27) | white | 10.4:1 |
+| SLA_BREACHED | SLA Breached | alarm | red-700 (40) | white | 6.5:1 |
+| ESCALATED | Escalated | trending-up | amber-500 (72) | gray-900 | 8.3:1 |
+| anything else | the value in words | ellipse | badgeFallback gray-100 | gray-600 | — |
+
+- The last four share a band with one of the first five and differ in hue.
+- DELETED, SLA_BREACHED and ESCALATED are never written today (G8 §7).
+- ATTACHMENT_ADDED shares the pale end with STATUS_CHANGED and COMMENTED. Its icon and label tell it apart.
+- **WCAG 1.4.1:** every pill has its label and its icon, so no meaning rests on colour.
+- **Not the web's colours.** The clone has no audit page, so the deployed page's colours could not be read (G8 §7). If Ronit wants them matched, they replace this table; the lightness test still applies.
+
+**States (S11):**
+- **Loading:** the `audit` skeleton, a day heading bar over cards with a pill, ticket, person and details box.
+- **Empty with filters:** "No entries match these filters", with "Clear all filters".
+- **Empty without filters:** "No audit entries yet". Both use the `empty` illustration.
+- **Error:** ErrorState with Retry.
+- **Offline:** OfflineState, then the footer's "More entries load when you reconnect".
+- **Footer:** "Loading more…", "Couldn't load more entries. Tap to retry", and at the 500 cap "Showing the first 500 of N — search or filter to narrow", the ticket list's words.
+
+**Sheets.**
+- **Entity type** is OptionSheet: All types, Ticket, Comment, Attachment. Each has a one-line description; Ticket's says automatic closes are not included (`05` B.38).
+- **Person** is PersonPickerSheet, searching every role.

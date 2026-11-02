@@ -6,6 +6,7 @@
 - Endpoints per page: from each page's API calls. Endpoint IDs refer to `01-API-CONTRACT.md`.
 - **SDP parity (2026-10-14):** the MVP was revised to follow the ManageEngine ServiceDesk Plus Android structure wherever the backend allows. Feature verdicts, the navigation design and the list-view spec are in `08-SDP-PARITY.md`. Every change to this file is listed in §3.
 - **Phase G4 (2026-10-22):** the service catalogue (P2, P3) is built and is now MVP: M17–M19. The web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`.
+- **Phase G8 (2026-11-02):** the audit log, ADMIN only: M20, AUD-1. The web page `/audit-log` is deployed but **not in the analysed clone**; the endpoint and its behaviour, with sources: `docs/G8-WEB-AUDIT.md`.
 
 **Key facts about the web UI**
 - **No web route has a role guard.** Roles only hide sidebar items, so any logged-in user can open any URL. The backend is the only enforcement, and it has gaps (`05` §C).
@@ -36,6 +37,7 @@
 | `/service-catalog/new/:itemId` · `ServiceRequestFormPage.tsx` | Dynamic request form | ALL | **M18 Service request form** | **MVP** (G4; was Phase 2 P3) | SCR-3, SCR-5. *The web never calls SCR-6* |
 | `/approvals` · `pages/approvals/ApprovalsPage.tsx` | My pending approvals; approve/reject | nav: ADMIN, AGENT. Server: any approver | **M12 Approvals inbox**, **M13 Approval detail** (drawer; every role, always, since G7; before, END_USER/L2 only while they had pending approvals, `08` S1) | **MVP** (was Phase 2 P4) | APR-1, APR-2, APR-3, TKT-3/TKT-7/ATT-1 best-effort (ticket approvals carry no ticket data; `08` 1.49) |
 | `/announcements` · `pages/announcements/AnnouncementsPage.tsx` | Read; ADMIN manages | ADMIN, AGENT, L2 | **M16 Announcements** (drawer) + pinned banner on M2 Home | **MVP** (was Phase 2 P5) | ANN-1 |
+| `/audit-log` · **not in the clone** (deployed only; Ronit, G8) | Who did what, when: action, ticket, person, details; filters Action, Entity type, From, To, Ticket # (as Ronit describes the deployed page) | ADMIN (the server's AUD-1 guard; the page's own visibility is unknown) | **M20 Audit log** (drawer, ADMIN only) | **Built in G8** (P2) | AUD-1, TKT-1 (ticket number → id), USR-3 (person filter) |
 | `/reports`, `/reports/scheduled`, `/reports/query-builder` | 10 report tabs, ~20 charts, exports, scheduled reports, ad-hoc queries | ADMIN, AGENT, L2 (query builder: URL only) | — | **Skip** | *`/reports/*`, `/query-builder/*`* |
 | `/problems` · `pages/problems/ProblemsPage.tsx` | Problem management | ADMIN, AGENT | — | **Skip** | *`/problems/*`* |
 | `/changes` · `pages/changes/ChangesPage.tsx` | Change management, CAB flow | ADMIN, AGENT | — (approve via P4 later) | **Skip** | *`/changes/*`* |
@@ -63,7 +65,7 @@
 
 ## 2. Proposed mobile screens
 
-### 2.1 MVP: 19 screens (16, plus the service catalogue's three since G4)
+### 2.1 MVP: 20 screens (16, plus the service catalogue's three since G4, plus the audit log since G8)
 
 **Navigation** (full spec: `08-SDP-PARITY.md` §3)
 - A **side drawer** ("Menu", as in SDP), opened by ☰ top-left on every root screen or by an edge-swipe, wraps **three bottom tabs: Home · Tickets · Alerts**.
@@ -71,9 +73,10 @@
   - The Alerts tab shows the unread badge.
 - **Drawer header:** avatar, name, role, country chip. Tap → M10.
 - **Drawer items by role**
-  - **Approvals** (badge): ADMIN and AGENT always; END_USER and L2 only while APR-1 returns ≥ 1 (`08` S1).
-  - **Knowledge base** and **Announcements**: all roles.
+  - **Approvals** (badge): every role, always (G7). Before G7: ADMIN and AGENT always; END_USER and L2 only while APR-1 returned ≥ 1 (`08` S1).
+  - **Knowledge base** and **Announcements**: ADMIN only since 2026-10-29 (`docs/ROLE-MATRIX.md` §16); all roles before.
   - **Service Request** (the service catalogue, M17; G4): all roles, after Knowledge base, as in the web sidebar.
+  - **Audit log** (M20; G8): ADMIN only, after Announcements below a divider, before Settings. The route is registered for ADMIN only.
   - **Settings** and **Sign out**: all roles.
   - Footer: app version + environment.
   - Later (hidden until their asks ship): My tasks (A20), Assets (P18). The Service catalog (P2) is built (G4).
@@ -102,6 +105,7 @@
 | **M17** | **Service catalogue + My Requests** (G4; drawer "Service Request") | all | The web's two views. **Catalog:** categories with their item counts, a category's services ("Requires approval" pill), search over every service's name and description, on the device; Android back leaves a category first. **My Requests:** as the web lists them (G5): **every request for ADMIN, AGENT and L2_MANAGER, the person's own for END_USER** (SR number, service, status, date; no requester column), newest first, pages of 50 read as the list scrolls. Only one's own rows open M19 | SCR-1, SCR-2, SCR-4 | `docs/G4-WEB-CATALOGUE.md` §2, §6; `01` SCR-4 (`limit` ≤ 50); `ROLE-MATRIX.md` §14.2 |
 | **M18** | **Service request form** (G4) | all | The item's custom fields in "Employee Details", **all seven types the web renders** (text, long text, date, phone, e-mail, number, drop-down; anything else as text); the web's checks; notes in a collapsed "Resolution"; for staff Impact, Urgency and the auto Priority (the web form's map). "Add Request" sends at once (no confirmation), shows the web's toast and returns to M17's Catalog view. Not shown: the web controls the server discards and the attachment box | SCR-3, SCR-5 | `05` §A.17, §B.24; `docs/G4-WEB-CATALOGUE.md` §3–§5 |
 | **M19** | **Request detail** (G4, mobile only) | all (own requests) | SR number, service, status, priority, dates, technician and group when set, the answers (labelled from the item's form), notes, approvals. Read-only: nothing to change or cancel, as on the web | SCR-6, SCR-3 | `docs/G4-WEB-CATALOGUE.md` §7 |
+| **M20** | **Audit log** (G8; drawer "Audit log") | ADMIN only (row and route; the server 403s everyone else) | Stacked cards grouped under a heading per day: the action as a coloured pill, entity and time, the ticket number as a link (deep-link resolver → M4), the person's name and email, the details in a tinted box, made readable where the stored JSON allows and raw otherwise (never the IP address). Filters, all server-side: Entity type, Ticket (a typed number, resolved to its id with TKT-1), Person (USR-3). No action or date filter: AUD-1 has none. Infinite scroll, 50 per page, capped at 500 with "search or filter to narrow" | AUD-1, TKT-1, USR-3 | `docs/G8-WEB-AUDIT.md`; `05` B.38 |
 
 **Shared components (not screens)**
 - Navigation drawer (§2.1 Navigation).
@@ -116,6 +120,7 @@
 **MVP endpoint coverage**
 - **44 endpoints:** the 33 from `01` Appendix B, plus KB-1..KB-5, APR-1..APR-3, ANN-1, TSK-2 and TSK-4.
 - G4 adds SCR-1..SCR-6 (M17–M19), which makes **50**. (G1–G3 also built LKP-6, LKP-7, ATT-5 and APR-4; see M4 and M5.)
+- G8 adds AUD-1 (M20), which makes **51**.
 - Plus the pending auth endpoint (A1 or A2).
 - ⚠ `01` Appendix B still labels these 11 as P2 until Ronit approves the label update (`08` §9 R7-1).
 
@@ -135,9 +140,10 @@
 | Edit category / impact / urgency | ❌ | ✅ | impact/urgency only | ✅ |
 | Notes section (read/write private notes) | ❌ | ✅ | ❌ | ✅ |
 | Tasks: toggle / add / edit / delete | ❌ (read-only, D4) | ✅ | ✅ | ✅ |
-| Approvals inbox and approve/reject | only while they have pending approvals (`08` S1) | ✅ | only while they have pending approvals | ✅ |
-| Knowledge base (published, public) | ✅ | ✅ | ✅ | ✅ |
-| Announcements | ✅ (`08` S1) | ✅ | ✅ | ✅ |
+| Approvals inbox and approve/reject | ✅ (G7; before, only while they had pending approvals, `08` S1) | ✅ | ✅ (G7; as END_USER before) | ✅ |
+| Knowledge base (published, public) | ❌ (ADMIN only since 2026-10-29) | ❌ | ❌ | ✅ |
+| Announcements | ❌ (ADMIN only since 2026-10-29) | ❌ | ❌ | ✅ |
+| Audit log (G8) | ❌ | ❌ | ❌ | ✅ |
 | Notifications | ✅ | ✅ | ✅ | ✅ |
 | Theme (System / Light / Dark) | ✅ | ✅ | ✅ | ✅ |
 | Service catalogue: browse, request a service, My Requests (own), request detail (G4) | ✅ | ✅ | ✅ | ✅ |
@@ -233,3 +239,10 @@ P-IDs are stable. Items moved into the MVP keep their ID and are marked as moved
 4. §2.1 retitled "MVP: 19 screens". The drawer gains **Service Request** (all roles); "Service catalog (P2)" leaves the "Later" list.
 5. §2.1 rows **M17, M18 and M19** added. Endpoint coverage: SCR-1..SCR-6, 50 in all. Role table: two catalogue rows.
 6. §2.2: P2 and P3 marked moved to the MVP (IDs kept). P2's drawer label is "Service Request" (the web sidebar's), not "Request a service".
+
+### 2026-11-02: Phase G8, the audit log (source: `docs/G8-WEB-AUDIT.md`)
+1. Header: a Phase G8 line.
+2. §1: a `/audit-log` row. The page is deployed but not in the analysed clone; it maps to M20, built in G8 (AUD-1, with TKT-1 and USR-3 for the ticket and person filters).
+3. §2.1 retitled "MVP: 20 screens". The drawer gains **Audit log** (ADMIN only, below a divider, before Settings).
+4. §2.1 row **M20** added. Endpoint coverage: AUD-1, 51 in all. Role table: an Audit log row (ADMIN only).
+5. Brought up to date in passing, in the drawer list and the role table: Approvals for every role (G7); Knowledge base and Announcements ADMIN only (2026-10-29). These lines still said what they said before those changes; `docs/ROLE-MATRIX.md` §16 and §18 already had the current rules.

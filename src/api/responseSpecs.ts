@@ -117,6 +117,16 @@ export const AUDIT_ITEM_SPEC: readonly FieldSpec[] = [
   { path: 'actor', kinds: OBJ_NULL },
 ];
 
+/** `AuditLogEntry` from AUD-1 (G8). `oldValues`/`newValues` are any JSON (03 §C): not checked, never trusted. */
+export const AUDIT_LOG_ROW_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'action', kinds: S, oneOf: AUDIT_ACTIONS },
+  { path: 'entityType', kinds: S },
+  { path: 'createdAt', kinds: S },
+  { path: 'actor', kinds: OBJ_NULL },
+  { path: 'ticket', kinds: OBJ_NULL },
+];
+
 /** CMT-2 201: the created comment. 01 CMT-2: `attachments` are NOT included (so not checked). */
 export const COMMENT_CREATED_SPEC: readonly FieldSpec[] = COMMENT_SPEC.filter((s) => s.path !== 'attachments');
 

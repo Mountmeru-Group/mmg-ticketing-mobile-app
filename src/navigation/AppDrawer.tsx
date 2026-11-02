@@ -2,13 +2,14 @@
 // The bottom bar (AppTabBar) shows on every screen: MainTabs draws it as its tab bar, and screenLayout puts it under each
 // other drawer screen, in the same place.
 // Which routes are registered is drawerRoutes() (utils/permissions.ts, pinned per role by tests/rbac); this file only
-// supplies screens. Knowledge and Announcements are registered for ADMIN only, so for every other role they do not
-// exist: nothing can navigate to them, not merely no drawer row (2026-10-29).
+// supplies screens. Knowledge, Announcements and the Audit log (G8) are registered for ADMIN only, so for every other
+// role they do not exist: nothing can navigate to them, not merely no drawer row (2026-10-29; G8 2026-11-02).
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import type { ComponentType, ReactElement } from 'react';
 import { View } from 'react-native';
 
+import { AuditLogScreen } from '@/screens/audit/AuditLogScreen';
 import { AnnouncementsScreen } from '@/screens/dashboard/AnnouncementsScreen';
 import { ProfileScreen } from '@/screens/profile/ProfileScreen';
 import { useAuthStore } from '@/store/auth.store';
@@ -28,6 +29,7 @@ const DRAWER_SCREENS: Record<DrawerRoute, ComponentType<any>> = {
   Knowledge: KnowledgeStack,
   Catalog: CatalogStack,
   Announcements: AnnouncementsScreen,
+  AuditLog: AuditLogScreen,
   Profile: ProfileScreen,
 };
 

@@ -42,8 +42,9 @@ describe('drawer and tab bar', () => {
   // G4: "Service Request" (the catalogue) for every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
   // 2026-10-29: Knowledge base and Announcements are ADMIN only (a product decision; tests/rbac/kb-announcements.test.mjs).
   // G7 (Ronit, 2026-11-02): Approvals for every role, always. Before: END_USER and L2_MANAGER only while APR-1 had one.
+  // G8: the Audit log, ADMIN only, after Announcements (tests/rbac/audit-log.test.mjs).
   const ROWS = ['approvals', 'tasks', 'catalog', 'settings'];
-  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
+  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'settings'];
 
   forEachPersona(
     'drawer rows (whatever is pending)',
