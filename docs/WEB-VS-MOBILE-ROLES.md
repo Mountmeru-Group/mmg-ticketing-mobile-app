@@ -1,5 +1,21 @@
 # Web portal vs mobile app: who can do what
 
+**2026-11-02 (G6): Home's period row and KPI tiles match the web dashboard. Parity is unchanged; the counts moved.**
+- **What changed:**
+  - Home has the web's ten period ranges.
+  - ADMIN and AGENT get the web's five KPI tiles (Total, Open, In progress, Resolved, SLA breached).
+  - Beneath them sit the web's status chips (Closed, the pending reasons, On hold).
+  - Active and Unassigned moved from the tiles into that chip row; neither was dropped.
+- **Rows** (section 3, Dashboard):
+  - "Closed, on hold and pending-reason counts" moved from ⊘ to ✅ (ADMIN, AGENT).
+  - "Choose the dashboard period" is new, ✅.
+  - "Active count" is new, ➕. It was counted inside the staff-counts row before, although the web never shows it.
+- **The figures** (section 2):
+  - Parity is unchanged: END_USER 94 %, AGENT 95 %, triage AGENT 95 %, L2_MANAGER 93 %, ADMIN 100 %.
+  - Counting the exclusions as misses, the range rises from 63–73 % to 64–75 %.
+  - 114 rows. Recounted by script, which first reproduced every published figure on the unchanged table.
+- Web behaviour with sources: `docs/G6-WEB-DASHBOARD.md`. Evidence and tests: `docs/ROLE-MATRIX.md` §17.
+
 **2026-10-29: Knowledge base and Announcements are ADMIN only on mobile (Ronit's decision). Parity drops below 100 % for every role but ADMIN.**
 - **What changed:** END_USER, AGENT (plain and triage) and L2_MANAGER no longer have the Knowledge base (read, search, "Was this helpful?") or announcements (the screen and the Home banner). The rows are hidden **and** the screens are unreachable: the menu does not register them for those roles.
 - **This is a deliberate divergence, and a new kind.** On the web both work, for every role that has them. So this is not 🔒 SAFER, where mobile hides something that fails or leaks on the web. It is not ⊘ OUT OF SCOPE either, which this document reserves for desk work that does not fit a phone. It is a product decision to simplify the mobile app, with its own status, **✂ SIMPLIFIED** (section 1), and it **counts against parity**.
@@ -29,21 +45,27 @@ This document compares, one capability per row, what the **web portal** lets eac
 
 | Role | Capabilities on web | Capabilities on mobile | % parity | Genuine gaps | Left out by decision (✂) |
 |---|---|---|---|---|---|
-| END_USER | 46 | 39 | **94%** (29 of 31) | none | 2: read and search the Knowledge base; "Was this helpful?" |
-| AGENT | 80 | 75 | **95%** (56 of 59) | none | 3: the two above; read announcements |
-| triage AGENT | 79 | 76 | **95%** (57 of 60) | none | 3: as AGENT |
-| L2_MANAGER | 59 | 54 | **93%** (39 of 42) | none | 3: as AGENT |
-| ADMIN | 82 | 80 | 100% (60 of 60) | none | none |
+| END_USER | 47 | 40 | **94%** (30 of 32) | none | 2: read and search the Knowledge base; "Was this helpful?" |
+| AGENT | 81 | 78 | **95%** (58 of 61) | none | 3: the two above; read announcements |
+| triage AGENT | 80 | 79 | **95%** (59 of 62) | none | 3: as AGENT |
+| L2_MANAGER | 58 | 54 | **93%** (39 of 42) | none | 3: as AGENT |
+| ADMIN | 83 | 83 | 100% (62 of 62) | none | none |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
 - **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips for that role as ⊘ OUT OF SCOPE or 🔒 SAFER.
   - **✂ SIMPLIFIED rows stay in: they are misses on purpose, and the figure shows them.**
   - What remains below 100 % is exactly the ✂ rows: no role has a ❌ gap.
-  - If the ⊘ and 🔒 exclusions are counted as misses too, the roles are at 63–73% (END_USER 63%, L2_MANAGER 66%, AGENT 70%, triage AGENT 72%, ADMIN 73%).
+  - If the ⊘ and 🔒 exclusions are counted as misses too, the roles are at 64–75% (END_USER 64%, L2_MANAGER 67%, AGENT 72%, triage AGENT 74%, ADMIN 75%).
 - **Why parity dropped (2026-10-29):** Ronit decided that only ADMIN keeps the Knowledge base and announcements on mobile, to simplify the app (section 5a).
   - Each role lost exactly the rows in the last column. END_USER also lost two ➕ rows, announcements and the Home banner, which were never on its web side, so they do not change its parity.
   - ADMIN is unchanged.
 - **Is anything still ❌ NOT BUILT? No.** G5 built the last row, "See the priority a new ticket will get, before saving" (gap 11). Every web capability is now on mobile; left out on purpose with its reason in section 5 or 6; or, since 2026-10-29, ✂ left out by decision (section 5a).
+- **Before G6** (2026-10-29 to 2026-11-02): END_USER 46 on web and 39 on mobile, 94% (29 of 31); AGENT 80 and 75, 95% (56 of 59); triage AGENT 79 and 76, 95% (57 of 60); L2_MANAGER 59 and 54, 93% (39 of 42); ADMIN 82 and 80, 100% (60 of 60). With the exclusions counted as misses, 63–73%.
+  - G6 added two rows and moved one, so parity is unchanged and only the counts and the strict range moved:
+    - "Choose the dashboard period", ✅ for END_USER, AGENT and ADMIN;
+    - "Active count", ➕ for ADMIN and AGENT;
+    - "Closed, on hold and pending-reason counts", ⊘ → ✅ for ADMIN and AGENT.
+  - L2_MANAGER's web count drops by one: its dashboard numbers are counted once, in "Counts for L2_MANAGER", as the staff-counts row already did.
 - **Before 2026-10-29** (after G5): END_USER 43 on mobile, AGENT 79, triage AGENT 80, L2_MANAGER 58, ADMIN 80, every role at 100% with no gap. With the exclusions counted as misses, 67–76%.
 - **Before G5** (after G4, 2026-10-22): END_USER 43 on mobile, 100%, no gap; AGENT 77, 98%, 1 gap; triage AGENT 78, 98%, 1; L2_MANAGER 57, 100%, none; ADMIN 78, 98%, 1. With the exclusions counted as misses, 67–73%. G5 moved two rows to ✅ SAME: the create form's priority preview (❌ → ✅, ADMIN and AGENT) and everyone's requests under My Requests (🔒 → ✅, ADMIN, AGENT and L2_MANAGER).
 - **Before G4** (after G3, 2026-10-22): END_USER 39 on mobile, 97%, 1 gap; AGENT 72, 96%, 2; triage AGENT 73, 96%, 2; L2_MANAGER 52, 97%, 1; ADMIN 73, 96%, 2. With the exclusions counted as misses, 64–72%. G4 replaced the one catalogue row (❌) with seven: four ✅ SAME, one ➕ MOBILE ONLY (a request's detail), one 🔒 SAFER (everyone's requests under My Requests) and one ⊘ OUT OF SCOPE (creating templates).
@@ -51,14 +73,15 @@ This document compares, one capability per row, what the **web portal** lets eac
 - **Before G2** (after G1, 2026-10-22): END_USER 37 on mobile, 90%, 3 gaps; AGENT 67, 86%, 8; triage AGENT 68, 88%, 7; L2_MANAGER 49, 89%, 4; ADMIN 68, 88%, 7. With the exclusions counted as misses, 59–65%. G2 moved the two filter rows to ✅ SAME, and the plain AGENT's country row to ⊘ OUT OF SCOPE because Ronit decided it stays locked.
 - **Before G1** (2026-10-20): AGENT 64 on mobile, 80%, 11 gaps; triage AGENT 64, 80%, 11; L2_MANAGER 47, 84%, 6; ADMIN 64, 80%, 11; END_USER unchanged. With the exclusions counted as misses, 58–60%.
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
-- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed. For 2026-10-29 it was rebuilt again, with ✂ SIMPLIFIED kept in the denominator. It was first run on the unchanged table, where it reproduced every published figure: 112 rows; 50, 22, 0, 23, 17; each role's counts; 100%; and 67–76%. Only then were the four rows changed.
+- The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed. For 2026-10-29 it was rebuilt again, with ✂ SIMPLIFIED kept in the denominator. It was first run on the unchanged table, where it reproduced every published figure: 112 rows; 50, 22, 0, 23, 17; each role's counts; 100%; and 67–76%. Only then were the four rows changed. For G6 it was rebuilt again and first run on the unchanged table. It reproduced every published figure there: 112 rows; 48, 21, 0, 23, 17, 3; each role's counts and parity; and 63–73%. Only then were the three dashboard rows changed.
 
-## 3. Main table: 112 capabilities
+## 3. Main table: 114 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | ✂ SIMPLIFIED | Total |
 |---|---|---|---|---|---|---|
-| 48 | 21 | 0 | 23 | 17 | 3 | **112** |
+| 50 | 22 | 0 | 22 | 17 | 3 | **114** |
 
+Before G6 (2026-11-02): 48 SAME, 21 MOBILE ONLY, 0 NOT BUILT, 23 OUT OF SCOPE, 17 SAFER, 3 SIMPLIFIED, 112 rows. G6 added "Choose the dashboard period" (✅) and "Active count" (➕), and moved "Closed, on hold and pending-reason counts" from ⊘ to ✅.
 Before 2026-10-29: 50 SAME, 22 MOBILE ONLY, 0 NOT BUILT, 23 OUT OF SCOPE, 17 SAFER. Two Knowledge Base rows moved from ✅ to ✂ (read and search; "Was this helpful?"). "Read announcements" moved from ➕ to ✂. The Home banner stays ➕, for ADMIN only.
 Before G5: 48 SAME, 22 MOBILE ONLY, 1 NOT BUILT, 23 OUT OF SCOPE, 18 SAFER. G5 moved the create form's priority preview from ❌ to ✅ and everyone's requests under My Requests from 🔒 to ✅.
 Before G4: 44 SAME, 21 MOBILE ONLY, 2 NOT BUILT, 22 OUT OF SCOPE, 17 SAFER, 106 rows. G4 replaced the catalogue row with the seven rows of "Service catalogue".
@@ -71,7 +94,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 - **AGENT** means every AGENT. A **triage AGENT** has no fixed country and can switch between countries. A **plain AGENT** is fixed to one country. Rows name them separately only where they differ.
 - **AGENT (lock)** means an AGENT cannot do this once the ticket is closed or canceled. The lock is identical on web and mobile.
 - **(L2_MANAGER: error)** in the web column means the web shows that role the control, but it fails. That role is not counted as "can".
-- ROLE-MATRIX.md audits 94 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 112 rows.
+- ROLE-MATRIX.md audits 94 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 114 rows (112 before G6).
 
 ### Tickets
 
@@ -231,10 +254,12 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Raise a ticket from the Home screen | All roles | All roles | ✅ SAME | |
 | Requester's open and resolved counts | END_USER | END_USER | ✅ SAME | |
 | Requester's other counts (total, in progress, SLA breached) | END_USER | Nobody | ⊘ OUT OF SCOPE | |
-| Staff counts: open, in progress, on hold, SLA breached, active | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | |
-| Counts for L2_MANAGER | L2_MANAGER | Nobody | 🔒 SAFER | Mobile shows the tiles without numbers. |
-| Unassigned count | ADMIN, AGENT, L2_MANAGER | ADMIN, triage AGENT | 🔒 SAFER | |
-| Closed count and pending-reason counts | ADMIN, AGENT, L2_MANAGER | Nobody | ⊘ OUT OF SCOPE | |
+| Choose the dashboard period (Today, Yesterday, Last 7 days, Last 30 days, This week, This month, Quarterly, This year, All time, Custom) | END_USER, AGENT, ADMIN | END_USER, AGENT, ADMIN | ✅ SAME | G6 (2026-11-02). Same ten ranges, same order, same default (This month), same request to the server. The web shows it to L2_MANAGER too; mobile shows L2_MANAGER no counts (two rows down), so a period would change nothing. |
+| Staff counts: total, open, in progress, resolved, SLA breached | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | The web's five KPI cards, in its order and colours, since G6. Open counts every open ticket, as on the web. Before G6 the row was "open, in progress, on hold, SLA breached, active". |
+| Counts for L2_MANAGER | L2_MANAGER | Nobody | 🔒 SAFER | Mobile shows the tiles and status chips without numbers. |
+| Unassigned count | ADMIN, AGENT, L2_MANAGER | ADMIN, triage AGENT | 🔒 SAFER | A status chip since G6 (a tile before). |
+| Closed, on hold and pending-reason counts | ADMIN, AGENT | ADMIN, AGENT | ✅ SAME | G6: the web's second row as status chips. As on the web, a pending reason or On hold shows only above 0. Was ⊘ OUT OF SCOPE with L2_MANAGER in the web column. L2_MANAGER's numbers are the "Counts for L2_MANAGER" row, as for the staff counts. |
+| Active count (open, in progress, on hold or pending right now) | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | A tile before G6, a status chip now. The web dashboard has no such count. Was counted inside the staff-counts row before G6. |
 | Charts, technician and team tables, trends, workload | ADMIN, AGENT, L2_MANAGER | Nobody | 🔒 SAFER | |
 | Recent tickets | All roles | All roles | ✅ SAME | |
 | Shortcuts to "My open" and "Due soon" | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | |
@@ -393,7 +418,6 @@ Three ✅ SAME rows also contain web controls that always fail, or do nothing, w
 | Create a service template (admin) | Administration; it stays on the web. The web page that offers it cannot define a template's form fields either. |
 | Write, edit or delete articles; see drafts | Rich-text writing with embedded images, and publishing is broken on the web. |
 | Requester's other counts | The phone Home screen keeps to a short, fixed set of counts; the full set stays on the web dashboard. |
-| Closed count and pending-reason counts | Same: the phone Home screen keeps to a short, fixed set of counts. |
 | Reports, query builder, scheduled reports | Wide charts, exports and report scheduling: desk analysis. |
 | Kanban board | Drag-and-drop doesn't suit a phone, and on the web the status change it makes is never saved. |
 | Problem and change management | Back-office service-management work done at a desk. |

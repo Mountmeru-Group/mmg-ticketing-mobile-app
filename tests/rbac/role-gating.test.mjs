@@ -23,8 +23,8 @@ import { assertAssignment, assertCanAttach, assertStatusChange } from '../../src
 import { TICKET_STATUSES } from '../../src/types/index.ts';
 import { visibleAuditItems, visibleComments } from '../../src/utils/activity.ts';
 import {
-  bulkActions, composerPermissions, drawerItems, homeTiles, homeVariant, inlineStatusTransitions, isCommentVisible,
-  mainTabs, showApprovalsShortcut, ticketDetailPermissions, ticketsTitle,
+  bulkActions, composerPermissions, drawerItems, homeChips, homeTiles, homeVariant, inlineStatusTransitions,
+  isCommentVisible, mainTabs, showApprovalsShortcut, showHomePeriod, ticketDetailPermissions, ticketsTitle,
 } from '../../src/utils/permissions.ts';
 import {
   availableTicketFilters, countrySelectorMode, isTicketFilterAllowed, listCountryParam, roleDefaultTicketQuery,
@@ -91,23 +91,37 @@ describe('drawer and tab bar', () => {
 // ── Home ─────────────────────────────────────────────────────
 
 describe('home tiles', () => {
-  const STAFF = ['open', 'inProgress', 'onHold', 'slaBreached', 'totalOpen'];
+  // G6: the web's five KPI cards, in its order (FE:DashboardPage.tsx:341-375). END_USER keeps its own set (04 M2).
+  const STAFF = ['total', 'open', 'inProgress', 'resolved', 'slaBreached'];
   forEachPersona(
     'variant',
     { END_USER: 'endUser', AGENT: 'staff', TRIAGE_AGENT: 'staff', L2_MANAGER: 'l2', ADMIN: 'staff' },
     (p) => homeVariant(p.role),
   );
-  // Unassigned only for ADMIN and the triage AGENT (04 M2): for anyone else the DSH-1 count is mis-scoped (05 B.20).
   forEachPersona(
     'KPI tiles',
-    {
-      END_USER: ['open', 'resolved'],
-      AGENT: STAFF,
-      TRIAGE_AGENT: [...STAFF, 'unassigned'],
-      L2_MANAGER: STAFF,
-      ADMIN: [...STAFF, 'unassigned'],
-    },
+    { END_USER: ['open', 'resolved'], AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: STAFF, ADMIN: STAFF },
     (p) => homeTiles(p),
+  );
+  // The web's second row (:379-417) then Active. Unassigned (and Active before it, G6) left the tile grid for this row.
+  // Unassigned only for ADMIN and the triage AGENT (04 M2): for anyone else the DSH-1 count is mis-scoped (05 B.20).
+  const PENDING = ['pendingMgmtReview', 'pendingPartner', 'pendingUserConfirm', 'pendingUserInfo', 'pendingMasterData', 'onHold'];
+  forEachPersona(
+    'status chips',
+    {
+      END_USER: [],
+      AGENT: ['closed', ...PENDING, 'active'],
+      TRIAGE_AGENT: ['closed', 'unassigned', ...PENDING, 'active'],
+      L2_MANAGER: ['closed', ...PENDING, 'active'],
+      ADMIN: ['closed', 'unassigned', ...PENDING, 'active'],
+    },
+    (p) => homeChips(p),
+  );
+  // Every role but L2_MANAGER, whose tiles have no counts for a period to change.
+  forEachPersona(
+    'PERIOD row',
+    { END_USER: true, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: false, ADMIN: true },
+    (p) => showHomePeriod(p.role),
   );
 });
 
@@ -580,7 +594,10 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       uses: ['serviceCatalogPermissions(', 'isOwnServiceRequest('],
       forbid: /getServiceRequest\(|apiClient/,
     },
-    { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
+    {
+      file: 'src/screens/dashboard/HomeScreen.tsx',
+      uses: ['homeVariant(', 'homeTiles(', 'homeChips(', 'showHomePeriod(', 'showApprovalsShortcut('],
+    },
     { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },
   ];
 

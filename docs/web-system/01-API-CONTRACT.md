@@ -876,7 +876,11 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 - **Errors:** 500, including when Redis is down (`getCached` has no try/catch).
 - **Source:** `dashboard.router.ts:8`, `dashboard.controller.ts:231-581`.
 - **Mobile:**
-  - Default `range=month`.
+  - Default `range=month`, the web's default ("This Month", `FE:pages/dashboard/DashboardPage.tsx:61`).
+  - **G6:** Home's PERIOD row sends `range=<preset>` for the nine presets, or `from` + `to` (`YYYY-MM-DD`) for Custom, only once both days are valid (`src/utils/dashboard-period.ts`).
+    - It never sends `range=custom`. The web does (`DashboardPage.tsx:99`), but it is not a `DashboardRange` in 03 §C, and the server ignores `range` whenever `from` is present.
+    - Home reads only the KPIs in `src/utils/home-kpis.ts` (`HomeKpis`): the web dashboard's set plus `totalOpen`.
+    - Web behaviour with sources: `docs/G6-WEB-DASHBOARD.md`.
   - Send `countryId` from the selector (not for L2).
   - Pull-to-refresh, no polling.
   - The 7 single-widget endpoints (`/dashboard/kpis` etc.) are ADMIN/AGENT only and **globally unscoped**: out of scope (Appendix A).

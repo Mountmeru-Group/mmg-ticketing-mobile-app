@@ -1,8 +1,14 @@
 // Transient UI state. Nothing here is persisted, and reset() runs on every sign-out (02 §5.5) — that
 // includes the country selection, which the web forgets to clear (05 §A.12), and the M3 filters, which the web keeps in
 // sessionStorage across a logout (docs/G2-WEB-FILTERS.md W-G2-4).
+// The Home period (G6) lives here too: kept while the app is open, back to the web's default ("This month") after a
+// restart or a sign-out. The web keeps it in component state, so it is back to "This Month" on every visit to its
+// dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
 import { create } from 'zustand';
 
+import {
+  DEFAULT_DASHBOARD_PERIOD, NO_CUSTOM_RANGE, type CustomDayRange, type DashboardPeriod,
+} from '@/utils/dashboard-period';
 import {
   NO_ADVANCED_FILTERS, withAdvancedFilters, withNamedFilter,
   type TicketAdvancedFilters, type TicketNamedFilter, type TicketSortOption,
@@ -22,6 +28,10 @@ interface UiState {
   ticketSearch: string | undefined;
   /** Announcements hidden from the Home banner for this session only — no server state (ANN-1 is read-only). */
   dismissedAnnouncementIds: readonly string[];
+  /** Home PERIOD row (G6): which window the DSH-1 counts cover. */
+  homePeriod: DashboardPeriod;
+  /** The Custom period's From and To. Kept when another period is picked, so going back to Custom restores them. */
+  homeCustomRange: CustomDayRange;
 
   setTicketFilter: (filter: TicketNamedFilter) => void;
   setTicketSort: (sort: TicketSortOption) => void;
@@ -35,6 +45,8 @@ interface UiState {
   openTicketList: (filter: TicketNamedFilter) => void;
   dismissAnnouncement: (id: string) => void;
   restoreAnnouncement: (id: string) => void;
+  setHomePeriod: (period: DashboardPeriod) => void;
+  setHomeCustomRange: (patch: Partial<CustomDayRange>) => void;
   reset: () => void;
 }
 
@@ -50,9 +62,12 @@ const INITIAL = {
   ...CLEARED_TICKET_FILTERS,
   ticketCountryId: null,
   dismissedAnnouncementIds: [],
+  homePeriod: DEFAULT_DASHBOARD_PERIOD,
+  homeCustomRange: NO_CUSTOM_RANGE,
 } as const satisfies Pick<
   UiState,
-  'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch' | 'ticketCountryId' | 'dismissedAnnouncementIds'
+  | 'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch' | 'ticketCountryId' | 'dismissedAnnouncementIds'
+  | 'homePeriod' | 'homeCustomRange'
 >;
 
 export const useUiStore = create<UiState>()((set) => ({
@@ -77,5 +92,7 @@ export const useUiStore = create<UiState>()((set) => ({
   dismissAnnouncement: (id) =>
     set((s) => (s.dismissedAnnouncementIds.includes(id) ? s : { dismissedAnnouncementIds: [...s.dismissedAnnouncementIds, id] })),
   restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),
+  setHomePeriod: (homePeriod) => set({ homePeriod }),
+  setHomeCustomRange: (patch) => set((s) => ({ homeCustomRange: { ...s.homeCustomRange, ...patch } })),
   reset: () => set({ ...INITIAL }),
 }));

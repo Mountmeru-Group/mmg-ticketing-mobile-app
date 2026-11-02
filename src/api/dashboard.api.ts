@@ -3,10 +3,11 @@ import type { DashboardAll, DashboardRange } from '@/types';
 import { apiClient } from './client';
 
 export interface DashboardQuery {
-  /** Default `month`. Unknown values also mean `month`. */
+  /** Default `month`. Unknown values also mean `month`. Not sent with `from`: the server ignores it then. */
   range?: DashboardRange;
-  /** If present, `range` is ignored. */
+  /** `YYYY-MM-DD`. If present, `range` is ignored. */
   from?: string;
+  /** `YYYY-MM-DD`, only with `from`. */
   to?: string;
   /** From the country selector. Ignored by the server for L2_MANAGER — don't send it for L2. */
   countryId?: string;
@@ -14,13 +15,12 @@ export interface DashboardQuery {
 
 /**
  * DSH-1 — GET /api/v1/dashboard/all
- * Show ONLY the correctly scoped KPIs (total, open, inProgress, onHold, resolved, slaBreached, totalOpen,
- * currentlyOpen) and `recent`. The technician/team widgets are unscoped for some roles (05 B.20, C.19).
- * Pull-to-refresh, no polling.
+ * Show ONLY the correctly scoped parts: the KPIs SafeDashboard lists (hooks/useHome.ts) and `recent`. The
+ * technician/team widgets are unscoped for some roles (05 B.20, C.19). Pull-to-refresh, no polling.
  */
 export async function getDashboard(query: DashboardQuery = {}): Promise<DashboardAll> {
   const params = {
-    range: query.range ?? 'month',
+    range: query.from ? undefined : (query.range ?? 'month'),
     from: query.from,
     to: query.from ? query.to : undefined,
     countryId: query.countryId,

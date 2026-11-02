@@ -56,7 +56,7 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
 - The title is the section caption, 12 dp above the content.
 - `flush` gives a card of rows (`px-4` only).
 - Tinted variants (private note, unread notification, selected ticket, announcement banner) change colour only.
-- KPI tiles are this card with a coloured 32 dp square from `colors.kpi`, the label in `text-sm gray-500` and the count in `text-2xl font-bold`, like the web's KPICard.
+- KPI tiles are this card with a coloured 32 dp square from `colors.kpi`, the label in `text-sm gray-500` and the count in `text-2xl font-bold`, like the web's KPICard. Since G6 (§11) they also have a 4 dp left edge in the same colour.
   - Arrangement: the square top-left, the label under it at the tile's full width, the count at the tile's foot. The web puts the label beside the square, but a phone tile leaves only about 80 dp for that.
   - Grid: two per row, 12 dp apart both ways, built as explicit rows with tile widths in dp from the grid's measured width. An odd last tile spans its row. Tiles in a row stretch to the taller one, so the counts line up. Minimum height 128 dp (`min-h-32`).
   - Labels are never truncated and never break inside a word. Each word may take a line (two lines at most). A word that is still too wide shrinks to fit (`adjustsFontSizeToFit`, no `minimumFontScale`).
@@ -216,6 +216,8 @@ arithmetic, with Roboto advance widths and the dp values NativeWind compiles (`i
 no build in this phase.
 
 ### 5.1 Home KPI tiles
+
+> **G6 (2026-11-02) changed the tile set.** The grid rules below still hold, but the tiles are now the web's five, and Active and Unassigned are status chips. The current pattern and its 360 dp figures are in §11.
 
 **Before.** The tiles were six squeezed into one row, with the sixth wrapping alone. Labels showed as "I", "A" and
 "right now".
@@ -568,3 +570,107 @@ lines) + 44 = **397 dp**. The white area's content, with the chip: about **282 d
 
 Check on the next build: 360 dp phones at 100 %, 130 % and 200 % text; the headline's weight (800 is drawn with the
 nearest system weight, Roboto Black on most phones); the offline banner on the red card.
+
+## 11. Home: the PERIOD row, KPI tiles and status chips (G6, 2026-11-02)
+
+Home's counts now match the web dashboard: the same periods, the same five tiles, the same second row. Web behaviour with
+sources: `docs/G6-WEB-DASHBOARD.md`. **Not run on a device:** no build in this phase; the 360 dp figures are arithmetic.
+
+Order on Home:
+1. greeting;
+2. ADMIN's announcement banner;
+3. END_USER's "Raise a ticket";
+4. **PERIOD** (16 dp below);
+5. TICKETS: the tiles, then the chips 12 dp under the grid;
+6. Shortcuts;
+7. Recent tickets.
+
+### 11.1 The PERIOD row
+
+- **Caption:** "PERIOD", the S3 section caption (`text-xs font-semibold uppercase tracking-wide text-gray-500`), 4 dp above the chips.
+- **Chips:** `FilterChip` (S5), unchanged. 36 dp + 4 dp hit slop. Active `bg-primary` with white `font-medium` text (5.47:1); idle white with a `gray-300` border and gray-700 text.
+- **Row:** one horizontal `ScrollView`, no scroll bar, 8 dp between chips. The 16 dp gutters are *inside* the scrolling content, so chips scroll to the screen edge. `radiogroup` with `radio` chips.
+- **Periods:** the web's ten, in its order and with its words in sentence case. Today, Yesterday, Last 7 days, Last 30 days, This week, **This month (default)**, Quarterly, This year, All time, Custom.
+- **Scroll into view:** "This month" is the sixth chip, off-screen at 360 dp. On first layout the row scrolls so the chosen chip shows with about 48 dp of the chip before it, a hint that the row scrolls. Only once: a chip the person tapped is already in view.
+- **Who:** every role but L2_MANAGER (no counts, so nothing for a period to change; `showHomePeriod`).
+- **Lifetime:** in memory (`ui.store`). Kept across tabs while the app is open; back to This month after a restart or sign-out. Nothing on disk.
+
+**Custom.** Tapping Custom selects it and, if no From day is set, opens the system date dialog for From straight away.
+- **Fields:** under the row (8 dp), two buttons side by side, 8 dp apart.
+  - Each is ≥ 44 dp, `rounded-lg border-gray-300` white, with an 18 dp calendar icon.
+  - "From" or "To" in `text-xs gray-500` over the day: `text-sm font-medium gray-900`, or "Pick a day" in gray-500.
+- **Dialog:** the same system date dialog as the Filters sheet (`DateTimePickerAndroid`). From is capped at To, or today. To starts at From and is capped at today.
+- **Message,** `text-xs`, live region, under the fields:
+  - "Pick a From day to see the counts." / "Pick a To day…" in gray-500;
+  - "The From day must be on or before the To day." in red-700.
+- **No request until the range is valid.** Tiles show "–" (gray-500) in place of a count; the recent list keeps the last response.
+
+### 11.2 KPI tiles
+
+- **Card:** the S2 KPI card, unchanged, plus a **4 dp left edge** in the tile's colour (Ronit's brief; the 2026-10-09 web clone's card has none).
+- **Colours:** from the web (`colors.kpi`):
+
+  | Tile | Colour | Contrast on white |
+  |---|---|---|
+  | Total tickets | purple-500 | 3.96 |
+  | Open | blue-500 | 3.68 |
+  | In progress | yellow-500 | 1.92 |
+  | Resolved | green-500 | 2.28 |
+  | SLA breached | red-500 | 3.76 |
+
+  - The square and the edge are decoration: the white icon on its square is the web's, and the label carries the meaning.
+- **Set:**
+  - Staff: Total tickets, Open, In progress, Resolved, SLA breached, in that order. "Resolved today" when the period is Today.
+  - END_USER: Open and Resolved.
+- **Open's hint:** `text-xs` "right now" under the label. Open counts every open ticket whatever the period, as on the web.
+- **Grid:** S2, unchanged. Two per row, 12 dp apart. Five tiles make two rows plus a full-width **SLA breached**; END_USER has one row.
+- **No count:** "–" in `text-2xl` gray-500 when counts are expected but not available (Custom not picked; the error card shows above the grid). L2_MANAGER keeps "View tickets".
+
+**At 360 dp.**
+- **Width:** grid 328 dp, tile 158 dp. The label width is 121 dp: 158 − 4 (left edge) − 1 (right border) − 32 (padding). It was 124 dp before G6.
+- **Labels:** the widths below scale the §5.1 Roboto measurements at about 7 dp a character at 100 %, so they are estimates.
+
+| Label | 100 % | 130 % | 200 % |
+|---|---|---|---|
+| Total tickets | ~82 dp, 1 line | ~107 dp, 1 line | ~164 dp → 2 lines ("tickets" ~98) |
+| In progress | 69, 1 line | 89, 1 line | 137 → 2 lines ("progress" 108) |
+| Resolved today (Today only) | ~98, 1 line | ~127 → 2 lines | 2 lines ("Resolved" 111) |
+| SLA breached (full width, 291 dp) | 85 | 110 | 170, 1 line |
+
+- **Widest word:** "breached" (113 dp at 200 %) still fits a half-width tile, so no tile label needs to shrink. "Unassigned", the only word that did (§5.1), is a chip now.
+
+### 11.3 Status chips
+
+- **The web's second row** (staff only), as pills, in the web's order: Closed, Unassigned (ADMIN and the UI's triage AGENT only), Mgmt review, With partner, User confirm, More info, Master data, On hold. Then **Active now**, the app's own.
+- **Pill:** `h-9` (36 dp) + 4 dp hit slop = 44 dp (S8), `rounded-full`, white, `border-border`, `px-3`. Inside:
+  - an 8 dp dot in the chip's colour;
+  - the count, `text-sm font-semibold gray-900`;
+  - the label, `text-sm gray-700`, 6 dp apart.
+- **Row:** `flex-row flex-wrap`, 8 dp both ways. Every chip stays visible; nothing scrolls sideways.
+- **Shown:**
+  - As on the web, a pending reason or On hold appears only when its count is above 0. Closed, Unassigned and Active always appear.
+  - While counts load, only those three, with a small skeleton for the count, so a zero chip never flashes up.
+  - L2_MANAGER: every chip, without counts, as shortcuts.
+- **Tap:** opens the Tickets tab with that chip's filter, as a tile does. The list shows it as the "from Home" chip.
+- **Dot colours:**
+
+  | Chip | Colour | Source | Contrast on white |
+  |---|---|---|---|
+  | Closed | zinc-600 | web | 7.73 |
+  | Unassigned | orange-500 | web | 2.80 |
+  | Mgmt review | amber-400 | web | 1.67 |
+  | With partner | purple-400 | web | 2.64 |
+  | User confirm | sky-400 | web | 2.14 |
+  | More info | indigo-400 | web | 2.98 |
+  | Master data | teal-400 | web | 1.86 |
+  | On hold | gray-400 | web | 2.54 |
+  | Active now | slate-500 (`colors.kpi.active`) | app only, the web's muted-foreground | 4.76 |
+
+### 11.4 Reported, not changed
+
+- **Contrast:** most dots and tile edges are below 3:1 on white. They are the web's colours, and they are decoration: every chip and tile names itself in gray-700 or gray-500 text. They are kept for parity, like the UI graphics in §3.3.
+- **Device check:** check on the next build at 360 dp with 100 %, 130 % and 200 % text:
+  - the period row's first-layout scroll;
+  - the chips' wrap;
+  - the full-width SLA breached tile;
+  - the From → To flow.

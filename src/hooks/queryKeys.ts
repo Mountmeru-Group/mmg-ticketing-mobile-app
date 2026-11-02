@@ -16,7 +16,8 @@
 //   ['lookups', 'canned-responses']                   LKP-7   reply templates (M5 Templates sheet; every role)
 //   ['users', 'search', term, roles]                  USR-3   typeahead (≥ 2 characters)
 //   ['users', 'profile', id]                          USR-1   own profile (M10)
-//   ['dashboard', range, countryId]                   DSH-1   Home KPIs (never for L2_MANAGER)
+//   ['dashboard', period, countryId]                  DSH-1   Home KPIs (never for L2_MANAGER); period = the range or
+//                                                             `custom:<from>:<to>` (utils/dashboard-period.ts)
 //   ['notifications', 'list']                         NTF-1   infinite, 20 per page
 //   ['notifications', 'count']                        NTF-2   unread badge
 //   ['approvals', 'pending']                          APR-1   my pending approvals (not paginated)
@@ -69,7 +70,7 @@ export const queryKeys = {
 
   dashboard: {
     all: () => ['dashboard'] as const,
-    summary: (range: string, countryId: string | undefined) => ['dashboard', range, countryId ?? null] as const,
+    summary: (period: string, countryId: string | undefined) => ['dashboard', period, countryId ?? null] as const,
   },
 
   notifications: {

@@ -144,7 +144,10 @@ export const colors = {
   /** Any status, priority or SLA value the app does not know (`bg-gray-100 text-gray-600` in all three web badges). */
   badgeFallback: tone(palette.gray[100], palette.gray[600]),
 
-  /** Dashboard KPI tiles: the square behind the tile's white icon. Web: pages/dashboard/DashboardPage.tsx KPICard. */
+  /**
+   * Dashboard KPI tiles: the square behind the tile's white icon and the tile's left edge; for Closed and Unassigned,
+   * the dot on their Home status chip. Web: pages/dashboard/DashboardPage.tsx KPICard (`bg-purple-500` … `bg-orange-500`).
+   */
   kpi: {
     total: palette.purple[500],
     open: palette.blue[500],
@@ -153,8 +156,10 @@ export const colors = {
     slaBreached: palette.red[500],
     closed: palette.zinc[600],
     unassigned: palette.orange[500],
+    /** App only (G6): the Active chip. The web dashboard has no Active count; the web's muted-foreground slate. */
+    active: palette.slate[500],
   },
-  /** The dot on the dashboard's pending sub-status mini-tiles (staff only). Same web file. */
+  /** The dot on the dashboard's pending sub-status mini-tiles (staff only), and on Home's chip for each. Same web file. */
   kpiPending: {
     PENDING_MGMT_REVIEW: palette.amber[400],
     PENDING_PARTNER: palette.purple[400],

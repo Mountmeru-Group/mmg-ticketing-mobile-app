@@ -1,12 +1,16 @@
 // M2 Home reads: DSH-1 counts and a short recent-tickets list. Pull-to-refresh only — no polling (01 DSH-1).
 //
-// WHICH DSH-1 KPIs ARE SHOWN (05 B.20, re-checked against backend dashboard.controller.ts on 2026-10-15):
-//   used     open, inProgress, onHold, slaBreached, totalOpen, resolved (END_USER), and `recent` — each query keeps the
-//            caller's scope; unassigned for ADMIN and the UI's triage AGENT only (brief + 04 M2).
-//   skipped  total, pending*, resolvedToday, closed, createdToday/Yesterday, currentlyOpen, slaBreachPercent (not
-//            needed); closedToday / closedYesterday (their `OR` overwrites the scope: global for AGENT/L2); byStatus,
-//            byPriority (not needed); workload, trends, technician*/team matrices, bySource, countryGroupRows,
-//            monthlyTrends (unscoped or mis-scoped, 05 B.20 / C.19).
+// WHICH DSH-1 KPIs ARE SHOWN (05 B.20; re-checked against backend dashboard.controller.ts:331-455 for G6, 2026-11-02):
+//   used     the web dashboard's set (utils/home-kpis.ts HomeKpis): total, currentlyOpen, inProgress, resolved,
+//            resolvedToday, slaBreached, closed, onHold, the five pending* counts, plus totalOpen (Active, app only),
+//            and `recent`. Each of those queries keeps the caller's scope. unassigned too, but shown to ADMIN and the
+//            UI's triage AGENT only (04 M2, permissions.ts homeChips).
+//   skipped  open (the web shows currentlyOpen instead), pending (plain PENDING: no web tile), createdToday/Yesterday,
+//            slaBreachPercent (not shown on the web dashboard); closedToday / closedYesterday (their `OR` overwrites the
+//            scope: global for AGENT/L2); byStatus, byPriority (charts); workload, trends, technician*/team matrices,
+//            bySource, countryGroupRows, monthlyTrends (unscoped or mis-scoped, 05 B.20 / C.19).
+// PERIOD (G6): the Home PERIOD row's choice (ui.store homePeriod), sent as the web sends it (utils/dashboard-period.ts).
+//            A Custom period with no valid From–To sends nothing: the query waits, as the web's does (:106).
 //   L2_MANAGER: DSH-1 is NOT called at all. The server caches /dashboard/all per ROLE for L2 (cache key
 //            `role:L2_MANAGER`, 01 DSH-1, 05 C.19), so every number in it can be another L2 manager's — including the
 //            `recent` list. L2 Home gets shortcut tiles without counts and a TKT-1 recent list instead.
@@ -23,24 +27,16 @@ import { listTickets } from '@/api/tickets.api';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import type { DashboardAll, DashboardRecentTicket, Ticket } from '@/types';
+import { dashboardPeriodKey, dashboardPeriodQuery } from '@/utils/dashboard-period';
+import { HOME_KPI_KEYS, type HomeKpis } from '@/utils/home-kpis';
 import { listCountryParam, roleDefaultTicketQuery } from '@/utils/ticket-filters';
 import { queryKeys, type TicketListKeyParams } from './queryKeys';
 
-/** 01 DSH-1: "Default range=month" — counts cover tickets created in the last 30 days (totalOpen: right now). */
-const DASHBOARD_RANGE = 'month';
 const RECENT_COUNT = 5;
 
 /** The only parts of DSH-1 a screen may read. Everything else in the response never leaves this hook. */
 export interface SafeDashboard {
-  kpis: {
-    open: number;
-    inProgress: number;
-    onHold: number;
-    slaBreached: number;
-    totalOpen: number;
-    resolved: number;
-    unassigned: number;
-  };
+  kpis: HomeKpis;
   recent: DashboardRecentTicket[];
 }
 
@@ -49,32 +45,36 @@ function num(value: unknown): number {
 }
 
 function pickSafe(res: DashboardAll): SafeDashboard {
-  const k = res.kpis;
+  const kpis = {} as HomeKpis;
+  for (const key of HOME_KPI_KEYS) kpis[key] = num(res.kpis[key]);
   return {
-    kpis: {
-      open: num(k.open),
-      inProgress: num(k.inProgress),
-      onHold: num(k.onHold),
-      slaBreached: num(k.slaBreached),
-      totalOpen: num(k.totalOpen),
-      resolved: num(k.resolved),
-      unassigned: num(k.unassigned),
-    },
+    kpis,
     recent: Array.isArray(res.recent) ? res.recent.filter((t) => t && typeof t.id === 'string') : [],
   };
 }
 
-/** DSH-1 for ADMIN, AGENT and END_USER. Never enabled for L2_MANAGER (see above). */
+/** DSH-1 for ADMIN, AGENT and END_USER, for the Home period. Never enabled for L2_MANAGER (see above). */
 export function useDashboard() {
   const user = useAuthStore((s) => s.user);
   const selectedCountry = useUiStore((s) => s.ticketCountryId);
+  const period = useUiStore((s) => s.homePeriod);
+  const customRange = useUiStore((s) => s.homeCustomRange);
   // Same country rule as the ticket list (05 §A.12). `''` means "no filter" to DSH-1 too, so it is not sent.
   const countryId = (user ? listCountryParam(user, selectedCountry) : undefined) || undefined;
+  // null = Custom without a valid From–To: nothing to ask yet.
+  const periodQuery = dashboardPeriodQuery(period, customRange);
+  const queryKey = queryKeys.dashboard.summary(periodQuery ? dashboardPeriodKey(periodQuery) : 'custom:incomplete', countryId);
 
   return useQuery({
-    queryKey: queryKeys.dashboard.summary(DASHBOARD_RANGE, countryId),
+    queryKey,
+    // When only the period changed, the last response stays as placeholder data while the new one loads (or while a
+    // Custom range is incomplete), so `recent` — which no period filters (01 DSH-1) — does not blank out. Its KPIs are
+    // another period's: Home never shows counts while `isPlaceholderData` is true. A different country starts empty.
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[2] === queryKey[2] ? previous : undefined),
     queryFn: async (): Promise<DashboardAll> => {
-      const res = await getDashboard({ range: DASHBOARD_RANGE, countryId });
+      // refetch() runs even on a disabled query: never let it ask for the default window under a Custom key.
+      if (!periodQuery) throw new Error('Pick a From day and a To day to see the counts.');
+      const res = await getDashboard({ ...periodQuery, countryId });
       assertObject<DashboardAll>('DSH-1', res);
       if (typeof res.kpis !== 'object' || res.kpis === null) {
         throw new ApiClientError('shape', 200, { error: 'Unexpected response shape from DSH-1' });
@@ -84,7 +84,7 @@ export function useDashboard() {
       return res;
     },
     select: pickSafe,
-    enabled: !!user && user.role !== 'L2_MANAGER',
+    enabled: !!user && user.role !== 'L2_MANAGER' && periodQuery !== null,
   });
 }
 
