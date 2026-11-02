@@ -29,5 +29,13 @@
       "channel": "production",
       "env": { "EXPO_PUBLIC_APP_ENV": "PROD" }
     }
+  },
+  "submit": {
+    "preview": {
+      "ios": {
+        "ascAppId": "6827931735",
+        "appleTeamId": "ZNPR2MFW76"
+      }
+    }
   }
 }
