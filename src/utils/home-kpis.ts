@@ -38,8 +38,9 @@ export const HOME_KPI_KEYS: readonly (keyof HomeKpis)[] = [
 // ── Tiles ────────────────────────────────────────────────────
 
 /**
- * The list a tile opens: the same tickets the tile counts, any creation date (the list has no period yet, see
- * ticket-filters.ts HomeTileFilter). Total opens everything, as the web's Total card opens /tickets (:346).
+ * The list a tile opens: the same tickets the tile counts. The period travels separately, as a created-date filter,
+ * for the tiles in HOME_TILE_CARRIES_PERIOD (G7). Total opens everything in the period, as the web's Total card opens
+ * /tickets with its dates (:346).
  */
 export const HOME_TILE_LIST_FILTER: Record<HomeTile, TicketNamedFilter> = {
   total: 'ALL',
@@ -55,6 +56,19 @@ const TILE_LABELS: Record<HomeTile, string> = {
   inProgress: 'In progress',
   resolved: 'Resolved',
   slaBreached: 'SLA breached',
+};
+
+/**
+ * Whether a tile hands the Home period to the list as a created-date filter (G7, as the web's links do: `${dp}` on
+ * Total, In Progress, Resolved and SLA Breached, FE:DashboardPage.tsx:346-374). Open counts right now, any date, so it
+ * opens every open ticket, as the web's Open link does (:353).
+ */
+export const HOME_TILE_CARRIES_PERIOD: Record<HomeTile, boolean> = {
+  total: true,
+  open: false,
+  inProgress: true,
+  resolved: true,
+  slaBreached: true,
 };
 
 export function homeTileLabel(tile: HomeTile, period: DashboardPeriod): string {
@@ -89,6 +103,24 @@ export const HOME_CHIP_LIST_FILTER: Record<HomeChip, TicketNamedFilter> = {
   pendingMasterData: 'MASTER_DATA_KPI',
   onHold: 'ON_HOLD_KPI',
   active: 'ACTIVE_KPI',
+};
+
+/**
+ * Whether a chip hands the Home period to the list (G7). Closed and Unassigned: as the web's links (`${dp}`, :386, :393).
+ * The pending reasons and On hold: **yes, unlike the web**. Their counts are created-in-the-period (the byStatus groupBy,
+ * BE:dashboard.controller.ts:346), but the web's mini-card links carry no dates (:407), so its list shows more rows than
+ * its card. The app passes the period so the chip and the list agree (05 B.37). Active counts right now, any date.
+ */
+export const HOME_CHIP_CARRIES_PERIOD: Record<HomeChip, boolean> = {
+  closed: true,
+  unassigned: true,
+  pendingMgmtReview: true,
+  pendingPartner: true,
+  pendingUserConfirm: true,
+  pendingUserInfo: true,
+  pendingMasterData: true,
+  onHold: true,
+  active: false,
 };
 
 /** The web's words (:382-402); Active is the app's own. */

@@ -15,7 +15,9 @@
 // ADMIN only (2026-10-29): the active-announcement banner (ANN-1, dismissible for this session) and its "Read more".
 //   Other roles get no banner and no ANN-1 request, because the Announcements screen does not exist for them.
 // The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
-// A tile or chip opens the Tickets tab with the matching filter (utils/home-kpis.ts: the same status set it counts).
+// A tile or chip opens the Tickets tab with the matching filter (utils/home-kpis.ts: the same status set it counts) and,
+//   since G7, the period as the list's created-date filter when it counts "created in the period" (all but Open and
+//   Active), as the web's dashboard links do. The list names the period in a chip that clears it.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,14 +37,14 @@ import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
 import {
-  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodQuery, type CustomDayRange,
-  type DashboardPeriod,
+  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodLabel, dashboardPeriodQuery,
+  periodListDates, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
 import { notify } from '@/utils/dialogs';
 import { greetingLine, greetingNow } from '@/utils/greeting';
 import {
-  HOME_CHIP_LABELS, HOME_CHIP_LIST_FILTER, HOME_TILE_LIST_FILTER, homeChipValue, homeTileLabel, homeTileValue,
-  visibleHomeChips, type HomeKpis,
+  HOME_CHIP_CARRIES_PERIOD, HOME_CHIP_LABELS, HOME_CHIP_LIST_FILTER, HOME_TILE_CARRIES_PERIOD, HOME_TILE_LIST_FILTER,
+  homeChipValue, homeTileLabel, homeTileValue, visibleHomeChips, type HomeKpis,
 } from '@/utils/home-kpis';
 import {
   homeChips, homeTiles, homeVariant, showAnnouncementBanner, showApprovalsShortcut, showHomePeriod, type HomeChip,
@@ -129,8 +131,11 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   // The store holds the filter, so a second tap on the same tile still applies it; `pop` returns to the existing
   // list instead of stacking another one. Like a web dashboard link, the tile's filter applies alone: the Filters
   // sheet, search and sort start empty, so the list matches the tile (docs/G2-WEB-FILTERS.md §4).
-  const openList = (filter: TicketNamedFilter) => {
-    openTicketList(filter);
+  // G7: a tile that counts "created in the period" also puts the period on the list as its created-date filter, as the
+  // web's links do (utils/dashboard-period.ts periodListDates). Not for L2_MANAGER, who has no period row.
+  const openList = (filter: TicketNamedFilter, carriesPeriod = false) => {
+    const dates = carriesPeriod && showPeriod ? periodListDates(period, customRange) : null;
+    openTicketList(filter, dates ? { label: dashboardPeriodLabel(period), ...dates } : null);
     navigation.navigate('TicketsTab', { screen: 'TicketList', params: { filter }, pop: true });
   };
   const openTicket = (ticketId: string) =>
@@ -239,7 +244,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
                   value={kpis ? homeChipValue(chip, kpis) : undefined}
                   loading={countsLoading}
                   color={CHIP_COLORS[chip]}
-                  onPress={() => openList(HOME_CHIP_LIST_FILTER[chip])}
+                  onPress={() => openList(HOME_CHIP_LIST_FILTER[chip], HOME_CHIP_CARRIES_PERIOD[chip])}
                 />
               ))}
             </View>
@@ -326,14 +331,14 @@ function buildTiles(
   keys: readonly HomeTile[],
   kpis: HomeKpis | undefined,
   period: DashboardPeriod,
-  openList: (f: TicketNamedFilter) => void,
+  openList: (f: TicketNamedFilter, carriesPeriod: boolean) => void,
 ): Tile[] {
   return keys.map((key) => ({
     key,
     label: homeTileLabel(key, period),
     ...TILE_LOOK[key],
     value: kpis ? homeTileValue(key, kpis, period) : undefined,
-    onPress: () => openList(HOME_TILE_LIST_FILTER[key]),
+    onPress: () => openList(HOME_TILE_LIST_FILTER[key], HOME_TILE_CARRIES_PERIOD[key]),
   }));
 }
 

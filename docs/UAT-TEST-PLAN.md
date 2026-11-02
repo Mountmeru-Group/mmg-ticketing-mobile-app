@@ -151,6 +151,20 @@ Failures that happen on **Microsoft's page** show no red box in the app, so they
 - [ ] **C5a. Period** (Admin): with the web's dashboard open on the same country, tap each period in turn. The five
   tile numbers match the web's cards for the same period (Open matches whatever the period). Custom: From opens the date
   dialog at once; after a To day the counts load; a From day after the To day shows a red message and no counts.
+- [ ] **C5b. Tile → list carries the period** (G7, Admin):
+  - pick **This month**, tap **In progress**: the list opens with a red **This month ✕** chip, and its "N tickets" equals the tile's number;
+  - tap the **✕**: the dates go, the In progress filter stays;
+  - **Open** and **Active now** open with no period chip;
+  - with **All time**, no chip appears;
+  - with **Custom**, the chip reads Custom and the summary line shows its two days.
+  - A difference of a few tickets at the window's edges is a known server-clock issue (05 B.37), not a test failure: note it.
+- [ ] **C5c. Approvals for everyone** (G7): with the **User** and **L2 Manager** accounts, with nothing pending, the menu shows **Approvals**. It opens "Nothing waiting for you", with no error.
+- [ ] **C5d. Notifications permission** (G7, Android 13+ phone, fresh install):
+  - no permission dialog at launch or at sign-in;
+  - the first visit to **Alerts** shows Android's dialog once;
+  - **Don't allow**: Alerts still works, and the notice says notifications are off with **Turn on notifications**;
+  - later visits don't ask again by themselves.
+  - Until the Service Desk ships push, after **Allow** the notice says notifications "aren't switched on at the Service Desk yet". There must be no error banner anywhere.
 - [ ] **C6. Home tiles at the largest font size.**
   - "Total tickets" and "In progress" may wrap onto two lines; SLA breached (full width) stays on one.
   - The two tiles in a row stay the same height, and their numbers line up.
@@ -183,7 +197,7 @@ Sign in as each account in turn and check every row.
 | Area | User (END_USER) | Technician (AGENT) | L2 Manager | Admin |
 |---|---|---|---|---|
 | Bottom tabs | Home, **My Tickets**, Alerts | Home, **Tickets**, Alerts | Home, Tickets, Alerts | Home, Tickets, Alerts |
-| Menu: Approvals | only while they have ≥ 1 pending approval | ✅ always, with a count badge | only while ≥ 1 pending | ✅ always |
+| Menu: Approvals (G7: every role, always) | ✅ always, with a count badge | ✅ always, with a count badge | ✅ always, with a count badge | ✅ always |
 | Menu: Tasks, Service Request, Settings | ✅ | ✅ | ✅ | ✅ |
 | Menu: Knowledge base, Announcements (ADMIN only since 2026-10-29) | ❌ | ❌ | ❌ | ✅ |
 | Home announcement banner (when one is active) | ❌ | ❌ | ❌ | ✅ |

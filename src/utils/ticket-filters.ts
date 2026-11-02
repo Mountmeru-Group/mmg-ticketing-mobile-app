@@ -34,8 +34,8 @@ export type TicketNamedFilter =
  *   MGMT_REVIEW_KPI, PARTNER_KPI, USER_CONFIRM_KPI, USER_INFO_KPI, MASTER_DATA_KPI (G6, Home's status chips)
  *                    kpis.pendingMgmtReview … pendingMasterData = that one status (the server's byStatus groupBy)
  * DSH-1 counts tickets CREATED in the Home period (G6; 01 DSH-1), except Open (currentlyOpen) and Active (totalOpen),
- * which count right now. The list has no date filter, so it can hold more rows than the tile says (the web passes its
- * period to the list as a created-date filter; the app does not yet, docs/G6-WEB-DASHBOARD.md §6).
+ * which count right now. Since G7 a tile also hands the period to the list as its created-date filter (TicketListPeriod
+ * below), so the list holds the tickets the tile counts (docs/G7-PERIOD-APPROVALS-PUSH.md §1).
  */
 export type HomeTileFilter =
   | 'IN_PROGRESS_KPI' | 'ON_HOLD_KPI' | 'ACTIVE_KPI' | 'BREACHED_KPI' | 'UNASSIGNED_KPI'
@@ -270,6 +270,30 @@ export function namedFilterSetsTechnician(filter: TicketNamedFilter): boolean {
 export interface TicketFilterState {
   filter: TicketNamedFilter;
   advanced: TicketAdvancedFilters;
+}
+
+/**
+ * The Home period a tile handed to the list (G7): its name, and the created-date filter it set. The filter itself is
+ * the ordinary `fromDate` / `toDate` of the Filters sheet, so it combines with every other filter exactly as a date
+ * picked by hand does. This record only lets the list name it ("This month") and clear it in one tap.
+ */
+export interface TicketListPeriod {
+  label: string;
+  fromDate: string;
+  toDate: string;
+}
+
+/**
+ * The period the list should show as applied, or null. Only while the created-date filter is still exactly the one the
+ * tile set, and the person may use the date filter: once they change a day in the Filters sheet, it is their own dates.
+ */
+export function appliedTicketPeriod(
+  period: TicketListPeriod | null,
+  advanced: TicketAdvancedFilters,
+  allowed: readonly TicketListFilterKey[],
+): TicketListPeriod | null {
+  if (!period || !allowed.includes('date')) return null;
+  return advanced.fromDate === period.fromDate && advanced.toDate === period.toDate ? period : null;
 }
 
 /** Pick a named filter. "My open" or "Unassigned" drops a technician filter (one slot, last choice wins). */

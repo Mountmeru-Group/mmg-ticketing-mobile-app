@@ -40,21 +40,15 @@ const NON_ADMIN = NAMES.filter((name) => name !== 'ADMIN');
 // ── 1. Drawer rows ───────────────────────────────────────────
 
 describe('KB and announcements: drawer rows (ADMIN only)', () => {
-  const STAFF = ['approvals', 'tasks', 'catalog', 'settings'];
-  const REQUESTER = ['tasks', 'catalog', 'settings'];
+  // G7: Approvals is on every drawer now (tests/rbac/approvals-visibility.test.mjs); it never brings KB or
+  // Announcements back.
+  const EVERYONE = ['approvals', 'tasks', 'catalog', 'settings'];
   const ADMIN = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
 
   forEachPersona(
-    'drawer rows, no pending approvals',
-    { END_USER: REQUESTER, AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: REQUESTER, ADMIN },
-    (p) => drawerItems(p.role, 0),
-  );
-
-  // A pending approval adds the Approvals row (08 S1) and nothing else: it never brings KB or Announcements back.
-  forEachPersona(
-    'drawer rows, 3 pending approvals',
-    { END_USER: STAFF, AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: STAFF, ADMIN },
-    (p) => drawerItems(p.role, 3),
+    'drawer rows',
+    { END_USER: EVERYONE, AGENT: EVERYONE, TRIAGE_AGENT: EVERYONE, L2_MANAGER: EVERYONE, ADMIN },
+    (p) => drawerItems(p.role),
   );
 
   forEachPersona(
@@ -70,15 +64,15 @@ describe('KB and announcements: drawer rows (ADMIN only)', () => {
   );
 
   test('a role the app does not know gets neither row', () => {
-    assert.equal(drawerItems('GUEST', 5).includes('knowledge'), false);
-    assert.equal(drawerItems('GUEST', 5).includes('announcements'), false);
+    assert.equal(drawerItems('GUEST').includes('knowledge'), false);
+    assert.equal(drawerItems('GUEST').includes('announcements'), false);
   });
 
   test('the two rows open the two ADMIN-only routes (DrawerContent.tsx), and rows come only from drawerItems()', () => {
     const src = read('src/navigation/DrawerContent.tsx');
     assert.match(src, /knowledge: \{ label: 'Knowledge base', icon: '[\w-]+', route: 'Knowledge' \}/);
     assert.match(src, /announcements: \{ label: 'Announcements', icon: '[\w-]+', route: 'Announcements' \}/);
-    assert.match(src, /const rows: DrawerRow\[\] = drawerItems\(role, pendingApprovals\)\.map\(/);
+    assert.match(src, /const rows: DrawerRow\[\] = drawerItems\(role\)\.map\(/);
   });
 });
 
@@ -129,10 +123,8 @@ describe('KB and announcements: the routes exist for ADMIN only', () => {
 
   test('every drawer row a person sees opens a route that is registered for them (no dead row)', () => {
     for (const name of NAMES) {
-      for (const pending of [0, 1]) {
-        const routes = drawerRoutes(PERSONAS[name].role);
-        for (const row of drawerItems(PERSONAS[name].role, pending)) assert.ok(routes.includes(ROW_ROUTE[row]), `${name}: ${row}`);
-      }
+      const routes = drawerRoutes(PERSONAS[name].role);
+      for (const row of drawerItems(PERSONAS[name].role)) assert.ok(routes.includes(ROW_ROUTE[row]), `${name}: ${row}`);
     }
   });
 

@@ -16,6 +16,13 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**Updated for Phase G7, 2026-11-02: Approvals for every role, the Home period on the ticket list, and push (app side).**
+- N1: the Approvals drawer row is on every role's drawer, always (Ronit's decision). The route was already registered for every role. APR-1 answers every role, `[]` when nothing waits. No role is one that can never be an approver: the web names approvers from all active users.
+- H7: the Home shortcut keeps the old rule.
+- H3, H10: a tile now opens the list with the period as its created-date filter.
+- Push changes no gate. Every signed-in role registers its phone, and the server half is not deployed.
+- No mismatch count changes. §18 has the evidence and the tests. Sources: `docs/G7-PERIOD-APPROVALS-PUSH.md`.
+
 **Updated for Phase G6, 2026-11-02: Home's period row, and the KPI tiles at parity with the web dashboard.**
 - Staff tiles are now the web's five: Total, Open, In progress, Resolved, SLA breached.
 - The web's status chips sit beneath them. On hold, Active and Unassigned moved there from the grid; none was dropped.
@@ -230,7 +237,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 ### 2.1 Drawer and tab bar
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
 |---|---|---|---|---|---|
-| N1 | Drawer · Approvals (badge) | ADMIN, AGENT always; END_USER and L2 while APR-1 ≥ 1 | ADMIN, AGENT; anyone by URL | **WIDER**, *decision* 08 S1. Not a security problem: APR-1 returns only approvals assigned to the caller, and the server lets any approver act | `src/navigation/DrawerContent.tsx:83` → perm `drawerItems` |
+| N1 | Drawer · Approvals (badge) | **every role, always** (G7, Ronit's decision; before: ADMIN, AGENT always, END_USER and L2 while APR-1 ≥ 1) | ADMIN, AGENT; anyone by URL (no route guard, `FE:router/index.tsx:141`) | **WIDER**, *decision* (G7; 08 S1 before). Not a security problem: APR-1 returns only approvals assigned to the caller (`[]` when none, never 403), and the server lets any approver act. The route is registered for every role (perm `drawerRoutes`) | `src/navigation/DrawerContent.tsx:92` → perm `drawerItems` |
 | N2 | Drawer · Tasks | all (END_USER read-only) | – (no standalone page) | N/A (mobile module, D4) | same |
 | N3 | Drawer · Knowledge base | ADMIN (2026-10-29; all before) | all | **NARROWER**, *simplified* (§16). The route is not registered for anyone else, so the screen is unreachable, not merely unlisted | perm `drawerItems`, `drawerRoutes`, `canUseKnowledgeBase`; `src/navigation/AppDrawer.tsx` |
 | N4 | Drawer · Announcements | ADMIN (2026-10-29; all before, which was **WIDER**, *decision* 08 S1) | ADMIN, AGENT, L2 | **NARROWER** for AGENT and L2, *simplified* (§16). MATCH for END_USER (neither side) and ADMIN. The route is not registered for anyone but ADMIN | perm `drawerItems`, `drawerRoutes`, `canReadAnnouncements`; `AppDrawer.tsx` |
@@ -248,7 +255,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | H4 | Unassigned count (G6: a status chip, no longer a tile) | ADMIN, triage AGENT | AGENT, L2, ADMIN | **NARROWER**, *decision* 04 M2: the count drops the scope for anyone else (05 B.20) | perm `homeChips` |
 | H5 | KPI numbers for L2 | none: tiles and chips without counts, plus a notice | all | **NARROWER**, *defect avoided*: DSH-1 is cached per role for L2, so the numbers can be another manager's (05 C.19) | `HomeScreen.tsx:172-176, :217-223` |
 | H6 | Matrices, Country × Group, trends, workload | none | AGENT, L2, ADMIN | **NARROWER**, *defect avoided* (unscoped or mis-scoped, 05 B.20) | `src/hooks/useHome.ts` `pickSafe` |
-| H7 | Pending approvals shortcut | as N1 | – | as N1 | perm `showApprovalsShortcut` |
+| H7 | Pending approvals shortcut | ADMIN, AGENT always; END_USER and L2 while APR-1 ≥ 1 (unchanged in G7: no longer "as N1") | – | N/A (mobile addition) | perm `showApprovalsShortcut` |
 | H8 | Recent tickets | all, own scope | all | MATCH | `HomeScreen.tsx:264-272` |
 | H9 | My open / Due soon shortcuts | staff | – | N/A | `HomeScreen.tsx:252-253` |
 | H10 | Status chips (G6): Closed, the five pending reasons, On hold (each of the last six hidden at 0) | AGENT, L2 (no counts, all shown), ADMIN | AGENT, L2, ADMIN | MATCH | perm `homeChips` |
@@ -1207,3 +1214,58 @@ The Home PERIOD row and the KPI tiles at parity with the web dashboard. Web beha
 - Navigation structure, every permission outside Home, staleTime and polling.
 - No library added, no EAS build run, nothing committed.
 - The web repo was read only and is byte-for-byte unchanged at HEAD `d7f3887`.
+
+## 18. What Phase G7 changed (2026-11-02, uncommitted)
+
+Sources for every web and server statement: `docs/G7-PERIOD-APPROVALS-PUSH.md`.
+
+### 18.1 Approvals for every role (N1)
+
+| Persona | Drawer row before | Drawer row now | Route | APR-1 with nothing pending |
+|---|---|---|---|---|
+| END_USER | only while APR-1 ≥ 1 | always | registered (unchanged) | `200 []` → "Nothing waiting for you" |
+| AGENT | always | always | registered | `200 []` |
+| triage AGENT | always | always | registered | `200 []` |
+| L2_MANAGER | only while APR-1 ≥ 1 | always | registered (unchanged) | `200 []` |
+| ADMIN | always | always | registered | `200 []` |
+
+- **The web:** the sidebar shows Approvals to ADMIN and AGENT (`FE:layouts/AppLayout.tsx:32`). The `/approvals` route has no role guard (`FE:router/index.tsx:141`), so anyone can reach it by address.
+- **APR-1:** `requireAuth` only (`BE:modules/approvals/approvals.router.ts:10`). It returns the caller's PENDING rows, `[]` when there are none (`approvals.controller.ts:105-112`). **No role gets a 403**, so no 403 handling was added: there is nothing to hide.
+- **Who can be an approver:** any active user, END_USER and L2_MANAGER included.
+  - The web's ticket "Submit for approval" searches all users, with no role filter (`FE:TicketDetailPage.tsx:418-421`).
+  - The server checks no approver role (`approvals.controller.ts:16-38`).
+  - Approve and reject check only that the caller is the named approver (`:118`).
+  - **No role can never have an approval**, so there is none to report.
+- **Not changed:** the Home shortcut (H7) keeps its rule, so a requester's Home does not show a shortcut that almost always reads 0. The unscoped `GET /approvals` is still never called (05 C.16).
+
+### 18.2 The Home period on the ticket list (H3, H10)
+
+- **Which tiles carry the period:** Total, In progress, Resolved and SLA breached, as the web's links do (`FE:DashboardPage.tsx:346-374`). So do Closed and Unassigned (`:386`, `:393`), and the pending reasons and On hold.
+  - **Unlike the web** (`:407`), the pending reasons and On hold carry it, so their number and the list agree (05 B.37).
+- **Which don't:** Open and Active (counted right now, any date).
+- **No role gate changes.** The created-date filter is every role's (`ticketListFilters`). L2_MANAGER has no period row, so its tiles carry nothing.
+- **Count and list agreement:** see `docs/G7-PERIOD-APPROVALS-PUSH.md` §1.3. Two exceptions, both server-side:
+  - the server clock, if it is not UTC;
+  - Unassigned, for an AGENT whose server scope is "assigned to me" alone (05 B.20).
+
+### 18.3 Push (app side)
+
+- No gate. Every signed-in role registers its phone once the permission is granted (asked on the first visit to Alerts).
+- The server half is not deployed (01 NTF-5/NTF-6).
+
+### 18.4 Tests
+
+- `tests/rbac/role-gating.test.mjs`: drawer rows re-pinned (Approvals for all five personas, whatever is pending); the Home shortcut pinned at 0 and 2 pending (139 tests, unchanged in number).
+- `tests/rbac/kb-announcements.test.mjs` and `service-catalog.test.mjs`: re-pinned for the new first row. The "no dead row" check runs over the new rows.
+- `tests/rbac/approvals-visibility.test.mjs` (new, 25):
+  - the row for all five personas;
+  - the route registered, and opened by React Navigation's own drawer router with the row's action;
+  - APR-1 only, `[]` read as the empty state;
+  - no unscoped `GET /approvals` anywhere in `src/`.
+- `tests/home/period-list.test.mjs` (new, 30):
+  - the days per period, identical to the web's computation;
+  - the carry table;
+  - the TKT-1 request after each tile and chip, through the real client;
+  - the list's period chip: shown, cleared, combined with other filters, replaced by hand-picked days.
+- `tests/push/push.test.mjs` (new, 35).
+- `npm test`: 896 (811 before).

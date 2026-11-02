@@ -23,13 +23,15 @@ export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'anno
 
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
- * Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns ≥ 1 (08 S1).
+ * Approvals: every role, always (G7, Ronit's decision 2026-11-02). Any active user can be named an approver on the web
+ * (no role filter, FE:TicketDetailPage.tsx:418-421) and APR-1 answers every role, `[]` when nothing waits
+ * (approvals.controller.ts:105-112). Before G7: ADMIN/AGENT always, END_USER and L2_MANAGER only while APR-1 had ≥ 1.
+ * The web's sidebar shows it to ADMIN and AGENT only (AppLayout.tsx:32): mobile is wider here, on purpose.
  * Knowledge base and Announcements: ADMIN only (2026-10-29, canUseKnowledgeBase, canReadAnnouncements).
  * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
  */
-export function drawerItems(role: UserRole, pendingApprovals: number): DrawerItem[] {
-  const items: DrawerItem[] = [];
-  if (isAgentOrAdmin(role) || pendingApprovals >= 1) items.push('approvals');
+export function drawerItems(role: UserRole): DrawerItem[] {
+  const items: DrawerItem[] = ['approvals'];
   items.push('tasks');
   if (canUseKnowledgeBase(role)) items.push('knowledge');
   if (canUseServiceCatalog(role)) items.push('catalog');
@@ -138,9 +140,13 @@ export function showHomePeriod(role: UserRole): boolean {
   return homeVariant(role) !== 'l2';
 }
 
-/** "Pending approvals" shortcut on Home: the same rule as the drawer row (08 S1). */
+/**
+ * "Pending approvals" shortcut on Home: ADMIN/AGENT always; END_USER and L2_MANAGER only while they have one (08 S1).
+ * This was "the drawer row's rule" until G7 made the row permanent. The shortcut keeps the old rule, so a requester's
+ * Home does not gain a shortcut that almost always reads 0; the drawer row is the way in when nothing waits.
+ */
 export function showApprovalsShortcut(role: UserRole, pendingApprovals: number): boolean {
-  return drawerItems(role, pendingApprovals).includes('approvals');
+  return isAgentOrAdmin(role) || pendingApprovals >= 1;
 }
 
 /**

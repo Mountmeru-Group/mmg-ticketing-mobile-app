@@ -84,3 +84,52 @@ export function customRangeLabel(range: CustomDayRange): string | null {
   if (customRangeProblem(range) !== null) return null;
   return `${formatFilterDay(range.from as string)} – ${formatFilterDay(range.to as string)}`;
 }
+
+// ── The period on the ticket list (G7) ───────────────────────
+
+/** The created-date filter a Home tile hands to the ticket list: TKT-1 `fromDate` / `toDate` (`YYYY-MM-DD`). */
+export interface PeriodListDates {
+  fromDate: string;
+  toDate: string;
+}
+
+/**
+ * The days a Home tile puts on the ticket list for a period, computed exactly as the web's dashboard links compute them
+ * (`getRangeDateParams`, FE:pages/dashboard/DashboardPage.tsx:72-86):
+ * - "today" is the **UTC** calendar day of the device clock (`toISOString()`, :74), and "N days ago" is the device's
+ *   date minus N (`setDate`, :76), also read as a UTC day. TKT-1 reads both as UTC days (BE:tickets.controller.ts:125-130),
+ *   so this is the server's own window whenever the server runs on UTC (docs/G7-PERIOD-APPROVALS-PUSH.md §1.3).
+ * - today, yesterday: that one day. last7 / week: 7 days ago → today. last30 / month: 30. quarter: 90. year: 365.
+ * - all: null, no date filter (:84).
+ * - custom: its From and To, once the range is valid. The web also sends a lone From (:77); the app shows no counts for
+ *   an incomplete range (dashboardPeriodQuery), so there is no number for a list to match and it sends nothing.
+ */
+export function periodListDates(period: DashboardPeriod, custom: CustomDayRange, now: Date = new Date()): PeriodListDates | null {
+  const day = (d: Date) => d.toISOString().split('T')[0] as string;
+  const daysAgo = (days: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - days);
+    return day(d);
+  };
+  const today = day(now);
+  switch (period) {
+    case 'today':
+      return { fromDate: today, toDate: today };
+    case 'yesterday':
+      return { fromDate: daysAgo(1), toDate: daysAgo(1) };
+    case 'last7':
+    case 'week':
+      return { fromDate: daysAgo(7), toDate: today };
+    case 'last30':
+    case 'month':
+      return { fromDate: daysAgo(30), toDate: today };
+    case 'quarter':
+      return { fromDate: daysAgo(90), toDate: today };
+    case 'year':
+      return { fromDate: daysAgo(365), toDate: today };
+    case 'all':
+      return null;
+    case 'custom':
+      return customRangeProblem(custom) === null ? { fromDate: custom.from as string, toDate: custom.to as string } : null;
+  }
+}

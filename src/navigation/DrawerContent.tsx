@@ -1,9 +1,10 @@
 // Side drawer ("Menu", as in SDP), role-aware per 08 §3.2. Which rows show is decided by drawerItems()
 // (utils/permissions.ts, pinned per role by tests/rbac); this file only lays them out.
 // The drawer never lists the three tab destinations, so no screen has two routes.
-// - Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns at least one (08 S1), so no one
-//   sees an empty module they can't use. Badge = APR-1 count (one cached query, shared with Home and the inbox; it
-//   refreshes on pull-to-refresh and after a decision, never polled).
+// - Approvals: every role, always (G7, Ronit's decision; before, END_USER and L2_MANAGER saw it only while APR-1 had
+//   one). Anyone can be named an approver, and APR-1 answers every role with `[]` when nothing waits, so the inbox opens
+//   on "Nothing waiting for you", never an error. Badge = APR-1 count (one cached query, shared with Home and the inbox;
+//   it refreshes on pull-to-refresh and after a decision, never polled).
 // - Tasks: every role (END_USER read-only). The list is built from TKT-1 rows; see hooks/useTasks.ts (no A20 yet).
 // - Knowledge base, Announcements: ADMIN only (2026-10-29, a product decision; their routes are registered for ADMIN
 //   only too, AppDrawer.tsx).
@@ -88,7 +89,7 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
     }
   };
 
-  const rows: DrawerRow[] = drawerItems(role, pendingApprovals).map((item) => ({
+  const rows: DrawerRow[] = drawerItems(role).map((item) => ({
     key: item,
     ...DRAWER_ROWS[item],
     badge: item === 'approvals' ? pendingApprovals : undefined,

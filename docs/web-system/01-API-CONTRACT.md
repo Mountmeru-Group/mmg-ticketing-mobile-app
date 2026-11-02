@@ -149,7 +149,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 | AUTH-P1 | `POST /api/v1/auth/mobile/login` `{ username, password }` | A1 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }` | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
-| AUTH-P4 | `POST /api/v1/devices`, `DELETE /api/v1/devices/:token` | A5 | `201` / `200` |
+| ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, ⚠ NOT YET DEPLOYED), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
 | AUTH-P5 | `GET /api/v1/tickets/by-number/:ticketNumber` | A8 | same as TKT-3 |
 
 ### 1.5 Reference only — exists, but mobile must NOT call it
@@ -278,7 +278,7 @@ export const assignTicketSchema = z.object({
 |---|---|---|---|
 | Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, one value | every role | the 03 enum, in that order |
 | Category | `categoryId=<top-level category id>`. **Exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name |
-| Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500) | every role | the system date picker |
+| Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500). **G7:** a Home tile also sets both, from the Home period, as the web's dashboard links do: UTC days of the device clock (`FE:pages/dashboard/DashboardPage.tsx:72-86`; `src/utils/dashboard-period.ts` `periodListDates`; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1) | every role | the system date picker, or a Home tile |
 | Technician | `assignedToId=<user id>` | ADMIN, AGENT | USR-3 `role=AGENT` (the web lists active AGENTs) |
 | Group | `teamId=<team id>` | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web) |
 
@@ -913,6 +913,8 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - **200:** `{ "count": number }`, the unread count.
 - **Source:** `notifications.router.ts:8`, `notifications.controller.ts:25-28`.
 - **Mobile:** this drives the badge. Poll it on app foreground, on pull-to-refresh, and every ≥ 60 s while the app is in the foreground. It is the substitute for push until A5 ships.
+  - In practice the app does not poll it: it reloads on pull-to-refresh and after a mark-read.
+  - Since G7 it also reloads when a push arrives while Setu is open; that does nothing until NTF-5/NTF-6 and the FCM send ship.
 
 ### NTF-3 `POST /api/v1/notifications/:id/read` — MVP
 - **200:** `{ "message": "Marked as read" }`. Also returns 200 for unknown or foreign IDs, which are silently ignored.
@@ -921,6 +923,33 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 ### NTF-4 `POST /api/v1/notifications/read-all` — MVP
 - **200:** `{ "message": "All notifications marked as read" }`.
 - **Source:** `notifications.router.ts:11`, `notifications.controller.ts:38-44`.
+
+### NTF-5 `POST /api/v1/notifications/device-token` — ⚠ NOT YET DEPLOYED (G7)
+- **Status:** **does not exist on the server yet.**
+  - Specified by Ronit in MOBILE-BACKEND-REQUIREMENTS.md §1.5, sent to the backend team on 2026-11-02. It replaces AUTH-P4 (§1.4).
+  - Until it ships, Express answers `404` with an HTML body (`Cannot POST …`).
+- **Auth:** Bearer, the signed-in user.
+- **Body:** `{ "token": "<FCM registration token>", "platform": "android" }`.
+- **200 (as specified):** `{ "ok": true }`.
+  - Upsert on `token`.
+  - A token already registered to a different user is **reassigned to the caller**.
+  - `lastSeenAt` is updated.
+- **Mobile (G7):** `registerDeviceToken()` in `src/api/notifications.api.ts`, called from `src/push/registration.ts`. It is sent:
+  - after sign-in, and once per app start with a stored session, while the notification permission is granted;
+  - when Firebase rotates the token.
+  - The token is the native FCM token (`getDevicePushTokenAsync`), not an Expo push token.
+  - **A 404 is silent**: no banner, no dialog. The Alerts notice says "not switched on at the Service Desk yet", and `[push] register: 404, NTF-5 not deployed yet` is logged for developers.
+  - No other failure is shown either. The token is never logged.
+
+### NTF-6 `DELETE /api/v1/notifications/device-token` — ⚠ NOT YET DEPLOYED (G7)
+- **Status:** **does not exist on the server yet** (same source as NTF-5).
+- **Auth:** Bearer.
+- **Body:** a JSON body, `{ "token": "<FCM registration token>" }`. It is not a path parameter.
+- **200 (as specified):** `{ "ok": true }`.
+- **Mobile (G7):** `unregisterDeviceToken()`, called from `useSignOut` (`src/hooks/useProfile.ts`) on an explicit sign-out.
+  - It is sent **before** AUTH-3, because AUTH-3 ends the session token NTF-6 needs.
+  - Sign-out waits at most 3 s for it, and its failures are silent.
+  - Sessions that end without the Sign out button (401, 8 h expiry, the 15-day re-authentication) cannot call it, because their token is already dead. For those, the app has Firebase delete the token on the phone (`FirebaseMessaging.deleteToken()`), so the old token can no longer deliver anything. The server row is then removed when FCM reports the token unregistered (MOBILE-BACKEND-REQUIREMENTS.md §1.6).
 
 > `GET /api/v1/notifications/stream` (SSE) is **out of scope**. It never delivers events (ioredis subscribe bug, `notifications.controller.ts:58-62`), and React Native has no `EventSource`. See `05` §B.
 
@@ -944,7 +973,9 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 #### APR-1 `GET /api/v1/approvals/pending` — P2
 - **Auth:** any role; scoped to `approverId = me`, `status = PENDING`.
 - **200:** `Approval[]`, `createdAt` asc, not paginated.
+  - Someone with nothing pending gets `200 []`, whatever their role. There is no role check, so there is never a 403 (re-checked in G7).
 - **Source:** `approvals.router.ts:10`, `approvals.controller.ts:105-112`.
+- **Mobile (G7):** the Approvals drawer row and route are there for **every** role, always (Ronit's decision). An empty answer is the inbox's "Nothing waiting for you" state. The app still never calls the unscoped `GET /approvals` (`05` §C.16).
 
 #### APR-2 `POST /api/v1/approvals/:id/approve` — P2
 - **Auth:** any role. (ctrl) must be the approver.
@@ -1160,7 +1191,11 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 5 are PENDING backend asks (§1.4) and 3 are reference-only, do-not-call (§1.5). SCR-1..SCR-6 are used by the app since G4; their label stays P2, as for LKP-7 and APR-4.
+**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 6 are PENDING backend asks:
+- AUTH-P1, P2, P3 and P5 (§1.4);
+- NTF-5 and NTF-6 (§9), ⚠ NOT YET DEPLOYED. The app calls them silently and they answer 404 until they ship (G7). They replace AUTH-P4.
+
+3 more are reference-only, do-not-call (§1.5). SCR-1..SCR-6 are used by the app since G4; their label stays P2, as for LKP-7 and APR-4.
 
 | ID | Method | Path (under `/api/v1` unless noted) | Roles (server) | Phase |
 |---|---|---|---|---|
@@ -1207,6 +1242,8 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | NTF-2 | GET | `/notifications/count` | own | MVP |
 | NTF-3 | POST | `/notifications/:id/read` | own | MVP |
 | NTF-4 | POST | `/notifications/read-all` | own | MVP |
+| NTF-5 | POST | `/notifications/device-token` `{ token, platform }` | own | ⚠ NOT YET DEPLOYED (G7) |
+| NTF-6 | DELETE | `/notifications/device-token` `{ token }` | own | ⚠ NOT YET DEPLOYED (G7) |
 | APR-1 | GET | `/approvals/pending` | own | P2 |
 | APR-2 | POST | `/approvals/:id/approve` | approver | P2 |
 | APR-3 | POST | `/approvals/:id/reject` | approver | P2 |

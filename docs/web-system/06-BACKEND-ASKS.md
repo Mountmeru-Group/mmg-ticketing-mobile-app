@@ -206,6 +206,14 @@ Keep the same login rate limiter (20 per 15 min per IP).
 
 ### A5 — Push notifications — Nice-to-have (MVP polls) — M–L
 
+> **Superseded on 2026-11-02 (G7)** by Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1, sent to the backend team. It asks for:
+> - FCM rather than Expo's push service, and a `DeviceToken` table;
+> - `POST /api/v1/notifications/device-token` `{ token, platform }`, which upserts and **reassigns a known token to the caller**;
+> - `DELETE /api/v1/notifications/device-token` `{ token }`;
+> - the FCM send, with `data.ticketId` and channel `setu_tickets`.
+>
+> The app side is built against that and is silent until it ships (`01` NTF-5/NTF-6, ⚠ NOT YET DEPLOYED). The original wording below is kept for the record.
+
 **Ask**
 1. New table `DeviceToken`:
    - `id`, `userId` (FK, cascade), `token` (unique)

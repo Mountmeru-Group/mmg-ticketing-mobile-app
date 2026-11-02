@@ -2,7 +2,8 @@
 //
 // Known backend quirks and what the app does about each (05 B.3, B.4, B.23) — the Alerts screen also tells the user:
 // - B.3  The SSE stream never delivers events, so nothing arrives live. The app does not open the stream.
-// - B.4  No push exists, so nothing arrives while the app is closed.
+// - B.4  No push on the server yet, so nothing arrives while the app is closed. The app side is built (G7, src/push/):
+//        it registers this phone once NTF-5 exists, and a push arriving while Setu is open refreshes this list.
 //        → The list and the badge load when first shown, and refresh on pull-to-refresh (Alerts or Home) and after a
 //          mark-read. This phase forbids polling, so the 60-second NTF-2 poll the docs allow (01 NTF-2) is NOT used:
 //          the badge can be behind until the person pulls to refresh.
