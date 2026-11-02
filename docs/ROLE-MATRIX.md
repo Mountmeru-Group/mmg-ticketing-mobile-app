@@ -16,6 +16,12 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**Updated for Phase G8, 2026-11-02: the audit log (M20), ADMIN only.**
+- N9 (new): the "Audit log" drawer row and its route exist for ADMIN only. For the other four personas the route is not registered, so React Navigation's router refuses every way to open it.
+- The server agrees: AUD-1 is `requireAuth, adminOnly` (`BE:modules/auditLog/auditLog.router.ts:8`), a 403 for every other role. **This is a server guard, not only a hidden link**, so there is no §C finding.
+- The web page `/audit-log` is deployed but **not in the analysed clone**. Its Action and date filters have no parameter in the clone's endpoint, so mobile does not offer them. That is a ❌ for ADMIN in `docs/WEB-VS-MOBILE-ROLES.md`.
+- §19 has the evidence and the tests. Sources: `docs/G8-WEB-AUDIT.md`.
+
 **Updated for Phase G7, 2026-11-02: Approvals for every role, the Home period on the ticket list, and push (app side).**
 - N1: the Approvals drawer row is on every role's drawer, always (Ronit's decision). The route was already registered for every role. APR-1 answers every role, `[]` when nothing waits. No role is one that can never be an approver: the web names approvers from all active users.
 - H7: the Home shortcut keeps the old rule.
@@ -245,6 +251,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | N6 | Sign out | all | all | MATCH | `DrawerContent.tsx` account card |
 | N7 | Locked-country chip | country AGENT | country AGENT (lock icon) | MATCH | `DrawerContent.tsx:59` |
 | N8 | Tabs Home · Tickets · Alerts | all, same three | all, five tabs | MATCH. KB and the catalogue (the web's "Requests" tab, SC1) are in the drawer | `src/navigation/MainTabs.tsx:46` → perm `mainTabs` |
+| N9 | Drawer · Audit log (M20, G8) | ADMIN (row and route) | ADMIN: the server's AUD-1 guard (`BE:modules/auditLog/auditLog.router.ts:8`). The page is not in the clone, so its sidebar visibility could not be read | **MATCH** with the server. The route is registered for ADMIN only, below a divider after Announcements. Its action and date filters are not built: the clone's endpoint has none (`docs/G8-WEB-AUDIT.md` §6) | perm `drawerItems`, `drawerRoutes`, `canViewAuditLog`; `src/navigation/AppDrawer.tsx`, `DrawerContent.tsx`; `src/hooks/useAuditLog.ts` |
 
 ### 2.2 Home (M2) vs Dashboard
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -1269,3 +1276,50 @@ Sources for every web and server statement: `docs/G7-PERIOD-APPROVALS-PUSH.md`.
   - the list's period chip: shown, cleared, combined with other filters, replaced by hand-picked days.
 - `tests/push/push.test.mjs` (new, 35).
 - `npm test`: 896 (811 before).
+
+## 19. What Phase G8 changed (2026-11-02, uncommitted)
+
+Sources for every web and server statement: `docs/G8-WEB-AUDIT.md`.
+
+### 19.1 The audit log, ADMIN only (N9)
+
+| Persona | Drawer row | Route | AUD-1 sent by the app | AUD-1 on the server |
+|---|---|---|---|---|
+| END_USER | no | not registered | never | 403 |
+| AGENT | no | not registered | never | 403 |
+| triage AGENT | no | not registered | never | 403 |
+| L2_MANAGER | no | not registered | never | 403 |
+| ADMIN | yes: after Announcements, below a divider, before Settings | registered | yes | 200 |
+
+- **One rule, three places:**
+  - `canViewAuditLog(role)` = ADMIN (`src/utils/permissions.ts`);
+  - it decides the row (`drawerItems`), the route (`drawerRoutes`) and the request (`useAuditLog` `enabled`).
+  - The screen also refuses to show the log to any other role, after its hooks. This is defence in depth: the route is not registered for them anyway.
+- **The server enforces the same rule** (`requireRole('ADMIN')`, `BE:middleware/rbac.middleware.ts:8-21`). Unlike the web's pages, it is not only a hidden link, so there is no §C finding.
+  - C.11 still applies: a demoted ADMIN keeps access until their cached session expires (≤ 8 h).
+- **The web side:**
+  - The page is deployed (Ronit) but not in the clone (G8 §1), so its sidebar rule could not be read.
+  - Whatever the page shows, the server returns 403 to every role but ADMIN.
+- **Not offered, and why:**
+  - **Action and date filters:** AUD-1 in the clone has no such parameter (G8 §6). Counted as ❌ for ADMIN in `docs/WEB-VS-MOBILE-ROLES.md`, gap 12.
+  - **The actor's role** ("(Consultant)" on the web page): not in the response (G8 §9).
+- **Mobile only:** the Person filter (AUD-1 `actorId`; the people search, USR-3, which ADMIN may use).
+
+### 19.2 Tests
+
+- `tests/rbac/audit-log.test.mjs` (new, 48):
+  - `canViewAuditLog`, the drawer row and the registered route, for all five personas;
+  - the row's position and its divider;
+  - for the four other personas, React Navigation's own drawer router refuses every action that could open the route (navigate, jumpTo, push, replace, preload, reset), and a stale saved state is rehydrated without it;
+  - ADMIN opens it with the row's action;
+  - the screen and the hook send AUD-1 for ADMIN only;
+  - AUD-1 is called from one module;
+  - filters → params through the real axios client: each filter alone, all three together, and stray keys dropped;
+  - the ticket number → id lookup takes an exact match only.
+- `tests/audit/audit-details.test.mjs` (new, 34):
+  - the Details formatter on every shape the server writes;
+  - its fallbacks, including a throwing getter;
+  - action labels, ticket links, the ticket-number box and the day groups;
+  - the pill colours: AA contrast, and lightness bands at least 15 L* apart.
+- Re-pinned for ADMIN's new row and route: `tests/rbac/role-gating.test.mjs`, `tests/rbac/kb-announcements.test.mjs` (including the "no dead row" check, which now covers the Audit log row).
+- `npm test`: 978 (896 before).

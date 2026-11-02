@@ -41,9 +41,9 @@ const NON_ADMIN = NAMES.filter((name) => name !== 'ADMIN');
 
 describe('KB and announcements: drawer rows (ADMIN only)', () => {
   // G7: Approvals is on every drawer now (tests/rbac/approvals-visibility.test.mjs); it never brings KB or
-  // Announcements back.
+  // Announcements back. G8: ADMIN's Audit log row sits after Announcements (tests/rbac/audit-log.test.mjs).
   const EVERYONE = ['approvals', 'tasks', 'catalog', 'settings'];
-  const ADMIN = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
+  const ADMIN = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'settings'];
 
   forEachPersona(
     'drawer rows',
@@ -79,7 +79,10 @@ describe('KB and announcements: drawer rows (ADMIN only)', () => {
 // ── 2. Routes: registered for ADMIN only, so unreachable for anyone else ──
 
 /** DrawerContent's DRAWER_ROWS: each row's route (pinned by the source test above and by service-catalog.test.mjs). */
-const ROW_ROUTE = { approvals: 'Approvals', tasks: 'Tasks', knowledge: 'Knowledge', catalog: 'Catalog', announcements: 'Announcements', settings: 'Profile' };
+const ROW_ROUTE = {
+  approvals: 'Approvals', tasks: 'Tasks', knowledge: 'Knowledge', catalog: 'Catalog', announcements: 'Announcements',
+  auditLog: 'AuditLog', settings: 'Profile',
+};
 
 /** The App drawer exactly as AppDrawer.tsx configures it, for this role's registered routes. */
 function drawerFor(role) {
@@ -112,7 +115,7 @@ describe('KB and announcements: the routes exist for ADMIN only', () => {
       AGENT: ALL,
       TRIAGE_AGENT: ALL,
       L2_MANAGER: ALL,
-      ADMIN: ['MainTabs', 'Approvals', 'Tasks', 'Knowledge', 'Catalog', 'Announcements', 'Profile'],
+      ADMIN: ['MainTabs', 'Approvals', 'Tasks', 'Knowledge', 'Catalog', 'Announcements', 'AuditLog', 'Profile'],
     },
     (p) => drawerRoutes(p.role),
   );

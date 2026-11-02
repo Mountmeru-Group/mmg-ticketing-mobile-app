@@ -1,5 +1,24 @@
 # Web portal vs mobile app: who can do what
 
+**2026-11-02 (G8): the audit log, ADMIN only. Three rows added; ADMIN drops from 100 % to 98 %, the other roles are unchanged.**
+- **What was built:** M20, the audit log, for ADMIN only.
+  - Cards grouped by day: the action as a coloured pill, the ticket as a link, the person, the details made readable.
+  - Filters: entity type, ticket number, person.
+  - The drawer row and the route are ADMIN only, as the server's own guard is (AUD-1 answers 403 to every other role).
+- **Rows** (section 3, new "Audit log" group):
+  - "Read the audit log …", ✅ SAME for ADMIN.
+  - "Filter the audit log by action, or by date", ❌ NOT BUILT. The first ❌ row since G5.
+  - "Filter the audit log by person", ➕ MOBILE ONLY.
+- **Why a ❌, and why the web column is less certain than usual:**
+  - The deployed web page offers Action and From/To filters (Ronit).
+  - But the page is not in the analysed clone, and the clone's endpoint has no such parameters.
+  - The row is counted as the web page shows it. If the deployed server turns out to support them, they can be built (`docs/G8-WEB-AUDIT.md` §11).
+- **The figures** (section 2):
+  - ADMIN 85 on web, 85 on mobile, 98 % (63 of 64). Every other role is unchanged.
+  - Counting the exclusions as misses, the range is 64–74 % (ADMIN 75 % → 74 %).
+  - 117 rows. Recounted by script, which first reproduced every published figure on the unchanged table.
+- Sources: `docs/G8-WEB-AUDIT.md`; evidence and tests: `docs/ROLE-MATRIX.md` §19.
+
 **2026-11-02 (G7): no row or figure changed.** Three behaviours changed within existing rows:
 - **Approvals is on every role's drawer, always** (Ronit's decision).
   - Before, END_USER and L2_MANAGER saw it only while something waited for them.
@@ -60,13 +79,14 @@ This document compares, one capability per row, what the **web portal** lets eac
 | AGENT | 81 | 78 | **95%** (58 of 61) | none | 3: the two above; read announcements |
 | triage AGENT | 80 | 79 | **95%** (59 of 62) | none | 3: as AGENT |
 | L2_MANAGER | 58 | 54 | **93%** (39 of 42) | none | 3: as AGENT |
-| ADMIN | 83 | 83 | 100% (62 of 62) | none | none |
+| ADMIN | 85 | 85 | **98%** (63 of 64) | 1: filter the audit log by action or date (G8, section 4) | none |
 
 - **Capabilities** is the number of rows in section 3 that the role can use. A web control that only gives that role an error is not counted.
 - **% parity** is the share of the role's web capabilities that mobile also offers, leaving out the ones mobile skips for that role as ⊘ OUT OF SCOPE or 🔒 SAFER.
   - **✂ SIMPLIFIED rows stay in: they are misses on purpose, and the figure shows them.**
-  - What remains below 100 % is exactly the ✂ rows: no role has a ❌ gap.
-  - If the ⊘ and 🔒 exclusions are counted as misses too, the roles are at 64–75% (END_USER 64%, L2_MANAGER 67%, AGENT 72%, triage AGENT 74%, ADMIN 75%).
+  - What remains below 100 % is the ✂ rows, and for ADMIN since G8 one ❌ gap: the audit log's action and date filters.
+  - If the ⊘ and 🔒 exclusions are counted as misses too, the roles are at 64–74% (END_USER 64%, L2_MANAGER 67%, AGENT 72%, triage AGENT 74%, ADMIN 74%).
+- **Before G8** (2026-11-02): ADMIN 83 on web and 83 on mobile, 100% (62 of 62); the strict range was 64–75% (ADMIN 75%). The other roles are unchanged by G8, which added three ADMIN-only rows (section 3, "Audit log").
 - **Why parity dropped (2026-10-29):** Ronit decided that only ADMIN keeps the Knowledge base and announcements on mobile, to simplify the app (section 5a).
   - Each role lost exactly the rows in the last column. END_USER also lost two ➕ rows, announcements and the Home banner, which were never on its web side, so they do not change its parity.
   - ADMIN is unchanged.
@@ -86,11 +106,13 @@ This document compares, one capability per row, what the **web portal** lets eac
 - The mobile count includes things only mobile offers (➕), so it is not a subset of the web count.
 - The figures were recounted from the section 3 table by script, which reproduces the published pre-G2 figures exactly. For G3 the script was rebuilt and first run on the pre-G3 table, where it reproduced every published figure (106 rows; 41, 21, 5, 22, 17; each role's counts, parity and gaps), before the three rows were changed. For G4 it was rebuilt again and first run on the pre-G4 table, where it reproduced every published figure (106 rows; 44, 21, 2, 22, 17; each role's counts, parity, gaps and the 64–72% range) before any row was changed. For G5 it was rebuilt once more and first run on the pre-G5 table, where it reproduced every published figure (112 rows; 48, 22, 1, 23, 18; each role's counts, parity, gaps and the 67–73% range) before the two rows were changed. For 2026-10-29 it was rebuilt again, with ✂ SIMPLIFIED kept in the denominator. It was first run on the unchanged table, where it reproduced every published figure: 112 rows; 50, 22, 0, 23, 17; each role's counts; 100%; and 67–76%. Only then were the four rows changed. For G6 it was rebuilt again and first run on the unchanged table. It reproduced every published figure there: 112 rows; 48, 21, 0, 23, 17, 3; each role's counts and parity; and 63–73%. Only then were the three dashboard rows changed.
 
-## 3. Main table: 114 capabilities
+## 3. Main table: 117 capabilities
 
 | ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | ✂ SIMPLIFIED | Total |
 |---|---|---|---|---|---|---|
-| 50 | 22 | 0 | 22 | 17 | 3 | **114** |
+| 51 | 23 | 1 | 22 | 17 | 3 | **117** |
+
+Before G8 (2026-11-02): 50 SAME, 22 MOBILE ONLY, 0 NOT BUILT, 22 OUT OF SCOPE, 17 SAFER, 3 SIMPLIFIED, 114 rows. G8 added the three "Audit log" rows: one ✅, one ❌ and one ➕.
 
 Before G6 (2026-11-02): 48 SAME, 21 MOBILE ONLY, 0 NOT BUILT, 23 OUT OF SCOPE, 17 SAFER, 3 SIMPLIFIED, 112 rows. G6 added "Choose the dashboard period" (✅) and "Active count" (➕), and moved "Closed, on hold and pending-reason counts" from ⊘ to ✅.
 Before 2026-10-29: 50 SAME, 22 MOBILE ONLY, 0 NOT BUILT, 23 OUT OF SCOPE, 17 SAFER. Two Knowledge Base rows moved from ✅ to ✂ (read and search; "Was this helpful?"). "Read announcements" moved from ➕ to ✂. The Home banner stays ➕, for ADMIN only.
@@ -105,7 +127,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 - **AGENT** means every AGENT. A **triage AGENT** has no fixed country and can switch between countries. A **plain AGENT** is fixed to one country. Rows name them separately only where they differ.
 - **AGENT (lock)** means an AGENT cannot do this once the ticket is closed or canceled. The lock is identical on web and mobile.
 - **(L2_MANAGER: error)** in the web column means the web shows that role the control, but it fails. That role is not counted as "can".
-- ROLE-MATRIX.md audits 94 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 114 rows (112 before G6).
+- ROLE-MATRIX.md audits 94 screen elements. Here some of them are split into separate capabilities and the web-only modules are added, which gives 117 rows (114 before G8, 112 before G6).
 
 ### Tickets
 
@@ -285,6 +307,14 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Bulk assign | Nobody | ADMIN, AGENT | ➕ MOBILE ONLY | |
 | Bulk close | Nobody | ADMIN, AGENT, L2_MANAGER | ➕ MOBILE ONLY | Skips any ticket the person could not close on its own. |
 
+### Audit log
+
+| Capability | WEB: who can | MOBILE: who can | Status | Note |
+|---|---|---|---|---|
+| Read the audit log: who did what and when, newest first, with the ticket, the person and the details; filter it by entity type or ticket number | ADMIN | ADMIN | ✅ SAME | G8 (2026-11-02). The web page `/audit-log` is deployed but **not in the analysed clone**, so the web column rests on Ronit's account of the page and on the server, which answers 403 to every other role (AUD-1). Mobile: a drawer row and route for ADMIN only; cards grouped by day; the ticket number opens the ticket. |
+| Filter the audit log by action, or by date (From, To) | ADMIN | Nobody | ❌ NOT BUILT | The deployed page offers these filters (Ronit). The endpoint in the analysed clone accepts no action or date parameter, so mobile has nothing to send. It needs the deployed server code checked (pull the clone), or a backend ask (`docs/G8-WEB-AUDIT.md` §11). Filtering loaded pages on the phone would show part of the answer as the whole, so it was not done. |
+| Filter the audit log by person | Nobody | ADMIN | ➕ MOBILE ONLY | The endpoint takes `actorId`; the web page's filters, as Ronit lists them, have no person filter. Mobile uses the people search (active users only). |
+
 ### Admin
 
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
@@ -302,7 +332,11 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open: none.** All eleven gaps of the 2026-10-20 list are built (1–9, 11) or decided (10).
+**Still open: one, since G8 (2026-11-02).** All eleven gaps of the 2026-10-20 list are built (1–9, 11) or decided (10).
+
+| # | Gap | Who | Why it is open |
+|---|---|---|---|
+| 12 | Filter the audit log by action, or by date (From, To) | ADMIN | **Unlike gaps 1–11, this one may need backend work.** The deployed web page offers these filters, but the page is not in the analysed clone, and the clone's AUD-1 reads no action or date parameter (`docs/G8-WEB-AUDIT.md` §2, §6). Next step, Ronit's: check the deployed server code (pull the clone). If it has the parameters, mobile adds two filter chips; if not, it is a backend ask (§11 there). |
 
 **Built in Phase G5 (2026-10-22)** — the web's behaviour, with sources: `FE:pages/tickets/CreateTicketPage.tsx:26, :49-76, :346-387`; `BE:modules/tickets/tickets.controller.ts:185-201`
 

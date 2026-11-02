@@ -55,7 +55,7 @@ Every error body is JSON `{ "error": string }`, with these exceptions noted belo
 ### 0.3 Pagination: four shapes, one adapter
 | Shape | Request | Response | Used by (in this file) |
 |---|---|---|---|
-| **(a) Standard** (`utils/pagination.ts:16-37`) | `?page=` (default 1, min 1), `?limit=` (default **25**, clamped 1–**100**) | `{ data: T[], total, page, limit, totalPages, hasNext, hasPrev }`. `totalPages = ceil(total/limit)` (0 when empty) | TKT-1, NTF-1, KB-2 |
+| **(a) Standard** (`utils/pagination.ts:16-37`) | `?page=` (default 1, min 1), `?limit=` (default **25**, clamped 1–**100**) | `{ data: T[], total, page, limit, totalPages, hasNext, hasPrev }`. `totalPages = ceil(total/limit)` (0 when empty) | TKT-1, NTF-1, KB-2, AUD-1 (G8) |
 | **(b) Hand-rolled** | `?page=&limit=`, **limit uncapped** | `{ data: T[], total, page, limit }` | APR (list), SCR-4 |
 | **(c) Ticket activity** | `?page=&pageSize=` (default 50, max 100) | `{ items, auditTotal, page, pageSize, auditPages }` | TKT-7 |
 | **(d) Plain array** | none | `T[]` | comments, attachments, tasks, categories, teams, users/search, … |
@@ -1142,6 +1142,39 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - ⚠ Any other role can read **any** request by id. **Mobile (G4):** M19 opens only from My Requests, and shows the request only when `requesterId === me` (`isOwnServiceRequest`). The web never calls this endpoint.
 - **Source:** `serviceCatalog.router.ts:24`, `serviceCatalog.controller.ts:126-133`.
 
+### 10.5 Audit log (`/api/v1/audit-log`, `app.ts:136`) — G8, 2026-11-02
+
+Out of scope until G8 (Appendix A). Evidence for every line below, and what the web page shows that this endpoint cannot supply: `docs/G8-WEB-AUDIT.md`.
+
+#### AUD-1 `GET /api/v1/audit-log` — P2 (ADMIN only; built in G8)
+- **Auth:** `requireAuth, adminOnly` (`auditLog.router.ts:8`). **ADMIN only, enforced by the server:**
+  - every other role gets `403 "Forbidden: insufficient role"` (`middleware/rbac.middleware.ts:13-15`);
+  - no user gives `401 "Unauthorized"`.
+  - The one route in the module.
+- **Query:** pagination shape (a), §0.3. The server reads these five parameters and nothing else (`auditLog.controller.ts:6-7`):
+  - `page`, default 1;
+  - `limit`, default **25**, clamped 1–100;
+  - `entityType`: an exact, case-sensitive match. Values written: `Ticket`, `Comment`, `Attachment`, and `ticket` from the auto-close job (`05` B.38);
+  - `actorId`: a user id, exact;
+  - `ticketId`: a ticket **id**, exact. No ticket-number form.
+  - An empty string is ignored. The filters combine with AND (`:9-13`).
+- **Not supported:** action, date range, ticket number, free text, sort. **Never send them** (rule 1).
+- **200:** `Paginated<AuditLogEntry>` (`03` §C):
+  - each row is the full `audit_logs` row, `ipAddress` included;
+  - plus `actor: { id, displayName, email } | null` and `ticket: { id, ticketNumber, title } | null` (`:19-22`);
+  - **no actor role**.
+  - `oldValues` / `newValues` are the stored JSON, **ids not resolved to names** (unlike TKT-7). Shapes per write site: `docs/G8-WEB-AUDIT.md` §8.
+- **Order:** `createdAt` desc (`:23`). Offset paging: rows repeat when entries are written between pages, so de-duplicate by `id`.
+- **Cost:** a `count` and a `findMany` per page. `ticketId`, `actorId` and `createdAt` are indexed; `entityType` is not (`schema.prisma:573-575`).
+- **Mobile (G8, M20):**
+  - The request:
+    - ADMIN only: the drawer row, the route and the request (`canViewAuditLog`);
+    - `limit=50`, capped at 500 entries;
+    - only `entityType`, `actorId` and `ticketId` are sent, through an allow-list (`src/api/auditLog.api.ts`).
+  - The ticket filter turns a typed number into the id with TKT-1 `search=<n>&limit=5`, exact `ticketNumber` match only, as the deep-link resolver does. The person filter uses USR-3.
+  - `ipAddress` is never displayed.
+- **Source:** `app.ts:30, :136`; `modules/auditLog/auditLog.router.ts:8`; `auditLog.controller.ts:5-29`; `utils/pagination.ts:16-44`; `schema.prisma:558-577`.
+
 ---
 
 ## Appendix A — Out of scope for mobile (names only)
@@ -1170,7 +1203,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | templates (`/templates`) | all (`GET /`, `GET /:id`, writes). The web uses them only in admin |
 | custom-fields (`/custom-fields`) | all (definitions are not rendered anywhere in the web) |
 | reports (`/reports`) | all: 16 report GETs, `GET /ticket-log`, `POST /export`, `/scheduled*` |
-| audit-log (`/audit-log`) | `GET /` |
+| audit-log (`/audit-log`) | none since G8: `GET /` is AUD-1 (§10.5), ADMIN only |
 | problems (`/problems`) | all (incl. `/:id/status`, `/:id/link-ticket`) |
 | changes (`/changes`) | all (incl. `/:id/status`, `/:id/submit`, `/:id/link-ticket`, which **force-closes tickets**, `/link-problem`, `/link-project`) |
 | cab (`/cab`) | all |
@@ -1191,7 +1224,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**59 documented endpoints:** 33 MVP and 26 Phase 2 (APR-4 added in G3). A further 6 are PENDING backend asks:
+**60 documented endpoints:** 33 MVP and 27 Phase 2 (APR-4 added in G3, AUD-1 in G8). A further 6 are PENDING backend asks:
 - AUTH-P1, P2, P3 and P5 (§1.4);
 - NTF-5 and NTF-6 (§9), ⚠ NOT YET DEPLOYED. The app calls them silently and they answer 404 until they ship (G7). They replace AUTH-P4.
 
@@ -1260,3 +1293,4 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SCR-4 | GET | `/service-catalog/requests` | any (END_USER own) ⚠ (mobile: own rows only) | P2 (G4) |
 | SCR-5 | POST | `/service-catalog/requests` | any | P2 (G4) |
 | SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |
+| AUD-1 | GET | `/audit-log` | ADMIN | P2 (G8) |

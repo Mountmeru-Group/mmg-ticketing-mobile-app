@@ -19,7 +19,7 @@ export type Viewer = Pick<AuthUser, 'id' | 'role' | 'countryId'>;
 
 // ── Navigation (08 §3) ───────────────────────────────────────
 
-export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'settings';
+export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'auditLog' | 'settings';
 
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
@@ -29,6 +29,7 @@ export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'anno
  * The web's sidebar shows it to ADMIN and AGENT only (AppLayout.tsx:32): mobile is wider here, on purpose.
  * Knowledge base and Announcements: ADMIN only (2026-10-29, canUseKnowledgeBase, canReadAnnouncements).
  * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
+ * Audit log (G8): ADMIN only (canViewAuditLog), after Announcements below a divider (DrawerContent.tsx), before Settings.
  */
 export function drawerItems(role: UserRole): DrawerItem[] {
   const items: DrawerItem[] = ['approvals'];
@@ -36,6 +37,7 @@ export function drawerItems(role: UserRole): DrawerItem[] {
   if (canUseKnowledgeBase(role)) items.push('knowledge');
   if (canUseServiceCatalog(role)) items.push('catalog');
   if (canReadAnnouncements(role)) items.push('announcements');
+  if (canViewAuditLog(role)) items.push('auditLog');
   items.push('settings');
   return items;
 }
@@ -45,16 +47,28 @@ export type DrawerRoute = keyof AppDrawerParamList;
 /**
  * The routes the App drawer REGISTERS for this role, in order (AppDrawer.tsx renders exactly these). A route left out
  * does not exist for that person: a navigate() to it is handled by no navigator, so no row, banner, link, back history
- * or stale call can open it. Knowledge (M14, M15) and Announcements (M16) are ADMIN only; every other route is
- * registered for every role, as before (their rows and shortcuts are gated by drawerItems and showApprovalsShortcut).
+ * or stale call can open it. Knowledge (M14, M15), Announcements (M16) and the Audit log (M20, G8) are ADMIN only;
+ * every other route is registered for every role, as before (their rows and shortcuts are gated by drawerItems and
+ * showApprovalsShortcut).
  */
 export function drawerRoutes(role: UserRole): DrawerRoute[] {
   const routes: DrawerRoute[] = ['MainTabs', 'Approvals', 'Tasks'];
   if (canUseKnowledgeBase(role)) routes.push('Knowledge');
   routes.push('Catalog');
   if (canReadAnnouncements(role)) routes.push('Announcements');
+  if (canViewAuditLog(role)) routes.push('AuditLog');
   routes.push('Profile');
   return routes;
+}
+
+// ── Audit log: ADMIN only (G8, docs/G8-WEB-AUDIT.md) ──────────
+// The server's own rule: AUD-1 is `requireAuth, adminOnly` (auditLog.router.ts:8), a 403 for every other role. Unlike
+// the web's pages, which have no route guards (ROLE-MATRIX.md §1), the server enforces this one; the app mirrors it for
+// the row AND the route, and useAuditLog never sends AUD-1 for anyone else.
+
+/** M20 Audit log: the drawer row, the AuditLog route and the AUD-1 request itself. */
+export function canViewAuditLog(role: UserRole): boolean {
+  return role === 'ADMIN';
 }
 
 // ── Knowledge base and announcements: ADMIN only (Ronit, 2026-10-29) ──
