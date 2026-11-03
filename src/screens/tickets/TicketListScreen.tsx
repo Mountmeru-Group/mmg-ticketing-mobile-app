@@ -41,27 +41,28 @@
 // selected, the navigation bar shows the count and Cancel. The status chip opens an iOS action sheet listing exactly
 // inlineStatusTransitions() for that ticket (Canceled in red); a closure target opens the M6 sheet. Bulk Assign and
 // Close open M7 and M6 as root sheets.
-// iOS-4 (HIG, Toolbars and Search fields):
-// - the search is the navigation bar's own (headerSearchBarOptions), under a large title that collapses as the list
-//   scrolls. It searches as before: the keyboard's search key submits, a pasted ticket link opens the resolver, and an
-//   emptied field (its ⓧ, or Cancel) clears the search, as the old field's ⓧ did;
-// - the named filters, sort, country, count and "Clear all" ride at the top of the list, with the banners, so the
-//   title can collapse (react-native-screens collapses it against the screen's first scroll view); every first-load
-//   state scrolls the same way (StateScroll);
-// - Filters is a button in the navigation bar, with how many of the five are on in its badge and its label.
+// iOS-8a (device finding, TestFlight 0.1.0 (1): the search and the first card sat under the large title):
+// - a solid navigation bar with a standard title; under it, as on Android, a white toolbar that never scrolls: the
+//   search field with the Filters button (how many of the five are on, in its badge and its label), then the named
+//   filters, sort, country, count and "Clear all". Then the error banner, then the list;
+// - the search works as in iOS-4: the keyboard's search key submits, a pasted ticket link opens the resolver, and an
+//   emptied field (or its ⓧ) clears the search;
+// - at the accessibility text sizes only the search row stays fixed; the rows under it ride at the top of the list, so
+//   the tickets keep room (iOS-4's large-text rule, UI-STANDARDS §iOS-A.3);
+// - the list clears the "+" button, or the selection bar at its measured height (listBottomInset).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlProps,
+  ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlProps, type ViewStyle,
 } from 'react-native';
-import type { SearchBarCommands } from 'react-native-screens';
 
 import { useIsOffline } from '@/api/network';
 import { assignTicket } from '@/api/tickets.api';
 import {
-  BulkProgressModal, EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
-  OfflineBanner, OfflineState, OptionSheet, OutlineButton, QueryBanner, TicketCard, type SheetOption,
+  BulkProgressModal, EmptyState, ErrorState, FAB_BOTTOM, FilterChip, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton,
+  NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, OptionSheet, OutlineButton, QueryBanner, SearchField, TicketCard,
+  listBottomInset, type SheetOption,
 } from '@/components';
 import {
   assertAssignment, countryName, fetchCurrentStatus, useAccessibilityTextSize, useBulkRunner, useChangeStatus,
@@ -96,8 +97,6 @@ const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
 
 const ALL_COUNTRIES = '__ALL__';
 const ticketKey = (t: Ticket) => t.id;
-/** Room under the last card for the "+" button; the tab bar already takes the home-indicator inset. */
-const LIST_BOTTOM_PADDING = 96;
 
 export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<'TicketList'>) {
   const user = useAuthStore((s) => s.user);
@@ -162,11 +161,9 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
-  // ── Search in the navigation bar (iOS-4) ───────────────────
-  // The bar keeps its own text; the store keeps the same text (searchText) and the search that was submitted (search).
-  const searchBar = useRef<SearchBarCommands>(null);
-  /** The text the bar last reported, so a change made elsewhere (Clear all, a Home tile) is written back to it. */
-  const barText = useRef(searchText);
+  // ── Search (08 §4.4; iOS-8a: Android's field, under the navigation bar) ──
+  // The store keeps the typed text (searchText) and the search that was submitted (search); the field shows the store's
+  // text, so Clear all and a Home tile empty it too.
   const submitSearch = useStableCallback((text: string) => {
     // A pasted email link opens that ticket (in-app resolver) instead of searching for the URL text.
     if (looksLikeUrl(text)) {
@@ -176,45 +173,14 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     setSearch(normaliseTicketSearch(text));
   });
   const clearSearch = useStableCallback(() => {
-    barText.current = '';
-    searchBar.current?.clearText();
     setSearchText('');
     setSearch(undefined);
   });
   const onSearchTextChange = useStableCallback((text: string) => {
-    barText.current = text;
     setSearchText(text);
-    // An emptied field clears the search, as the old field's ⓧ did (the bar's ⓧ empties it).
+    // An emptied field clears the search, as its ⓧ does (iOS-4).
     if (text === '') setSearch(undefined);
   });
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerSearchBarOptions: {
-        ref: searchBar,
-        placeholder: 'Ticket #, subject, requester or technician',
-        // Under the title, in the navigation bar, and kept on screen while the list scrolls (HIG, Search fields: "Place
-        // search at the top … when … there's no bottom toolbar").
-        placement: 'stacked',
-        hideWhenScrolling: false,
-        autoCapitalize: 'none',
-        tintColor: colors.primary,
-        onChangeText: (e) => onSearchTextChange(e.nativeEvent.text),
-        onSearchButtonPress: (e) => submitSearch(e.nativeEvent.text),
-        onCancelButtonPress: () => clearSearch(),
-      },
-    });
-  }, [navigation, onSearchTextChange, submitSearch, clearSearch]);
-  // Clear all and a Home tile change the store's text: show it in the bar too.
-  useEffect(() => {
-    if (barText.current === searchText) return;
-    const frame = requestAnimationFrame(() => {
-      if (!searchBar.current) return;
-      barText.current = searchText;
-      if (searchText) searchBar.current.setText(searchText);
-      else searchBar.current.clearText();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [searchText]);
 
   const countryOptions = useMemo<SheetOption<string>[]>(
     () => [
@@ -260,7 +226,8 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   // Rows can vanish when the query changes; start over rather than act on tickets no longer shown.
   useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, ticketAdvanced, clearSelection]);
   // iOS has no back button to clear the selection (Android's did): while tickets are selected, the navigation bar shows
-  // how many and a Cancel that clears them, as iOS's own selection modes do. Otherwise its right side is Filters (G2).
+  // how many and a Cancel that clears them, as iOS's own selection modes do. iOS-8a: otherwise the bar shows only the
+  // title, as Android's; Filters (G2) sits beside the search field.
   const filtersOn = activeMore.length;
   useLayoutEffect(() => {
     navigation.setOptions(
@@ -273,13 +240,15 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
         : {
             title: ticketsTitle(role),
             headerLeft: undefined,
-            headerRight: () => <FiltersButton on={filtersOn} onPress={openFilters} />,
+            headerRight: undefined,
           },
     );
-  }, [navigation, selectionMode, selected.size, clearSelection, role, filtersOn, openFilters]);
+  }, [navigation, selectionMode, selected.size, clearSelection, role]);
   const selectedTickets = useMemo(() => list.tickets.filter((t) => selected.has(t.id)), [list.tickets, selected]);
   // iOS-4: at the accessibility text sizes the selection bar's buttons stack instead of shrinking their labels.
   const largeText = useAccessibilityTextSize();
+  // iOS-8a: the selection bar's height as drawn (taller when its buttons stack), so the last rows clear it.
+  const [selectionBarHeight, setSelectionBarHeight] = useState(0);
 
   // ── Inline status chip (08 §4.1) ───────────────────────────
   const changeStatus = useChangeStatus();
@@ -391,126 +360,153 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
   );
 
-  const contentStyle = useMemo(() => ({ paddingBottom: LIST_BOTTOM_PADDING, flexGrow: 1 }), []);
+  // iOS-8a: below the toolbar, clear of the "+" button or the selection bar. At the accessibility sizes the filter rows
+  // open the list, so it has no top gap of its own (the rows end with one).
+  const selectionOverlay = selectionMode ? selectionBarHeight : 0;
+  const contentStyle = useMemo<ViewStyle>(
+    () => ({ paddingTop: largeText ? 0 : LIST_TOP_GAP, paddingBottom: listBottomInset({ fab: true, overlay: selectionOverlay }), flexGrow: 1 }),
+    [largeText, selectionOverlay],
+  );
   const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />;
 
-  // The top of the list (iOS-4): the banners, then the named filters (08 §4.5), sort (08 §4.3), country (05 §A.12), the
-  // count, and what is applied with the web's Clear (shown when anything but the sort is set, TicketsListPage.tsx:395-397).
-  // The search itself is the navigation bar's (one box, no field selector, A22); Filters (G2) is the bar's right button.
-  const listHeader = (
-    <View>
-      <OfflineBanner />
-      <View className="border-b border-border bg-white px-4 pb-1 pt-2">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2 py-1"
-          keyboardShouldPersistTaps="handled"
-        >
-          {isHomeTileFilter(activeFilter) ? (
-            <View
-              accessible
-              accessibilityRole="radio"
-              accessibilityState={{ selected: true }}
-              accessibilityLabel={`Filter from Home: ${TICKET_FILTER_LABELS[activeFilter]}`}
-              className="min-h-9 flex-row items-center rounded-full border border-primary bg-primary px-3 py-1"
-            >
-              <Ionicons name="home-outline" size={14} color={colors.primaryForeground} />
-              <Text className="ml-1 text-sm font-medium text-primary-foreground">{TICKET_FILTER_LABELS[activeFilter]}</Text>
-            </View>
-          ) : null}
-          {filters.map((f) => (
-            <FilterChip key={f} label={TICKET_FILTER_LABELS[f]} active={f === activeFilter} onPress={() => setTicketFilter(f)} />
-          ))}
-        </ScrollView>
-
-        <View className="mt-1 flex-row flex-wrap items-center gap-y-1">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Sort: ${TICKET_SORT_LABELS[ticketSort]}`}
-            onPress={() => setSheet('sort')}
-            hitSlop={4}
-            className="mr-2 min-h-9 flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1 active:bg-gray-50"
-          >
-            <Ionicons name="swap-vertical" size={14} color={colors.text.body} />
-            <Text className="ml-1 text-sm text-gray-700">{TICKET_SORT_LABELS[ticketSort]}</Text>
-          </Pressable>
-          {countryMode === 'switch' ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Country: ${selectedCountryLabel}`}
-              onPress={() => setSheet('country')}
-              hitSlop={4}
-              className="mr-2 min-h-9 shrink flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1 active:bg-gray-50"
-            >
-              <Ionicons name="globe-outline" size={14} color={colors.text.body} />
-              <Text className="ml-1 shrink text-sm text-gray-700" numberOfLines={1}>{selectedCountryLabel}</Text>
-              <Ionicons name="chevron-down" size={14} color={colors.text.body} style={{ marginLeft: 2 }} />
-            </Pressable>
-          ) : null}
-          {countryMode === 'locked' ? (
-            <View
-              accessible
-              accessibilityLabel={`Locked to ${selectedCountryLabel}`}
-              className="mr-2 min-h-9 shrink flex-row items-center rounded-full bg-gray-100 px-3 py-1"
-            >
-              <Ionicons name="lock-closed" size={14} color={colors.badgeFallback.fg} />
-              <Text className="ml-1 shrink text-sm text-gray-600" numberOfLines={1}>{selectedCountryLabel}</Text>
-            </View>
-          ) : null}
-          <View className="flex-1" />
-          {list.total !== undefined ? (
-            <Text className="text-xs text-gray-500">
-              {list.total} {list.total === 1 ? 'ticket' : 'tickets'}
-            </Text>
-          ) : null}
-        </View>
-
-        {activeLabels.length > 0 ? (
-          <View className="flex-row items-center">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Filtered by ${activeLabels.join(', ')}. Open filters`}
-              onPress={openFilters}
-              className="min-h-11 flex-1 flex-row items-center active:opacity-60"
-            >
-              <Ionicons name="funnel-outline" size={14} color={colors.text.secondary} />
-              <Text className="ml-1.5 flex-1 text-xs text-gray-700" numberOfLines={2}>
-                {activeLabels.join(' · ')}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear all filters, search and sort"
-              onPress={clearTicketFilters}
-              className="min-h-11 justify-center pl-3 active:opacity-60"
-            >
-              <Text className="text-sm font-medium text-blue-700">Clear all</Text>
-            </Pressable>
-          </View>
-        ) : null}
+  // The toolbar under the navigation bar (iOS-8a, Android's): the search row, always fixed. One box, no field selector
+  // (08 §4.4, A22); Filters (G2) opens the sheet.
+  const searchRow = (
+    <View className="flex-row items-center">
+      <View className="flex-1">
+        <SearchField
+          value={searchText}
+          onChangeText={onSearchTextChange}
+          onClear={clearSearch}
+          onSubmitEditing={() => submitSearch(searchText)}
+          returnKeyType="search"
+          placeholder="Ticket #, subject, requester or technician"
+          accessibilityLabel="Search tickets"
+        />
       </View>
-      <QueryBanner error={isFetchNextPageError ? null : list.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      <View className="h-3" />
+      <FiltersButton on={filtersOn} onPress={openFilters} />
     </View>
   );
+  // Then the named filters (08 §4.5), sort (08 §4.3), country (05 §A.12), the count, and what is applied with the web's
+  // Clear (shown when anything but the sort is set, TicketsListPage.tsx:395-397). Fixed with the search row, as on
+  // Android; at the accessibility text sizes they ride at the top of the list instead (listHeader).
+  const filterRows = (
+    <>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-2"
+        contentContainerClassName="gap-2 py-1"
+        keyboardShouldPersistTaps="handled"
+      >
+        {isHomeTileFilter(activeFilter) ? (
+          <View
+            accessible
+            accessibilityRole="radio"
+            accessibilityState={{ selected: true }}
+            accessibilityLabel={`Filter from Home: ${TICKET_FILTER_LABELS[activeFilter]}`}
+            className="min-h-9 flex-row items-center rounded-full border border-primary bg-primary px-3 py-1"
+          >
+            <Ionicons name="home-outline" size={14} color={colors.primaryForeground} />
+            <Text className="ml-1 text-sm font-medium text-primary-foreground">{TICKET_FILTER_LABELS[activeFilter]}</Text>
+          </View>
+        ) : null}
+        {filters.map((f) => (
+          <FilterChip key={f} label={TICKET_FILTER_LABELS[f]} active={f === activeFilter} onPress={() => setTicketFilter(f)} />
+        ))}
+      </ScrollView>
+
+      <View className="mt-1 flex-row flex-wrap items-center gap-y-1">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Sort: ${TICKET_SORT_LABELS[ticketSort]}`}
+          onPress={() => setSheet('sort')}
+          hitSlop={4}
+          className="mr-2 min-h-9 flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1 active:bg-gray-50"
+        >
+          <Ionicons name="swap-vertical" size={14} color={colors.text.body} />
+          <Text className="ml-1 text-sm text-gray-700">{TICKET_SORT_LABELS[ticketSort]}</Text>
+        </Pressable>
+        {countryMode === 'switch' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Country: ${selectedCountryLabel}`}
+            onPress={() => setSheet('country')}
+            hitSlop={4}
+            className="mr-2 min-h-9 shrink flex-row items-center rounded-full border border-gray-300 bg-white px-3 py-1 active:bg-gray-50"
+          >
+            <Ionicons name="globe-outline" size={14} color={colors.text.body} />
+            <Text className="ml-1 shrink text-sm text-gray-700" numberOfLines={1}>{selectedCountryLabel}</Text>
+            <Ionicons name="chevron-down" size={14} color={colors.text.body} style={{ marginLeft: 2 }} />
+          </Pressable>
+        ) : null}
+        {countryMode === 'locked' ? (
+          <View
+            accessible
+            accessibilityLabel={`Locked to ${selectedCountryLabel}`}
+            className="mr-2 min-h-9 shrink flex-row items-center rounded-full bg-gray-100 px-3 py-1"
+          >
+            <Ionicons name="lock-closed" size={14} color={colors.badgeFallback.fg} />
+            <Text className="ml-1 shrink text-sm text-gray-600" numberOfLines={1}>{selectedCountryLabel}</Text>
+          </View>
+        ) : null}
+        <View className="flex-1" />
+        {list.total !== undefined ? (
+          <Text className="text-xs text-gray-500">
+            {list.total} {list.total === 1 ? 'ticket' : 'tickets'}
+          </Text>
+        ) : null}
+      </View>
+
+      {activeLabels.length > 0 ? (
+        <View className="flex-row items-center">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Filtered by ${activeLabels.join(', ')}. Open filters`}
+            onPress={openFilters}
+            className="min-h-11 flex-1 flex-row items-center active:opacity-60"
+          >
+            <Ionicons name="funnel-outline" size={14} color={colors.text.secondary} />
+            <Text className="ml-1.5 flex-1 text-xs text-gray-700" numberOfLines={2}>
+              {activeLabels.join(' · ')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear all filters, search and sort"
+            onPress={clearTicketFilters}
+            className="min-h-11 justify-center pl-3 active:opacity-60"
+          >
+            <Text className="text-sm font-medium text-blue-700">Clear all</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </>
+  );
+  // The top of the list: the filter rows at the accessibility text sizes only, then the list's own top gap.
+  const listHeader = largeText ? (
+    <View>
+      <View className="border-b border-border bg-white px-4 pb-1">{filterRows}</View>
+      <View style={{ height: LIST_TOP_GAP }} />
+    </View>
+  ) : null;
 
   let content: ReactNode;
   if (!hasData && list.fetchStatus === 'paused') {
     content = (
-      <StateScroll header={listHeader} refreshControl={refreshControl}>
+      <StateScroll header={listHeader} style={contentStyle} refreshControl={refreshControl}>
         <OfflineState what="Tickets" />
       </StateScroll>
     );
   } else if (list.isPending && !hasData) {
     content = (
-      <StateScroll header={listHeader}>
+      <StateScroll header={listHeader} style={contentStyle}>
         <LoadingSkeleton rows={5} />
       </StateScroll>
     );
   } else if (list.isError && !hasData) {
     content = (
-      <StateScroll header={listHeader} refreshControl={refreshControl}>
+      <StateScroll header={listHeader} style={contentStyle} refreshControl={refreshControl}>
         <ErrorState error={list.error} title="Couldn't load tickets" onRetry={() => void list.refetch()} />
       </StateScroll>
     );
@@ -525,8 +521,6 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
         onEndReachedThreshold={0.4}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
-        // Under the translucent large-title bar and its search field (iOS-4).
-        contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={listHeader}
         contentContainerStyle={contentStyle}
         refreshControl={refreshControl}
@@ -560,12 +554,23 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
 
   return (
     <View className="flex-1 bg-gray-50">
+      <OfflineBanner />
+      {/* The toolbar (iOS-8a, Android's): below the navigation bar, never under it, and it does not scroll. */}
+      <View className="border-b border-border bg-white px-4 pb-1 pt-2">
+        {searchRow}
+        {largeText ? null : filterRows}
+      </View>
+      <QueryBanner error={isFetchNextPageError ? null : list.error} hasData={hasData} onRetry={() => void onRefresh()} />
+
       <ListEntryScope>{content}</ListEntryScope>
 
       {selectionMode ? (
         // Selection action bar (08 §4.2): exactly the buttons bulkActions() returns. It sits on the tab bar, which
-        // already takes the home-indicator inset.
-        <View className={`absolute bottom-0 left-0 right-0 gap-2 border-t border-border bg-white px-4 pb-2 pt-3 ${largeText ? '' : 'flex-row'}`}>
+        // already takes the home-indicator inset; the list clears its measured height (iOS-8a).
+        <View
+          onLayout={(e) => setSelectionBarHeight(e.nativeEvent.layout.height)}
+          className={`absolute bottom-0 left-0 right-0 gap-2 border-t border-border bg-white px-4 pb-2 pt-3 ${largeText ? '' : 'flex-row'}`}
+        >
           {bulk.map((action) => (
             <BarButton key={action} icon={BULK_BUTTONS[action].icon} label={BULK_BUTTONS[action].label} onPress={onBulk[action]} stacked={largeText} />
           ))}
@@ -576,7 +581,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
           accessibilityRole="button"
           accessibilityLabel="Create ticket"
           onPress={() => navigation.navigate('CreateTicket')}
-          style={[{ bottom: 20 }, shadows.fab]}
+          style={[{ bottom: FAB_BOTTOM }, shadows.fab]}
           className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-primary active:opacity-80"
         >
           <Ionicons name="add" size={28} color={colors.primaryForeground} />
@@ -758,27 +763,27 @@ function BarButton({
   );
 }
 
-/** A text button in the navigation bar (iOS: Cancel), in the bar's tint colour, 44 pt tall. */
+/** A text button in the navigation bar (iOS: Cancel), 44 pt tall; iOS-8a: Android's header text action style. */
 function HeaderTextButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={8} className="min-h-11 justify-center active:opacity-60">
-      <Text className="text-base text-primary">{label}</Text>
+      <Text className="text-sm font-medium text-blue-700">{label}</Text>
     </Pressable>
   );
 }
 
-/** The navigation bar's Filters button (G2, iOS-4): the sheet, with how many of the five are on. */
+/** The Filters button beside the search field (G2; iOS-8a: Android's): the sheet, with how many of the five are on. */
 function FiltersButton({ on, onPress }: { on: number; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={on > 0 ? `Filters, ${on} on` : 'Filters'}
       onPress={onPress}
-      className="h-11 w-11 items-center justify-center active:opacity-60"
+      className={`ml-2 h-11 w-11 items-center justify-center rounded-lg border ${on > 0 ? 'border-primary bg-primary/10' : 'border-gray-300 bg-white active:bg-gray-50'}`}
     >
-      <Ionicons name={on > 0 ? 'options' : 'options-outline'} size={24} color={colors.primary} />
+      <Ionicons name="options-outline" size={18} color={on > 0 ? colors.primary : colors.text.body} />
       {on > 0 ? (
-        <View className="absolute right-0 top-0.5 min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1">
+        <View className="absolute -right-1.5 -top-1.5 min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1">
           <Text className="text-xs font-semibold text-primary-foreground" maxFontSizeMultiplier={1.4}>{on}</Text>
         </View>
       ) : null}
@@ -787,21 +792,22 @@ function FiltersButton({ on, onPress }: { on: number; onPress: () => void }) {
 }
 
 /**
- * A first-load state (offline, loading, error) in a scroll view under the large-title bar, with the list's header on top,
- * so the title still collapses and the filters stay reachable (iOS-4; the Alerts screen's StateScroll).
+ * A first-load state (offline, loading, error) in a scroll view, so it can be pulled to refresh. At the accessibility
+ * text sizes the filter rows sit on top (`header`), as they do on the list.
  */
 function StateScroll({
-  header, refreshControl, children,
+  header, style, refreshControl, children,
 }: {
   header: ReactNode;
+  /** The list's own padding (top gap, and room for the "+" button). */
+  style: ViewStyle;
   refreshControl?: ReactElement<RefreshControlProps>;
   children: ReactNode;
 }) {
   return (
     <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: LIST_BOTTOM_PADDING }}
+      contentContainerStyle={style}
       refreshControl={refreshControl}
     >
       {header}

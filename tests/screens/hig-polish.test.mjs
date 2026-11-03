@@ -5,7 +5,7 @@
 // 4. Dynamic Type: the iOS text styles, the title caps, the accessibility layouts, readable KB tables;
 // 5. VoiceOver: no control hidden inside another; the priority preview is announced;
 // 6. appearance: light only, nothing reads the system scheme; brand yellow never text or an icon;
-// 7. the ticket list's search is the navigation bar's own, and searches exactly as before;
+// 7. the ticket list's search (iOS-8a: Android's field, fixed under the navigation bar) searches exactly as before;
 // 8. account deletion: the exact TKT-2 payload per role, and nothing sent without the confirmation;
 // 9. the privacy policy: the row, and the release guard that refuses a production build without the URL.
 // Source checks read the files as text, as the other screen tests do; pure modules are run.
@@ -391,34 +391,35 @@ describe('appearance: light only (D9), and brand yellow never as text', () => {
   });
 });
 
-// ── 7. Search in the navigation bar ──────────────────────────
+// ── 7. Search under the navigation bar ───────────────────────
+// iOS-8a replaces iOS-4's search in the navigation bar (under a large title the search and the first card overlapped on
+// a device): Android's field, in a toolbar fixed under the bar. The search rules are iOS-4's, unchanged.
 
-describe('the ticket list: the navigation bar\'s search, under a large title', () => {
+describe('the ticket list: Android\'s search field, fixed under the navigation bar (iOS-8a)', () => {
   const src = code(read('src/screens/tickets/TicketListScreen.tsx'));
 
-  test('the native search field, at the top, kept on screen while the list scrolls', () => {
-    assert.match(src, /headerSearchBarOptions: \{/);
-    assert.match(src, /placement: 'stacked',\s*hideWhenScrolling: false,/);
-    assert.match(src, /placeholder: 'Ticket #, subject, requester or technician'/);
-    assert.doesNotMatch(src, /<SearchField\b/, 'the old field is gone');
+  test('the search field and the Filters button, under the bar; nothing in the bar but the title', () => {
+    assert.doesNotMatch(src, /headerSearchBarOptions|SearchBarCommands/, 'the bar\'s own search field is gone');
+    assert.match(src, /<SearchField\s+value=\{searchText\}\s+onChangeText=\{onSearchTextChange\}\s+onClear=\{clearSearch\}/);
+    assert.match(src, /placeholder="Ticket #, subject, requester or technician"/);
+    assert.match(src, /<FiltersButton on=\{filtersOn\} onPress=\{openFilters\} \/>/);
+    assert.match(src, /title: ticketsTitle\(role\),\s*headerLeft: undefined,\s*headerRight: undefined,/);
   });
 
-  test('it searches exactly as before: search key submits, a link opens the resolver, an emptied field clears', () => {
-    assert.match(src, /onSearchButtonPress: \(e\) => submitSearch\(e\.nativeEvent\.text\)/);
-    assert.match(src, /onCancelButtonPress: \(\) => clearSearch\(\)/);
+  test('it searches exactly as before: search key submits, a link opens the resolver, an emptied field or ⓧ clears', () => {
+    assert.match(src, /onSubmitEditing=\{\(\) => submitSearch\(searchText\)\}\s*returnKeyType="search"/);
     assert.match(src, /if \(looksLikeUrl\(text\)\) \{\s*navigation\.navigate\('TicketLink', \{ link: text\.trim\(\) \}\);/);
     assert.match(src, /setSearch\(normaliseTicketSearch\(text\)\);/);
     assert.match(src, /if \(text === ''\) setSearch\(undefined\);/);
+    assert.match(src, /const clearSearch = useStableCallback\(\(\) => \{\s*setSearchText\(''\);\s*setSearch\(undefined\);/);
   });
 
-  test('the filters ride at the top of the list, in every state, so the large title collapses', () => {
+  test('the filter rows are fixed with the search, and ride at the top of the list only at the accessibility sizes', () => {
+    assert.match(src, /\{searchRow\}\s*\{largeText \? null : filterRows\}/);
+    assert.match(src, /const listHeader = largeText \? \(/);
+    assert.equal((src.match(/<StateScroll header=\{listHeader\} style=\{contentStyle\}/g) ?? []).length, 3, 'offline, loading and error');
     assert.match(src, /ListHeaderComponent=\{listHeader\}/);
-    assert.match(src, /contentInsetAdjustmentBehavior="automatic"/);
-    assert.equal((src.match(/<StateScroll header=\{listHeader\}/g) ?? []).length, 3, 'offline, loading and error');
-    assert.match(src, /headerRight: \(\) => <FiltersButton on=\{filtersOn\} onPress=\{openFilters\} \/>/);
     const inbox = code(read('src/screens/approvals/ApprovalsInboxScreen.tsx'));
-    assert.match(inbox, /contentInsetAdjustmentBehavior="automatic"/);
-    assert.equal((inbox.match(/<StateScroll header=\{header\}/g) ?? []).length, 3);
     assert.doesNotMatch(inbox, /SearchField|headerSearchBarOptions/, 'Approvals has no search on web or Android');
   });
 });

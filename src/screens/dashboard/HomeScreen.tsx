@@ -12,11 +12,12 @@
 // The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
 // A tile opens the Tickets tab with the matching filter (utils/ticket-filters.ts: the same status set as the KPI).
 //
-// iOS (docs/ios/00-PORT-MANIFEST.md §6 #1): the Home tab's root, under the native navigation bar's large title. A recent
-// ticket and the banner open inside Home; a tile switches to the Tickets tab; "Pending approvals" switches to the
-// Approvals tab, or opens More's Approvals for the roles without that tab (hasApprovalsTab). The offline and error
-// banners sit inside the scroll view, so the large title collapses as the screen scrolls (react-native-screens tracks
-// the first scroll view on the screen). "Raise a ticket" and the "+" button open the create sheet (M8) over the tabs.
+// iOS (docs/ios/00-PORT-MANIFEST.md §6 #1): the Home tab's root, under the native navigation bar. A recent ticket and
+// the banner open inside Home; a tile switches to the Tickets tab; "Pending approvals" switches to the Approvals tab, or
+// opens More's Approvals for the roles without that tab (hasApprovalsTab). "Raise a ticket" and the "+" button open the
+// create sheet (M8) over the tabs.
+// iOS-8a: the bar is solid with a standard title, so the screen starts below it. As on Android, the offline and error
+// banners sit under the bar, above the scroll view; the scroll view clears the "+" button (listBottomInset).
 // iOS-4: at the accessibility text sizes the KPI tiles are one per row and their labels wrap instead of shrinking; the
 // greeting and the counts stop growing where iOS's Title 2 and Title 1 stop (theme/typography.ts maxTextScale).
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -27,8 +28,8 @@ import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementBanner, EmptyState, ErrorState, LoadingSkeleton, Notice, OfflineBanner, QueryBanner, RecentTicketRow,
-  Skeleton, SubmitButton,
+  AnnouncementBanner, EmptyState, ErrorState, FAB_BOTTOM, LIST_TOP_GAP, LoadingSkeleton, Notice, OfflineBanner, QueryBanner,
+  RecentTicketRow, Skeleton, SubmitButton, listBottomInset,
 } from '@/components';
 import {
   queryKeys, useAccessibilityTextSize, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, useScaledIconSize,
@@ -144,14 +145,13 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
 
   return (
     <View className="flex-1 bg-gray-50">
+      <OfflineBanner />
+      <QueryBanner error={primaryError} hasData={hasAnyData} onRetry={() => void onRefresh()} />
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: showFab ? 96 : 24 }}
+        contentContainerStyle={{ paddingTop: LIST_TOP_GAP, paddingBottom: listBottomInset({ fab: showFab }) }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        <OfflineBanner />
-        <QueryBanner error={primaryError} hasData={hasAnyData} onRetry={() => void onRefresh()} />
-        <View className="mx-4 mb-4 mt-3">
+        <View className="mx-4 mb-4">
           <Text accessibilityRole="header" className="text-xl font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title2}>
             {greetingLine(greeting, user?.displayName)}
           </Text>
@@ -233,7 +233,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
           accessibilityRole="button"
           accessibilityLabel="Create ticket"
           onPress={createTicket}
-          style={[{ bottom: 20 }, shadows.fab]}
+          style={[{ bottom: FAB_BOTTOM }, shadows.fab]}
           className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-primary active:opacity-80"
         >
           <Ionicons name="add" size={28} color={colors.primaryForeground} />

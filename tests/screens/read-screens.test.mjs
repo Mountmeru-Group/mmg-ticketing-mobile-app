@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { __changeReduceMotion, __setReduceMotion } from 'react-native';
 
 import { TICKET_PAGE_SIZE } from '../../src/api/tickets.api.ts';
-import { SHEET_ROUTES, STACK_ROUTES, hasLargeTitle } from '../../src/navigation/routes.ts';
+import { SHEET_ROUTES, STACK_ROUTES } from '../../src/navigation/routes.ts';
 import { TICKET_LIST_CAP, isTicketListCapped, nextTicketListPage } from '../../src/hooks/useTickets.ts';
 import { motion } from '../../src/theme/motion.ts';
 import { TICKET_STATUSES } from '../../src/types/index.ts';
@@ -380,15 +380,12 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     for (const src of [stacks, root]) assert.doesNotMatch(src, /Placeholder/);
   });
 
-  test('large titles: on every tab root (iOS-4: the ticket list and the approvals inbox no longer pin a bar)', () => {
-    assert.equal(hasLargeTitle('HomeTab', 'Home'), true);
-    // iOS-4: the search is the navigation bar's and the filters ride in the list, so the title collapses (was false).
-    assert.equal(hasLargeTitle('TicketsTab', 'TicketList'), true);
-    // iOS-4: the type chips ride in the list (iOS-3c plan Q3 had them pinned, with a standard title).
-    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), true);
-    assert.equal(hasLargeTitle('AlertsTab', 'Notifications'), true);
-    assert.equal(hasLargeTitle('MoreTab', 'More'), true);
-    assert.equal(hasLargeTitle('HomeTab', 'TicketDetail'), false);
-    assert.equal(hasLargeTitle('MoreTab', 'ApprovalsInbox'), false);
+  // iOS-8a replaces iOS-4's "large titles on every tab root": on a device their content showed through the bar.
+  test('no large titles: every route takes the solid bar of STACK_SCREEN_OPTIONS, the sheets included (iOS-8a)', () => {
+    const stacks = code(read('src/navigation/TabStacks.tsx'));
+    assert.match(stacks, /headerLargeTitle: false,/);
+    assert.match(stacks, /options=\{\{ title: routeTitle\(name, role\) \}\}/, 'no route sets a title style of its own');
+    assert.match(code(read('src/navigation/RootNavigator.tsx')), /const SHEET_OPTIONS: NativeStackNavigationOptions = \{\s*\.\.\.STACK_SCREEN_OPTIONS,/);
+    assert.doesNotMatch(read('src/navigation/routes.ts'), /export function hasLargeTitle/);
   });
 });

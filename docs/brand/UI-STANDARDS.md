@@ -604,12 +604,14 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
 - **Caps (`maxFontSizeMultiplier`):** iOS's titles grow less than body text, so titles stop at iOS's own AX5 size (`maxTextScale`): Title 1 ×2.07, Title 2 ×2.55, Title 3 ×2.75. That applies only to text of 20 pt and more: the Home greeting, the KPI counts, and the ticket, task, article, request and Profile titles. Initials in avatars and badge counts stop at ×1.4 so they stay inside their circle. Body and caption text is never capped.
 
 ### iOS-A.2 Screen frame
-- **Header:** the native navigation bar (replaces S1's ScreenHeader).
-  - Tab roots (Home, Tickets, Approvals, Alerts, More) have a large title that collapses as the content scrolls (HIG, Toolbars).
-  - Pushed screens have a standard title and the back chevron with no label.
-- **Nothing is pinned above a tab root's list.** The banners, filter chips, sort and count ride at the top of the list (`ListHeaderComponent`). Every first-load state (offline, loading, error) scrolls the same way (`StateScroll`). Otherwise the large title can't collapse.
+> **iOS-8a (2026-11-02) replaced iOS-4's large titles, the pinned-nothing rule and the bar's search field.** Why: §iOS-A.13.
+- **Header:** the native navigation bar (replaces S1's ScreenHeader), solid and in the look of Android's top bar, on every stack screen and sheet (§iOS-A.13).
+  - Every screen has a standard title; none has a large title.
+  - Pushed screens have the back chevron with no label; sheets have ✕.
+- **Under the bar, as on Android:** the offline banner, then the screen's toolbar (Tickets: search, Filters, the filter chips, sort, country, count, Clear all; Approvals: the type chips), then the error banner, then the list. None of them scrolls; the list starts below them.
+  - At the accessibility text sizes, only the Tickets search row stays fixed: its filter rows ride at the top of the list, so the tickets keep room (§iOS-A.3).
 - **Search** (HIG, Search fields):
-  - On Tickets, search is the navigation bar's own field, under the title and kept on screen while the list scrolls (`placement: 'stacked'`, `hideWhenScrolling: false`). Filters is the bar's right button, with a count badge.
+  - On Tickets, search is Android's `SearchField`, fixed under the bar with the Filters button beside it (a count badge when any of the five are on).
   - On pushed screens (Knowledge base, the catalogue, the people and template pickers), the inline `SearchField` stays above what it searches.
 - **Sheets:**
   - The write sheets are root page sheets with ✕ on the left.
@@ -621,8 +623,9 @@ The `text-*` classes keep their names, but each one now resolves to an iOS text 
   - Home's KPI tiles are one per row.
   - The ticket's four tabs are two rows of two.
   - The ticket card's header (number, Updated, New reply) stacks.
-  - The bulk-selection bar's buttons stack.
+  - The bulk-selection bar's buttons stack, and the list clears the bar at its measured height (iOS-8a).
   - The Filters sheet's date rows put the label above the field.
+  - The ticket list's filter rows (chips, sort, country, count, Clear all) leave the fixed toolbar and ride at the top of the list; the search row stays fixed (iOS-8a).
 - **No `adjustsFontSizeToFit` at the accessibility sizes:** the text wraps instead. One exception since iOS-5c: the sign-in label in Login's fixed 52 pt pill (§iOS-A.12).
 - **Controls grow with the text:** `min-h-*`, never `h-*`, on any button, field or chip that holds text (`SubmitButton` 48, `SearchField` 44, chips 36 plus slop).
 - **Icons:** icons that carry meaning grow with the text, up to twice their size (`useScaledIconSize()`). These are More's row icons and the KPI glyph with its square.
@@ -687,3 +690,49 @@ S11 stands; the shared `EmptyState`, `ErrorState`, `OfflineState` and `LoadingSk
 - **Status bar:** Login asks for white status-bar icons over the red card (`StatusBar barStyle="light-content"`); leaving Login restores the dark ones (App.tsx). On a cold start to Login, the start-up intro is white while Login mounts under it, so for up to about a second the clock and battery are white on white. Android does the same. Check on a device (`docs/ios/UAT-TEST-PLAN-IOS.md` A5).
 - **Launch screen:** expo-splash-screen builds the iOS launch screen from `assets/splash-icon.png`: the 192 × 192 pt image centred on the whole screen, which is the box the intro draws (`splashArt`), so the intro's first frame is the launch screen. iOS hides the launch screen without a fade (`fade` is false by default; the `duration` that `splash.ts` sets has no effect on iOS), over that identical frame.
 - **Light only** (iOS-A.10): the red card and the white ground stay as they are in Dark Mode.
+
+### iOS-A.13 Solid navigation bars, Android's look (iOS-8a, 2026-11-02)
+**The device finding (TestFlight 0.1.0 (1)):**
+- On Home, Tickets, Approvals and Alerts the large title was drawn over the content, and the content scrolled under the title and under the status bar.
+- Tickets' search and Filters sat over the title, and the first card was hidden. Approvals' chips sat under the clock. Alerts' "Mark all read" and "Earlier" overlapped the title.
+- The last rows of the lists sat behind the tab bar and the "+".
+
+**Why it happened:**
+- **The large title made the bar see-through.** In the installed native-stack (7.21), a large title or a search field in the bar makes the bar translucent unless `headerTransparent: false` is set. A large title also makes its background transparent.
+- **The screen was then laid out under the bar.** react-native-screens (4.26) lays a translucent bar's screen out from the top of the display (`edgesForExtendedLayout`). The content relied on UIKit moving the scroll view down (`contentInsetAdjustmentBehavior="automatic"`), and on the device that did not happen.
+- **The bottom is a separate question.** React Navigation's tab bar takes its own space under the screens; it is not drawn over them. So a list already ends at the bar's top edge, and code alone does not show why rows sat behind it. The likely cause is the same UIKit inset handling. What was found and fixed: the ticket list's selection bar is about 170 pt tall at the accessibility sizes, but the list padded only 96.
+
+**The rule since iOS-8a:**
+- **One solid bar on every stack screen and sheet,** from `STACK_SCREEN_OPTIONS` (`src/navigation/TabStacks.tsx`):
+  - opaque white (`colors.surface`, `headerTransparent: false`), with UIKit's hairline under it (Android's `border-b`);
+  - the title 18 pt semibold gray-900 (Android's `text-lg font-semibold text-gray-900`);
+  - the back chevron and icon buttons gray-900; text buttons in the bar `text-sm font-medium text-blue-700`, as Android's "Mark all read" and "Clear all";
+  - no iOS 26 glass capsule behind bar buttons (`headerLeftBackgroundVisible` and `headerRightBackgroundVisible` false).
+- **Nothing in a screen sets the bar's look.**
+- **Where iOS keeps its own:** UIKit's 44 pt bar height (Android: 56 dp); the centred title (native-stack: title alignment is "Not supported on iOS"); the back chevron with no label; the native edge swipe; the sheets' ✕.
+- **Never:**
+  - a large title, `headerTransparent: true`, a header background view or a blur;
+  - the bar's own search field (`headerSearchBarOptions`);
+  - `contentInsetAdjustmentBehavior`.
+
+  Each of these lays the screen out under the bar, or leaves its content to UIKit.
+- **Toolbars and banners go under the bar, above the list, as on Android** (§iOS-A.2). They never go in the bar, inside the list, or over the screen. "Mark all read" stays at the bar's right, as on Android.
+- **List padding, from `src/components/listDefaults.ts`:**
+  - 12 pt above the first row (`LIST_TOP_GAP`), 24 pt under the last (`LIST_END_GAP`);
+  - 96 pt on a screen with the "+" button (`FAB_CLEARANCE`: the button's 20 pt offset, its 56 pt and a 20 pt gap);
+  - while tickets are selected, the selection bar's measured height + 24, when that is more (`listBottomInset`).
+  - **No tab-bar height is added,** because the bar is under the screens, not over them. A test fails if that changes (`tests/screens/solid-headers.test.mjs` §4).
+
+**HIG:**
+- **Layout, Guides and safe areas:** *"A safe area defines the area within a window that isn't covered on the edge by a hardware feature or another view within the window, like a toolbar, tab bar, or status bar. Respecting the safe area is essential to make sure system UI and hardware features like the Dynamic Island don't obstruct content and controls."* The solid bar keeps every screen's content out of the area under the status bar and the bar.
+- **Toolbars, Phone (iOS):** *"Use a large title to help people stay oriented as they navigate and scroll."*
+  - This is a recommendation, and iOS-8a no longer follows it, on purpose: on a device the large title covered the content, and Android's top bar has a standard title.
+  - Location is still shown by the selected tab and the bar's title (Toolbars, Titles: *"A title helps people confirm their location as they navigate your app"*).
+
+**Pinned by:** `tests/screens/solid-headers.test.mjs`. Run against the files shipped in 0.1.0 (1) (`30cc239`), its scan flags all six: the large title in TabStacks, the bar's search field in the ticket list, and the automatic inset in Home, Tickets, Approvals, Alerts and More. Also pinned by the updated `hig-polish.test.mjs` §7, `read-screens.test.mjs` and `module-screens.test.mjs`.
+
+**Device check (iOS-8 round 1, after the EAS Update):**
+- every tab root at the top and scrolled, with nothing under the bar or the clock;
+- the end of every list: the last row fully above the tab bar and the "+";
+- Tickets: search, Filters and selection mode, at the default text size and at AX5;
+- one pushed screen and one sheet.

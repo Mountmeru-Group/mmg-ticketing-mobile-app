@@ -80,7 +80,8 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
     setDayPicker({ title, value: (current ? dateFromDay(current) : null) ?? new Date(), apply });
   };
 
-  // The bar's right side: the web's Clear, while anything is set. The ✕ on the left comes with every sheet.
+  // The bar's right side: the web's Clear, while anything is set, in Android's header-button style (iOS-8a). The ✕ on
+  // the left comes with every sheet.
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: anythingOn
@@ -92,7 +93,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
               hitSlop={8}
               className="min-h-11 justify-center active:opacity-60"
             >
-              <Text className="text-base text-primary">Clear all</Text>
+              <Text className="text-sm font-medium text-blue-700">Clear all</Text>
             </Pressable>
           )
         : undefined,

@@ -144,21 +144,8 @@ function recordId(value: unknown): string | undefined {
   return undefined;
 }
 
-export function isStackRoot(tab: AppTab, name: string): boolean {
-  return STACK_ROUTES[tab][0] === name;
-}
-
-/**
- * Every tab root gets the iOS large title; pushed screens a standard one (HIG, Toolbars: "Use a large title to help
- * people stay oriented as they navigate and scroll").
- * react-native-screens collapses a large title only against the scroll view on the screen's first-subview chain, so
- * nothing may be pinned above a root's list. iOS-4: the ticket list's search is the navigation bar's own, and its
- * filters, and the approvals inbox's type chips, ride at the top of their lists (before iOS-4 both were pinned, with a
- * standard title).
- */
-export function hasLargeTitle(tab: AppTab, name: string): boolean {
-  return isStackRoot(tab, name);
-}
+// iOS-8a: no route has a large title (TabStacks.tsx STACK_SCREEN_OPTIONS). iOS-4's hasLargeTitle() gave every tab root
+// one, over a translucent bar that the tab roots' content showed through on a device (UI-STANDARDS §iOS-A.13).
 
 /** Header titles, as on Android. Screens that show a record's own title set it themselves (iOS-3). */
 const TITLES: Record<Exclude<StackRoute | SheetRoute, 'TicketList'>, string> = {

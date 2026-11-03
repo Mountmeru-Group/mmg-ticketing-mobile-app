@@ -9,12 +9,12 @@
 // - No live updates (SSE is broken, 05 B.3) and no push (05 B.4); this phase also forbids polling. The screen says so,
 //   and pull-to-refresh reloads the newest page and the badge. Details: hooks/useNotifications.ts.
 //
-// iOS (docs/ios/00-PORT-MANIFEST.md §6 #6): the root of the Alerts tab, with the iOS large title. A tap opens the
-// record inside Alerts (utils/deep-links.ts notificationDestination(): the approval or the ticket, both registered in
-// every tab's stack) instead of switching module. "Mark all read" sits in the native navigation bar. The large-title
-// bar is translucent, so every state scrolls under it (contentInsetAdjustmentBehavior "automatic"), and the banners and
-// the notice ride in the list's header so the title collapses. The tab badge is AppTabs' NTF-2 query, which this screen
-// shares: no second query and no polling.
+// iOS (docs/ios/00-PORT-MANIFEST.md §6 #6): the root of the Alerts tab. A tap opens the record inside Alerts
+// (utils/deep-links.ts notificationDestination(): the approval or the ticket, both registered in every tab's stack)
+// instead of switching module. "Mark all read" sits on the right of the native navigation bar, as on Android's top bar.
+// The tab badge is AppTabs' NTF-2 query, which this screen shares: no second query and no polling.
+// iOS-8a (device finding: "Mark all read" and "Earlier" overlapped the large title): a solid bar with a standard title,
+// so the screen starts below it; as on Android, the banners sit under the bar and the notice opens the list.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
@@ -23,8 +23,8 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View, t
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState,
-  OutlineButton, QueryBanner,
+  EmptyState, ErrorState, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner,
+  OfflineState, OutlineButton, QueryBanner, listBottomInset,
 } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
@@ -168,7 +168,7 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
     }),
   );
 
-  // The native navigation bar's right side: a text button in the bar's tint, as Android's header button.
+  // The native navigation bar's right side: a text button in Android's header-button style (iOS-8a).
   const markAllDisabled = unreadCount === 0 || markAll.isPending;
   const markAllPending = markAll.isPending;
   useLayoutEffect(() => {
@@ -186,7 +186,7 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
           {markAllPending ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
-            <Text className={`text-base ${markAllDisabled ? 'text-gray-400' : 'text-primary'}`}>Mark all read</Text>
+            <Text className={`text-sm font-medium ${markAllDisabled ? 'text-gray-400' : 'text-blue-700'}`}>Mark all read</Text>
           )}
         </Pressable>
       ),
@@ -194,29 +194,23 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
   }, [navigation, markAllDisabled, markAllPending, onMarkAll]);
 
   const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />;
-  const banners = (
-    <>
-      <OfflineBanner />
-      <QueryBanner error={isFetchNextPageError ? null : list.error} hasData={hasData} onRetry={() => void onRefresh()} />
-    </>
-  );
 
   let content;
   if (!hasData && list.fetchStatus === 'paused') {
     content = (
-      <StateScroll banners={banners} refreshControl={refreshControl}>
+      <StateScroll refreshControl={refreshControl}>
         <OfflineState what="Notifications" />
       </StateScroll>
     );
   } else if (!hasData && list.isError) {
     content = (
-      <StateScroll banners={banners} refreshControl={refreshControl}>
+      <StateScroll refreshControl={refreshControl}>
         <ErrorState error={list.error} title="Couldn't load notifications" onRetry={() => void list.refetch()} />
       </StateScroll>
     );
   } else if (!hasData) {
     content = (
-      <StateScroll banners={banners}>
+      <StateScroll>
         <LoadingSkeleton variant="notifications" rows={5} />
       </StateScroll>
     );
@@ -228,15 +222,11 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
         getItemType={alertItemType}
         renderItem={renderItem}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
-        contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={
-          <View>
-            {banners}
-            <View className="mx-4 mt-3">
-              <Notice>
-                Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
-              </Notice>
-            </View>
+          <View className="mx-4">
+            <Notice>
+              Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
+            </Notice>
           </View>
         }
         ListEmptyComponent={
@@ -253,7 +243,7 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
-        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+        contentContainerStyle={LIST_PADDING}
         refreshControl={refreshControl}
       />
     );
@@ -261,25 +251,21 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
 
   return (
     <View className="flex-1 bg-gray-50">
+      {/* The banners (iOS-8a, Android's): below the navigation bar, never under it, and they do not scroll. */}
+      <OfflineBanner />
+      <QueryBanner error={isFetchNextPageError ? null : list.error} hasData={hasData} onRetry={() => void onRefresh()} />
       <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }
 
-/**
- * The first-load states (loading, offline, error), in a scroll view under the translucent large-title bar with the
- * banners on top, so nothing sits behind the title.
- */
-function StateScroll({
-  banners, refreshControl, children,
-}: {
-  banners: ReactNode;
-  refreshControl?: ReactElement<RefreshControlProps>;
-  children: ReactNode;
-}) {
+/** The list's padding (iOS-8a): Android's top gap, and the end gap above the tab bar (no "+" button here). */
+const LIST_PADDING = { paddingTop: LIST_TOP_GAP, paddingBottom: listBottomInset(), flexGrow: 1 };
+
+/** The first-load states (loading, offline, error), in a scroll view so they can be pulled to refresh. */
+function StateScroll({ refreshControl, children }: { refreshControl?: ReactElement<RefreshControlProps>; children: ReactNode }) {
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }} refreshControl={refreshControl}>
-      {banners}
+    <ScrollView contentContainerStyle={LIST_PADDING} refreshControl={refreshControl}>
       {children}
     </ScrollView>
   );
