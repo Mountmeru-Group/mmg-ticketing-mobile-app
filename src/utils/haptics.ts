@@ -7,8 +7,8 @@
 // FLAG_IGNORE_GLOBAL_SETTING (expo-haptics HapticsModule.kt), so Android itself drops it when the person has turned
 // touch feedback / "Vibration & haptics" off. expo-haptics' other calls (impactAsync, notificationAsync,
 // selectionAsync) drive the Vibrator directly, which that setting does not govern, so the app never uses them; nor
-// React Native's Vibration. The app therefore needs no VIBRATE permission, and app.json blocks the one expo-haptics
-// declares (UI-STANDARDS.md §14).
+// React Native's Vibration. These calls need no VIBRATE permission; the one expo-haptics declares is kept all the same
+// (Ronit, 2026-11-03; UI-STANDARDS.md §14.5). It is a normal install-time permission: no prompt.
 //
 // Android 10 and older have no CONFIRM or REJECT (API 30): expo-haptics rejects them, and the event falls back to an
 // effect every Android version has. Fire and forget: nothing waits for a haptic, and a phone without one is silent.

@@ -81,9 +81,10 @@ describe('the OS setting, app-wide', () => {
     }
   });
 
-  test('the app declares no VIBRATE permission: View.performHapticFeedback needs none, and app.json blocks the one expo-haptics adds', () => {
+  test('VIBRATE is kept (Ronit, 2026-11-03): app.json does not block the one expo-haptics declares; the old block stays', () => {
+    // View.performHapticFeedback needs no permission, so the OS setting still governs every haptic either way.
     const app = JSON.parse(read('app.json')).expo;
-    assert.ok(app.android.blockedPermissions.includes('android.permission.VIBRATE'));
+    assert.ok(!app.android.blockedPermissions.includes('android.permission.VIBRATE'));
     assert.ok(app.android.blockedPermissions.includes('android.permission.SYSTEM_ALERT_WINDOW'), 'the existing block stays');
   });
 

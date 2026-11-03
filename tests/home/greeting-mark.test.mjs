@@ -76,18 +76,21 @@ describe('greeting mark: drawn, not an emoji', () => {
         return /\.tsx?$/.test(e) ? [rel] : [];
       });
     })('src');
-    // One emoji predates this phase and is left as it is (reported in docs/brand/UI-STANDARDS.md §14): the paperclip
-    // in the placeholder html.ts writes for an e-mail's inline (cid:) image, "📎 image in attachments", since Phase 3a.
-    // It is pinned here, so no other emoji can join it.
-    const KNOWN = { 'src/utils/html.ts': ['📎', '📎'] };
+    // None at all since 2026-11-03: the paperclip emoji html.ts used to write for an e-mail's inline (cid:) image is a
+    // drawn icon now (tests/polish/cid-image.test.mjs). Characters are built from code points, so this file holds none.
+    const VARIATION_SELECTOR_16 = String.fromCodePoint(0xfe0f); // asks for the emoji form of any character
     for (const rel of files) {
       // Code only: comments are not drawn (some older comments use a marker such as the padlock).
       const code = read(rel.replace(/\\/g, '/')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-      // Emoji_Presentation draws as an emoji by default; U+FE0F asks for emoji presentation of anything else.
-      const found = code.match(/\p{Emoji_Presentation}|️/gu) ?? [];
-      assert.deepEqual(found, KNOWN[rel.replace(/\\/g, '/')] ?? [], rel);
+      // Emoji_Presentation draws as an emoji by default.
+      assert.deepEqual(code.match(/\p{Emoji_Presentation}/gu) ?? [], [], rel);
+      assert.ok(!code.includes(VARIATION_SELECTOR_16), rel);
     }
-    assert.doesNotMatch(read('src/screens/dashboard/HomeScreen.tsx'), /[☀⛅\u{1F324}-\u{1F326}\u{1F319}-\u{1F31B}\u{1F31E}]/u);
+    // Sun, sun behind cloud (three forms), crescent moons, sun with face: none on Home, drawn or not.
+    const home = read('src/screens/dashboard/HomeScreen.tsx');
+    for (const cp of [0x2600, 0x26c5, 0x1f324, 0x1f325, 0x1f326, 0x1f319, 0x1f31a, 0x1f31b, 0x1f31e]) {
+      assert.ok(!home.includes(String.fromCodePoint(cp)), cp.toString(16));
+    }
   });
 });
 

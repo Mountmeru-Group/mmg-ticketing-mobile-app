@@ -115,9 +115,41 @@ describe('swipe (components/TicketCard.tsx)', () => {
   });
 });
 
-describe('count roll on Home: not built', () => {
-  test('Home animates no number: a count-up needs a new text every frame, which the native driver cannot draw', () => {
-    const home = read('src/screens/dashboard/HomeScreen.tsx');
-    assert.doesNotMatch(home, /Animated\.|addListener\(|requestAnimationFrame/);
+describe('count roll on Home: a cross-fade, not a count-up (components/CountFade.tsx, Ronit\'s option 5)', () => {
+  const fade = read('src/components/CountFade.tsx');
+  const home = read('src/screens/dashboard/HomeScreen.tsx');
+
+  test('no count-up anywhere: no number is driven frame by frame (it would need JavaScript every frame)', () => {
+    for (const src of [fade, home]) assert.doesNotMatch(src, /addListener\(|requestAnimationFrame|setInterval|Animated\.loop/);
+    assert.doesNotMatch(home, /Animated\./, 'Home itself animates nothing');
+  });
+
+  test('one native timing per change, on opacity and translateY: the old number fades out over the new', () => {
+    assert.equal(fade.split('Animated.timing(').length - 1, 1);
+    assert.match(fade, /Animated\.timing\(fade\.progress, \{ toValue: 1, duration, easing: ease, useNativeDriver: true \}\)/);
+    assert.match(fade, /\{ opacity: progress, transform: \[\{ translateY: progress\.interpolate\(\{ inputRange: \[0, 1\], outputRange: \[rise, 0\] \}\) \}\] \}/);
+    assert.match(fade, /\{ opacity: progress\.interpolate\(\{ inputRange: \[0, 1\], outputRange: \[1, 0\] \}\) \}/);
+    assert.ok(motion.countFade.duration > 0 && motion.countFade.duration <= 500);
+  });
+
+  test('only when the period changes: a refresh within the same period shows its number at once', () => {
+    assert.match(fade, /active && periodChanged && shown\.value !== value && !reduceMotionEnabled\(\)/);
+  });
+
+  test('"Remove animations", or Home out of view: the end state at once; stopped on unmount', () => {
+    assert.match(fade, /useState<Fade \| null>\(\(\) =>\s*active && !reduceMotionEnabled\(\) \?/);
+    assert.match(fade, /if \(fade && !active\) setFade\(null\);/);
+    assert.match(fade, /return \(\) => run\.stop\(\);/);
+  });
+
+  test('Home: only while it is the screen in view, and only after the period has been changed', () => {
+    assert.match(home, /const focused = useIsFocused\(\);/);
+    assert.match(home, /const countsFade = focused && periodTouched;/);
+    assert.match(home, /const pickPeriod = \(next: DashboardPeriod\) => \{\s*setPeriodTouched\(true\);/);
+    assert.match(home, /<CountFade value=\{t\.value\} periodKey=\{periodKey\} active=\{countsFade\} \/>/);
+  });
+
+  test('a previous period\'s count is never shown as the new one: placeholder data still supplies no count', () => {
+    assert.match(home, /const countsCurrent = showTileCounts && periodReady && !dashboard\.isPlaceholderData;/);
   });
 });

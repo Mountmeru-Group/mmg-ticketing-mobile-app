@@ -142,6 +142,18 @@ export const motion = {
     pressDelay: 60,
   },
 
+  /**
+   * A Home KPI tile's number when the period changes (components/CountFade.tsx, 2026-11-03, Ronit's option 5 for the
+   * count roll): the old number fades out as the new one fades in and rises into place. Not a count-up: that needs
+   * JavaScript every frame (docs/PERFORMANCE.md §13.6).
+   */
+  countFade: {
+    duration: 300,
+    /** How far below its place the new number starts, dp. */
+    rise: 4,
+    curve: curve.standard,
+  },
+
   /** The greeting mark beside "Good morning, Ronit" (components/GreetingMark.tsx, 2026-11-03): one rise and fade. */
   greetingMark: {
     duration: 420,

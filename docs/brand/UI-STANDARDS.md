@@ -9,8 +9,8 @@ motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). �
 property-editor pattern on the ticket, now that the technician has one too. §9 (2026-10-29) sets the rule for the
 time-of-day greeting on Home. §10 (2026-10-30) is the login's "arc split" layout and the motion palette (white
 ground, yellow accent); the motion itself is `docs/PERFORMANCE.md` §12. §14 (2026-11-03) is the polish pass: the people
-row on ticket cards, the greeting mark, the window captions on Home's counts, swipe actions, haptics, the SLA countdown
-bar and press feedback (its motion is `docs/PERFORMANCE.md` §13).
+row on ticket cards, the greeting mark, the window captions on Home's counts, swipe actions, haptics, the SLA deadline,
+press feedback, the count cross-fade and the drawn paperclip (its motion is `docs/PERFORMANCE.md` §13).
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -117,6 +117,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 | Empty list illustration (S11) | 128 × 96 |
 | Greeting mark beside the Home greeting (§14.2) | 26 |
 | People-row avatar on a ticket card (§14.1) | 25 |
+| Paperclip for an e-mail's inline image in a rendered body (§14.9) | 16 |
 
 **S8 Touch targets.** Every control is at least 44 dp: either by size (`h-11`, `min-h-11`, `min-h-12`) or, where a small visual is intended (badge, chip, checkbox, ✕), with a `hitSlop` that makes up the 44 dp.
 
@@ -138,6 +139,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
   - Rows of a list enter with a short stagger the first time it shows.
   - A status badge pulses when its own record's status changes.
   - Since 2026-11-03 (§14.7), every tappable card and list row dips and dims while held (`PressableCard`).
+  - Since 2026-11-03 (§14.8), a Home tile's number cross-fades into the new one when the period changes (`CountFade`).
   - Nothing in a list row loops.
 - Error: the `describeError()` message plus an outline **Retry** button.
 - Offline: the banner directly under the header on every screen, and on Login at the top; OfflineState for a first load.
@@ -795,9 +797,16 @@ Ronit's brief, UAT only. The motion side (native driver, cost, what a device mus
 | 3 | Total vs Open: window captions | **Built**; no count changed (§14.3) |
 | 4.1 | Swipe actions | **Built** (§14.4) |
 | 4.2 | Haptics | **Built**, `expo-haptics` (§14.5) |
-| 4.3 | SLA countdown bar, detail only | **Built**; the bar is wall-clock, which leaves a decision (§14.6) |
+| 4.3 | SLA countdown bar, detail only | **Changed to the deadline** ("Due Mon 11:00", no bar), Ronit's option C. A real countdown is backend ask A31 (§14.6) |
 | 4.4 | Press feedback | **Built** on every tappable card and list row (§14.7) |
-| 4.5 | Count roll on Home | **Skipped**: it needs JavaScript every frame (§14.8) |
+| 4.5 | Count roll on Home | **A cross-fade instead** (Ronit's option 5). A count-up needs JavaScript every frame (§14.8) |
+
+**Ronit's decisions after the first pass (2026-11-03), all made:**
+- the SLA line shows the deadline, not a countdown, and A31 is filed (§14.6);
+- the count roll is a cross-fade (§14.8);
+- the paperclip emoji is a drawn icon (§14.9);
+- VIBRATE is kept (§14.5);
+- "Active now" became "Active" (§14.3, already done).
 
 Not touched: every count, query and API call; navigation; every permission (the swipe reuses the existing rules);
 `auth.config.ts`, the 15-day re-authentication and the production profile.
@@ -922,37 +931,55 @@ Not touched: every count, query and API call; navigation; every permission (the 
 - **The phone's setting is respected.**
   - Only `performAndroidHapticsAsync` is used. It calls View.performHapticFeedback, which Android silences when touch feedback is off.
   - expo-haptics' `impactAsync`, `notificationAsync` and `selectionAsync` drive the Vibrator directly, which that setting does not govern. The app never calls them, and a test fails if anything in `src/` does.
-- **No VIBRATE permission.** expo-haptics declares one in its manifest, but the app does not need it. `app.json` adds it to `blockedPermissions` beside `SYSTEM_ALERT_WINDOW`, so the app's permission list is unchanged.
+- **VIBRATE is kept** (Ronit, 2026-11-03).
+  - expo-haptics declares it in its manifest, and `app.json` does not block it. The first pass blocked it.
+  - The calls the app makes do not need it, so the OS setting governs every haptic either way.
+  - It is a normal install-time permission: no prompt. The Play listing shows "control vibration".
 - **Fire and forget:** nothing waits for a haptic, and a phone without one stays silent. A signed-out (401) error plays nothing, just as it shows nothing.
 - **Not covered:** the bulk runner's per-ticket results, and saves outside the brief's list (a task ticked, a profile saved). Those play no confirm on success, though their failures still get REJECT.
 
-### 14.6 The SLA countdown bar (ticket detail only)
+### 14.6 The SLA deadline (ticket detail only)
 
-- **Place:** in the header card, under the badges, never on a list card.
-  - A `text-xs font-semibold` row: "Time to resolve" in gray-500 on the left, the time left in gray-900 on the right. "Breached" is red-700 (6.5:1).
-  - Under it, a 6 dp rounded bar on a gray-200 track.
-- **Words:** "6h left", "25m left", "2d 4h left", "under 1m left", "Breached".
-  - Whole units, rounded down, so it never promises more time than there is.
-  - A ticket on hold reads "Paused · 6h left".
-- **From the existing fields only** (`utils/sla-countdown.ts`):
-  - The deadline is `effectiveResolveDue()`, the web's hold-adjusted resolve deadline (05 §A.9). It is the same value as the Properties card's "Resolve by".
+**Ronit's decision (option C):** show the deadline, not a countdown, and no bar.
+
+**Why the first pass's countdown was replaced:**
+- The server sets the deadline in business hours (09:00–18:00, Monday to Friday by default; SLAPolicy in 03 §B).
+- The countdown and its bar measured clock time to it.
+- So on a Friday at 17:00, a Monday 11:00 deadline read "66h left" with 3 working hours to go, and the bar filled over the weekend while the SLA clock stood still.
+
+A real countdown needs the server's own figure: backend ask **A31** in `docs/web-system/06-BACKEND-ASKS.md`, with that example.
+
+- **Place:** in the header card, under the badges, never on a list card (`components/SlaDeadline.tsx`). One `text-xs font-semibold` row:
+  - "Resolution" in gray-500 on the left;
+  - on the right, an 8 dp dot in the status colour, then the deadline in gray-900. "Breached" is red-700 (6.5:1).
+- **Words** (`formatDueTime` in `utils/sla-deadline.ts`), on the phone's clock and calendar:
+
+  | When the deadline falls | Reads |
+  |---|---|
+  | Later today | "Due today 16:30" |
+  | Tomorrow | "Due tomorrow 09:05" |
+  | Within the next 6 days | "Due Mon 11:00" |
+  | Further out, or in another year | "Due 13 Nov 10:00", "Due 04 Jan 2027 09:00" |
+  | Already passed | "Breached" |
+  | On hold, not yet breached | "Paused while on hold" |
+
+  - A weekday is never more than 6 days away, so "Mon" never means next week's Monday.
+  - No label ever says "left" (tested).
+  - **Why no time is given on hold:** the hold-adjusted deadline moves later minute by minute while a ticket is on hold. The Properties card's "Resolve by" row still shows it, as before.
+- **From the existing fields only:**
+  - The deadline is `effectiveResolveDue()`, the web's hold-adjusted resolve deadline (05 §A.9), the same value as "Resolve by".
   - The colour follows the SLA badge's own `getDisplaySlaStatus()`. Amber is the server's DUE_SOON (≤ 30 min left); the app sets no threshold of its own.
-  - A first-response breach alone leaves the resolution bar green: the badge above already shows that breach.
-  - Nothing shows when there is no resolve deadline, or once the ticket is Resolved, Closed or Canceled.
-- **Colours** (`colors.slaBar`), told apart by lightness:
+  - A first-response breach alone leaves the resolution line green: the badge above already shows that breach.
+  - Nothing shows without a resolve deadline, or once the ticket is Resolved, Closed or Canceled.
+- **Colours** (`colors.slaDeadline`, the dot), told apart by lightness. The words carry the meaning; the dot is decoration.
 
   | Status | Colour (L*) |
   |---|---|
   | Within SLA | green-600 (59) |
   | Due soon | amber-400 (81) |
   | Breached | red-700 (40) |
-- **Decision for Ronit: what the bar measures.**
-  - The bar is the share of **wall-clock** time from the ticket's creation to its deadline.
-  - The deadline itself is set in business hours (09:00–18:00, Monday to Friday by default; SLAPolicy in 03 §B). The API does not say how many business minutes the policy allows, or how many have passed.
-  - So overnight and at weekends the bar fills and the hours drop while the SLA clock stands still. Example: on Friday at 17:00, a Monday 11:00 deadline reads "66h left".
-  - Computing business time would mean re-implementing the server's SLA calendar in the app, which the rules forbid.
-  - If the wall-clock bar misleads, the options are: drop the bar and keep the words, or ask the backend for the time left (a new ask).
-- **Clock:** read on render, on focus and on return to the app (the §9 pattern), never on a timer. The bar is static and never animates.
+- **Screen readers:** "Resolution: Due Mon 11:00". On hold, it adds "The SLA clock is paused while the ticket is on hold".
+- **Clock:** read on render, on focus and on return to the app (the §9 pattern), never on a timer, so "Due today" turns into "Breached" when the screen is next shown. Static: nothing animates.
 
 ### 14.7 Press feedback
 
@@ -966,27 +993,33 @@ Not touched: every count, query and API call; navigation; every permission (the 
 - **A touch that becomes a scroll shows nothing:** the press shows 60 ms after touch-down (`pressDelay`). A quicker tap still shows it and still fires.
 - **"Remove animations":** no dip; the 85 % tint shows and clears at once, as before.
 
-### 14.8 Count roll on Home: skipped
+### 14.8 Count roll on Home: a cross-fade
 
-**Why it was skipped:**
-- A count-up shows every number in between, so the text has to change on every frame.
-- React Native's native driver animates only transforms and opacity, never text.
-- So a count-up would need JavaScript on every frame: a listener and a re-render of each tile, about 30 per tile over 500 ms. That is what this phase must not add.
+**No count-up.** A count-up shows every number in between, so the text must change on every frame. The native driver animates only transforms and opacity, never text, so a count-up would need JavaScript on every frame, which this phase must not add.
 
-As the brief allowed, it is skipped, and the number changes at once, as before.
+**Ronit's choice (option 5):** cross-fade the old number into the new one (`components/CountFade.tsx`, `motion.countFade`).
 
-**An alternative, if wanted (a decision):** an odometer.
-- Each digit becomes a column of 0–9 that slides with `translateY` on the native driver, so there is no per-frame JavaScript.
-- It rolls rather than counts.
-- It adds about 10 text views per digit on Home.
-- It needs care with the tiles' shrink-to-fit counts and with 200 % text.
+- **What it looks like:** the old number fades out over the new one, which fades in and rises 4 dp into place. One native timing of 300 ms on `opacity` and `translateY`.
+- **When it runs:**
+  - **A period already loaded** (cached): the old number cross-fades into the new one.
+  - **A period not loaded yet:** the old number gives way to the loading bar at once, as before, and the new number fades in when it arrives.
+  - **Why the old number does not stay while loading:** G6's rule is that a previous period's count is never shown as the new one (placeholder data supplies no count). That rule is unchanged.
+- **When it does not run** (the number appears at once, as before):
+  - a refresh within the same period;
+  - Home's first numbers, before the person has changed the period;
+  - Home not in view (it ends at once on blur);
+  - "Remove animations".
+- **Not on the chips:** pending-reason chips appear and disappear at 0, and their pills change width. Only the KPI tiles fade.
+- **Screen readers:** they read the new number only; the fading one is hidden.
 
-### 14.9 Reported, not changed
+### 14.9 Reported, not changed (and one fixed)
 
-- **An emoji already in the app:** since Phase 3a, `utils/html.ts` replaces an e-mail's inline (`cid:`) image with "📎 image in attachments".
-  - The paperclip comes from the phone's font, against this phase's no-emoji rule.
-  - It is left as it was, and a test pins it so no other emoji can join it.
-  - Fixing it (a decision): a drawn icon, or plain "[image in attachments]".
+- **Fixed (Ronit, 2026-11-03): the paperclip emoji.**
+  - Since Phase 3a, `utils/html.ts` wrote the web's emoji placeholder for an e-mail's inline (`cid:`) image.
+  - It now writes a `<cid-image>` element. A rendered body draws it as a 16 dp paperclip (a flat SVG in gray-500, `assets/illustrations/paperclip.svg`, drawn by expo-image) with "Image in attachments" in `text-sm italic` gray-500 (`HtmlText.tsx`).
+  - Plain text reads "[image in attachments]".
+  - An inline `<svg>` was not possible: the sanitiser strips `<svg>` on purpose, and the renderer cannot draw one without `react-native-svg`.
+  - `src/` now has no emoji at all (tested). The web keeps its emoji (05 §A.6, mobile deviation noted there).
 - **Home's recent-ticket rows** keep the old people line (§14.1).
 - **TalkBack** has no swipe actions (§14.4).
 
@@ -1005,5 +1038,10 @@ As the brief allowed, it is skipped, and the number changes at once, as before.
    - each event plays once;
    - with Settings → Sound & vibration → Touch feedback (or "Vibration & haptics") off, none plays;
    - check on Android 10 or older too (the fallbacks).
-6. **SLA bar:** the three colours; "Paused" on a ticket on hold.
+6. **SLA deadline:** the three dot colours; "Due Mon 11:00" against the Properties card's "Resolve by"; "Paused while on hold" on a ticket on hold.
 7. **Press:** no flicker while scrolling a list; the dip shows on a held card.
+8. **Count fade:**
+   - switch between two periods already loaded: the numbers cross-fade;
+   - pick a new period: the loading bar, then the numbers fade in;
+   - pull to refresh: nothing fades.
+9. **Paperclip:** a reply with an inline e-mail image shows the drawn paperclip and "Image in attachments", sharp at the phone's density.

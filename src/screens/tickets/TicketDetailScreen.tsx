@@ -50,7 +50,7 @@ import { useIsOffline } from '@/api/network';
 import {
   AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice,
   OfflineBanner, OfflineState, OptionSheet, OutlineButton, PressableCard, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge,
-  SlaCountdown, StatusBadge, SubmitButton, TaskRow, type SheetOption,
+  SlaDeadline, StatusBadge, SubmitButton, TaskRow, type SheetOption,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
@@ -561,8 +561,8 @@ const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDet
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
       </View>
-      {/* 2026-11-03: time left to the hold-adjusted resolve deadline, with its bar. Detail only, never the list. */}
-      <SlaCountdown ticket={ticket} />
+      {/* 2026-11-03: the hold-adjusted resolve deadline as a time ("Due Mon 11:00"), coloured. Detail only. */}
+      <SlaDeadline ticket={ticket} />
       <Text className="mt-2 text-xs text-gray-500">
         Created {formatDateTime(ticket.createdAt)} · Updated {formatRelative(ticket.updatedAt)}
       </Text>
