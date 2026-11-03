@@ -152,9 +152,10 @@ describe('build profiles and store identity', () => {
     assert.match(source, /^\s*PROD: 'https:\/\/servicedesk\.mountmerugroup\.com\/api\/v1',$/m);
   });
 
-  test('version 1.0.0 with a versionCode above every earlier build (all used 1)', () => {
+  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (2)', () => {
+    // versionCode 2 was the first AAB uploaded to Play; Play rejects any upload not above the last one it received.
     assert.equal(app.version, '1.0.0');
-    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode >= 2, String(app.android.versionCode));
+    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 2, String(app.android.versionCode));
   });
 
   test('package, slug, schemes and EAS project are unchanged (the Entra registration and EAS key depend on them)', () => {
