@@ -15,14 +15,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice, OfflineBanner, OfflineState,
-  OutlineButton, QueryBanner, ScreenHeader,
+  OutlineButton, QueryBanner, ScreenHeader, usePressFeedback,
 } from '@/components';
 import {
   useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePendingApprovals, useSingleFlight, useStableCallback,
@@ -259,54 +259,59 @@ const NotificationRow = memo(function NotificationRow({
   const ticket = n.ticket && typeof n.ticket.ticketNumber === 'number' ? n.ticket : null;
   // Meta text one shade darker on the unread tint: gray-500 on blue-50 is 4.4:1, below WCAG AA.
   const meta = n.isRead ? 'text-gray-500' : 'text-gray-600';
-  // The standard card; unread ones tinted with the app's information blue.
+  // The standard card; unread ones tinted with the app's information blue. Press feedback (2026-11-03): the whole card
+  // dips while its main area is held; the mark-read button keeps its own.
+  const feedback = usePressFeedback();
   return (
-    <View className={`mx-4 mb-3 flex-row rounded-xl border p-4 ${n.isRead ? 'border-border bg-white' : 'border-blue-200 bg-blue-50'}`}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${n.isRead ? '' : 'Unread. '}${n.title}`}
-        accessibilityHint={n.ticketId ? 'Opens the ticket' : undefined}
-        onPress={onPress}
-        className="flex-1 flex-row active:opacity-70"
-      >
-        <View className="mr-3 mt-0.5">
-          <Ionicons name={icon} size={20} color={n.isRead ? palette.gray[500] : palette.blue[700]} />
-        </View>
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            {!n.isRead ? <View className="mr-1.5 h-2 w-2 rounded-full bg-blue-600" /> : null}
-            <Text className={`flex-1 text-sm text-gray-900 ${n.isRead ? 'font-medium' : 'font-bold'}`} numberOfLines={2}>
-              {n.title || 'Notification'}
-            </Text>
-          </View>
-          {body ? (
-            <Text className="mt-0.5 text-sm text-gray-700" numberOfLines={3}>
-              {body}
-            </Text>
-          ) : null}
-          {ticket ? (
-            <Text className={`mt-1 text-xs ${meta}`} numberOfLines={1}>
-              #{ticket.ticketNumber} · {ticket.title}
-            </Text>
-          ) : null}
-          <Text className={`mt-1 text-xs ${meta}`} accessibilityLabel={formatDateTime(n.createdAt)}>
-            {formatRelative(n.createdAt)}
-          </Text>
-        </View>
-      </Pressable>
-      {onMarkRead ? (
+    <Animated.View style={feedback.style}>
+      <View className={`mx-4 mb-3 flex-row rounded-xl border p-4 ${n.isRead ? 'border-border bg-white' : 'border-blue-200 bg-blue-50'}`}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Mark as read"
-          disabled={marking}
-          onPress={onMarkRead}
-          hitSlop={6}
-          className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center self-start rounded-full active:bg-blue-100"
+          accessibilityLabel={`${n.isRead ? '' : 'Unread. '}${n.title}`}
+          accessibilityHint={n.ticketId ? 'Opens the ticket' : undefined}
+          onPress={onPress}
+          {...feedback.pressProps()}
+          className="flex-1 flex-row"
         >
-          {marking ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
+          <View className="mr-3 mt-0.5">
+            <Ionicons name={icon} size={20} color={n.isRead ? palette.gray[500] : palette.blue[700]} />
+          </View>
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              {!n.isRead ? <View className="mr-1.5 h-2 w-2 rounded-full bg-blue-600" /> : null}
+              <Text className={`flex-1 text-sm text-gray-900 ${n.isRead ? 'font-medium' : 'font-bold'}`} numberOfLines={2}>
+                {n.title || 'Notification'}
+              </Text>
+            </View>
+            {body ? (
+              <Text className="mt-0.5 text-sm text-gray-700" numberOfLines={3}>
+                {body}
+              </Text>
+            ) : null}
+            {ticket ? (
+              <Text className={`mt-1 text-xs ${meta}`} numberOfLines={1}>
+                #{ticket.ticketNumber} · {ticket.title}
+              </Text>
+            ) : null}
+            <Text className={`mt-1 text-xs ${meta}`} accessibilityLabel={formatDateTime(n.createdAt)}>
+              {formatRelative(n.createdAt)}
+            </Text>
+          </View>
         </Pressable>
-      ) : null}
-    </View>
+        {onMarkRead ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mark as read"
+            disabled={marking}
+            onPress={onMarkRead}
+            hitSlop={6}
+            className="-mr-2 -mt-2 ml-1 h-8 w-8 items-center justify-center self-start rounded-full active:bg-blue-100"
+          >
+            {marking ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="checkmark-done-outline" size={20} color={palette.blue[700]} />}
+          </Pressable>
+        ) : null}
+      </View>
+    </Animated.View>
   );
 });
 

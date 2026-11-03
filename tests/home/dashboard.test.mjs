@@ -196,10 +196,12 @@ describe('tiles and chips count what the web counts', () => {
   });
 
   test('chips use the web\'s words (FE:DashboardPage.tsx:382-402)', () => {
+    // Active is the app's own. Since 2026-11-03 its "now" is the chip's window caption ("right now", homeChipCaption),
+    // as Open's is; until then the label read "Active now" (tests/home/window-captions.test.mjs).
     assert.deepEqual(HOME_CHIP_LABELS, {
       closed: 'Closed', unassigned: 'Unassigned', pendingMgmtReview: 'Mgmt review', pendingPartner: 'With partner',
       pendingUserConfirm: 'User confirm', pendingUserInfo: 'More info', pendingMasterData: 'Master data',
-      onHold: 'On hold', active: 'Active now',
+      onHold: 'On hold', active: 'Active',
     });
   });
 

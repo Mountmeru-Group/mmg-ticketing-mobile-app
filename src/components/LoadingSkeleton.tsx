@@ -274,7 +274,8 @@ function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: numbe
         </View>
       );
     default:
-      // `list`: TicketCard — number and time, title, three badges, people line.
+      // `list`: TicketCard — number and time, title, three badges, then the people row under its hairline rule: two
+      // 25 dp avatars (2026-11-03; TicketCard.tsx, PeopleRow.tsx).
       return items.map((i) => (
         <Card key={i}>
           <Bar className="mb-2 h-3 w-1/4" />
@@ -284,7 +285,12 @@ function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: numbe
             <Bar className="mr-1.5 h-5 w-14 rounded-full" />
             <Bar className="h-5 w-20 rounded-full" />
           </View>
-          <Bar className="mt-2 h-3 w-1/2" />
+          <View className="mt-3 flex-row items-center border-t border-border pt-2.5">
+            <Bar className="h-[25px] w-[25px] rounded-full" />
+            <Bar className="ml-1.5 h-3 w-24" />
+            <Bar className="ml-6 h-[25px] w-[25px] rounded-full" />
+            <Bar className="ml-1.5 h-3 w-16" />
+          </View>
         </Card>
       ));
   }

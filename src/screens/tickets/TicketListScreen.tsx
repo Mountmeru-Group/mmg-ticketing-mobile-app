@@ -38,13 +38,18 @@
 //   Tap-and-hold multi-select (08 §4.2): staff only, hard cap BULK_ACTION_LIMIT (20). Pick up (ADMIN/AGENT) runs
 //     here; Assign → M7 and Close → M6 in bulk mode. Sequential, Stop button, per-ticket results, one list refresh.
 //   No bulk delete or merge: those endpoints don't exist (08 §4.2).
+//   Swipe left on a row (2026-11-03): Assign and Resolve, only where a tap already offers them (ticketSwipeActions,
+//     utils/permissions.ts). Assign opens M7 as More options does; Resolve runs the status chip's own handler (→ M6).
+//     One row open at a time; a scroll or a selection closes it. Not for END_USER (canSwipeTickets).
+// HAPTICS (2026-11-03, utils/haptics.ts): a tick on the long-press that selects; the confirm on a status change.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator, Alert, BackHandler, Pressable, RefreshControl, ScrollView, StatusBar, Text, View,
 } from 'react-native';
+import type { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
@@ -65,7 +70,10 @@ import type { Ticket, TicketStackScreenProps, TicketStatus, UserRole } from '@/t
 import { looksLikeUrl } from '@/utils/deep-links';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
-import { bulkActions, inlineStatusTransitions, ticketListFilters, ticketsTitle, type BulkAction } from '@/utils/permissions';
+import { haptic } from '@/utils/haptics';
+import {
+  bulkActions, canSwipeTickets, inlineStatusTransitions, ticketListFilters, ticketsTitle, type BulkAction, type SwipeAction,
+} from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
 import {
   TICKET_FILTER_LABELS, TICKET_SORT_LABELS, activeAdvancedFilters, activeFilterLabels, appliedTicketPeriod,
@@ -202,6 +210,11 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     }
   });
   const onCardPress = useCallback((ticketId: string) => (selectionMode ? toggle(ticketId) : openTicket(ticketId)), [selectionMode, toggle, openTicket]);
+  // The long-press that selects gets a light tick (2026-11-03). One identity for the screen's lifetime, as toggle has.
+  const onCardLongPress = useStableCallback((ticketId: string) => {
+    haptic('select');
+    toggle(ticketId);
+  });
   // Rows can vanish when the query changes; start over rather than act on tickets no longer shown.
   useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, ticketAdvanced, clearSelection]);
   // Android back clears the selection first.
@@ -239,6 +252,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     if (!ok) return;
     try {
       await changeStatus.mutateAsync({ ticketId: t.id, from: t.status, body: { status: target } });
+      haptic('success');
       notify('Status updated');
     } catch (e) {
       reportWriteError('Failed to update status', e);
@@ -289,6 +303,31 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
     else navigation.navigate('StatusClosure', { ticketIds, target: 'CLOSED' });
     clearSelection();
   }
+  // ── Swipe actions (2026-11-03) ─────────────────────────────
+  // Which rows swipe is decided per role (canSwipeTickets), and which actions a row reveals per ticket inside the card
+  // (ticketSwipeActions): the same rules as the tap paths they shortcut.
+  const swipeable = canSwipeTickets(role);
+  const openRow = useRef<Swipeable | null>(null);
+  const onSwipeOpen = useCallback((row: Swipeable) => {
+    if (openRow.current && openRow.current !== row) openRow.current.close();
+    openRow.current = row;
+  }, []);
+  const onSwipeClose = useCallback((row: Swipeable) => {
+    if (openRow.current === row) openRow.current = null;
+  }, []);
+  const closeOpenRow = useCallback(() => {
+    openRow.current?.close();
+    openRow.current = null;
+  }, []);
+  // A selection disables swiping; an open row closes first.
+  useEffect(() => {
+    if (selectionMode) closeOpenRow();
+  }, [selectionMode, closeOpenRow]);
+  const onSwipeAction = useStableCallback((action: SwipeAction, t: Ticket) => {
+    if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [t.id] }); // as More options' Assign…
+    else void once(() => applyTransition(t, 'RESOLVED')); // the status chip's own path: checks the transition, opens M6
+  });
+
   const onBulk: Record<BulkAction, () => void> = {
     pickup: () => void once(bulkPickUp),
     assign: () => openBulk('AssignPicker'),
@@ -304,16 +343,23 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             ticket={item}
             role={role}
             onPress={onCardPress}
-            onLongPress={canSelect ? toggle : undefined}
+            onLongPress={canSelect ? onCardLongPress : undefined}
             selectionMode={selectionMode}
             selected={selected.has(item.id)}
             onStatusPress={interactive ? onStatusPress : undefined}
             statusBusy={statusBusyId === item.id}
+            swipeViewer={swipeable ? user : undefined}
+            onSwipeAction={onSwipeAction}
+            onSwipeOpen={onSwipeOpen}
+            onSwipeClose={onSwipeClose}
           />
         </ListEntry>
       );
     },
-    [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
+    [
+      role, onCardPress, canSelect, onCardLongPress, selectionMode, selected, onStatusPress, statusBusyId, swipeable, user,
+      onSwipeAction, onSwipeOpen, onSwipeClose,
+    ],
   );
 
   const contentStyle = useMemo(() => ({ paddingTop: 12, paddingBottom: insets.bottom + 96, flexGrow: 1 }), [insets.bottom]);
@@ -334,6 +380,7 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
         renderItem={renderItem}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
+        onScrollBeginDrag={closeOpenRow}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={contentStyle}

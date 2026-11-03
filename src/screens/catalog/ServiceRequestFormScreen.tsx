@@ -25,6 +25,7 @@ import { colors, palette } from '@/theme';
 import type { CatalogStackScreenProps, TicketImpact, TicketPriority } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { formatDisplayName } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { serviceCatalogPermissions } from '@/utils/permissions';
 import {
   REQUEST_IMPACT_OPTIONS, REQUEST_URGENCY_OPTIONS, buildServiceRequestBody, formErrors, initialFormValues, nextRequestPriority,
@@ -104,10 +105,14 @@ export function ServiceRequestFormScreen({ navigation, route }: CatalogStackScre
             priority: can.requestProperties ? priority : null,
           }),
         );
+        haptic('success');
         notify(submittedMessage(item));
         leave(() => navigation.popTo('ServiceCatalog', { view: 'catalog', resetAt: Date.now() }));
       } catch (e) {
-        if (!isSessionEndedError(e)) setError(describeWriteError(e) || 'Failed to submit request');
+        if (!isSessionEndedError(e)) {
+          haptic('error');
+          setError(describeWriteError(e) || 'Failed to submit request');
+        }
       }
     });
 

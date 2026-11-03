@@ -29,6 +29,7 @@ import {
 } from '@/types';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { IMPACT_LABELS, URGENCY_LABELS, formatDisplayName } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { createTicketPermissions } from '@/utils/permissions';
 import { PriorityPreviewBox } from './TicketPropertyEditors';
 
@@ -142,13 +143,18 @@ export function CreateTicketScreen({ navigation }: TicketStackScreenProps<'Creat
         files,
       });
       if (result.uploadError) {
+        haptic('error'); // the ticket exists, but a save failed: its files
         Alert.alert('Ticket created', `Ticket created but some attachments failed to upload. ${describeWriteError(result.uploadError)}`);
       } else {
+        haptic('success');
         notify('Ticket created successfully');
       }
       leave(() => navigation.replace('TicketDetail', { ticketId: result.ticket.id }));
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e) || 'Failed to create ticket');
+      if (!isSessionEndedError(e)) {
+        haptic('error');
+        setError(describeWriteError(e) || 'Failed to create ticket');
+      }
     }
   }
 

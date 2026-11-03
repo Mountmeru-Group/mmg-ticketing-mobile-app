@@ -25,6 +25,7 @@ import type { TicketDetail, TicketStackScreenProps, UserRole } from '@/types';
 import { submitApprovalMessage, submitApprovalOutcome } from '@/utils/approvals';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { canSubmitForApproval } from '@/utils/permissions';
 
 type Props = TicketStackScreenProps<'SubmitApproval'>;
@@ -89,9 +90,13 @@ function SubmitApprovalForm({ navigation, route }: Props) {
       await submit.mutateAsync({ ticketId, approverIds: chosenIds, comments });
     } catch (e) {
       // The form keeps everything as it was, so the person can correct it and try again.
-      if (!isSessionEndedError(e)) setError(describeActionWriteError('submit tickets for approval', e));
+      if (!isSessionEndedError(e)) {
+        haptic('error');
+        setError(describeActionWriteError('submit tickets for approval', e));
+      }
       return;
     }
+    haptic('success');
     notify('Approval request submitted');
     // Show the status the server now has, not the one it should have: one TKT-3 read.
     const statusNow = await fetchCurrentStatus(ticketId).catch(() => null);

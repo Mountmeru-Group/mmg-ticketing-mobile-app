@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, QueryBanner, ScreenHeader, SearchField, StatusBadge,
+  OfflineState, PressableCard, QueryBanner, ScreenHeader, SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -340,10 +340,10 @@ function CatalogRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       onPress={onPress}
-      className="mx-4 mb-3 flex-row items-center rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 flex-row items-center rounded-xl border border-border bg-white p-4"
     >
       {/* The web's icon square: `bg-blue-100 text-blue-600` (ServiceCatalogPage.tsx:429, :463). */}
       <View className="h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
@@ -361,7 +361,7 @@ function CatalogRow({
         {trailing ? <View className="mt-1.5 flex-row">{trailing}</View> : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />
-    </Pressable>
+    </PressableCard>
   );
 }
 
@@ -488,9 +488,9 @@ const RequestRow = memo(function RequestRow({ request, own, onPress }: { request
   );
   const className = 'mx-4 mb-3 rounded-xl border border-border bg-white p-4';
   return onPress ? (
-    <Pressable accessibilityRole="button" onPress={onPress} className={`${className} active:opacity-80`}>
+    <PressableCard accessibilityRole="button" onPress={onPress} className={className}>
       {body}
-    </Pressable>
+    </PressableCard>
   ) : (
     <View className={className}>{body}</View>
   );

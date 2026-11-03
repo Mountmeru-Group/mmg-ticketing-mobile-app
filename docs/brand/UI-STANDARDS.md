@@ -8,7 +8,9 @@ defects found on a device, the Home KPI tiles and the drawer layout (§5), and u
 motion and the empty-list illustrations (S7, S11; `docs/PERFORMANCE.md` §10). §8 (2026-10-27) restates the inline
 property-editor pattern on the ticket, now that the technician has one too. §9 (2026-10-29) sets the rule for the
 time-of-day greeting on Home. §10 (2026-10-30) is the login's "arc split" layout and the motion palette (white
-ground, yellow accent); the motion itself is `docs/PERFORMANCE.md` §12.
+ground, yellow accent); the motion itself is `docs/PERFORMANCE.md` §12. §14 (2026-11-03) is the polish pass: the people
+row on ticket cards, the greeting mark, the window captions on Home's counts, swipe actions, haptics, the SLA countdown
+bar and press feedback (its motion is `docs/PERFORMANCE.md` §13).
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -67,7 +69,8 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
 - Record title: `text-lg font-bold`. Card/list title: `text-base font-semibold`. Row title: `text-sm font-semibold`.
 - Section caption: `text-xs font-semibold uppercase tracking-wide text-gray-500`. Sub-label: `text-xs font-semibold text-gray-500`.
 - Body `text-sm`, meta `text-xs`, IDs `text-xs font-semibold text-gray-500`.
-- Avatars: `bg-primary/10` with `text-primary` initials (the web's avatar); amber on private notes.
+- Avatars: `bg-primary/10` with `text-primary` initials (the web's avatar); amber on private notes. On a ticket card's
+  people row (§14.1) they are 25 dp: the requester in this avatar, the technician in slate-700 with white initials.
 
 **S4 Colour.**
 
@@ -112,6 +115,8 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 | Chips and beside `text-xs` | 12–14 |
 | Empty, error and crash states | 40 |
 | Empty list illustration (S11) | 128 × 96 |
+| Greeting mark beside the Home greeting (§14.2) | 26 |
+| People-row avatar on a ticket card (§14.1) | 25 |
 
 **S8 Touch targets.** Every control is at least 44 dp: either by size (`h-11`, `min-h-11`, `min-h-12`) or, where a small visual is intended (badge, chip, checkbox, ✕), with a `hitSlop` that makes up the 44 dp.
 
@@ -129,7 +134,11 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
     - `empty` (an empty tray under the Meru drop): nothing here yet, or nothing matches. Tickets, tasks, knowledge base, announcements, the catalogue and My Requests.
     - `clear` (the Meru drop with a tick): nothing waiting for you. Approvals and Alerts.
   - Everything else keeps its icon: offline, no access, not found, "Keep typing", the ticket-detail tabs and Home's recent tickets (sections inside a screen, not a screen).
-- Motion: tokens in `src/theme/motion.ts`, rules in `docs/PERFORMANCE.md` §10. Rows of a list enter with a short stagger the first time it shows; a status badge pulses when its own record's status changes.
+- Motion: tokens in `src/theme/motion.ts`, rules in `docs/PERFORMANCE.md` §10.
+  - Rows of a list enter with a short stagger the first time it shows.
+  - A status badge pulses when its own record's status changes.
+  - Since 2026-11-03 (§14.7), every tappable card and list row dips and dims while held (`PressableCard`).
+  - Nothing in a list row loops.
 - Error: the `describeError()` message plus an outline **Retry** button.
 - Offline: the banner directly under the header on every screen, and on Login at the top; OfflineState for a first load.
 
@@ -773,3 +782,228 @@ Order on Home:
 **Sheets.**
 - **Entity type** is OptionSheet: All types, Ticket, Comment, Attachment. Each has a one-line description; Ticket's says automatic closes are not included (`05` B.38).
 - **Person** is PersonPickerSheet, searching every role.
+
+## 14. Polish pass (2026-11-03): people row, greeting mark, window captions, five refinements
+
+Ronit's brief, UAT only. The motion side (native driver, cost, what a device must confirm) is `docs/PERFORMANCE.md` §13.
+**Not run on a device:** there was no build. Every dp figure below is arithmetic on the classes.
+
+| # | Item | Result |
+|---|---|---|
+| 1 | People row on ticket cards | **Built** (§14.1) |
+| 2 | Greeting mark | **Built**: three drawn SVGs, one rise and fade (§14.2) |
+| 3 | Total vs Open: window captions | **Built**; no count changed (§14.3) |
+| 4.1 | Swipe actions | **Built** (§14.4) |
+| 4.2 | Haptics | **Built**, `expo-haptics` (§14.5) |
+| 4.3 | SLA countdown bar, detail only | **Built**; the bar is wall-clock, which leaves a decision (§14.6) |
+| 4.4 | Press feedback | **Built** on every tappable card and list row (§14.7) |
+| 4.5 | Count roll on Home | **Skipped**: it needs JavaScript every frame (§14.8) |
+
+Not touched: every count, query and API call; navigation; every permission (the swipe reuses the existing rules);
+`auth.config.ts`, the 15-day re-authentication and the production profile.
+
+### 14.1 The people row on ticket cards
+
+`[RJ] Rohit Jadhav  →  [SD] Sarthak D.` replaces "Rohit Jadhav · Technician: Sarthak Darekar" (`components/PeopleRow.tsx`).
+
+- **Place:** the last row of the card, under the badges, after a hairline rule (`StyleSheet.hairlineWidth`, `border-border`): `mt-3` above the rule, `pt-2.5` below it.
+- **Avatars:** 25 dp circles with two initials (`text-xs font-semibold`). The initials grow with system text only up to 1.2×, so they stay inside the circle at 200 % text. The name beside each avatar grows without limit.
+- **Colours** (`colors.avatar`). They differ in **lightness**, not hue alone; tested at ≥ 15 L* apart:
+
+  | Who | Fill (L*) | Initials | Contrast |
+  |---|---|---|---|
+  | Requester | S3's avatar, `bg-primary/10` as hex `#fbe7e9` (93) | brand red | 4.6:1 |
+  | Technician | slate-700 (27) | white | 10.4:1 |
+  | Unassigned | none: a 1 dp **dashed** gray-500 ring with a 14 dp plus | — | ring 4.8:1 on white (UI graphic ≥ 3:1) |
+
+- **Names:** `text-xs font-medium text-gray-700`. The requester's full name, and the technician's first name and last initial ("Sarthak D.", `shortName`). Both go through `formatDisplayName`, as the drawer does, so `rohit.jadhav@…` reads "Rohit Jadhav" and its initials are "RJ".
+- **Unassigned:** "Unassigned", `text-xs italic` in gray-500. On the selected card's red-50 tint it is gray-600, like the card's other meta text.
+- **The arrow:** a static 14 dp `arrow-forward` icon in `text.muted`, 8 dp either side. Nothing in the row animates.
+- **One line, always:** each name has `numberOfLines={1}` and shrinks; the row never wraps. At 100 % text the row is exactly 25 dp.
+- **END_USER** sees the technician (or "Unassigned") only: the requester is themselves.
+- **Screen readers:** the row itself is hidden, and the card's label now ends with it.
+  - Staff: "… Requested by Rohit Jadhav, technician Sarthak Darekar".
+  - END_USER: "Technician …" or "Unassigned".
+  - The words come from `peopleRowLabel` in `utils/format.ts`.
+- **Height:** each card is taller.
+  - The old line took 24 dp (8 + 16). The new row takes 47 dp (12 + the rule + 10 + 25).
+  - So **each card grows by 23 dp** at 100 % text, 18 dp at 130 % and 14 dp at 200 %.
+  - About one card in seven fewer fits on a screen.
+- **FlashList:** there was nothing to update.
+  - v2 has no item-size estimate (`estimatedItemSize` is gone in v2): it measures each card, and nothing in the app sets one.
+  - The `list` skeleton now ends with the rule and two 25 dp circles, so the first load does not jump.
+- **Not changed:** Home's recent-ticket rows (`RecentTicketRow`) keep their plain line ("Rohit · Sarthak"). The brief named the ticket cards; say if Home should match.
+
+### 14.2 The greeting mark
+
+- **What:** a small drawn mark after "Good morning, Ronit", one for each band of §9:
+  - a **sun** for morning (05:00–11:59);
+  - a **sun behind a cloud** for afternoon (12:00–16:59);
+  - a **moon** for evening (17:00–04:59).
+  It changes when the greeting does (`greetingMark` in `utils/greeting.ts`).
+- **Drawn, never an emoji.** Emoji come from the phone's font: they differ across Android versions, and some older fonts lack them.
+  - The marks are three flat SVGs in `assets/illustrations/`: `greeting-sun.svg`, `greeting-cloud-sun.svg` and `greeting-moon.svg`.
+  - Each is 48 × 48 and about 0.4–1.1 KB.
+- **Not inline `<svg>`:** `react-native-svg` is not installed, and the brief allowed no library other than `expo-haptics`. expo-image draws the files as vectors, as it draws Phase A1's empty-state art.
+- **Colours** (each file lists them): brand yellow (`secondary`) for the sun and the moon, and a white cloud with a gray-400 outline (gray-300 was too faint at 26 dp in a desktop render). The yellow is 1.45:1 on the grey canvas. That is fine for decoration: the greeting text already says the time of day.
+- **Size and place:** 26 dp, 8 dp after the greeting. It is centred on the greeting's line (`text-xl`, 28 dp) and stays beside the text when a long name makes it wrap.
+- **Motion:** ONE rise and fade (6 dp, 420 ms, `curve.enter`).
+  - It plays the first time the art is on screen after Home mounts.
+  - It never plays again while Home stays mounted, and it never loops.
+  - "Remove animations": the mark shows in place at once.
+- **Screen readers:** hidden.
+
+### 14.3 Total vs Open: the window captions
+
+**Why:** on Ronit's phone Home showed Total 199 and Open 342. The web counts Total within the period and Open with no date filter (`docs/G6-WEB-DASHBOARD.md` §5.1).
+
+**Ronit's decision:** keep the web's numbers and label the windows. No count, query or request changed; `tests/home/window-captions.test.mjs` pins the values.
+
+**Which window each count covers** (G6 §5 and §7, `BE:dashboard.controller.ts:331-442`; `HOME_TILE_WINDOW`, `HOME_CHIP_WINDOW`):
+
+| Count | Field | Window | Caption |
+|---|---|---|---|
+| Total tickets | `total` | created in the period | the period |
+| **Open** | `currentlyOpen` | status OPEN **right now**, any creation date | **right now** |
+| In progress | `inProgress` | created in the period | the period |
+| Resolved / Resolved today | `resolved` / `resolvedToday` | created in the period | the period |
+| SLA breached | `slaBreached` | created in the period | the period |
+| Chips: Closed, Unassigned, the pending reasons, On hold | `closed`, `unassigned`, `byStatus` | created in the period | none: they all share the period |
+| **Active** chip | `totalOpen` | open statuses **right now**, any date | **right now** |
+
+- **"right now", not "all time":** Open and Active count what is open at this moment, not everything ever. The window agrees with G7's rule for which tiles hand the period to the list (tested).
+- **The period's words** (`PERIOD_CAPTIONS`, `periodCaption`):
+
+  | Period | Caption |
+  |---|---|
+  | Today, Yesterday | today, yesterday |
+  | Last 7 days, Last 30 days | last 7 days, last 30 days |
+  | This week, This month, This year | this week, this month, this year |
+  | Quarterly | this quarter (the web's own name for it, in its chart titles) |
+  | All time | all time |
+  | Custom | its two days: "01 Oct – 15 Oct", with years when they differ; "custom range" until both days are valid |
+
+  These are the periods' names, as on the chips. "This month" is still the last 30 days on the server (05 B.36, unchanged).
+- **On a tile:** `text-xs text-gray-500` (4.8:1), directly under the count, up to two lines.
+  - It shows whenever counts are expected, including while they load, so nothing moves when the number arrives.
+  - Not for L2_MANAGER, who has no counts.
+  - It replaces Open's old "right now" hint under the label.
+- **On the chips:** only Active has a caption, because it is the one chip counted differently from its neighbours. It reads "Active" then a muted `text-xs` "right now". The label was "Active now" until now, so "now" is not said twice.
+- **Screen readers:** "Total tickets: 199, this month. Opens the list" and "Active: 342, right now. Opens the list".
+- **Height:** each tile gains one 16 dp line, from about 128 dp to 136 dp at 100 % text. The tiles of a row still stretch to the taller one.
+
+### 14.4 Swipe actions on ticket-list rows
+
+- **Gesture:** swipe a row left to reveal **Assign** and **Resolve** on its right.
+  - A tap on an open row closes it.
+  - A scroll, a selection, or opening another row also closes it.
+- **Who sees what** (`ticketSwipeActions`, `canSwipeTickets` in `utils/permissions.ts`). Each action appears exactly where a tap already offers it; this is not a new permission.
+  - **Assign:** where ticket detail's More options offers "Assign…": ADMIN, and AGENT except on a Closed or Canceled ticket. It opens the same M7 screen.
+  - **Resolve:** where the row's status chip offers "Resolve". It runs the chip's own handler, which checks the transition and opens M6 for the closure fields.
+  - **END_USER:** nothing; the rows do not swipe at all.
+  - **A ticket with neither action** does not move.
+- **Tests** (`tests/rbac/swipe-actions.test.mjs`): the actions are written out for all five personas and every status, and checked against the tap paths for every status and assignee.
+- **Look:** each action is 80 dp wide and the card's full height, with a 20 dp icon over a `text-xs font-semibold` white label. The pair has rounded right corners, like the card.
+
+  | Action | Fill (L*) | Label contrast |
+  |---|---|---|
+  | Assign (`person-add-outline`) | slate-700 (27) | 10.4:1 |
+  | Resolve (`checkmark-circle-outline`) | green-700 (47) | 5.0:1 |
+- **Screen readers:** the swipe is not offered as an accessibility action. TalkBack users reach Assign and Resolve on the ticket screen, as before.
+
+### 14.5 Haptics
+
+| When | Android effect | Android 10 and older (no CONFIRM / REJECT) |
+|---|---|---|
+| A save succeeds: a status change, an assignment (Assign, Pick up, the technician editor), a property save, or a submit (new ticket, reply or note, closure, approval request, approval decision, service request) | CONFIRM | VIRTUAL_KEY |
+| A save fails: every write error the app reports (`utils/dialogs.ts`), and the forms that show their error inline | REJECT | LONG_PRESS |
+| A long-press selects a ticket on the list | LONG_PRESS | — |
+
+- **The phone's setting is respected.**
+  - Only `performAndroidHapticsAsync` is used. It calls View.performHapticFeedback, which Android silences when touch feedback is off.
+  - expo-haptics' `impactAsync`, `notificationAsync` and `selectionAsync` drive the Vibrator directly, which that setting does not govern. The app never calls them, and a test fails if anything in `src/` does.
+- **No VIBRATE permission.** expo-haptics declares one in its manifest, but the app does not need it. `app.json` adds it to `blockedPermissions` beside `SYSTEM_ALERT_WINDOW`, so the app's permission list is unchanged.
+- **Fire and forget:** nothing waits for a haptic, and a phone without one stays silent. A signed-out (401) error plays nothing, just as it shows nothing.
+- **Not covered:** the bulk runner's per-ticket results, and saves outside the brief's list (a task ticked, a profile saved). Those play no confirm on success, though their failures still get REJECT.
+
+### 14.6 The SLA countdown bar (ticket detail only)
+
+- **Place:** in the header card, under the badges, never on a list card.
+  - A `text-xs font-semibold` row: "Time to resolve" in gray-500 on the left, the time left in gray-900 on the right. "Breached" is red-700 (6.5:1).
+  - Under it, a 6 dp rounded bar on a gray-200 track.
+- **Words:** "6h left", "25m left", "2d 4h left", "under 1m left", "Breached".
+  - Whole units, rounded down, so it never promises more time than there is.
+  - A ticket on hold reads "Paused · 6h left".
+- **From the existing fields only** (`utils/sla-countdown.ts`):
+  - The deadline is `effectiveResolveDue()`, the web's hold-adjusted resolve deadline (05 §A.9). It is the same value as the Properties card's "Resolve by".
+  - The colour follows the SLA badge's own `getDisplaySlaStatus()`. Amber is the server's DUE_SOON (≤ 30 min left); the app sets no threshold of its own.
+  - A first-response breach alone leaves the resolution bar green: the badge above already shows that breach.
+  - Nothing shows when there is no resolve deadline, or once the ticket is Resolved, Closed or Canceled.
+- **Colours** (`colors.slaBar`), told apart by lightness:
+
+  | Status | Colour (L*) |
+  |---|---|
+  | Within SLA | green-600 (59) |
+  | Due soon | amber-400 (81) |
+  | Breached | red-700 (40) |
+- **Decision for Ronit: what the bar measures.**
+  - The bar is the share of **wall-clock** time from the ticket's creation to its deadline.
+  - The deadline itself is set in business hours (09:00–18:00, Monday to Friday by default; SLAPolicy in 03 §B). The API does not say how many business minutes the policy allows, or how many have passed.
+  - So overnight and at weekends the bar fills and the hours drop while the SLA clock stands still. Example: on Friday at 17:00, a Monday 11:00 deadline reads "66h left".
+  - Computing business time would mean re-implementing the server's SLA calendar in the app, which the rules forbid.
+  - If the wall-clock bar misleads, the options are: drop the bar and keep the words, or ask the backend for the time left (a new ask).
+- **Clock:** read on render, on focus and on return to the app (the §9 pattern), never on a timer. The bar is static and never animates.
+
+### 14.7 Press feedback
+
+- **What:** while held, a card dips to 0.97 and dims to 85 % opacity: a slight tint towards the grey canvas. It returns when the finger lifts.
+  - Code: `components/PressFeedback.tsx`; values in `motion.press`.
+  - It replaces the cards' `active:opacity-80` and the attachment card's `active:bg-gray-50`.
+- **Where:**
+  - every tappable card: ticket, approval, catalogue category and service, My Requests, knowledge-base article and search result, notification, attachment, and Home's KPI tiles;
+  - the list rows: Home's recent tickets and the task rows. Their separators stay still.
+- **Unchanged:** chips, buttons, text links and icon buttons keep their §9.6 feedback (PERFORMANCE.md). A notification's mark-read button keeps its own.
+- **A touch that becomes a scroll shows nothing:** the press shows 60 ms after touch-down (`pressDelay`). A quicker tap still shows it and still fires.
+- **"Remove animations":** no dip; the 85 % tint shows and clears at once, as before.
+
+### 14.8 Count roll on Home: skipped
+
+**Why it was skipped:**
+- A count-up shows every number in between, so the text has to change on every frame.
+- React Native's native driver animates only transforms and opacity, never text.
+- So a count-up would need JavaScript on every frame: a listener and a re-render of each tile, about 30 per tile over 500 ms. That is what this phase must not add.
+
+As the brief allowed, it is skipped, and the number changes at once, as before.
+
+**An alternative, if wanted (a decision):** an odometer.
+- Each digit becomes a column of 0–9 that slides with `translateY` on the native driver, so there is no per-frame JavaScript.
+- It rolls rather than counts.
+- It adds about 10 text views per digit on Home.
+- It needs care with the tiles' shrink-to-fit counts and with 200 % text.
+
+### 14.9 Reported, not changed
+
+- **An emoji already in the app:** since Phase 3a, `utils/html.ts` replaces an e-mail's inline (`cid:`) image with "📎 image in attachments".
+  - The paperclip comes from the phone's font, against this phase's no-emoji rule.
+  - It is left as it was, and a test pins it so no other emoji can join it.
+  - Fixing it (a decision): a drawn icon, or plain "[image in attachments]".
+- **Home's recent-ticket rows** keep the old people line (§14.1).
+- **TalkBack** has no swipe actions (§14.4).
+
+### 14.10 Device checks (next build, 360 dp, 100 / 130 / 200 % text)
+
+1. **People row:** long names truncate on one line; the dashed ring is round, not clipped; the initials fit at 200 %.
+2. **Greeting mark:** sharp at the phone's density and centred on the greeting's line; the rise plays once.
+3. **Captions:** the tiles stay aligned; the Custom caption fits or wraps to two lines.
+4. **Swipe:**
+   - a vertical fling never drags a row;
+   - a left swipe opens a row, and a tap closes it;
+   - long-press still selects;
+   - the drawer's edge swipe still opens the drawer;
+   - after scrolling, no row shows open on another ticket.
+5. **Haptics:**
+   - each event plays once;
+   - with Settings → Sound & vibration → Touch feedback (or "Vibration & haptics") off, none plays;
+   - check on Android 10 or older too (the fallbacks).
+6. **SLA bar:** the three colours; "Paused" on a ticket on hold.
+7. **Press:** no flicker while scrolling a list; the dip shows on a held card.
