@@ -15,7 +15,7 @@ export { FieldLabel, FormCard, InlineError, LookupError, Notice, OutlineButton, 
 export { HtmlRenderProvider, HtmlText } from './HtmlText';
 export { KeyboardDoneBar } from './KeyboardDoneBar';
 export { ImageViewerModal } from './ImageViewerModal';
-export { NO_SCROLL_ANCHOR } from './listDefaults';
+export { FAB_BOTTOM, FAB_CLEARANCE, LIST_END_GAP, LIST_TOP_GAP, NO_SCROLL_ANCHOR, listBottomInset } from './listDefaults';
 export { ListEntry, ListEntryScope } from './ListEntry';
 export { LoadingSkeleton, Skeleton } from './LoadingSkeleton';
 export { OptionSheet, type SheetOption } from './OptionSheet';

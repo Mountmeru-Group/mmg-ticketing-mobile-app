@@ -10,8 +10,8 @@
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #13): the root of the Approvals tab (ADMIN, AGENT), and pushed from More for
 // END_USER and L2_MANAGER while they have one (permissions.ts moreSections). An approval opens in the stack it is in
 // (getId: one screen per approval).
-// iOS-4: the type chips and the banners ride at the top of the list, so the Approvals tab has the large title that
-// collapses as the list scrolls (routes.ts hasLargeTitle); every first-load state scrolls the same way (StateScroll).
+// iOS-8a (device finding: the chips sat under the status bar): a solid navigation bar with a standard title; under it,
+// as on Android, the offline banner, the type chips and the error banner, which do not scroll; then the list.
 // No search: APR-1 has none and neither the web nor Android offers one.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from '@react-navigation/native';
@@ -21,8 +21,8 @@ import { Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlP
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, QueryBanner,
+  EmptyState, ErrorState, FilterChip, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
+  OfflineBanner, OfflineState, QueryBanner, listBottomInset,
 } from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
 import { colors } from '@/theme';
@@ -69,10 +69,65 @@ export function ApprovalsInboxScreen({ navigation }: SharedStackScreenProps<'App
   const ticketApprovalCount = (query.data ?? []).filter((a) => a.entityType === 'ticket').length;
   const hasData = query.data !== undefined;
   const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />;
-  // The top of the list (iOS-4): the banners, then the type chips.
-  const header = (
-    <View>
+  let content;
+  if (!hasData && query.fetchStatus === 'paused') {
+    content = (
+      <StateScroll refreshControl={refreshControl}>
+        <OfflineState what="Your approvals" />
+      </StateScroll>
+    );
+  } else if (!hasData && query.isError) {
+    content = (
+      <StateScroll refreshControl={refreshControl}>
+        <ErrorState error={query.error} title="Couldn't load approvals" onRetry={() => void query.refetch()} />
+      </StateScroll>
+    );
+  } else if (!hasData) {
+    content = (
+      <StateScroll>
+        <LoadingSkeleton variant="approvals" rows={3} />
+      </StateScroll>
+    );
+  } else {
+    content = (
+      <FlashList
+        data={rows}
+        keyExtractor={approvalKey}
+        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
+        renderItem={({ item, index }) => {
+          const lookup = item.entityType === 'ticket' ? tickets.get(item.entityId) : undefined;
+          return (
+            <ListEntry index={index}>
+              <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />
+            </ListEntry>
+          );
+        }}
+        ListHeaderComponent={
+          ticketApprovalCount > MAX_CARD_TICKET_LOOKUPS ? (
+            <Text className="mx-4 mb-2 text-xs text-gray-500">
+              Ticket details are shown on the first {MAX_CARD_TICKET_LOOKUPS} ticket approvals; open any other to see its ticket.
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={
+          <EmptyState
+            illustration="clear"
+            title={filter === 'ALL' ? 'Nothing waiting for you' : 'Nothing of this type'}
+            message="Approvals assigned to you appear here. Pull down to refresh."
+            actionLabel={filter === 'ALL' ? undefined : 'Show all approvals'}
+            onAction={() => setFilter('ALL')}
+          />
+        }
+        contentContainerStyle={LIST_PADDING}
+        refreshControl={refreshControl}
+      />
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-gray-50">
       <OfflineBanner />
+      {/* The type chips (iOS-8a, Android's): below the navigation bar, never under it, and they do not scroll. */}
       <View className="border-b border-border bg-white px-4 py-2">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 py-1">
           {APPROVAL_FILTERS.map((f) => (
@@ -86,86 +141,18 @@ export function ApprovalsInboxScreen({ navigation }: SharedStackScreenProps<'App
         </ScrollView>
       </View>
       <QueryBanner error={query.error} hasData={hasData} onRetry={() => void onRefresh()} />
-      <View className="h-3" />
-    </View>
-  );
-  let content;
-  if (!hasData && query.fetchStatus === 'paused') {
-    content = (
-      <StateScroll header={header} refreshControl={refreshControl}>
-        <OfflineState what="Your approvals" />
-      </StateScroll>
-    );
-  } else if (!hasData && query.isError) {
-    content = (
-      <StateScroll header={header} refreshControl={refreshControl}>
-        <ErrorState error={query.error} title="Couldn't load approvals" onRetry={() => void query.refetch()} />
-      </StateScroll>
-    );
-  } else if (!hasData) {
-    content = (
-      <StateScroll header={header}>
-        <LoadingSkeleton variant="approvals" rows={3} />
-      </StateScroll>
-    );
-  } else {
-    content = (
-      <FlashList
-        data={rows}
-        keyExtractor={approvalKey}
-        maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
-        contentInsetAdjustmentBehavior="automatic"
-        renderItem={({ item, index }) => {
-          const lookup = item.entityType === 'ticket' ? tickets.get(item.entityId) : undefined;
-          return (
-            <ListEntry index={index}>
-              <ApprovalCard approval={item} ticket={lookup?.ticket} ticketLoading={!!lookup?.loading} onPress={openApproval} />
-            </ListEntry>
-          );
-        }}
-        ListHeaderComponent={
-          <View>
-            {header}
-            {ticketApprovalCount > MAX_CARD_TICKET_LOOKUPS ? (
-              <Text className="mx-4 mb-2 text-xs text-gray-500">
-                Ticket details are shown on the first {MAX_CARD_TICKET_LOOKUPS} ticket approvals; open any other to see its ticket.
-              </Text>
-            ) : null}
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            illustration="clear"
-            title={filter === 'ALL' ? 'Nothing waiting for you' : 'Nothing of this type'}
-            message="Approvals assigned to you appear here. Pull down to refresh."
-            actionLabel={filter === 'ALL' ? undefined : 'Show all approvals'}
-            onAction={() => setFilter('ALL')}
-          />
-        }
-        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
-        refreshControl={refreshControl}
-      />
-    );
-  }
-
-  return (
-    <View className="flex-1 bg-gray-50">
       <ListEntryScope>{content}</ListEntryScope>
     </View>
   );
 }
 
-/** A first-load state under the large-title bar, with the list's header on top (iOS-4; the Alerts screen's pattern). */
-function StateScroll({
-  header, refreshControl, children,
-}: {
-  header: ReactNode;
-  refreshControl?: ReactElement<RefreshControlProps>;
-  children: ReactNode;
-}) {
+/** The list's padding (iOS-8a): Android's top gap, and the end gap above the tab bar (no "+" button here). */
+const LIST_PADDING = { paddingTop: LIST_TOP_GAP, paddingBottom: listBottomInset(), flexGrow: 1 };
+
+/** A first-load state (offline, loading, error) in a scroll view, so it can be pulled to refresh. */
+function StateScroll({ refreshControl, children }: { refreshControl?: ReactElement<RefreshControlProps>; children: ReactNode }) {
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }} refreshControl={refreshControl}>
-      {header}
+    <ScrollView contentContainerStyle={LIST_PADDING} refreshControl={refreshControl}>
       {children}
     </ScrollView>
   );

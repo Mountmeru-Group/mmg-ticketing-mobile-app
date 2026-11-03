@@ -10,6 +10,8 @@
 // - Footer: version and environment.
 // - iOS-4: the separators are the cards' border colour (gray-100 was barely visible on white), the row icons grow with
 //   the text size (HIG Typography: "Increase the size of meaningful interface icons"), and every row has a label.
+// - iOS-8a: under the solid navigation bar with a standard title, so the list starts below the bar; nothing asks iOS
+//   to move it (UI-STANDARDS §iOS-A.13).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -65,7 +67,7 @@ export function MoreScreen({ navigation }: MoreStackScreenProps<'More'>) {
   };
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" className="flex-1 bg-gray-50" contentContainerClassName="px-4 pb-8 pt-2">
+    <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="px-4 pb-8 pt-2">
       {moreSections(user?.role, pendingApprovals).map((section) => (
         <Group key={section.key}>
           {section.items.map((item, i) => (

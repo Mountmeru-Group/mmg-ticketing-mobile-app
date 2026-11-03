@@ -277,7 +277,7 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
   const hasMoreActions = (can?.moreActions.length ?? 0) > 0;
   const assignPending = assign.isPending;
   // The native navigation bar: the ticket's number as the title, and More options on the right only when it has
-  // something in it, drawn as the iOS "more" mark (Android: ⋮).
+  // something in it, drawn as the iOS "more" mark (Android: ⋮) in Android's header-icon gray-900 (iOS-8a).
   useLayoutEffect(() => {
     navigation.setOptions({
       title,
@@ -294,7 +294,7 @@ export function TicketDetailScreen({ navigation, route }: RecordScreenProps<'Tic
               {assignPending ? (
                 <ActivityIndicator color={colors.primary} />
               ) : (
-                <Ionicons name="ellipsis-horizontal-circle" size={26} color={colors.primary} />
+                <Ionicons name="ellipsis-horizontal-circle" size={26} color={colors.text.primary} />
               )}
             </Pressable>
           )

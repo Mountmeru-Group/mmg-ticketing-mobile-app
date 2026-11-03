@@ -30,7 +30,7 @@ import { apiClient } from '../../src/api/client.ts';
 import { getKbArticle, listKbArticles, markKbArticleHelpful, searchKb } from '../../src/api/kb.api.ts';
 import { MIN_STALE_TIME_MS } from '../../src/api/queryClient.ts';
 import { updateOwnProfile } from '../../src/api/users.api.ts';
-import { SHEET_ROUTES, STACK_ROUTES, getIdFor, hasLargeTitle } from '../../src/navigation/routes.ts';
+import { SHEET_ROUTES, STACK_ROUTES, getIdFor } from '../../src/navigation/routes.ts';
 import { TASK_STATUSES } from '../../src/types/index.ts';
 import { CANCEL_LABEL, chooseForField } from '../../src/utils/actionSheet.ts';
 import { TASK_ASSIGNEE_ROLES } from '../../src/utils/assignment.ts';
@@ -230,13 +230,16 @@ describe('notifications (M9): the tap, the badge, the bar', () => {
     assert.doesNotMatch(src, /ScreenHeader/);
   });
 
-  test('the large title collapses: every state scrolls under the translucent bar, the banners ride in the list', () => {
-    assert.equal(hasLargeTitle('AlertsTab', 'Notifications'), true);
+  // iOS-8a replaces iOS-4's large title over a translucent bar: on a device "Mark all read" and "Earlier" overlapped it.
+  test('iOS-8a: under the solid bar the banners sit above the list, as on Android, and every state pads the same', () => {
     const src = code(read(NOTIFICATIONS));
-    assert.match(src, /<FlashList[\s\S]*?contentInsetAdjustmentBehavior="automatic"/);
-    assert.match(src, /<ScrollView contentInsetAdjustmentBehavior="automatic"/, 'loading, offline and error states too');
+    assert.doesNotMatch(src, /contentInsetAdjustmentBehavior/);
     const root = src.slice(src.lastIndexOf('return (', src.indexOf('function StateScroll')), src.indexOf('function StateScroll'));
-    assert.doesNotMatch(root, /OfflineBanner|QueryBanner/, 'no banner above the list: it would stop the title collapsing');
+    assert.ok(root.indexOf('<OfflineBanner />') < root.indexOf('<QueryBanner'));
+    assert.ok(root.indexOf('<QueryBanner') < root.indexOf('<ListEntryScope>'), 'the banners are above the list, not in it');
+    assert.match(src, /<FlashList[\s\S]*?contentContainerStyle=\{LIST_PADDING\}/);
+    assert.match(src, /<ScrollView contentContainerStyle=\{LIST_PADDING\}/, 'loading, offline and error states too');
+    assert.match(src, /const LIST_PADDING = \{ paddingTop: LIST_TOP_GAP, paddingBottom: listBottomInset\(\), flexGrow: 1 \};/);
   });
 });
 
@@ -282,12 +285,15 @@ describe('approvals (M12, M13)', () => {
     for (const tab of ['ApprovalsTab', 'MoreTab']) assert.ok(STACK_ROUTES[tab].includes('ApprovalsInbox'), tab);
   });
 
-  test('the inbox: the Approvals tab\'s root for ADMIN and AGENT, pushed from More otherwise; iOS-4: chips in the list, a large title', () => {
+  // iOS-8a: the same solid bar in both stacks (iOS-4 gave the tab root a large title, with the chips in the list).
+  test('the inbox: the Approvals tab\'s root for ADMIN and AGENT, pushed from More otherwise; iOS-8a: chips fixed under the bar', () => {
     assert.equal(STACK_ROUTES.ApprovalsTab[0], 'ApprovalsInbox');
-    // iOS-4: the chips ride at the top of the list, so the tab root has the large title (iOS-3c had a standard one).
-    assert.equal(hasLargeTitle('ApprovalsTab', 'ApprovalsInbox'), true);
-    assert.equal(hasLargeTitle('MoreTab', 'ApprovalsInbox'), false, 'pushed from More: a standard title');
-    assert.match(code(read(INBOX)), /navigation\.navigate\('ApprovalDetail', \{ approvalId \}\)/);
+    const src = code(read(INBOX));
+    assert.match(src, /navigation\.navigate\('ApprovalDetail', \{ approvalId \}\)/);
+    const root = src.slice(src.lastIndexOf('return (', src.indexOf('const LIST_PADDING')), src.indexOf('const LIST_PADDING'));
+    const order = ['<OfflineBanner />', 'APPROVAL_FILTERS.map(', '<QueryBanner', '<ListEntryScope>'].map((s) => root.indexOf(s));
+    assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])), `banner, chips, banner, then the list: ${order}`);
+    assert.doesNotMatch(src, /contentInsetAdjustmentBehavior/);
   });
 });
 
