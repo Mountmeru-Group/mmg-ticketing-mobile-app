@@ -158,6 +158,29 @@ describe('build profiles and store identity', () => {
     assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 2, String(app.android.versionCode));
   });
 
+  test("ShortcutBadger's 16 launcher-badge permissions are blocked, and nothing the app needs is", () => {
+    // Every <uses-permission> in ShortcutBadger 1.1.22's AAR manifest (pulled in by expo-notifications); its four
+    // com.android.launcher entries are commented out there. Setu never sets a badge. RELEASE.md §5a.
+    const BADGER = [
+      'com.sec.android.provider.badge.permission.READ', 'com.sec.android.provider.badge.permission.WRITE',
+      'com.htc.launcher.permission.READ_SETTINGS', 'com.htc.launcher.permission.UPDATE_SHORTCUT',
+      'com.sonyericsson.home.permission.BROADCAST_BADGE', 'com.sonymobile.home.permission.PROVIDER_INSERT_BADGE',
+      'com.anddoes.launcher.permission.UPDATE_COUNT', 'com.majeur.launcher.permission.UPDATE_BADGE',
+      'com.huawei.android.launcher.permission.CHANGE_BADGE', 'com.huawei.android.launcher.permission.READ_SETTINGS',
+      'com.huawei.android.launcher.permission.WRITE_SETTINGS', 'android.permission.READ_APP_BADGE',
+      'com.oppo.launcher.permission.READ_SETTINGS', 'com.oppo.launcher.permission.WRITE_SETTINGS',
+      'me.everything.badger.permission.BADGE_COUNT_READ', 'me.everything.badger.permission.BADGE_COUNT_WRITE',
+    ];
+    const blocked = app.android.blockedPermissions;
+    for (const permission of BADGER) assert.ok(blocked.includes(permission), permission);
+    const needed = [
+      'INTERNET', 'ACCESS_NETWORK_STATE', 'POST_NOTIFICATIONS', 'WAKE_LOCK', 'CAMERA', 'READ_EXTERNAL_STORAGE', 'VIBRATE',
+    ].map((p) => `android.permission.${p}`);
+    for (const permission of [...needed, 'com.google.android.c2dm.permission.RECEIVE']) {
+      assert.ok(!blocked.includes(permission), permission);
+    }
+  });
+
   test('package, slug, schemes and EAS project are unchanged (the Entra registration and EAS key depend on them)', () => {
     assert.equal(app.android.package, 'com.mountmeru.servicedesk');
     assert.equal(app.slug, 'meru-servicedesk');

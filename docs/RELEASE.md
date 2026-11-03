@@ -254,7 +254,8 @@ State on **2026-11-03** (versionCode 3, after UAT testing passed). Items marked 
 - [x] `tests/release/production-readiness.test.mjs` now requires versionCode **> 2**. Before, it only required ≥ 2.
 - [x] Production target re-verified: the PROD URL, the `production` profile (store, `app-bundle`), `preview` still on UAT, and the build guard's verdicts.
 - [x] `npm run verify:release-bundle` **PASS** in both modes (§6), plus a wider secret scan of the PROD bundle.
-- [x] Permissions audited from every manifest that merges into the build. Two groups are flagged for a decision.
+- [x] Permissions audited from every manifest that merges into the build. Two groups were flagged (§5a).
+- [x] **ShortcutBadger's 16 launcher-badge permissions blocked** in `app.json` `android.blockedPermissions`, beside `SYSTEM_ALERT_WINDOW` (Ronit, 2026-11-03). The merged list goes from 28 permissions to 12 (§5a flag 1).
 - [x] `npx tsc --noEmit` clean. `npm test`: 1086 pass, 0 fail.
 - Not done: no EAS build, no commit. `auth.config.ts`, the Entra redirect URI and the UAT configuration are untouched.
 
@@ -293,7 +294,7 @@ State on **2026-11-03** (versionCode 3, after UAT testing passed). Items marked 
   - [ ] Play Console data-safety form and privacy policy. §5a lists every permission. For Play's advertising-ID question, the answer is **No**: there is no ads or analytics SDK and no `AD_ID` permission;
   - [ ] store listing: icon, the app name "Setu" and the splash approved by brand, rebuilt from a high-resolution master (§7 Resolution).
 - [ ] **Push** (not blocking): the Firebase project and `google-services.json` (§2b), and NTF-5/NTF-6 deployed on production. Until both are done, push stays off, silently.
-- [ ] **Decide:** the permissions §5a flags. The main one is the 20 launcher-badge permissions from ShortcutBadger: Setu never sets a badge.
+- [x] **Decided:** ShortcutBadger's 16 launcher-badge permissions are blocked (Ronit, 2026-11-03). The three inherited normal permissions (§5a flag 2) stay.
 - [ ] `eas build --platform android --profile production`. Ronit runs it; it was not run on 2026-10-29 or 2026-11-03.
 
 **Notes for Ronit (not blockers, nothing changed)**
@@ -381,7 +382,7 @@ No `.env` file exists in the repo, and EAS uploads none.
 | targetSdkVersion ≥ 36 | **PASS**: 36 | React Native 0.86's version catalog: `targetSdk = "36"`, `compileSdk = "36"` (`node_modules/react-native/gradle/libs.versions.toml`). Expo's root-project plugin reads it, and falls back to 35 only if the entry is missing |
 | minSdkVersion unchanged at 24 | **PASS**: 24 | The same catalog: `minSdk = "24"` |
 | No UAT reference reachable from a production build | **PASS** | `env.ts` picks UAT only when `EXPO_PUBLIC_APP_ENV` isn't `PROD`, and `production` inlines `PROD`. Deep-link origins come from `API_BASE_URL`. The `[MOBILE TEST]` title prefix is `__DEV__`-only. `npm test` loads `env.ts` as a PROD release build and gets the PROD URL and health URL. The UAT string sits once in the JS as the unused table entry, and is absent from the `-O` Hermes bytecode (§5 notes) |
-| Permissions | **PASS, 2 flags** | Table below |
+| Permissions | **PASS** | Table below: 12 after the badge block, 3 of them inherited and unused (flag 2) |
 | 15-day re-authentication active | **PASS** | `REAUTH_INTERVAL_MS` = 15 days (`src/store/auth.store.ts`). It is checked on cold start (`restoreSession`) and on every return to the foreground (`endSessionIfReauthDue`, `RootNavigator`). When it is due, the next sign-in sends `prompt=login`. 47 cases in `tests/auth/reauth.test.mjs`, all passing |
 | Push silent when the backend endpoint is missing | **PASS** | A 404 from NTF-5 or NTF-6 sets status `not-deployed` and writes one `[push]` log line, with no banner, dialog or toast (`src/push/registration.ts`). Tests: "a 404 from the device-token endpoint is silent" and "a 404 on sign-out is silent too" |
 | `google-services.json` | **Absent**: the build succeeds with push off | Not in the repo, and no `googleServicesFile` in `app.json` (§2b). Firebase gives no token, the app records `unavailable`, and Alerts says "This version of Setu can't receive notifications" |
@@ -412,14 +413,28 @@ App bundle explorer → the bundle → Permissions.
 | `WRITE_EXTERNAL_STORAGE` (max SDK 32) | runtime; no effect from Android 10 | template, expo-file-system, expo-image-picker | None: the app writes only to its own cache, and shares downloads from there. App code never requests it | Inherited; low risk |
 | `ACCESS_WIFI_STATE` | normal | NetInfo | None: the app reads only connected / not connected | Inherited; low risk |
 | `RECEIVE_BOOT_COMPLETED` | normal | expo-notifications | None: it reschedules local notifications after a reboot, and Setu schedules none | Inherited; low risk |
-| **20 launcher-badge permissions**: `com.android.launcher.permission.{READ_SETTINGS, WRITE_SETTINGS, INSTALL_SHORTCUT, UNINSTALL_SHORTCUT}`, `android.permission.READ_APP_BADGE`, plus Samsung, HTC, Sony (×2), Huawei (×3), OPPO (×2), Apex, Solid and Everything badge permissions | normal / vendor | ShortcutBadger 1.1.22, through expo-notifications | None: they set icon badge counts on some launchers, and Setu never sets one (no `setBadgeCountAsync` in `src/`) | **FLAG: not justified by app code** |
+| **16 launcher-badge permissions**: `com.sec.android.provider.badge.permission.{READ, WRITE}` (Samsung), `com.htc.launcher.permission.{READ_SETTINGS, UPDATE_SHORTCUT}`, `com.sonyericsson.home.permission.BROADCAST_BADGE`, `com.sonymobile.home.permission.PROVIDER_INSERT_BADGE`, `com.anddoes.launcher.permission.UPDATE_COUNT` (Apex), `com.majeur.launcher.permission.UPDATE_BADGE` (Solid), `com.huawei.android.launcher.permission.{CHANGE_BADGE, READ_SETTINGS, WRITE_SETTINGS}`, `android.permission.READ_APP_BADGE` (ZUK), `com.oppo.launcher.permission.{READ_SETTINGS, WRITE_SETTINGS}`, `me.everything.badger.permission.{BADGE_COUNT_READ, BADGE_COUNT_WRITE}` | normal / vendor | ShortcutBadger 1.1.22, through expo-notifications | None: they set icon badge counts on some launchers, and Setu never sets one | **Removed** (`blockedPermissions`, 2026-11-03; flag 1) |
 | `SYSTEM_ALERT_WINDOW` | — | template | — | Removed (`blockedPermissions`) |
 | `RECORD_AUDIO` | — | expo-image-picker | — | Removed (`microphonePermission: false`) |
 
-- **Flag 1, the 20 badge permissions.** None is on Play's restricted or sensitive lists, and none prompts the user.
-  But they show in the listing's permission details, and nothing in Setu uses them.
-  - Adding them to `android.blockedPermissions` in `app.json` would remove them, with no code change. ShortcutBadger fails quietly without them.
-  - Ronit's decision. Not changed here.
+- **Flag 1, the launcher-badge permissions: blocked on 2026-11-03** (Ronit). None was on Play's restricted or
+  sensitive lists, and none prompted the user. But they showed in the listing's permission details, and nothing in Setu uses them.
+  - **There are 16, not 20.** The four `com.android.launcher.permission.*` entries (`READ_SETTINGS`, `WRITE_SETTINGS`,
+    `INSTALL_SHORTCUT`, `UNINSTALL_SHORTCUT`) are commented out in ShortcutBadger's manifest. The first version of this
+    section read the AAR without stripping comments, counted them, and said 20.
+  - All 16 are in `android.blockedPermissions` in `app.json`, beside `SYSTEM_ALERT_WINDOW`. Prebuild writes each one
+    as `<uses-permission … tools:node="remove"/>` (checked with `npx expo config --type introspect`), and the
+    manifest merger then drops it from the library.
+  - Simulated merge of every manifest listed above, with that rule: **28 permissions before, 12 after**. Every
+    permission this table marks justified is still there.
+  - **Nothing breaks.** Setu sets no badge: `shouldSetBadge: false` in `src/push/PushBridge.tsx`, no
+    `setBadgeCountAsync`, and on Android a notification's `badge` field is only passed back to JS.
+    - If a badge were ever set, ShortcutBadger wraps any exception, a `SecurityException` included, as
+      `ShortcutBadgeException` (`applyCountOrThrow`). expo-notifications' `BadgeHelper` catches that and logs it at debug level.
+    - Android 8+ notification dots need no permission, so they are unaffected.
+  - `tests/release/production-readiness.test.mjs` pins the 16. It also fails if a permission the app needs is
+    blocked: `INTERNET`, `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, c2dm `RECEIVE`, `CAMERA`,
+    `READ_EXTERNAL_STORAGE` or `VIBRATE`.
 - **Flag 2, the three inherited normal permissions** (`WRITE_EXTERNAL_STORAGE` capped at 32, `ACCESS_WIFI_STATE`,
   `RECEIVE_BOOT_COMPLETED`). They are unused but harmless, and are in almost every Expo app with these libraries. They can be blocked the same way.
 - **Not declared:**
@@ -593,7 +608,7 @@ Resolution:
   - the adaptive foreground is 512 px wide, inside the inner 66 %;
   - there is no `android/` folder or image cache in the repo that could still hold the old icon.
 
-`android.blockedPermissions` removes `SYSTEM_ALERT_WINDOW` (draw over other apps). The Expo template adds it, but the app never uses it, and Play reviews flag it. `allowBackup` stays `false`, so the SecureStore token is never restored onto another device.
+`android.blockedPermissions` removes `SYSTEM_ALERT_WINDOW` (draw over other apps). The Expo template adds it, but the app never uses it, and Play reviews flag it. Since 2026-11-03 it also removes ShortcutBadger's 16 launcher-badge permissions (§5a flag 1). `allowBackup` stays `false`, so the SecureStore token is never restored onto another device.
 
 ## 8. Packages waiting for approval
 
