@@ -350,9 +350,11 @@ describe('motion rules hold in every animation in src/', () => {
   const animated = files.filter((rel) => /\bAnimated\.(timing|loop|spring|decay)\(/.test(read(rel)));
   const ALLOWED = new Set(['opacity', 'translateX', 'translateY', 'scale', 'scaleX', 'scaleY', 'rotate']);
 
-  test('the animating files are exactly these seven', () => {
-    // 2026-11-03: + the greeting mark and the press feedback (docs/PERFORMANCE.md §13; tests/motion/polish.test.mjs).
+  test('the animating files are exactly these eight', () => {
+    // 2026-11-03: + the greeting mark, the press feedback and the Home count fade (docs/PERFORMANCE.md §13;
+    // tests/motion/polish.test.mjs).
     assert.deepEqual(animated.sort(), [
+      'src/components/CountFade.tsx',
       'src/components/GreetingMark.tsx',
       'src/components/ListEntry.tsx',
       'src/components/PressFeedback.tsx',
@@ -428,6 +430,7 @@ describe('motion rules hold in every animation in src/', () => {
 
   test('every animation is stopped when its component unmounts', () => {
     const cleanups = {
+      'src/components/CountFade.tsx': [/return \(\) => run\.stop\(\);/],
       'src/components/GreetingMark.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/],
       'src/components/PressFeedback.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/],
       'src/components/Shimmer.tsx': [/return \(\) => sweep\.stop\(\);/],

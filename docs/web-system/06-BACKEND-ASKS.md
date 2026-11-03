@@ -70,12 +70,14 @@ Source of every item: `C:\Users\Ronit Chaudhari\mmg-ticketing-diagnostic.md` §1
 | A28 | Ticket templates readable by every role (active only, minimal fields) | SDP "pick a template" before the form. `GET /templates` is ADMIN/AGENT only and returns inactive rows and creator emails | Nice-to-have (SDP parity) | XS |
 | A29 | Exact asset lookup by tag | QR scan → one asset. Today only a contains-search exists | Nice-to-have (Phase 2) | XS |
 | A30 | Requester acknowledgement on closure | SDP close-flow field. No column exists | Nice-to-have (SDP parity) | S |
+| A31 | Business time remaining on a ticket's SLA (`slaResolveRemainingMinutes`, `slaResolveTotalMinutes`) | The deadline is in business hours, but no field says how much business time is left. A wall-clock countdown reads "66h left" on a Friday evening with 3 working hours to go, so the app shows the deadline instead | Nice-to-have | S |
 
 **Totals**
 - **5 blocking asks:** A1, A2, A7, A13, A14.
-- **25 nice-to-have asks:**
+- **26 nice-to-have asks:**
   - the original 13: A3–A6, A8–A12, A15–A18;
-  - 12 SDP-parity asks added 2026-10-14: A19–A30. Source: `08-SDP-PARITY.md` §7. Rough effort for these 12 is another 3 to 5 weeks of one backend developer.
+  - 12 SDP-parity asks added 2026-10-14: A19–A30. Source: `08-SDP-PARITY.md` §7. Rough effort for these 12 is another 3 to 5 weeks of one backend developer;
+  - 1 added 2026-11-03: A31, a real SLA countdown (Ronit's decision; `docs/brand/UI-STANDARDS.md` §14.6).
 
 ---
 
@@ -501,6 +503,42 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - Show it in the web closure modal.
 
 **Acceptance criteria:** closing with `requesterAcknowledged: true` persists it and returns it on `GET /tickets/:id`.
+
+## Asks added 2026-11-03
+
+### A31 — Business time remaining on a ticket's SLA — Nice-to-have — S
+
+**Why (the Friday-evening example)**
+- A ticket is raised on Friday at 16:00. Its policy allows 4 working hours, 09:00–18:00, Monday to Friday. The server's calculator sets `slaResolveDue` to Monday 11:00: 2 hours on Friday, 2 on Monday.
+- At 17:00 that Friday, a client can only count wall-clock time to that deadline: **"66h left"**. Yet only **3 working hours** remain (1 on Friday, 2 on Monday).
+- Over the weekend, a progress bar on wall-clock time fills from 1 % to 97 % while the SLA clock stands still. On Monday morning a technician sees almost no time left, after a Friday evening that said there was plenty.
+- So the mobile app shows the deadline itself ("Due Mon 11:00", `docs/brand/UI-STANDARDS.md` §14.6) instead of a countdown. A real countdown needs the server's own figure.
+
+**Today**
+- The ticket carries the deadlines `slaResponseDue` and `slaResolveDue`, plus `slaHoldMinutes`, `slaHoldStartedAt` and `slaStatus`.
+  - The deadlines are business-hours times, computed server-side from the SLA policy (`businessHoursOnly`, `businessHoursStart`/`End`, `businessDays`, `timezone`, `operationalHoursId`).
+  - `slaStatus` is set by a job every 60 s; DUE_SOON means ≤ 30 min left (`jobs/slaBreachChecker.job.ts:62-65`).
+- `GET /tickets/:id` (TKT-3) returns the full SLA policy row. But no field says how much business time is left, or how much the policy allowed for this ticket.
+- A client could work it out only by re-implementing the calculator: business days, hours, timezone, operational hours, and the hold handling flagged in `05` B.27.
+  - The mobile rules forbid that duplication.
+  - Any difference from the server's own maths would make the app's countdown disagree with the server's breach.
+
+**Ask:** on `GET /tickets/:id`, and optionally on `GET /tickets` rows, computed by the same SLA calculator that sets `slaResolveDue`, at the time of the response:
+
+| Field | Meaning |
+|---|---|
+| `slaResolveRemainingMinutes: number \| null` | Business minutes left until the resolve deadline. While on hold, the value does not change. 0 or negative once breached. `null` without an SLA, or once the ticket is resolved, closed or canceled |
+| `slaResolveTotalMinutes: number \| null` | The policy's resolve budget for this ticket's priority, so a client can draw a true progress bar |
+| `slaClockPaused: boolean` | `true` while the ticket is in a hold status |
+| *Optional:* `slaResponseRemainingMinutes`, `slaResponseTotalMinutes` | The same pair for the first response |
+
+**Acceptance criteria**
+- The Friday example: policy 09:00–18:00, Monday to Friday, resolve budget 240 min, ticket created Friday 16:00, read Friday 17:00. The response has `slaResolveRemainingMinutes: 180` and `slaResolveTotalMinutes: 240`.
+- Read again on Saturday at noon: still 180.
+- During a hold, two reads an hour apart return the same remaining minutes, and `slaClockPaused: true`.
+- After the deadline passes, the remaining minutes are ≤ 0. After RESOLVED, `null`.
+
+**Mobile after this ships:** the deadline line on ticket detail becomes "3h left" in working time, with a bar. The client reads the server's figures and adds no SLA rule of its own.
 
 ---
 

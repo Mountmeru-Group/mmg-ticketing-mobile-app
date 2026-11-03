@@ -17,6 +17,8 @@
 // The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
 //   Beside it, a drawn sun, sun-behind-cloud or moon for the band (components/GreetingMark.tsx): one rise and fade
 //   when Home mounts, hidden from screen readers.
+// Count fade (2026-11-03, Ronit's option 5 for the count roll): when the period changes, each tile's number fades from
+//   the old into the new instead of snapping (components/CountFade.tsx), only while Home is visible.
 // Window captions (2026-11-03): under every count, the window it covers ("this month", "last 7 days" … or "right now"
 //   for Open), and "right now" on the Active chip, the one chip counted differently from its neighbours
 //   (utils/home-kpis.ts HOME_TILE_WINDOW, HOME_CHIP_WINDOW). The counts themselves are unchanged: the web's (G6).
@@ -25,7 +27,7 @@
 //   Active), as the web's dashboard links do. The list names the period in a chip that clears it.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -33,7 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementBanner, EmptyState, ErrorState, FilterChip, GreetingMark, LoadingSkeleton, Notice, OfflineBanner,
+  AnnouncementBanner, CountFade, EmptyState, ErrorState, FilterChip, GreetingMark, LoadingSkeleton, Notice, OfflineBanner,
   PressableCard, QueryBanner, RecentTicketRow, ScreenHeader, Skeleton, SubmitButton,
 } from '@/components';
 import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets } from '@/hooks';
@@ -42,8 +44,8 @@ import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { DashboardRecentTicket, MainTabScreenProps, Ticket } from '@/types';
 import {
-  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodLabel, dashboardPeriodQuery,
-  periodListDates, type CustomDayRange, type DashboardPeriod,
+  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodKey, dashboardPeriodLabel,
+  dashboardPeriodQuery, periodListDates, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
 import { notify } from '@/utils/dialogs';
 import { greetingLine, greetingMark, greetingNow } from '@/utils/greeting';
@@ -94,7 +96,14 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const showPeriod = showHomePeriod(role);
   const dashboard = useDashboard(); // disabled for L2_MANAGER, and while a Custom period has no valid range
   // null = Custom without a valid From–To: DSH-1 waits, and pull-to-refresh must not ask for it.
-  const periodReady = dashboardPeriodQuery(period, customRange) !== null;
+  const periodQuery = dashboardPeriodQuery(period, customRange);
+  const periodReady = periodQuery !== null;
+  // Count fade: which period the numbers count, and whether they may fade. Only after the person has changed the period
+  // on this visit of Home (the first numbers appear as before), and only while Home is the screen in view.
+  const periodKey = periodQuery ? dashboardPeriodKey(periodQuery) : 'none';
+  const focused = useIsFocused();
+  const [periodTouched, setPeriodTouched] = useState(false);
+  const countsFade = focused && periodTouched;
   const recent = useRecentTickets({ enabled: isEndUser || isL2 });
   const showBanner = showAnnouncementBanner(role); // ADMIN only
   const announcements = useAnnouncements(); // disabled inside the hook for every other role
@@ -163,11 +172,15 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
       mode: 'date',
       minimumDate,
       maximumDate,
-      onValueChange: (_event, date) => setCustomRange({ [which]: dayFromDate(date) }),
+      onValueChange: (_event, date) => {
+        setPeriodTouched(true);
+        setCustomRange({ [which]: dayFromDate(date) });
+      },
       onError: () => notify("Couldn't open the date picker."),
     });
   };
   const pickPeriod = (next: DashboardPeriod) => {
+    setPeriodTouched(true);
     setPeriod(next);
     // "Custom" opens the From dialog straight away when there is no From yet.
     if (next === 'custom' && customRangeProblem(customRange) === 'from-missing') pickDay('from');
@@ -241,6 +254,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
           <TileGrid
             tiles={tiles}
             showCounts={showTileCounts}
+            periodKey={periodKey}
+            countsFade={countsFade}
             loading={countsLoading}
             error={countsMissing && dashboard.isError ? dashboard.error : null}
             paused={countsMissing && dashboard.fetchStatus === 'paused'}
@@ -470,11 +485,14 @@ function DayButton({ label, day, onPress }: { label: string; day: string | null;
 const TILE_GAP = 12;
 
 function TileGrid({
-  tiles, showCounts, loading, error, paused, onRetry,
+  tiles, showCounts, periodKey, countsFade, loading, error, paused, onRetry,
 }: {
   tiles: readonly Tile[];
   /** false = L2_MANAGER: a tile shows "View tickets" instead of a count. */
   showCounts: boolean;
+  /** The period the counts belong to, and whether a new count may fade in (CountFade). */
+  periodKey: string;
+  countsFade: boolean;
   loading: boolean;
   error: unknown;
   paused: boolean;
@@ -507,7 +525,15 @@ function TileGrid({
         {rows.map((row) => (
           <View key={row.map((t) => t.key).join('+')} className="flex-row" style={{ columnGap: TILE_GAP }}>
             {row.map((t) => (
-              <KpiTile key={t.key} tile={t} width={row.length === 2 ? half : width} showCounts={showCounts} loading={loading} />
+              <KpiTile
+                key={t.key}
+                tile={t}
+                width={row.length === 2 ? half : width}
+                showCounts={showCounts}
+                loading={loading}
+                periodKey={periodKey}
+                countsFade={countsFade}
+              />
             ))}
           </View>
         ))}
@@ -516,7 +542,16 @@ function TileGrid({
   );
 }
 
-function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: number; showCounts: boolean; loading: boolean }) {
+function KpiTile({
+  tile: t, width, showCounts, loading, periodKey, countsFade,
+}: {
+  tile: Tile;
+  width: number;
+  showCounts: boolean;
+  loading: boolean;
+  periodKey: string;
+  countsFade: boolean;
+}) {
   // The web's KPI card (DashboardPage.tsx KPICard): white card, a coloured square with a white icon, the label in
   // `text-sm text-gray-500`, the count in `text-2xl font-bold`. The web puts the label beside the square; a phone tile
   // is too narrow for that (about 80 dp at 360 dp), so the label goes under the square and gets the full width.
@@ -549,9 +584,8 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
       </View>
       <View>
         {t.value !== undefined ? (
-          <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>
-            {t.value}
-          </Text>
+          // 2026-11-03: fades from the old number into the new when the period changes (components/CountFade.tsx).
+          <CountFade value={t.value} periodKey={periodKey} active={countsFade} />
         ) : loading ? (
           // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the
           // tile keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a

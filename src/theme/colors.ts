@@ -261,15 +261,14 @@ export const colors = {
   },
 
   /**
-   * The SLA countdown bar on ticket detail (2026-11-03, UI-STANDARDS.md §14), by the hold-adjusted SLA status (05 §A.9).
-   * Told apart by lightness: L* 59, 81 and 40, at least 15 apart (tests/polish/sla-countdown.test.mjs). The words
-   * ("6h left", "Breached") carry the meaning; the bar is decoration (WCAG 1.4.1).
+   * The dot beside the SLA deadline on ticket detail (2026-11-03, UI-STANDARDS.md §14.6), by the hold-adjusted SLA status
+   * (05 §A.9). Told apart by lightness: L* 59, 81 and 40, at least 15 apart (tests/polish/sla-deadline.test.mjs). The
+   * words ("Due Mon 11:00", "Breached") carry the meaning; the dot is decoration (WCAG 1.4.1).
    */
-  slaBar: {
+  slaDeadline: {
     WITHIN_SLA: palette.green[600],
     DUE_SOON: palette.amber[400],
     BREACHED: palette.red[700],
-    track: palette.gray[200],
   },
 
   /**

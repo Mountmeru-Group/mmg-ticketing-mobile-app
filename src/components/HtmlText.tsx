@@ -4,22 +4,25 @@
 // - Links open in the system browser, and only for http(s) and mailto — except a ticket link to THIS environment
 //   (…/ticket/<n>, …/tickets/<uuid or n>), which opens the ticket in the app (deep-link resolver, 05 §A.11).
 // - If the renderer throws, the body falls back to plain text (htmlToDisplayText), never to a blank card.
+// - An e-mail's inline (cid:) image, which the sanitiser turns into <cid-image>, is drawn as a paperclip and
+//   "Image in attachments" (2026-11-03): no emoji (utils/html.ts CID_IMAGE_TAG).
 // One renderer for every server HTML body: ticket descriptions, comments, KB articles, announcements.
 import { useRecyclingState } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { Component, memo, useMemo, type ComponentProps, type ReactNode } from 'react';
 import { Linking, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import {
-  IMGElementContainer, IMGElementContentError, IMGElementContentLoading, RenderHTMLConfigProvider, RenderHTMLSource,
-  TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts, useIMGElementProps, useIMGElementState,
-  type CustomBlockRenderer, type MixedStyleDeclaration, type MixedStyleRecord, type RenderersProps,
+  HTMLContentModel, HTMLElementModel, IMGElementContainer, IMGElementContentError, IMGElementContentLoading,
+  RenderHTMLConfigProvider, RenderHTMLSource, TRenderEngineProvider, defaultFallbackFonts, defaultSystemFonts,
+  useIMGElementProps, useIMGElementState, type CustomBlockRenderer, type MixedStyleDeclaration, type MixedStyleRecord,
+  type RenderersProps,
 } from 'react-native-render-html';
 
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette } from '@/theme';
 import { parseTicketLink } from '@/utils/deep-links';
-import { BLOCKED_TAGS, clearPreparedHtml, prepareHtmlBody } from '@/utils/html';
+import { BLOCKED_TAGS, CID_IMAGE_TAG, clearPreparedHtml, prepareHtmlBody } from '@/utils/html';
 
 // Prepared bodies (utils/html.ts) and expo-image's caches (inline images, attachments opened in ImageViewerModal) are
 // ticket content: drop them when the session ends, as the query cache is dropped.
@@ -98,7 +101,27 @@ const ImgRenderer: CustomBlockRenderer = (props) => {
   );
 };
 
-const RENDERERS = { img: ImgRenderer };
+/**
+ * An e-mail's inline (cid:) image: the picture is an attachment, not in the body. A drawn paperclip (flat SVG, gray-500,
+ * through expo-image like the greeting mark) and the words, instead of the web's emoji, which is the phone's font.
+ */
+const PAPERCLIP = require('../../assets/illustrations/paperclip.svg') as number;
+/** 16 dp beside the 14 dp body text. */
+const PAPERCLIP_SIZE = { width: 16, height: 16 };
+
+const CidImageRenderer: CustomBlockRenderer = () => (
+  <View className="my-1 flex-row items-center">
+    <Image source={PAPERCLIP} style={PAPERCLIP_SIZE} contentFit="contain" accessible={false} />
+    <Text className="ml-1.5 text-sm italic text-gray-500">Image in attachments</Text>
+  </View>
+);
+
+/** <cid-image> is a block of its own; its text ("[image in attachments]") is only for the plain-text paths. */
+const CUSTOM_ELEMENT_MODELS = {
+  [CID_IMAGE_TAG]: HTMLElementModel.fromCustomModel({ tagName: CID_IMAGE_TAG, contentModel: HTMLContentModel.block }),
+};
+
+const RENDERERS = { img: ImgRenderer, [CID_IMAGE_TAG]: CidImageRenderer };
 
 /**
  * Wrap the app once (App.tsx). Every TRenderEngineProvider option is passed explicitly: react-native-render-html
@@ -118,7 +141,7 @@ export function HtmlRenderProvider({ children }: { children: ReactNode }) {
       classesStyles={{}}
       enableUserAgentStyles
       enableCSSInlineProcessing
-      customHTMLElementModels={{}}
+      customHTMLElementModels={CUSTOM_ELEMENT_MODELS}
       fallbackFonts={defaultFallbackFonts}
       systemFonts={defaultSystemFonts}
     >

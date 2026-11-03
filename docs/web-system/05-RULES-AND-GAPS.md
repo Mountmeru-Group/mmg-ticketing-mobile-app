@@ -276,6 +276,7 @@ function sanitizeHtml(html: string): string {
   - Allow `data:image/*` sources (inline images arrive as base64).
   - Block remote `<img>` fetches unless they are attachment URLs, which need the Bearer header.
   - Replace `cid:` images with "📎 image in attachments".
+    - **Mobile deviation (Ronit, 2026-11-03): no emoji.** The app writes a `<cid-image>` element instead (`src/utils/html.ts`). In a rendered body it is drawn as a paperclip icon (a flat SVG) with "Image in attachments" (`HtmlText.tsx`). In plain text it reads "[image in attachments]". The web keeps its emoji. Display only: nothing is sent to the server. See `docs/brand/UI-STANDARDS.md` §14.9.
 
 ### A.7 Activity / audit → human sentence
 **Source:** `FE:TicketDetailPage.tsx:2883-2932`. **Backend** supplies the `_xxxName` fields (`tickets.controller.ts:1036-1082`).
