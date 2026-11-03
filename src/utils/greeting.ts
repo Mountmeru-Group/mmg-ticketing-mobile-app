@@ -21,6 +21,19 @@ export function greetingNow(clock: Date = new Date()): Greeting {
   return greetingForHour(clock.getHours());
 }
 
+/** The drawn mark beside the greeting (2026-11-03, components/GreetingMark.tsx): one per band. */
+export type GreetingMarkName = 'sun' | 'cloudSun' | 'moon';
+
+export const GREETING_MARKS: Record<Greeting, GreetingMarkName> = {
+  'Good morning': 'sun',
+  'Good afternoon': 'cloudSun',
+  'Good evening': 'moon',
+};
+
+export function greetingMark(greeting: Greeting): GreetingMarkName {
+  return GREETING_MARKS[greeting];
+}
+
 /** The first word of the display name ("Ronit Chaudhari" → "Ronit"), or '' when there is no name. */
 export function firstName(displayName: string | null | undefined): string {
   return formatDisplayName(displayName).trim().split(/\s+/)[0] ?? '';

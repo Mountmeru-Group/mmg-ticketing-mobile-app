@@ -79,6 +79,42 @@ export function dashboardPeriodLabel(period: DashboardPeriod): string {
   return DASHBOARD_PERIODS.find((p) => p.value === period)?.label ?? period;
 }
 
+/**
+ * The caption under a period-scoped Home count (2026-11-03, docs/brand/UI-STANDARDS.md §14): the chosen period in the
+ * chip's own words, lower case. Two read differently from their chip, because a chip label is not a caption:
+ * "Quarterly" is "this quarter", the web's own name for it (its chart titles, FE:DashboardPage.tsx:139), and Custom is
+ * its two days. Like the chips, the words are the web's: "this month" is the last 30 days (05 B.36).
+ */
+export const PERIOD_CAPTIONS: Record<Exclude<DashboardPeriod, 'custom'>, string> = {
+  today: 'today',
+  yesterday: 'yesterday',
+  last7: 'last 7 days',
+  last30: 'last 30 days',
+  week: 'this week',
+  month: 'this month',
+  quarter: 'this quarter',
+  year: 'this year',
+  all: 'all time',
+};
+
+export function periodCaption(period: DashboardPeriod, custom: CustomDayRange): string {
+  if (period !== 'custom') return PERIOD_CAPTIONS[period];
+  return customRangeCaption(custom) ?? 'custom range';
+}
+
+/**
+ * A complete custom range, short enough for a tile: "01 Oct – 15 Oct" when both days are in the same year, otherwise
+ * "28 Dec 2025 – 02 Jan 2026". Null until the range is valid.
+ */
+export function customRangeCaption(range: CustomDayRange): string | null {
+  if (customRangeProblem(range) !== null) return null;
+  const from = range.from as string;
+  const to = range.to as string;
+  if (from.slice(0, 4) !== to.slice(0, 4)) return `${formatFilterDay(from)} – ${formatFilterDay(to)}`;
+  const noYear = (day: string) => formatFilterDay(day).replace(/\s\d{4}$/, '');
+  return `${noYear(from)} – ${noYear(to)}`;
+}
+
 /** "01 Oct 2026 – 15 Oct 2026" for a complete custom range, else null. */
 export function customRangeLabel(range: CustomDayRange): string | null {
   if (customRangeProblem(range) !== null) return null;

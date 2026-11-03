@@ -221,6 +221,33 @@ export function formatDisplayName(name: string | null | undefined): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * First name and last initial, for the technician on a ticket card (2026-11-03): "Sarthak Darekar" → "Sarthak D.",
+ * "Ana Maria Lopez" → "Ana L.". One word stays as it is. Formatted as formatDisplayName() first, so an e-mail-style name
+ * gives the same words the drawer shows.
+ */
+export function shortName(name: string | null | undefined): string {
+  const parts = formatDisplayName(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0] as string;
+  const last = parts[parts.length - 1] as string;
+  return `${parts[0]} ${last[0]?.toUpperCase() ?? ''}.`;
+}
+
+/**
+ * What a ticket card's people row says, for the card's screen-reader label (the row itself is hidden from TalkBack):
+ * "Requested by Rohit Jadhav, technician Sarthak Darekar"; END_USER's row has the technician only ("Unassigned").
+ */
+export function peopleRowLabel(
+  requesterName: string | null | undefined,
+  technicianName: string | null | undefined,
+  showRequester: boolean,
+): string {
+  const technician = formatDisplayName(technicianName);
+  if (!showRequester) return technician ? `Technician ${technician}` : 'Unassigned';
+  return `Requested by ${formatDisplayName(requesterName) || 'unknown requester'}, ${technician ? `technician ${technician}` : 'unassigned'}`;
+}
+
 /** Two-letter initials for the drawer avatar. */
 export function initials(name: string | null | undefined): string {
   const clean = formatDisplayName(name).trim();

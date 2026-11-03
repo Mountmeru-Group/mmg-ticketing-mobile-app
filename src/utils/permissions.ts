@@ -471,6 +471,37 @@ export function inlineStatusTransitions(role: UserRole, status: TicketStatus): r
   return canChangeStatus(role) ? getAvailableTransitions(role, status) : [];
 }
 
+export type SwipeAction = 'assign' | 'resolve';
+
+/**
+ * Swipe left on a ticket-list row (2026-11-03): the actions it reveals for this ticket, in order. NOT a new permission:
+ * each is offered exactly where a tap already offers it, so a swipe can never do what a tap could not.
+ * - Assign: where ticket detail's More options offers "Assign…" (ticketDetailPermissions: ADMIN and AGENT, not under the
+ *   AGENT lock). It opens the same M7 screen, with its own guards.
+ * - Resolve: where the row's status chip offers "Resolve" (inlineStatusTransitions). It runs the chip's own handler,
+ *   which opens M6 for the closure fields (05 §A.2).
+ * Empty = nothing is revealed and the row does not move.
+ */
+export function ticketSwipeActions(
+  viewer: Viewer | null,
+  ticket: { status: TicketStatus; assignedToId: string | null },
+): SwipeAction[] {
+  const role: UserRole = viewer?.role ?? 'END_USER';
+  const actions: SwipeAction[] = [];
+  if (ticketDetailPermissions(viewer, ticket).moreActions.includes('assign')) actions.push('assign');
+  if (inlineStatusTransitions(role, ticket.status).some((t) => t.target === 'RESOLVED')) actions.push('resolve');
+  return actions;
+}
+
+/**
+ * Whether a role's ticket-list rows are swipeable at all: true when some ticket could reveal an action. Decided per
+ * role, not per row, so every row of one list has the same element type and FlashList's recycling never remounts a
+ * card because the next ticket allows less (a row with no actions keeps the wrapper, disabled). END_USER: false.
+ */
+export function canSwipeTickets(role: UserRole): boolean {
+  return canAssignTickets(role) || canChangeStatus(role);
+}
+
 // ── Create ticket (04 M8, 05 §A.8; the web: FE:CreateTicketPage.tsx, `isStaff = role !== 'END_USER'` at :26) ──
 
 export interface CreateTicketPermissions {

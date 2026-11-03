@@ -30,6 +30,7 @@ import {
 } from '@/utils/assignment';
 import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { canAssignTickets } from '@/utils/permissions';
 import { BULK_ACTION_LIMIT, isResolvedLocked } from '@/utils/ticket-rules';
 import { assignMessage, bulkAssignMessage, unassignMessage } from '@/utils/writeCopy';
@@ -97,6 +98,7 @@ function SingleAssign({ navigation, route }: Props) {
     if (!ok) return;
     try {
       await assign.mutateAsync({ ticketId, status: ticket.status, assignedToId: person ? person.id : null, teamId });
+      haptic('success');
       notify(confirm.done ?? assignmentDoneMessage(person ? formatDisplayName(person.displayName) : null));
       leave(() => navigation.goBack());
     } catch (e) {

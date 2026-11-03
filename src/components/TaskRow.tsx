@@ -2,6 +2,7 @@
 // list, so both show a task the same way.
 // - `onToggle` (staff only, ticket screen only): the done/not-done checkbox (TSK-3). Without it the icon is display-only.
 // - `parent`: shows the parent ticket line (standalone list).
+// - Press feedback (2026-11-03, ./PressFeedback.tsx) on the tappable part; the separator and checkbox stay still.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -10,6 +11,7 @@ import { colors, palette } from '@/theme';
 import type { TicketTaskEmbedded } from '@/types';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
 import { formatDueDay, isTaskOverdue } from '@/utils/tasks';
+import { PressableCard } from './PressFeedback';
 
 export const TASK_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
   OPEN: { name: 'ellipse-outline', color: palette.gray[500] },
@@ -94,20 +96,24 @@ function TaskRowImpl({ task, onPress, onToggle, toggling = false, parent, last =
     <View className={`flex-row items-start py-3 ${last ? '' : 'border-b border-gray-100'}`}>
       {statusIcon}
       {onPress ? (
-        <Pressable
+        <PressableCard
           accessibilityRole="button"
           accessibilityHint="Opens the task"
           onPress={onPress}
-          className="flex-1 flex-row items-center active:opacity-70"
+          wrapperStyle={FILL}
+          className="flex-row items-center"
         >
           {body}
           <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />
-        </Pressable>
+        </PressableCard>
       ) : (
         body
       )}
     </View>
   );
 }
+
+/** The tappable part takes the rest of the row, beside the checkbox. */
+const FILL = { flex: 1 } as const;
 
 export const TaskRow = memo(TaskRowImpl);

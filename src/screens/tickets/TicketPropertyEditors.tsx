@@ -36,6 +36,7 @@ import {
 } from '@/utils/assignment';
 import { notify, reportFieldWriteError } from '@/utils/dialogs';
 import { IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, categoryCascade, formatDateTime, formatDisplayName } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { ticketFieldPermissions, type FieldAccess, type TicketFieldPermissions } from '@/utils/permissions';
 import {
   categoryChoices, categoryIdToSave, categorySavedMessage, categorySelectionOf, classificationChanges, newTicketPriority,
@@ -112,7 +113,9 @@ export function usePropertyEditing(ticket: TicketDetail | undefined): PropertyEd
   async function run(key: EditorKey, write: (ticket: TicketDetail) => Promise<string>) {
     if (!ticket) return;
     try {
-      notify(await write(ticket));
+      const done = await write(ticket);
+      haptic('success');
+      notify(done);
     } catch (e) {
       reportFieldWriteError(COPY[key].failed, COPY[key].field, e);
     } finally {

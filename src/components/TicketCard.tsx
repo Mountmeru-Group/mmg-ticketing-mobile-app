@@ -2,14 +2,26 @@
 // - Inline status chip (08 §4.1): tappable only when the list passes onStatusPress, i.e. staff with at least one valid
 //   transition for this ticket. The chip itself never writes; the list asks first.
 // - Selection (08 §4.2): tap-and-hold starts multi-select; the list owns the selection and its 20-ticket cap.
+// - People row (2026-11-03): avatars, a static arrow, under a hairline rule (./PeopleRow.tsx).
+// - Press feedback (2026-11-03): the card dips and dims while held (./PressFeedback.tsx). One native timing per press;
+//   never a loop.
+// - Swipe left (2026-11-03): reveals Assign and Resolve, each only where a tap already offers it (ticketSwipeActions in
+//   utils/permissions.ts). react-native-gesture-handler's Swipeable moves the row with `translateX` on the native
+//   driver. How it stays out of FlashList's recycling and the long-press selection: SwipeRow below, and
+//   docs/PERFORMANCE.md §13.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { memo } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 
-import { colors, palette } from '@/theme';
+import { reduceMotionEnabled } from '@/hooks';
+import { colors, motion, palette } from '@/theme';
 import type { Ticket, UserRole } from '@/types';
-import { formatDisplayName, formatRelative, statusLabel } from '@/utils/format';
+import { formatRelative, peopleRowLabel, statusLabel } from '@/utils/format';
+import { ticketSwipeActions, type SwipeAction, type Viewer } from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
+import { PeopleRow } from './PeopleRow';
+import { usePressFeedback } from './PressFeedback';
 import { PriorityBadge } from './PriorityBadge';
 import { SlaBadge } from './SlaBadge';
 import { StatusBadge } from './StatusBadge';
@@ -25,17 +37,27 @@ interface TicketCardProps {
   onStatusPress?: (ticket: Ticket) => void;
   /** A status change for this ticket is in flight. */
   statusBusy?: boolean;
+  /**
+   * Present only for a role whose rows are swipeable (canSwipeTickets). Which actions this ticket reveals is
+   * ticketSwipeActions(swipeViewer, ticket); none = the row does not move.
+   */
+  swipeViewer?: Viewer | null;
+  onSwipeAction?: (action: SwipeAction, ticket: Ticket) => void;
+  /** The list keeps one row open at a time and closes it when a scroll starts. */
+  onSwipeOpen?: (row: Swipeable) => void;
+  onSwipeClose?: (row: Swipeable) => void;
 }
 
 function TicketCardImpl({
   ticket, role, onPress, onLongPress, selectionMode = false, selected = false, onStatusPress, statusBusy = false,
+  swipeViewer, onSwipeAction, onSwipeOpen, onSwipeClose,
 }: TicketCardProps) {
   const staff = isStaff(role);
   // 05 §A.9: highlight rows whose requester replied last. Staff only — for END_USER the requester is themselves.
   const newReply = staff && !!ticket.lastRequesterReplyAt;
-  const requester = formatDisplayName(ticket.requester?.displayName) || 'Unknown requester';
-  const technician = formatDisplayName(ticket.assignedTo?.displayName);
   const chipInteractive = !!onStatusPress && !selectionMode;
+  const feedback = usePressFeedback();
+  const swipeable = swipeViewer !== undefined;
 
   // The standard card (Card.tsx). Selected: brand primary edge, as every selected state. New reply: the blue accent
   // edge, the app's information colour.
@@ -46,71 +68,203 @@ function TicketCardImpl({
       : 'border-border bg-white';
   // Meta text one shade darker on the selected tint: gray-500 on red-50 is 4.4:1, below WCAG AA.
   const meta = selected ? 'text-gray-600' : 'text-gray-500';
+  const people = peopleRowLabel(ticket.requester?.displayName, ticket.assignedTo?.displayName, staff);
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={selectionMode ? { selected } : undefined}
-      accessibilityLabel={`Ticket ${ticket.ticketNumber}: ${ticket.title}${newReply ? ', new reply' : ''}`}
-      accessibilityHint={onLongPress && !selectionMode ? 'Long press to select several tickets' : undefined}
-      onPress={() => onPress(ticket.id)}
-      onLongPress={onLongPress ? () => onLongPress(ticket.id) : undefined}
-      delayLongPress={350}
-      className={`mx-4 mb-3 rounded-xl border p-4 active:opacity-80 ${border}`}
-    >
-      <View className="mb-1 flex-row items-center">
-        {selectionMode ? (
-          <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.primary : colors.text.secondary} style={{ marginRight: 6 }} />
-        ) : null}
-        <Text className={`text-xs font-semibold ${meta}`}>#{ticket.ticketNumber ?? '—'}</Text>
-        <Text className={`ml-2 flex-1 text-xs ${meta}`} numberOfLines={1}>
-          Updated {formatRelative(ticket.updatedAt)}
+  const card = (
+    // The card's 16 dp gutters and 12 dp gap sit on the swipe row when there is one (so its actions line up with the
+    // card), otherwise here.
+    <Animated.View style={[feedback.style, swipeable ? null : styles.box]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={selectionMode ? { selected } : undefined}
+        accessibilityLabel={`Ticket ${ticket.ticketNumber}: ${ticket.title}${newReply ? ', new reply' : ''}. ${people}`}
+        accessibilityHint={onLongPress && !selectionMode ? 'Long press to select several tickets' : undefined}
+        onPress={() => onPress(ticket.id)}
+        onLongPress={onLongPress ? () => onLongPress(ticket.id) : undefined}
+        delayLongPress={350}
+        {...feedback.pressProps()}
+        className={`rounded-xl border p-4 ${border}`}
+      >
+        <View className="mb-1 flex-row items-center">
+          {selectionMode ? (
+            <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.primary : colors.text.secondary} style={{ marginRight: 6 }} />
+          ) : null}
+          <Text className={`text-xs font-semibold ${meta}`}>#{ticket.ticketNumber ?? '—'}</Text>
+          <Text className={`ml-2 flex-1 text-xs ${meta}`} numberOfLines={1}>
+            Updated {formatRelative(ticket.updatedAt)}
+          </Text>
+          {newReply ? (
+            <View className="rounded-full bg-blue-600 px-2.5 py-0.5">
+              <Text className="text-xs font-semibold text-white">New reply</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text className={`text-base text-gray-900 ${newReply ? 'font-bold' : 'font-semibold'}`} numberOfLines={2}>
+          {ticket.title || '(no subject)'}
         </Text>
-        {newReply ? (
-          <View className="rounded-full bg-blue-600 px-2.5 py-0.5">
-            <Text className="text-xs font-semibold text-white">New reply</Text>
-          </View>
-        ) : null}
-      </View>
 
-      <Text className={`text-base text-gray-900 ${newReply ? 'font-bold' : 'font-semibold'}`} numberOfLines={2}>
-        {ticket.title || '(no subject)'}
-      </Text>
-
-      <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-        {chipInteractive ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Status ${statusLabel(ticket.status)}. Change status`}
-            accessibilityState={{ disabled: statusBusy, busy: statusBusy }}
-            disabled={statusBusy}
-            onPress={() => onStatusPress?.(ticket)}
-            hitSlop={12}
-            className="flex-row items-center active:opacity-70"
-          >
+        <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
+          {chipInteractive ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Status ${statusLabel(ticket.status)}. Change status`}
+              accessibilityState={{ disabled: statusBusy, busy: statusBusy }}
+              disabled={statusBusy}
+              onPress={() => onStatusPress?.(ticket)}
+              hitSlop={12}
+              className="flex-row items-center active:opacity-70"
+            >
+              <StatusBadge status={ticket.status} recordId={ticket.id} />
+              {statusBusy ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
+              ) : (
+                <Ionicons name="chevron-down" size={14} color={palette.gray[600]} style={{ marginLeft: 2 }} />
+              )}
+            </Pressable>
+          ) : (
             <StatusBadge status={ticket.status} recordId={ticket.id} />
-            {statusBusy ? (
-              <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />
-            ) : (
-              <Ionicons name="chevron-down" size={14} color={palette.gray[600]} style={{ marginLeft: 2 }} />
-            )}
-          </Pressable>
-        ) : (
-          <StatusBadge status={ticket.status} recordId={ticket.id} />
-        )}
-        <PriorityBadge priority={ticket.priority} />
-        <SlaBadge ticket={ticket} />
-      </View>
+          )}
+          <PriorityBadge priority={ticket.priority} />
+          <SlaBadge ticket={ticket} />
+        </View>
 
-      <Text className={`mt-2 text-xs ${meta}`} numberOfLines={1}>
-        {staff
-          ? `${requester} · ${technician ? `Technician: ${technician}` : 'Unassigned'}`
-          : technician
-            ? `Technician: ${technician}`
-            : 'Not yet assigned to a technician'}
-      </Text>
-    </Pressable>
+        {/* People (2026-11-03): a hairline rule, then requester → technician. */}
+        <View className="mt-3 border-border pt-2.5" style={styles.rule}>
+          <PeopleRow
+            requesterName={ticket.requester?.displayName}
+            technicianName={ticket.assignedTo?.displayName}
+            showRequester={staff}
+            onTint={selected}
+          />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+
+  if (!swipeable) return card;
+  const actions = ticketSwipeActions(swipeViewer, ticket);
+  return (
+    <SwipeRow
+      ticket={ticket}
+      actions={actions}
+      enabled={!selectionMode && actions.length > 0}
+      onAction={onSwipeAction}
+      onOpen={onSwipeOpen}
+      onClose={onSwipeClose}
+    >
+      {card}
+    </SwipeRow>
   );
 }
 
 export const TicketCard = memo(TicketCardImpl);
+
+// ── Swipe ────────────────────────────────────────────────────
+
+const { actionWidth, dragStart, verticalFail, openThreshold, friction, reducedSpringSpeed } = motion.swipe;
+/** "Remove animations": the snap settles in a frame or two (Swipeable's spring keeps bounciness 0 and the native driver). */
+const REDUCED_SPRING = { speed: reducedSpringSpeed };
+
+const ACTION_LOOK: Record<SwipeAction, { label: string; icon: keyof typeof Ionicons.glyphMap; tone: { bg: string; fg: string } }> = {
+  assign: { label: 'Assign', icon: 'person-add-outline', tone: colors.swipe.assign },
+  resolve: { label: 'Resolve', icon: 'checkmark-circle-outline', tone: colors.swipe.resolve },
+};
+
+/**
+ * The swipe wrapper. Kept out of the way of the list:
+ * - Only a leftward drag of `dragStart` dp starts it (activeOffsetX), and any vertical travel of `verticalFail` dp
+ *   first cancels it (failOffsetY), so scrolling never drags a row and the drawer's rightward edge swipe is untouched.
+ * - Until the first drag the actions are one empty box of their width, so a resting row adds one view, not seven.
+ * - A tap on an open row closes it (Swipeable's own tap handler; the card under it gets no press), so a long-press
+ *   can start a selection only on a closed row. Entering selection disables every row (`enabled`).
+ * - FlashList recycles a cell by giving it another ticket. If the cell was open, it is closed at once (`reset`, no
+ *   animation) before the new ticket shows; the list also closes the open row when a scroll starts.
+ */
+function SwipeRow({
+  ticket, actions, enabled, onAction, onOpen, onClose, children,
+}: {
+  ticket: Ticket;
+  actions: readonly SwipeAction[];
+  enabled: boolean;
+  onAction?: (action: SwipeAction, ticket: Ticket) => void;
+  onOpen?: (row: Swipeable) => void;
+  onClose?: (row: Swipeable) => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<Swipeable>(null);
+  const open = useRef(false);
+  const shownId = useRef(ticket.id);
+  const [revealed, setRevealed] = useState(false);
+
+  useLayoutEffect(() => {
+    if (shownId.current === ticket.id) return;
+    shownId.current = ticket.id;
+    if (open.current) {
+      open.current = false;
+      ref.current?.reset();
+    }
+  }, [ticket.id]);
+
+  const renderActions = () =>
+    revealed ? (
+      <View className="flex-row overflow-hidden rounded-r-xl">
+        {actions.map((action) => {
+          const look = ACTION_LOOK[action];
+          return (
+            <Pressable
+              key={action}
+              accessibilityRole="button"
+              accessibilityLabel={`${look.label} ticket ${ticket.ticketNumber}`}
+              onPress={() => {
+                ref.current?.close();
+                onAction?.(action, ticket);
+              }}
+              style={[styles.action, { backgroundColor: look.tone.bg }]}
+              className="items-center justify-center active:opacity-80"
+            >
+              <Ionicons name={look.icon} size={20} color={look.tone.fg} />
+              <Text className="mt-1 text-xs font-semibold" style={{ color: look.tone.fg }} numberOfLines={1}>
+                {look.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    ) : (
+      <View style={{ width: actions.length * actionWidth }} />
+    );
+
+  return (
+    <Swipeable
+      ref={ref}
+      enabled={enabled}
+      friction={friction}
+      rightThreshold={openThreshold}
+      overshootRight={false}
+      activeOffsetX={-dragStart}
+      failOffsetY={[-verticalFail, verticalFail]}
+      animationOptions={reduceMotionEnabled() ? REDUCED_SPRING : undefined}
+      containerStyle={styles.box}
+      renderRightActions={actions.length > 0 ? renderActions : undefined}
+      onSwipeableOpenStartDrag={() => setRevealed(true)}
+      onSwipeableWillOpen={() => {
+        open.current = true;
+        if (ref.current) onOpen?.(ref.current);
+      }}
+      onSwipeableClose={() => {
+        open.current = false;
+        if (ref.current) onClose?.(ref.current);
+      }}
+    >
+      {children}
+    </Swipeable>
+  );
+}
+
+const styles = StyleSheet.create({
+  /** The standard card's place in a list: `mx-4 mb-3` (S2). */
+  box: { marginHorizontal: 16, marginBottom: 12 },
+  rule: { borderTopWidth: StyleSheet.hairlineWidth },
+  action: { width: actionWidth },
+});

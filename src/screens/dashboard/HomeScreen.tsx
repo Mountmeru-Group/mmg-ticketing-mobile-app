@@ -15,6 +15,11 @@
 // ADMIN only (2026-10-29): the active-announcement banner (ANN-1, dismissible for this session) and its "Read more".
 //   Other roles get no banner and no ANN-1 request, because the Announcements screen does not exist for them.
 // The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
+//   Beside it, a drawn sun, sun-behind-cloud or moon for the band (components/GreetingMark.tsx): one rise and fade
+//   when Home mounts, hidden from screen readers.
+// Window captions (2026-11-03): under every count, the window it covers ("this month", "last 7 days" … or "right now"
+//   for Open), and "right now" on the Active chip, the one chip counted differently from its neighbours
+//   (utils/home-kpis.ts HOME_TILE_WINDOW, HOME_CHIP_WINDOW). The counts themselves are unchanged: the web's (G6).
 // A tile or chip opens the Tickets tab with the matching filter (utils/home-kpis.ts: the same status set it counts) and,
 //   since G7, the period as the list's created-date filter when it counts "created in the period" (all but Open and
 //   Active), as the web's dashboard links do. The list names the period in a chip that clears it.
@@ -28,8 +33,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementBanner, EmptyState, ErrorState, FilterChip, LoadingSkeleton, Notice, OfflineBanner, QueryBanner,
-  RecentTicketRow, ScreenHeader, Skeleton, SubmitButton,
+  AnnouncementBanner, EmptyState, ErrorState, FilterChip, GreetingMark, LoadingSkeleton, Notice, OfflineBanner,
+  PressableCard, QueryBanner, RecentTicketRow, ScreenHeader, Skeleton, SubmitButton,
 } from '@/components';
 import { queryKeys, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -41,10 +46,10 @@ import {
   periodListDates, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
 import { notify } from '@/utils/dialogs';
-import { greetingLine, greetingNow } from '@/utils/greeting';
+import { greetingLine, greetingMark, greetingNow } from '@/utils/greeting';
 import {
   HOME_CHIP_CARRIES_PERIOD, HOME_CHIP_LABELS, HOME_CHIP_LIST_FILTER, HOME_TILE_CARRIES_PERIOD, HOME_TILE_LIST_FILTER,
-  homeChipValue, homeTileLabel, homeTileValue, visibleHomeChips, type HomeKpis,
+  homeChipCaption, homeChipValue, homeTileCaption, homeTileLabel, homeTileValue, visibleHomeChips, type HomeKpis,
 } from '@/utils/home-kpis';
 import {
   homeChips, homeTiles, homeVariant, showAnnouncementBanner, showApprovalsShortcut, showHomePeriod, type HomeChip,
@@ -59,7 +64,8 @@ interface Tile {
   label: string;
   /** undefined = no count shown (L2_MANAGER, still loading, or a Custom period not picked yet). */
   value?: number;
-  hint?: string;
+  /** The window the count covers, under it: the period, or "right now" (homeTileCaption). */
+  caption: string;
   icon: keyof typeof Ionicons.glyphMap;
   /** The square behind the icon and the tile's left edge: the web KPI card's colour for this count (colors.kpi). */
   color: string;
@@ -177,7 +183,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
   const showTileCounts = !isL2;
   const countsCurrent = showTileCounts && periodReady && !dashboard.isPlaceholderData;
   const kpis = countsCurrent ? dashboard.data?.kpis : undefined;
-  const tiles: Tile[] = user ? buildTiles(homeTiles(user), kpis, period, openList) : [];
+  const tiles: Tile[] = user ? buildTiles(homeTiles(user), kpis, period, customRange, openList) : [];
   const chips: HomeChip[] = user ? visibleHomeChips(homeChips(user), kpis, showTileCounts) : [];
   const countsMissing = showTileCounts && periodReady && (!dashboard.data || dashboard.isPlaceholderData);
   const countsLoading = countsMissing && dashboard.fetchStatus !== 'idle';
@@ -195,7 +201,12 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <View className="mx-4 mb-4">
-          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900">{greetingLine(greeting, user?.displayName)}</Text>
+          <View className="flex-row items-center">
+            <View className="shrink">
+              <Text accessibilityRole="header" className="text-xl font-bold text-gray-900">{greetingLine(greeting, user?.displayName)}</Text>
+            </View>
+            <GreetingMark mark={greetingMark(greeting)} />
+          </View>
           <Text className="text-sm text-gray-500">{ROLE_LABELS[role]}</Text>
         </View>
 
@@ -241,6 +252,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<'HomeTab'>) {
                 <StatusChip
                   key={chip}
                   label={HOME_CHIP_LABELS[chip]}
+                  caption={homeChipCaption(chip)}
                   value={kpis ? homeChipValue(chip, kpis) : undefined}
                   loading={countsLoading}
                   color={CHIP_COLORS[chip]}
@@ -305,10 +317,9 @@ function clampDate(value: Date, min: Date, max: Date): Date {
 // Which tiles and chips show, per role, is homeTiles() / homeChips(); what each counts and which list it opens is
 // utils/home-kpis.ts. These tables only say how each one looks. Colours: the web's KPI card or mini-card for the same
 // count (FE:DashboardPage.tsx:341-402), via colors.kpi and colors.kpiPending; Active (app only) is colors.kpi.active.
-const TILE_LOOK: Record<HomeTile, Pick<Tile, 'icon' | 'color' | 'hint'>> = {
+const TILE_LOOK: Record<HomeTile, Pick<Tile, 'icon' | 'color'>> = {
   total: { icon: 'ticket-outline', color: colors.kpi.total },
-  // Open counts right now, whatever the period (the web's currentlyOpen): the hint says so.
-  open: { icon: 'folder-open-outline', color: colors.kpi.open, hint: 'right now' },
+  open: { icon: 'folder-open-outline', color: colors.kpi.open },
   inProgress: { icon: 'time-outline', color: colors.kpi.inProgress },
   resolved: { icon: 'checkmark-circle-outline', color: colors.kpi.resolved },
   slaBreached: { icon: 'warning-outline', color: colors.kpi.slaBreached },
@@ -331,11 +342,13 @@ function buildTiles(
   keys: readonly HomeTile[],
   kpis: HomeKpis | undefined,
   period: DashboardPeriod,
+  customRange: CustomDayRange,
   openList: (f: TicketNamedFilter, carriesPeriod: boolean) => void,
 ): Tile[] {
   return keys.map((key) => ({
     key,
     label: homeTileLabel(key, period),
+    caption: homeTileCaption(key, period, customRange),
     ...TILE_LOOK[key],
     value: kpis ? homeTileValue(key, kpis, period) : undefined,
     onPress: () => openList(HOME_TILE_LIST_FILTER[key], HOME_TILE_CARRIES_PERIOD[key]),
@@ -508,13 +521,17 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
   // `text-sm text-gray-500`, the count in `text-2xl font-bold`. The web puts the label beside the square; a phone tile
   // is too narrow for that (about 80 dp at 360 dp), so the label goes under the square and gets the full width.
   // G6: a 4 dp left edge in the same colour (Ronit's brief; the 2026-10-09 web clone's card has no coloured edge).
+  // 2026-11-03: the window caption under the count, and the standard press feedback. The width is on the press
+  // wrapper, which the row stretches to the taller tile; the card grows to fill it (`grow`, basis auto, so it is still
+  // measured by its content first), and the counts stay aligned.
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
-      accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}` : ''}${t.hint && t.value !== undefined ? `, ${t.hint}` : ''}. Opens the list`}
+      accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}, ${t.caption}` : ''}. Opens the list`}
       onPress={t.onPress}
-      style={{ width, borderLeftWidth: 4, borderLeftColor: t.color }}
-      className="min-h-32 justify-between rounded-xl border border-border bg-white p-4 active:opacity-80"
+      wrapperStyle={{ width }}
+      style={{ borderLeftWidth: 4, borderLeftColor: t.color }}
+      className="min-h-32 grow justify-between rounded-xl border border-border bg-white p-4"
     >
       <View>
         <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: t.color }}>
@@ -529,41 +546,41 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
         >
           {t.label}
         </Text>
-        {t.hint && t.value !== undefined ? (
-          <Text className="text-xs text-gray-500">{t.hint}</Text>
-        ) : t.hint && loading ? (
-          // Phase P: the hint's line is kept (invisible, hidden from screen readers) while the count loads, so the row
-          // does not grow and push the screen down when the number arrives.
-          <Text className="text-xs text-gray-500" style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            {t.hint}
+      </View>
+      <View>
+        {t.value !== undefined ? (
+          <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>
+            {t.value}
+          </Text>
+        ) : loading ? (
+          // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the
+          // tile keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a
+          // fixed 32 dp line, which matched only at 100 %.
+          <View className="mt-1 justify-center">
+            <Text className="text-2xl font-bold" style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              0
+            </Text>
+            <View style={StyleSheet.absoluteFill} className="justify-center">
+              <Skeleton className="h-6 w-12" />
+            </View>
+          </View>
+        ) : showCounts ? (
+          // No count to show yet (a Custom period without both days, or an error shown above the grid).
+          <Text className="mt-1 text-2xl font-bold text-gray-500" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            –
+          </Text>
+        ) : (
+          <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>
+        )}
+        {/* The window (2026-11-03), small and muted under the number. Shown whenever counts are, loading included, so
+            nothing moves when the number arrives: it depends on the period, not on the data. */}
+        {showCounts ? (
+          <Text className="text-xs text-gray-500" numberOfLines={2}>
+            {t.caption}
           </Text>
         ) : null}
       </View>
-      {t.value !== undefined ? (
-        <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit>
-          {t.value}
-        </Text>
-      ) : loading ? (
-        // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the tile
-        // keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a fixed
-        // 32 dp line, which matched only at 100 %.
-        <View className="mt-1 justify-center">
-          <Text className="text-2xl font-bold" style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            0
-          </Text>
-          <View style={StyleSheet.absoluteFill} className="justify-center">
-            <Skeleton className="h-6 w-12" />
-          </View>
-        </View>
-      ) : showCounts ? (
-        // No count to show yet (a Custom period without both days, or an error shown above the grid).
-        <Text className="mt-1 text-2xl font-bold text-gray-500" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          –
-        </Text>
-      ) : (
-        <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>
-      )}
-    </Pressable>
+    </PressableCard>
   );
 }
 
@@ -572,9 +589,11 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
  * :408-413). 36 dp with a 4 dp hit slop (S8), the standard white card border. No count for L2_MANAGER.
  */
 function StatusChip({
-  label, value, loading, color, onPress,
+  label, caption, value, loading, color, onPress,
 }: {
   label: string;
+  /** Only on a chip counted differently from its neighbours: Active's "right now" (homeChipCaption). */
+  caption: string | null;
   value: number | undefined;
   loading: boolean;
   color: string;
@@ -583,7 +602,7 @@ function StatusChip({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}${value !== undefined ? `: ${value}` : ''}. Opens the list`}
+      accessibilityLabel={`${label}${value !== undefined ? `: ${value}` : ''}${caption ? `, ${caption}` : ''}. Opens the list`}
       onPress={onPress}
       hitSlop={4}
       className="h-9 flex-row items-center rounded-full border border-border bg-white px-3 active:bg-gray-50"
@@ -595,6 +614,7 @@ function StatusChip({
         <Skeleton className="ml-1.5 h-3.5 w-5" />
       ) : null}
       <Text className="ml-1.5 text-sm text-gray-700">{label}</Text>
+      {caption ? <Text className="ml-1 text-xs text-gray-500">{caption}</Text> : null}
     </Pressable>
   );
 }

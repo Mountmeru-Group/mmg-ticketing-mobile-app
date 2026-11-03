@@ -55,6 +55,9 @@ const BRAND_RED_LIGHT = '#de1223';
 const BRAND_RED_TINT = '#fff3f4';
 /** Brand yellow at about 30 % on white: the sign-in spinner's ring. Decoration only (the label says what happens). */
 const BRAND_YELLOW_PALE = '#fff0b3';
+// App-only shade added with the polish pass (2026-11-03, docs/brand/UI-STANDARDS.md §14).
+/** S3's avatar fill, `bg-primary/10` over white, as hex. Brand red initials on it are 4.6:1. */
+const BRAND_RED_PALE = '#fbe7e9';
 
 /** Ticket status pill. Web: frontend/src/components/ui/StatusBadge.tsx. */
 const status: Record<TicketStatus, BadgeTone> = {
@@ -242,6 +245,40 @@ export const colors = {
     buttonBorder: palette.gray[300],
     buttonPressed: palette.gray[50],
     buttonLabel: palette.gray[900],
+  },
+
+  /**
+   * The people row on a ticket card (2026-11-03, UI-STANDARDS.md §14). Requester and technician are told apart by
+   * LIGHTNESS, not hue alone (tests/polish/people-row.test.mjs): CIELAB L* 93 against 27.
+   *   requester   S3's avatar: bg-primary/10 with brand red initials, 4.6:1
+   *   technician  slate-700 with white initials, 10.4:1
+   *   unassigned  the dashed ring, the plus and the "Unassigned" text: gray-500, 4.8:1 on white
+   */
+  avatar: {
+    requester: tone(BRAND_RED_PALE, BRAND_RED),
+    technician: tone(palette.slate[700], palette.white),
+    unassigned: palette.gray[500],
+  },
+
+  /**
+   * The SLA countdown bar on ticket detail (2026-11-03, UI-STANDARDS.md §14), by the hold-adjusted SLA status (05 §A.9).
+   * Told apart by lightness: L* 59, 81 and 40, at least 15 apart (tests/polish/sla-countdown.test.mjs). The words
+   * ("6h left", "Breached") carry the meaning; the bar is decoration (WCAG 1.4.1).
+   */
+  slaBar: {
+    WITHIN_SLA: palette.green[600],
+    DUE_SOON: palette.amber[400],
+    BREACHED: palette.red[700],
+    track: palette.gray[200],
+  },
+
+  /**
+   * The two swipe actions on a ticket-list row (2026-11-03, UI-STANDARDS.md §14). L* 27 and 47; each has its icon and
+   * its word. White on slate-700 is 10.4:1, on green-700 5.0:1.
+   */
+  swipe: {
+    assign: tone(palette.slate[700], palette.white),
+    resolve: tone(palette.green[700], palette.white),
   },
 
   /** Microsoft's four-square logo, in Microsoft's own colours (the sign-in button only). */

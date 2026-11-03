@@ -24,6 +24,8 @@
 //     TKT-4 PUT (never status, never priority). docs/G1-WEB-BEHAVIOUR.md has the web's rules.
 //     The technician (2026-10-27): the same inline editor, saved through useAssignTicket (TKT-5), the hook Pick up and
 //     Assign… (M7) use; offered exactly where More options offers Assign.
+//   Haptics (2026-11-03, utils/haptics.ts): the confirm after a status change or a pick-up; failures get the error
+//     pattern through utils/dialogs.ts.
 //   Phase G3 (docs/G3-WEB-BEHAVIOUR.md): a delete button on each file for ADMIN, AGENT and L2_MANAGER, in any status,
 //     confirmed by name, then ATT-5 (permanent); "Submit for approval…" in More options for ADMIN and AGENT, in any
 //     status, opening ./SubmitApprovalScreen.tsx.
@@ -47,8 +49,8 @@ import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice,
-  OfflineBanner, OfflineState, OptionSheet, OutlineButton, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge, StatusBadge,
-  SubmitButton, TaskRow, type SheetOption,
+  OfflineBanner, OfflineState, OptionSheet, OutlineButton, PressableCard, PriorityBadge, QueryBanner, ScreenHeader, SlaBadge,
+  SlaCountdown, StatusBadge, SubmitButton, TaskRow, type SheetOption,
 } from '@/components';
 import {
   useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
@@ -62,6 +64,7 @@ import { confirmAction, notify, reportActionWriteError, reportWriteError } from 
 import {
   effectiveResolveDue, formatBytes, formatDateTime, formatDisplayName, formatRelative, initials, sourceLabel,
 } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import {
   isCommentVisible, ticketDetailPermissions, ticketFieldPermissions, type ComposerMode, type MoreAction,
   type TicketDetailPermissions, type TicketFieldPermissions,
@@ -178,6 +181,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     if (!ok) return;
     try {
       await changeStatus.mutateAsync({ ticketId, from: ticket.status, body: { status: t.target } });
+      haptic('success');
       notify('Status updated');
     } catch (e) {
       reportWriteError('Failed to update status', e);
@@ -195,6 +199,7 @@ export function TicketDetailScreen({ navigation, route }: TicketStackScreenProps
     try {
       // 08 S5 / 05 B.14: send the current team so the server doesn't pick an arbitrary one.
       await assign.mutateAsync({ ticketId, status: ticket.status, assignedToId: user.id, teamId: ticket.teamId ?? undefined });
+      haptic('success');
       notify('Assigned to you');
     } catch (e) {
       reportWriteError('Failed to pick up', e);
@@ -556,6 +561,8 @@ const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDet
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
       </View>
+      {/* 2026-11-03: time left to the hold-adjusted resolve deadline, with its bar. Detail only, never the list. */}
+      <SlaCountdown ticket={ticket} />
       <Text className="mt-2 text-xs text-gray-500">
         Created {formatDateTime(ticket.createdAt)} · Updated {formatRelative(ticket.updatedAt)}
       </Text>
@@ -927,14 +934,14 @@ const AttachmentRow = memo(function AttachmentRow({
 }) {
   const name = attachment.fileName || 'Unnamed file';
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityState={{ busy: opening || deleting, expanded: detailsOpen }}
       accessibilityHint={onView ? 'Opens the image. Long-press for details' : 'Downloads the file and opens the share sheet. Long-press for details'}
       disabled={opening || deleting}
       onPress={() => (onView ?? onOpen)(attachment)}
       onLongPress={() => onToggleDetails(attachment.id)}
-      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
+      className="mx-4 mb-3 rounded-xl border border-border bg-white p-4"
     >
       <View className="flex-row items-center">
         <Ionicons name={attachmentIcon(attachment.mimeType)} size={20} color={palette.gray[600]} />
@@ -975,7 +982,7 @@ const AttachmentRow = memo(function AttachmentRow({
           </Pressable>
         </View>
       ) : null}
-    </Pressable>
+    </PressableCard>
   );
 });
 

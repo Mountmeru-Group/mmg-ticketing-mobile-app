@@ -1,0 +1,117 @@
+// The greeting mark (2026-11-03, docs/brand/UI-STANDARDS.md §14): a drawn sun, sun behind a cloud, or moon beside
+// "Good morning, Ronit", one per greeting band; flat SVG in brand yellow, never an emoji; one rise and fade when Home
+// mounts; hidden from screen readers. The band rule is src/utils/greeting.ts; the component is read as source.
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import { colors, palette } from '../../src/theme/colors.ts';
+import { GREETING_MARKS, greetingForHour, greetingMark, greetingNow } from '../../src/utils/greeting.ts';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
+
+const SVG = {
+  sun: 'assets/illustrations/greeting-sun.svg',
+  cloudSun: 'assets/illustrations/greeting-cloud-sun.svg',
+  moon: 'assets/illustrations/greeting-moon.svg',
+};
+
+describe('greeting mark: one per band', () => {
+  test('every hour of the day, written out: sun 05–11, sun behind a cloud 12–16, moon 17–04', () => {
+    const S = 'sun';
+    const C = 'cloudSun';
+    const M = 'moon';
+    const expected = [M, M, M, M, M, S, S, S, S, S, S, S, C, C, C, C, C, M, M, M, M, M, M, M];
+    assert.deepEqual(Array.from({ length: 24 }, (_, h) => greetingMark(greetingForHour(h))), expected);
+  });
+
+  test('the three greetings map to three different marks', () => {
+    assert.deepEqual(GREETING_MARKS, { 'Good morning': 'sun', 'Good afternoon': 'cloudSun', 'Good evening': 'moon' });
+  });
+
+  test('the boundaries follow the greeting exactly', () => {
+    const at = (h, m = 0) => new Date(2026, 10, 3, h, m);
+    assert.equal(greetingMark(greetingNow(at(4, 59))), 'moon');
+    assert.equal(greetingMark(greetingNow(at(5, 0))), 'sun');
+    assert.equal(greetingMark(greetingNow(at(11, 59))), 'sun');
+    assert.equal(greetingMark(greetingNow(at(12, 0))), 'cloudSun');
+    assert.equal(greetingMark(greetingNow(at(16, 59))), 'cloudSun');
+    assert.equal(greetingMark(greetingNow(at(17, 0))), 'moon');
+  });
+});
+
+describe('greeting mark: drawn, not an emoji', () => {
+  const mark = read('src/components/GreetingMark.tsx');
+
+  test('each band has its own flat SVG, required by the component', () => {
+    for (const [name, rel] of Object.entries(SVG)) {
+      assert.ok(existsSync(path.join(REPO, rel)), rel);
+      assert.match(mark, new RegExp(`${name}: require\\('\\.\\./\\.\\./${rel.replace(/\./g, '\\.')}'\\) as number,`), name);
+    }
+  });
+
+  test('flat: no gradient, filter, image or text in any of them; brand yellow in each', () => {
+    for (const rel of Object.values(SVG)) {
+      const svg = read(rel).replace(/<!--[\s\S]*?-->/g, ''); // the drawing, not its comment
+      assert.doesNotMatch(svg, /Gradient|<filter|<image|<text|opacity=/i, rel);
+      assert.match(svg, new RegExp(`fill="${colors.secondary}"`, 'i'), `${rel}: brand yellow`);
+    }
+  });
+
+  test('every colour in them is a src/theme/colors.ts token (brand yellow, white, gray-400)', () => {
+    const allowed = new Set([colors.secondary, palette.white, palette.gray[400]].map((c) => c.toLowerCase()));
+    for (const rel of Object.values(SVG)) {
+      for (const [hex] of read(rel).matchAll(/#[0-9a-f]{6}\b/gi)) assert.ok(allowed.has(hex.toLowerCase()), `${rel}: ${hex}`);
+    }
+  });
+
+  test('no emoji anywhere in src/ (they are the phone\'s font, and differ across Android versions)', () => {
+    const files = (function walk(dir) {
+      return readdirSync(path.join(REPO, dir)).flatMap((e) => {
+        const rel = path.join(dir, e);
+        if (statSync(path.join(REPO, rel)).isDirectory()) return walk(rel);
+        return /\.tsx?$/.test(e) ? [rel] : [];
+      });
+    })('src');
+    // One emoji predates this phase and is left as it is (reported in docs/brand/UI-STANDARDS.md §14): the paperclip
+    // in the placeholder html.ts writes for an e-mail's inline (cid:) image, "📎 image in attachments", since Phase 3a.
+    // It is pinned here, so no other emoji can join it.
+    const KNOWN = { 'src/utils/html.ts': ['📎', '📎'] };
+    for (const rel of files) {
+      // Code only: comments are not drawn (some older comments use a marker such as the padlock).
+      const code = read(rel.replace(/\\/g, '/')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+      // Emoji_Presentation draws as an emoji by default; U+FE0F asks for emoji presentation of anything else.
+      const found = code.match(/\p{Emoji_Presentation}|️/gu) ?? [];
+      assert.deepEqual(found, KNOWN[rel.replace(/\\/g, '/')] ?? [], rel);
+    }
+    assert.doesNotMatch(read('src/screens/dashboard/HomeScreen.tsx'), /[☀⛅\u{1F324}-\u{1F326}\u{1F319}-\u{1F31B}\u{1F31E}]/u);
+  });
+});
+
+describe('greeting mark: on Home, quiet', () => {
+  const mark = read('src/components/GreetingMark.tsx');
+  const home = read('src/screens/dashboard/HomeScreen.tsx');
+
+  test('Home draws it beside the greeting, for the band the greeting is in', () => {
+    assert.match(home, /\{greetingLine\(greeting, user\?\.displayName\)\}<\/Text>\s*<\/View>\s*<GreetingMark mark=\{greetingMark\(greeting\)\} \/>/);
+  });
+
+  test('hidden from screen readers: the greeting already says the time of day', () => {
+    assert.match(mark, /accessible=\{false\}\s*accessibilityElementsHidden\s*importantForAccessibility="no-hide-descendants"/);
+  });
+
+  test('about 26 dp', () => {
+    assert.match(mark, /art: \{ width: 26, height: 26 \}/);
+  });
+
+  test('ONE rise and fade: a single native timing, started once, never looped; none under "Remove animations"', () => {
+    assert.equal(mark.split('Animated.timing(').length - 1, 1);
+    assert.doesNotMatch(mark, /Animated\.loop|setInterval|setTimeout/);
+    assert.match(mark, /useState\(\(\) => \(reduceMotionEnabled\(\) \? null : new Animated\.Value\(0\)\)\)/);
+    assert.match(mark, /if \(!entry \|\| played\.current\) return;\s*played\.current = true;/);
+    assert.match(mark, /useNativeDriver: true/);
+  });
+});

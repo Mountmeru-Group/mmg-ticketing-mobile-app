@@ -4,6 +4,7 @@
 import { Alert, Platform, ToastAndroid } from 'react-native';
 
 import { describeActionWriteError, describeFieldWriteError, describeWriteError, isSessionEndedError } from '@/api/errors';
+import { haptic } from './haptics';
 
 interface ConfirmOptions {
   title: string;
@@ -35,22 +36,26 @@ export function notify(message: string): void {
 }
 
 /**
- * Show a failed write. Silent on 401: the API client has already cleared the session and the app is on its way
- * to Login (02 §5.3), so a dialog would only pop up over the login screen.
+ * Show a failed write, with the error haptic (utils/haptics.ts; all three reporters below). Silent on 401: the API
+ * client has already cleared the session and the app is on its way to Login (02 §5.3), so a dialog would only pop up
+ * over the login screen.
  */
 export function reportWriteError(title: string, error: unknown): void {
   if (isSessionEndedError(error)) return;
+  haptic('error');
   Alert.alert(title, describeWriteError(error));
 }
 
 /** reportWriteError() for a G3 action: a 403 says the role can't `action` (e.g. "delete files from a ticket"). */
 export function reportActionWriteError(title: string, action: string, error: unknown): void {
   if (isSessionEndedError(error)) return;
+  haptic('error');
   Alert.alert(title, describeActionWriteError(action, error));
 }
 
 /** reportWriteError() for a property save on M4: a 403 names the field the role can't change (Phase G1). */
 export function reportFieldWriteError(title: string, field: string, error: unknown): void {
   if (isSessionEndedError(error)) return;
+  haptic('error');
   Alert.alert(title, describeFieldWriteError(field, error));
 }

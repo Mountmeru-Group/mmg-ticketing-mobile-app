@@ -24,6 +24,7 @@ import { colors, palette } from '@/theme';
 import type { CannedResponse, TicketStackScreenProps } from '@/types';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { notify } from '@/utils/dialogs';
+import { haptic } from '@/utils/haptics';
 import { composerPermissions, type ComposerMode } from '@/utils/permissions';
 import { insertTemplate, templateHasImages } from '@/utils/templates';
 
@@ -103,10 +104,14 @@ export function ReplyComposerScreen({ navigation, route }: TicketStackScreenProp
         cc: showRecipients ? finalRecipients(cc, ccInput) : [],
         files,
       });
+      haptic('success');
       notify(isPublic ? 'Reply sent' : 'Note saved');
       leave(() => navigation.goBack());
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e));
+      if (!isSessionEndedError(e)) {
+        haptic('error');
+        setError(describeWriteError(e));
+      }
     }
   }
 

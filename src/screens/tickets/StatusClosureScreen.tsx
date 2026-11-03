@@ -27,6 +27,7 @@ import { colors, palette } from '@/theme';
 import type { TicketStackScreenProps, TicketStatus, UserRole } from '@/types';
 import { notify, confirmAction, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import {
   BULK_ACTION_LIMIT, CLOSURE_CODE_OPTIONS, EMPTY_CLOSURE_FORM, buildClosureBody, canChangeStatus, canCloseInBulk,
   canSubmitClosure, closureSaveLabel, closureTitle, getAvailableTransitions, isResolvedLocked, requiresClosureForm,
@@ -156,6 +157,7 @@ function SingleStatus({ navigation, route }: Props) {
     if (!ok) return;
     try {
       await change.mutateAsync({ ticketId, from: ticket.status, body: { status: t.target } });
+      haptic('success');
       notify('Status updated');
       leave(() => navigation.goBack());
     } catch (e) {
@@ -175,10 +177,14 @@ function SingleStatus({ navigation, route }: Props) {
     if (!ok) return;
     try {
       await change.mutateAsync({ ticketId, from: ticket.status, body: buildClosureBody(closure.target, form), files });
+      haptic('success');
       notify('Status updated');
       leave(() => navigation.goBack());
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e));
+      if (!isSessionEndedError(e)) {
+        haptic('error');
+        setError(describeWriteError(e));
+      }
     }
   }
 

@@ -25,7 +25,8 @@
         "backgroundColor": "#FFFFFF"
       },
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE"
       ]
     },
     "plugins": [

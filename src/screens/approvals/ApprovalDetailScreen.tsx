@@ -27,6 +27,7 @@ import type { Approval, ApprovalsStackScreenProps, TicketDetail } from '@/types'
 import { decisionMessage, decisionOutcome, entityLabel, shortApprovalId } from '@/utils/approvals';
 import { confirmAction, reportWriteError } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, statusLabel } from '@/utils/format';
+import { haptic } from '@/utils/haptics';
 import { htmlToDisplayText } from '@/utils/html';
 
 export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreenProps<'ApprovalDetail'>) {
@@ -64,6 +65,7 @@ export function ApprovalDetailScreen({ navigation, route }: ApprovalsStackScreen
       if (!ok) return;
       try {
         const res = await decide.mutateAsync({ approval, decision, comments: comment });
+        haptic('success');
         setResult(res);
       } catch (e) {
         reportWriteError(decision === 'approve' ? "Couldn't approve" : "Couldn't reject", e);
