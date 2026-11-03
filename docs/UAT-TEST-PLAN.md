@@ -138,17 +138,37 @@ Failures that happen on **Microsoft's page** show no red box in the app, so they
   - In the menu, the screen you are on (e.g. Tasks) is a **filled brand-red row with white text**.
   - The others are grey.
   - Tapping the card's name area opens Settings / Profile.
-- [ ] **C5. Home tiles** (Admin account), at normal font size:
-  - **two tiles per row**: Open, In progress / On hold, SLA breached / Active ("right now"), Unassigned;
-  - each tile shows a coloured square with a white icon, the label **in full** (no single letters, no "…"), then the
-    number;
+- [ ] **C5. Home tiles** (Admin account), at normal font size (G6, 2026-11-02):
+  - a **PERIOD** row of chips above the tiles, with **This month** red (selected) and scrolled into view;
+  - **two tiles per row**: Total tickets, Open ("right now") / In progress, Resolved / **SLA breached full width**;
+  - each tile shows a coloured square with a white icon and a coloured left edge, the label **in full** (no single
+    letters, no "…"), then the number;
+  - under the tiles, small pills with a coloured dot, a number and a label: Closed, Unassigned, then any of Mgmt review,
+    With partner, User confirm, More info, Master data, On hold **whose number is above 0**, then Active now;
   - the tiles do **not** overlap the "Good morning, …" greeting.
-  - With the **Technician-with-country** or **L2 Manager** account there are five tiles, and the last one (Active) is
-    **full width**.
+  - With the **Technician-with-country** account the pills have no Unassigned. With **L2 Manager** there is no PERIOD
+    row, and tiles and pills have no numbers.
+- [ ] **C5a. Period** (Admin): with the web's dashboard open on the same country, tap each period in turn. The five
+  tile numbers match the web's cards for the same period (Open matches whatever the period). Custom: From opens the date
+  dialog at once; after a To day the counts load; a From day after the To day shows a red message and no counts.
+- [ ] **C5b. Tile → list carries the period** (G7, Admin):
+  - pick **This month**, tap **In progress**: the list opens with a red **This month ✕** chip, and its "N tickets" equals the tile's number;
+  - tap the **✕**: the dates go, the In progress filter stays;
+  - **Open** and **Active now** open with no period chip;
+  - with **All time**, no chip appears;
+  - with **Custom**, the chip reads Custom and the summary line shows its two days.
+  - A difference of a few tickets at the window's edges is a known server-clock issue (05 B.37), not a test failure: note it.
+- [ ] **C5c. Approvals for everyone** (G7): with the **User** and **L2 Manager** accounts, with nothing pending, the menu shows **Approvals**. It opens "Nothing waiting for you", with no error.
+- [ ] **C5d. Notifications permission** (G7, Android 13+ phone, fresh install):
+  - no permission dialog at launch or at sign-in;
+  - the first visit to **Alerts** shows Android's dialog once;
+  - **Don't allow**: Alerts still works, and the notice says notifications are off with **Turn on notifications**;
+  - later visits don't ask again by themselves.
+  - Until the Service Desk ships push, after **Allow** the notice says notifications "aren't switched on at the Service Desk yet". There must be no error banner anywhere.
 - [ ] **C6. Home tiles at the largest font size.**
-  - "In progress" and "SLA breached" may wrap onto two lines.
-  - "Unassigned" stays on one line, slightly smaller.
+  - "Total tickets" and "In progress" may wrap onto two lines; SLA breached (full width) stays on one.
   - The two tiles in a row stay the same height, and their numbers line up.
+  - The pills wrap onto more lines; none is cut off.
   - Nothing is cut off.
 - [ ] **C7. Brand red elsewhere:**
   - the active bottom tab (red icon and label);
@@ -177,12 +197,14 @@ Sign in as each account in turn and check every row.
 | Area | User (END_USER) | Technician (AGENT) | L2 Manager | Admin |
 |---|---|---|---|---|
 | Bottom tabs | Home, **My Tickets**, Alerts | Home, **Tickets**, Alerts | Home, Tickets, Alerts | Home, Tickets, Alerts |
-| Menu: Approvals | only while they have ≥ 1 pending approval | ✅ always, with a count badge | only while ≥ 1 pending | ✅ always |
+| Menu: Approvals (G7: every role, always) | ✅ always, with a count badge | ✅ always, with a count badge | ✅ always, with a count badge | ✅ always |
 | Menu: Tasks, Service Request, Settings | ✅ | ✅ | ✅ | ✅ |
 | Menu: Knowledge base, Announcements (ADMIN only since 2026-10-29) | ❌ | ❌ | ❌ | ✅ |
 | Home announcement banner (when one is active) | ❌ | ❌ | ❌ | ✅ |
 | Account card: lock chip with country name | ❌ | ❌; **(CA)** ✅ | ❌ | ❌ |
-| Home tiles | **Open, Resolved** (with numbers) | Open, In progress, On hold, SLA breached, Active, **Unassigned**; **(CA)** the same without Unassigned | the same five **without numbers**: each says "View tickets", and a blue notice explains why | all six |
+| Home PERIOD row (G6) | ✅ | ✅ | ❌ | ✅ |
+| Home tiles (G6) | **Open, Resolved** (with numbers) | Total tickets, Open, In progress, Resolved, SLA breached | the same five **without numbers**: each says "View tickets", and a blue notice explains why | the same five |
+| Home pills under the tiles (G6) | ❌ | Closed, **Unassigned**, the pending reasons above 0, On hold above 0, Active now; **(CA)** the same without Unassigned | every pill, **without numbers** | as Technician |
 | Home shortcuts | "Pending approvals" only while ≥ 1 | My open, Due soon, Pending approvals | My open, Due soon (+ Pending approvals while ≥ 1) | My open, Due soon, Pending approvals |
 | Home create button | **"Raise a ticket"** button; ❌ no **+** button | **+** button bottom right | **+** | **+** |
 | Ticket list chip "Unassigned" | ❌ | ✅ | ❌ | ✅ |

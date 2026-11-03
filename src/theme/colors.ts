@@ -7,7 +7,7 @@
 //   on the web.
 // No hex literal belongs anywhere else in src/: import from '@/theme'. This file must stay free of runtime imports,
 // because tailwind.config.js loads it outside Metro.
-import type { SLAStatus, TicketPriority, TicketStatus } from '@/types';
+import type { AuditAction, SLAStatus, TicketPriority, TicketStatus } from '@/types';
 
 export const palette = {
   white: '#ffffff',
@@ -27,7 +27,7 @@ export const palette = {
   emerald: { 500: '#10b981' },
   teal: { 100: '#ccfbf1', 400: '#2dd4bf', 700: '#0f766e' },
   cyan: { 100: '#cffafe', 500: '#06b6d4', 700: '#0e7490' },
-  sky: { 400: '#38bdf8' },
+  sky: { 300: '#7dd3fc', 400: '#38bdf8' },
   blue: { 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a' },
   indigo: { 100: '#e0e7ff', 400: '#818cf8', 700: '#4338ca' },
   violet: { 500: '#8b5cf6', 700: '#6d28d9' },
@@ -88,6 +88,36 @@ const sla: Record<SLAStatus, BadgeTone> = {
   BREACHED: tone(palette.red[100], palette.red[700]),
 };
 
+/**
+ * Audit-log action pill (G8, M20). App-only: the web's audit page is not in the analysed clone (docs/G8-WEB-AUDIT.md
+ * §1, §7), so these are not read from a web file. Tailwind shades only. Told apart by LIGHTNESS, not hue alone: each
+ * of the five actions the server writes most has its own band, at least 15 CIELAB L* from every other
+ * (tests/audit/audit-details.test.mjs):
+ *   UPDATED         blue-900   L* 27   white text 10.4:1
+ *   CREATED         green-700  L* 47   white text 5.0:1
+ *   ASSIGNED        orange-500 L* 64   gray-900 text 6.3:1
+ *   STATUS_CHANGED  sky-300    L* 81   blue-900 text 6.2:1
+ *   COMMENTED       white      L* 100  gray-700 text 10.3:1, with a gray-300 outline
+ * The other four share a band with one of those and differ in hue: ATTACHMENT_ADDED purple-100 (L* 93, 5.9:1), DELETED
+ * zinc-700 (27, 10.4:1), SLA_BREACHED red-700 (40, 6.5:1), ESCALATED amber-500 (72, 8.3:1). The last three are never
+ * written today (G8 §8). Every pill also carries its label and an icon, so no pair depends on colour (WCAG 1.4.1).
+ */
+export interface AuditActionTone extends BadgeTone {
+  /** An outline for the white pill, which would otherwise vanish into the white card. */
+  border?: string;
+}
+const auditAction: Record<AuditAction, AuditActionTone> = {
+  UPDATED: tone(palette.blue[900], palette.white),
+  DELETED: tone(palette.zinc[700], palette.white),
+  CREATED: tone(palette.green[700], palette.white),
+  SLA_BREACHED: tone(palette.red[700], palette.white),
+  ASSIGNED: tone(palette.orange[500], palette.gray[900]),
+  ESCALATED: tone(palette.amber[500], palette.gray[900]),
+  STATUS_CHANGED: tone(palette.sky[300], palette.blue[900]),
+  ATTACHMENT_ADDED: tone(palette.purple[100], palette.purple[700]),
+  COMMENTED: { bg: palette.white, fg: palette.gray[700], border: palette.gray[300] },
+};
+
 export const colors = {
   // ── The web's CSS variables (frontend/src/index.css `:root`), under the web's tailwind.config.js names ──
   primary: BRAND_RED,
@@ -141,10 +171,14 @@ export const colors = {
   status,
   priority,
   sla,
+  auditAction,
   /** Any status, priority or SLA value the app does not know (`bg-gray-100 text-gray-600` in all three web badges). */
   badgeFallback: tone(palette.gray[100], palette.gray[600]),
 
-  /** Dashboard KPI tiles: the square behind the tile's white icon. Web: pages/dashboard/DashboardPage.tsx KPICard. */
+  /**
+   * Dashboard KPI tiles: the square behind the tile's white icon and the tile's left edge; for Closed and Unassigned,
+   * the dot on their Home status chip. Web: pages/dashboard/DashboardPage.tsx KPICard (`bg-purple-500` … `bg-orange-500`).
+   */
   kpi: {
     total: palette.purple[500],
     open: palette.blue[500],
@@ -153,8 +187,10 @@ export const colors = {
     slaBreached: palette.red[500],
     closed: palette.zinc[600],
     unassigned: palette.orange[500],
+    /** App only (G6): the Active chip. The web dashboard has no Active count; the web's muted-foreground slate. */
+    active: palette.slate[500],
   },
-  /** The dot on the dashboard's pending sub-status mini-tiles (staff only). Same web file. */
+  /** The dot on the dashboard's pending sub-status mini-tiles (staff only), and on Home's chip for each. Same web file. */
   kpiPending: {
     PENDING_MGMT_REVIEW: palette.amber[400],
     PENDING_PARTNER: palette.purple[400],

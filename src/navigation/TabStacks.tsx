@@ -10,12 +10,14 @@
 // Every route renders its real screen since iOS-3c: SCREENS is a complete table, so a route without one does not compile.
 // Which routes are registered is stackRoutes() (routes.ts, pinned per role by tests/rbac); this file only supplies
 // screens. The knowledge base and Announcements are registered for ADMIN only, so for every other role they do not
-// exist: nothing can navigate to them, not merely no More row (iOS-5b, as Android's drawer, 2026-10-29).
+// exist: nothing can navigate to them, not merely no More row (iOS-5b, as Android's drawer, 2026-10-29). The Audit log
+// likewise, in the More stack (iOS-5e, Android's G8, 2026-11-02).
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
 
 import { ApprovalDetailScreen } from '@/screens/approvals/ApprovalDetailScreen';
 import { ApprovalsInboxScreen } from '@/screens/approvals/ApprovalsInboxScreen';
+import { AuditLogScreen } from '@/screens/audit/AuditLogScreen';
 import { ServiceCatalogScreen } from '@/screens/catalog/ServiceCatalogScreen';
 import { ServiceRequestDetailScreen } from '@/screens/catalog/ServiceRequestDetailScreen';
 import { ServiceRequestFormScreen } from '@/screens/catalog/ServiceRequestFormScreen';
@@ -49,6 +51,7 @@ const SCREENS: Record<StackRoute, ComponentType<any>> = {
   ApprovalsInbox: ApprovalsInboxScreen,
   Notifications: NotificationsScreen,
   Announcements: AnnouncementsScreen,
+  AuditLog: AuditLogScreen,
   TaskList: TaskListScreen,
   KnowledgeBase: KnowledgeBaseScreen,
   KbArticle: KbArticleScreen,

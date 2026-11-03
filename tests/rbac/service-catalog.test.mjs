@@ -114,10 +114,11 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
   );
 
   // 2026-10-29: Knowledge base is ADMIN only, so for every other role the row follows Tasks directly.
+  // G7: Approvals heads every drawer, so Catalog is third for everyone but ADMIN.
   forEachPersona(
     'the drawer row "catalog" sits after Knowledge base (web sidebar order; ADMIN only has Knowledge base)',
-    { END_USER: 1, AGENT: 2, TRIAGE_AGENT: 2, L2_MANAGER: 1, ADMIN: 3 },
-    (p) => drawerItems(p.role, 0).indexOf('catalog'),
+    { END_USER: 2, AGENT: 2, TRIAGE_AGENT: 2, L2_MANAGER: 2, ADMIN: 3 },
+    (p) => drawerItems(p.role).indexOf('catalog'),
   );
 
   test('a role the app does not know gets no catalogue, no drawer row and no request', () => {
@@ -125,7 +126,7 @@ describe('catalogue: who sees it (web: sidebar and bottom tab for all four roles
     assert.deepEqual(serviceCatalogPermissions({ role: 'GUEST' }), {
       browse: false, submit: false, requestProperties: false, myRequests: false, everyonesRequests: false,
     });
-    assert.equal(drawerItems('GUEST', 0).includes('catalog'), false);
+    assert.equal(drawerItems('GUEST').includes('catalog'), false);
     assert.equal(serviceCatalogPermissions(null).requestProperties, false, 'no session reads as END_USER: no request properties');
   });
 

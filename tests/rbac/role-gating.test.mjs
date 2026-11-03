@@ -33,8 +33,8 @@ import { assertAssignment, assertCanAttach, assertStatusChange } from '../../src
 import { TICKET_STATUSES } from '../../src/types/index.ts';
 import { visibleAuditItems, visibleComments } from '../../src/utils/activity.ts';
 import {
-  bulkActions, composerPermissions, drawerItems, homeTiles, homeVariant, inlineStatusTransitions, isCommentVisible,
-  mainTabs, showApprovalsShortcut, taskPermissions, ticketDetailPermissions, ticketsTitle,
+  bulkActions, composerPermissions, drawerItems, homeChips, homeTiles, homeVariant, inlineStatusTransitions,
+  isCommentVisible, mainTabs, showApprovalsShortcut, showHomePeriod, taskPermissions, ticketDetailPermissions, ticketsTitle,
 } from '../../src/utils/permissions.ts';
 import { isAgentOrAdmin, isStaff } from '../../src/utils/roles.ts';
 import {
@@ -52,27 +52,27 @@ const targets = (transitions) => transitions.map((t) => t.target);
 describe('drawer and tab bar', () => {
   // G4: "Service Request" (the catalogue) for every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
   // 2026-10-29: Knowledge base and Announcements are ADMIN only (a product decision; tests/rbac/kb-announcements.test.mjs).
-  const ALWAYS = ['tasks', 'catalog', 'settings'];
-  const WITH_APPROVALS = ['approvals', ...ALWAYS];
-  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
+  // G7 (Ronit, 2026-11-02): Approvals for every role, always. Before: END_USER and L2_MANAGER only while APR-1 had one.
+  // G8: the Audit log, ADMIN only, after Announcements (tests/rbac/audit-log.test.mjs).
+  const ROWS = ['approvals', 'tasks', 'catalog', 'settings'];
+  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'settings'];
 
   forEachPersona(
-    'drawer rows with no pending approvals',
-    { END_USER: ALWAYS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: ALWAYS, ADMIN: ADMIN_ROWS },
-    (p) => drawerItems(p.role, 0),
+    'drawer rows (whatever is pending)',
+    { END_USER: ROWS, AGENT: ROWS, TRIAGE_AGENT: ROWS, L2_MANAGER: ROWS, ADMIN: ADMIN_ROWS },
+    (p) => drawerItems(p.role),
   );
 
-  // 08 S1: END_USER and L2_MANAGER see Approvals only while APR-1 (scoped to them as approver) returns something.
+  // The Home shortcut keeps the old rule (08 S1): a requester's Home gains no shortcut that almost always reads 0.
   forEachPersona(
-    'drawer rows with 2 pending approvals',
-    { END_USER: WITH_APPROVALS, AGENT: WITH_APPROVALS, TRIAGE_AGENT: WITH_APPROVALS, L2_MANAGER: WITH_APPROVALS, ADMIN: ADMIN_ROWS },
-    (p) => drawerItems(p.role, 2),
-  );
-
-  forEachPersona(
-    'Home "Pending approvals" shortcut follows the drawer rule (0 pending)',
+    'Home "Pending approvals" shortcut (0 pending)',
     { END_USER: false, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: false, ADMIN: true },
     (p) => showApprovalsShortcut(p.role, 0),
+  );
+  forEachPersona(
+    'Home "Pending approvals" shortcut (2 pending)',
+    { END_USER: true, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: true, ADMIN: true },
+    (p) => showApprovalsShortcut(p.role, 2),
   );
 
   const STAFF_TABS = [
@@ -102,23 +102,37 @@ describe('drawer and tab bar', () => {
 // ── Home ─────────────────────────────────────────────────────
 
 describe('home tiles', () => {
-  const STAFF = ['open', 'inProgress', 'onHold', 'slaBreached', 'totalOpen'];
+  // G6: the web's five KPI cards, in its order (FE:DashboardPage.tsx:341-375). END_USER keeps its own set (04 M2).
+  const STAFF = ['total', 'open', 'inProgress', 'resolved', 'slaBreached'];
   forEachPersona(
     'variant',
     { END_USER: 'endUser', AGENT: 'staff', TRIAGE_AGENT: 'staff', L2_MANAGER: 'l2', ADMIN: 'staff' },
     (p) => homeVariant(p.role),
   );
-  // Unassigned only for ADMIN and the triage AGENT (04 M2): for anyone else the DSH-1 count is mis-scoped (05 B.20).
   forEachPersona(
     'KPI tiles',
-    {
-      END_USER: ['open', 'resolved'],
-      AGENT: STAFF,
-      TRIAGE_AGENT: [...STAFF, 'unassigned'],
-      L2_MANAGER: STAFF,
-      ADMIN: [...STAFF, 'unassigned'],
-    },
+    { END_USER: ['open', 'resolved'], AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: STAFF, ADMIN: STAFF },
     (p) => homeTiles(p),
+  );
+  // The web's second row (:379-417) then Active. Unassigned (and Active before it, G6) left the tile grid for this row.
+  // Unassigned only for ADMIN and the triage AGENT (04 M2): for anyone else the DSH-1 count is mis-scoped (05 B.20).
+  const PENDING = ['pendingMgmtReview', 'pendingPartner', 'pendingUserConfirm', 'pendingUserInfo', 'pendingMasterData', 'onHold'];
+  forEachPersona(
+    'status chips',
+    {
+      END_USER: [],
+      AGENT: ['closed', ...PENDING, 'active'],
+      TRIAGE_AGENT: ['closed', 'unassigned', ...PENDING, 'active'],
+      L2_MANAGER: ['closed', ...PENDING, 'active'],
+      ADMIN: ['closed', 'unassigned', ...PENDING, 'active'],
+    },
+    (p) => homeChips(p),
+  );
+  // Every role but L2_MANAGER, whose tiles have no counts for a period to change.
+  forEachPersona(
+    'PERIOD row',
+    { END_USER: true, AGENT: true, TRIAGE_AGENT: true, L2_MANAGER: false, ADMIN: true },
+    (p) => showHomePeriod(p.role),
   );
 });
 
@@ -642,7 +656,10 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
       uses: ['serviceCatalogPermissions(', 'isOwnServiceRequest('],
       forbid: /getServiceRequest\(|apiClient/,
     },
-    { file: 'src/screens/dashboard/HomeScreen.tsx', uses: ['homeVariant(', 'homeTiles(', 'showApprovalsShortcut('] },
+    {
+      file: 'src/screens/dashboard/HomeScreen.tsx',
+      uses: ['homeVariant(', 'homeTiles(', 'homeChips(', 'showHomePeriod(', 'showApprovalsShortcut('],
+    },
     { file: 'src/screens/profile/ProfileScreen.tsx', uses: ['countrySelectorMode('] },
     {
       // iOS-3c (not in Android's list): "Assigned to me" only from taskPermissions(); the list only through useTaskFeed.

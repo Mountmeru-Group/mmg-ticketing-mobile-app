@@ -45,11 +45,13 @@ describe('tab bar', () => {
     for (const p of Object.values(PERSONAS)) assert.ok(appTabs(p.role).length <= 5, p.role);
   });
 
-  test('the Approvals tab is exactly the roles that always have Approvals (drawerItems with nothing pending)', () => {
-    for (const p of Object.values(PERSONAS)) {
-      assert.equal(hasApprovalsTab(p.role), drawerItems(p.role, 0).includes('approvals'), p.role);
-    }
-  });
+  // iOS-5e (G7, Ronit's Q1 (a)): every role has the Approvals drawer row now; the tab stays with the web sidebar's two
+  // roles (AppLayout.tsx:32), and END_USER and L2_MANAGER get the row in More (below).
+  forEachPersona(
+    'the Approvals tab: ADMIN and AGENT only, while every role has the drawer row',
+    { END_USER: [false, true], AGENT: [true, true], TRIAGE_AGENT: [true, true], L2_MANAGER: [false, true], ADMIN: [true, true] },
+    (p) => [hasApprovalsTab(p.role), drawerItems(p.role).includes('approvals')],
+  );
 
   test('a role\'s tabs never depend on a count: appTabs takes none (HIG: never hide a tab)', () => {
     assert.equal(appTabs.length, 1);
@@ -76,40 +78,39 @@ describe('More list', () => {
   const WORK_APPROVALS = { key: 'work', items: ['approvals', 'tasks', 'catalog', 'myRequests'] };
   const INFO = { key: 'information', items: ['knowledge', 'announcements'] };
   const SETTINGS = { key: 'settings', items: ['settings'] };
+  // iOS-5e (G8): the Audit log, ADMIN only, in a section of its own before Settings (Android: below a divider).
+  const AUDIT = { key: 'admin', items: ['auditLog'] };
   // iOS-5b (Android 2026-10-29): Knowledge base and Announcements are ADMIN only, so the "information" section is
   // ADMIN's alone; for everyone else it is empty and left out (tests/rbac/kb-announcements.test.mjs).
   const PLAIN = [WORK, SETTINGS];
   const WITH_APPROVALS = [WORK_APPROVALS, SETTINGS];
-  const ADMIN = [WORK, INFO, SETTINGS];
+  const ADMIN = [WORK, INFO, AUDIT, SETTINGS];
 
+  // G7 (iOS-5e): END_USER and L2_MANAGER have Approvals as a More row always, first, as Android's drawer row is first.
+  // Before G7 it was there only while APR-1 returned something (08 S1). ADMIN and AGENT have the tab, so it is never
+  // also a More row (one route per screen).
   forEachPersona(
-    'More rows with no pending approvals',
-    { END_USER: PLAIN, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: PLAIN, ADMIN },
-    (p) => moreSections(p.role, 0),
-  );
-
-  // 08 S1: END_USER and L2_MANAGER see Approvals only while APR-1 returns something. ADMIN and AGENT have the tab, so
-  // it is never also a More row (one route per screen).
-  forEachPersona(
-    'More rows with 2 pending approvals',
+    'More rows (whatever is pending)',
     { END_USER: WITH_APPROVALS, AGENT: PLAIN, TRIAGE_AGENT: PLAIN, L2_MANAGER: WITH_APPROVALS, ADMIN },
-    (p) => moreSections(p.role, 2),
+    (p) => moreSections(p.role),
   );
+
+  test('the More rows never depend on a count: moreSections takes the role alone', () => {
+    assert.equal(moreSections.length, 1);
+  });
 
   test('every drawer row is a tab or a More row, never both', () => {
     for (const p of Object.values(PERSONAS)) {
-      for (const pending of [0, 2]) {
-        const more = moreSections(p.role, pending).flatMap((s) => s.items);
-        for (const row of drawerItems(p.role, pending)) {
-          const inTab = row === 'approvals' && hasApprovalsTab(p.role);
-          assert.equal(more.includes(row), !inTab, `${p.role} ${pending} ${row}`);
-        }
+      const more = moreSections(p.role).flatMap((s) => s.items);
+      for (const row of drawerItems(p.role)) {
+        const inTab = row === 'approvals' && hasApprovalsTab(p.role);
+        assert.equal(more.includes(row), !inTab, `${p.role} ${row}`);
       }
     }
   });
 
   test('a role the app does not know gets no catalogue, as on Android', () => {
-    const rows = moreSections('SUPERUSER', 0).flatMap((s) => s.items);
+    const rows = moreSections('SUPERUSER').flatMap((s) => s.items);
     assert.equal(rows.includes('catalog'), false);
     assert.equal(rows.includes('myRequests'), false);
   });

@@ -250,7 +250,7 @@ There is no URL field. Build URLs as `/api/v1/tickets/{ticketId}/attachments/{id
 | **Country** | `:1374-1404` | `id, code (VarChar 2, unique), name (unique), displayName, timezone (default "UTC"), currency, dateFormat, businessLanguage, isActive (default true)`. Inside tickets: `{id,name,displayName}` |
 | **SLAPolicy** | `:282-318` | `id, name (unique), description?, isActive, respondTimeUrgent/High/Medium/Low (min; defaults 60/240/480/1440), resolveTimeUrgent/High/Medium/Low (defaults 240/480/1440/2880), businessHoursOnly (true), businessHoursStart (9), businessHoursEnd (18), businessDays Int[] ([1..5]), timezone ("UTC"), operationalHoursId?, countryId?, createdAt, updatedAt` |
 | **Notification** | `:488-505` | `id, userId, ticketId?, type: NotificationType, title, body, isRead (false), readAt?, createdAt`, + `ticket:{id,ticketNumber,title}` on NTF-1 |
-| **AuditLog** | `:558-577` | `id, ticketId?, actorId?, action: AuditAction, entityType (string: 'Ticket', 'Comment', 'Attachment'…), entityId, oldValues Json?, newValues Json?, ipAddress?, createdAt`, + `actor:{id,displayName}` on TKT-7 |
+| **AuditLog** | `:558-577` | `id, ticketId?, actorId?, action: AuditAction, entityType (string: 'Ticket', 'Comment', 'Attachment'…), entityId, oldValues Json?, newValues Json?, ipAddress?, createdAt`, + `actor:{id,displayName}` on TKT-7. On AUD-1 (G8): every column, + `actor:{id,displayName,email}` and `ticket:{id,ticketNumber,title}` (see `AuditLogEntry`). `entityType` values written: `Ticket`, `Comment`, `Attachment`, and lowercase `ticket` from the auto-close job (`05` B.38). `ticketId`/`actorId` become null when the ticket/user is deleted (`onDelete: SetNull`, `:570-571`) |
 | **Session** | `:179-193` | never exposed (token only) |
 | Approval | `:763-783` | Phase 2: see the interface |
 | Announcement | `:1010-1028` | Phase 2 |
@@ -564,6 +564,25 @@ export interface ActivityAuditItem {
   actor: { id: UUID; displayName: string } | null;
 }
 export type ActivityItem = ActivityCommentItem | ActivityAuditItem;
+
+// ── Audit log (AUD-1) ────────────────────────────────────────
+/** One AUD-1 row: the full `audit_logs` row plus `actor` and `ticket` (auditLog.controller.ts:17-25). */
+export interface AuditLogEntry {
+  id: UUID; ticketId: UUID | null; actorId: UUID | null; action: AuditAction;
+  entityType: string;                           // 'Ticket' | 'Comment' | 'Attachment' | 'ticket' (auto-close job)
+  entityId: string;
+  oldValues: unknown;                           // Json? — normally an object, never trusted to be one
+  newValues: unknown;
+  ipAddress: string | null;                     // never display
+  createdAt: ISODateString;
+  actor: { id: UUID; displayName: string; email: string } | null;   // null: a job, or the user was deleted
+  ticket: { id: UUID; ticketNumber: number; title: string } | null; // null: no ticket, or the ticket was deleted
+}
+/** AUD-1 query. Only these five keys are read by the server (auditLog.controller.ts:6-7); each filter is exact. */
+export interface AuditLogQuery {
+  page?: number; limit?: number;                // limit 1–100, default 25 (utils/pagination.ts:16-20)
+  entityType?: string; actorId?: UUID; ticketId?: UUID;
+}
 
 // ── Notifications ────────────────────────────────────────────
 export interface Notification {

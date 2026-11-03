@@ -8,8 +8,8 @@
 
 - This is the **iPhone app** for the Mount Meru Group Service Desk. Users see it as **Setu**. In-app text that says "the Service Desk" means the backend or the IT team, not the app.
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
-- **Port source:** `origin/dev` @ `f4fad10a1bd1aac9658f4c4be151b0172f683898` (since iOS-5d, 2026-11-01; before it `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
-  - To bring later Android changes across, diff `f4fad10..origin/dev`.
+- **Port source:** `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (since iOS-5e, 2026-11-03; before it `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
+  - To bring later Android changes across, diff `8b522e3..origin/dev` (on 2026-11-03 that is `e85c602` and `69a38ab`, not yet ported).
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
 - Stack (`package.json` is the source of truth):

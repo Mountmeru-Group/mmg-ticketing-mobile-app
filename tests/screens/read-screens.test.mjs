@@ -265,11 +265,12 @@ describe('ticket list: the 500-ticket cap and its footer', () => {
 // ── 4. Home tiles per role, as on Android ────────────────────
 
 describe('Home: which tiles each role sees, and where they lead, is Android\'s', () => {
-  // Android c84d53a tests/rbac/role-gating.test.mjs "home tiles", unchanged.
-  const STAFF = ['open', 'inProgress', 'onHold', 'slaBreached', 'totalOpen'];
+  // Android 8b522e3 tests/rbac/role-gating.test.mjs "home tiles" (G6: the web's five KPI cards; Unassigned and Active
+  // moved to the status chips, pinned there and in tests/home/dashboard.test.mjs).
+  const STAFF = ['total', 'open', 'inProgress', 'resolved', 'slaBreached'];
   forEachPersona(
     'KPI tiles',
-    { END_USER: ['open', 'resolved'], AGENT: STAFF, TRIAGE_AGENT: [...STAFF, 'unassigned'], L2_MANAGER: STAFF, ADMIN: [...STAFF, 'unassigned'] },
+    { END_USER: ['open', 'resolved'], AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: STAFF, ADMIN: STAFF },
     (p) => homeTiles(p),
   );
   forEachPersona(
@@ -298,18 +299,12 @@ describe('Home: which tiles each role sees, and where they lead, is Android\'s',
   });
 
   test('each tile opens the Tickets tab with the same filter as on Android', () => {
+    // G6: the filters are Android's shared tables (utils/home-kpis.ts, pinned in tests/home/dashboard.test.mjs); the
+    // screen keeps no table of its own.
     const src = read(HOME);
-    const table = src.slice(src.indexOf('const TILES'), src.indexOf('function buildTiles'));
-    const filters = Object.fromEntries([...table.matchAll(/^\s*(\w+): \{[^}]*filter: '(\w+)' \},$/gm)].map((m) => [m[1], m[2]]));
-    assert.deepEqual(filters, {
-      open: 'OPEN',
-      resolved: 'RESOLVED',
-      inProgress: 'IN_PROGRESS_KPI',
-      onHold: 'ON_HOLD_KPI',
-      slaBreached: 'BREACHED_KPI',
-      totalOpen: 'ACTIVE_KPI',
-      unassigned: 'UNASSIGNED_KPI',
-    });
+    assert.match(src, /onPress: \(\) => openList\(HOME_TILE_LIST_FILTER\[key\]/);
+    assert.match(src, /onPress=\{\(\) => openList\(HOME_CHIP_LIST_FILTER\[chip\]/);
+    assert.doesNotMatch(src, /filter: '\w+_KPI'/);
     assert.ok(src.includes("navigation.navigate('TicketsTab', { screen: 'TicketList', params: { filter }, pop: true })"));
   });
 });

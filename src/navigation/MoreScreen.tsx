@@ -1,10 +1,13 @@
 // The More tab (docs/ios/00-PORT-MANIFEST.md §4.5): Android's drawer as an iOS grouped list. Which rows show is decided
 // by moreSections() (utils/permissions.ts, pinned per role by tests/navigation); this file only lays them out.
 // - A row pushes its module inside the More stack, so the module's first screen swipes back here.
-// - Approvals is a row only for END_USER and L2_MANAGER while APR-1 returns ≥ 1; ADMIN and AGENT have the tab.
-//   Badge = the APR-1 count: one cached query, shared with the tab bar, Home and the inbox. Never polled.
+// - Approvals is a row for END_USER and L2_MANAGER, always (G7, iOS-5e: Android's drawer row is now on every drawer);
+//   ADMIN and AGENT have the tab. Badge = the APR-1 count: one cached query, shared with the tab bar, Home and the
+//   inbox. Never polled. With nothing pending the inbox opens on "Nothing waiting for you" (APR-1 answers `[]`).
 // - Knowledge base, Announcements: ADMIN only (2026-10-29, a product decision; their routes are registered for ADMIN
 //   only too, routes.ts stackRoutes).
+// - Audit log (G8, iOS-5e): ADMIN only, the server's own rule (AUD-1 is adminOnly); a section of its own before
+//   Settings, where Android's drawer draws a divider. Its route exists for ADMIN only too.
 // - At the bottom, as the drawer and the web's user block: the account card (avatar, name, role, and the locked country
 //   chip; it opens Profile & settings) and Sign out (confirmation, AUTH-3, then the local wipe: useSignOut).
 // - Footer: version and environment.
@@ -36,6 +39,8 @@ const ROWS: Record<MoreItem, { label: string; icon: keyof typeof Ionicons.glyphM
   myRequests: { label: 'My Requests', icon: 'documents-outline' },
   knowledge: { label: 'Knowledge base', icon: 'book-outline' },
   announcements: { label: 'Announcements', icon: 'megaphone-outline' },
+  // G8 (Android's drawer row): ADMIN only, in a section of its own, where Android's drawer has a divider.
+  auditLog: { label: 'Audit log', icon: 'document-text-outline' },
   settings: { label: 'Settings', icon: 'settings-outline' },
 };
 
@@ -61,6 +66,8 @@ export function MoreScreen({ navigation }: MoreStackScreenProps<'More'>) {
         return navigation.navigate('KnowledgeBase');
       case 'announcements':
         return navigation.navigate('Announcements');
+      case 'auditLog':
+        return navigation.navigate('AuditLog');
       case 'settings':
         return navigation.navigate('Profile');
     }
@@ -68,7 +75,7 @@ export function MoreScreen({ navigation }: MoreStackScreenProps<'More'>) {
 
   return (
     <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="px-4 pb-8 pt-2">
-      {moreSections(user?.role, pendingApprovals).map((section) => (
+      {moreSections(user?.role).map((section) => (
         <Group key={section.key}>
           {section.items.map((item, i) => (
             <Row
