@@ -6,7 +6,7 @@
   - G: iOS-only checks;
   - H: write safety, on one agreed UAT test ticket;
   - I: the account-deletion request and the privacy link.
-- **225 checks:** A–E 134, G 67 (22 screens at two text sizes among them), H 17, I 7. iOS-5d (2026-11-01) added six for Android's `f4fad10` 15-day re-authentication, G15.1–G15.6, and extended G1.3. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
+- **246 checks:** A–E 140, G 82 (23 screens at two text sizes among them), H 17, I 7. iOS-5e (2026-11-03) added twenty-one for Android's `8b522e3` (G6, G7a, G7b, G8): C5a–C5c, D1.3c, D1.6a, D1.6b, G10.23 and G16–G18. It rewrote C1, C5, C6, D1.2, D1.6, E12.2 and E12.6, and widened G10.2 and G10.3. Android's C5d (the notification permission) has no iOS check: push (G7c) is not ported. iOS-5d (2026-11-01) added six for Android's `f4fad10` 15-day re-authentication, G15.1–G15.6, and extended G1.3. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
 - **F, the defect log, is at the end**, so that it follows every section.
 
 **How to use it**
@@ -99,12 +99,15 @@ Every failure **inside the app** shows a red box with a title, a message and a l
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo whole in its white card on the red card, and the red reaching up behind the clock (iOS-5c). More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Settings; the middle group is the Admin account's only, since iOS-5b), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
+| C1 | Admin | Login, then the **More** tab (iOS has no drawer) | Login: the Meru logo whole in its white card on the red card, and the red reaching up behind the clock (iOS-5c). More: a grouped list (Tasks, Service Request, My Requests · Knowledge base, Announcements · Audit log · Settings; the Knowledge base and Audit log groups are the Admin account's only, since iOS-5b and iOS-5e), then the account card and **Sign out** in red. Nothing hides under the home indicator | |
 | C2 | Any | Look at More's account card and footer | Initials circle, **name**, **role** and a chevron; tapping it opens Settings. **Sign out** in red under it. The footer reads **`v0.1.0 · UAT`**, without "dev build" | |
 | C3 | Any | Set the largest text size (Settings › Accessibility › Display & Text Size › Larger Text, slider at the far right), then open More | The rows grow and the list scrolls. The account card and the version line are reached by scrolling, and nothing is clipped. (Android pinned the card; iOS's More is one scrolling list) | |
 | C4 | Any | Look at the tab bar, then switch tabs | The tab you are on has a **brand-red** icon and label; the others are grey. Badges are red with white text | |
-| C5 | Admin | Home, at the default text size | Tiles **two per row**: Open; In progress, On hold; SLA breached, Active; Unassigned. Each has a coloured square with a white icon, the label **in full** and the number, and none covers the "Hello, …" greeting. With **Technician-CA** or **L2 Manager** there are five tiles, and the last (Active) is **full width** | |
-| C6 | Admin | Home, at the largest accessibility size | Tiles **one per row**. Labels in full, numbers aligned, nothing cut off | |
+| C5 | Admin | Home, at the default text size | iOS-5e (Android G6): under the navigation bar, a **Period** button reading **This month**. Tiles **two per row**: Total tickets, Open ("right now"); In progress, Resolved; **SLA breached, full width**. Each has a coloured square with a white icon, a coloured left edge, the label **in full** and the number, and none covers the "Good morning, …" greeting. Under the tiles, small chips with a coloured dot, a number and a label: Closed, Unassigned, then any of Mgmt review, With partner, User confirm, More info, Master data and On hold **whose number is above 0**, then Active now. With **Technician-CA** the chips have no Unassigned. With **L2 Manager** there is no Period button, and tiles and chips have no numbers | |
+| C5a | Admin | With the web portal's dashboard open on the same country, choose each period in turn (**Period** › the sheet) | iOS-5e (Android G6): the five tile numbers match the web's cards for the same period; Open matches whatever the period. **Custom:** the From calendar opens by itself, and once a To day is picked the counts load (G16 checks the calendars) | |
+| C5b | Admin | Choose **This month** and tap **In progress**; then tap the chip's **✕**. Back on Home, tap **Open**, then **Active now**. Then try **All time**, and **Custom** | iOS-5e (Android G7): Tickets opens with a red **This month ✕** chip, first in the row under the search, and its "N tickets" equals the tile's number. ✕: the dates go, and the In progress filter stays. Open and Active now open with **no** period chip. All time: no chip. Custom: the chip reads **Custom**, and the line under the chips shows its two days. A difference of a few tickets at the window's edges is a known server-clock issue (05 B.37), not a failure: note it in F | |
+| C5c | User, L2 Manager | With **nothing pending**, open More | iOS-5e (Android G7): **Approvals** is the first row. It opens "Nothing waiting for you", with no error. These roles still have no Approvals tab, and More has no badge (Q1 a) | |
+| C6 | Admin | Home, at the largest accessibility size | Tiles **one per row**. Labels in full, numbers aligned, nothing cut off. iOS-5e: the chips wrap onto more lines and none is cut off; the Period button grows with the text | |
 | C7 | Any | Look for the brand red | The active tab, "Raise a ticket", Save / Send, the **+** button, spinners and pull to refresh, the selected filter chips. Links are blue | |
 | C8 | Any | Login and the More list at the largest accessibility size | Login's card and its button stay readable, and the page scrolls to the footer. iOS-5c: the headline stops growing early (three lines, none wrapped); the button stays 52 pt tall and its label stays on one line, getting smaller to fit the width (the one text that does, UI-STANDARDS §iOS-A.12). The More rows wrap, without breaking a word in the middle. (Android's C8 noted the drawer header at 200 %; iOS has no drawer header) | |
 
@@ -119,13 +122,16 @@ Sign in as each account in turn and check every row. **✅** = must be there. **
 | ID | Area | User | Technician | L2 Manager | Admin | ✓/✗ |
 |---|---|---|---|---|---|---|
 | D1.1 | Tabs (iOS) | Home, **My Tickets**, Alerts, More | Home, **Tickets**, **Approvals**, Alerts, More | Home, Tickets, Alerts, More | Home, Tickets, Approvals, Alerts, More | |
-| D1.2 | More: Approvals row (iOS) | only while ≥ 1 approval is pending, with the count on the More tab | ❌ (it's a tab) | only while ≥ 1 is pending, with the count on More | ❌ (it's a tab) | |
+| D1.2 | More: Approvals row (iOS; every role since iOS-5e, Android G7) | ✅ **always**, the first row; the count on the More tab while ≥ 1 is pending | ❌ (it's a tab) | ✅ always, the first row; the count on More | ❌ (it's a tab) | |
 | D1.3 | More: Tasks, Service Request, My Requests, Settings | ✅ | ✅ | ✅ | ✅ | |
 | D1.3a | More: Knowledge base, Announcements (Admin only since iOS-5b, as Android 2026-10-29) | ❌ | ❌ | ❌ | ✅ | |
 | D1.3b | Home: announcement banner, when one is active (Admin only since iOS-5b) | ❌ | ❌ | ❌ | ✅ | |
+| D1.3c | More: **Audit log**, in a group of its own above Settings (Admin only, iOS-5e, Android G8) | ❌ | ❌ | ❌ | ✅ | |
 | D1.4 | Badges (iOS) | Alerts: unread. More: pending approvals | Alerts; Approvals: pending | as User | as Technician | |
 | D1.5 | Account card: lock chip with the country | ❌ | ❌; **(CA)** ✅ | ❌ | ❌ | |
-| D1.6 | Home tiles | **Open, Resolved** (with numbers) | Open, In progress, On hold, SLA breached, Active, **Unassigned**; **(CA)** the same, without Unassigned | the same five **without numbers** ("View tickets"), with a blue notice saying why | all six | |
+| D1.6 | Home tiles (iOS-5e, Android G6) | **Open, Resolved** (with numbers) | Total tickets, Open, In progress, Resolved, SLA breached; **(CA)** the same | the same five **without numbers** ("View tickets"), with a blue notice saying why | the same five | |
+| D1.6a | Home: **Period** button under the navigation bar (iOS-5e) | ✅ | ✅ | ❌ | ✅ | |
+| D1.6b | Home: chips under the tiles (iOS-5e) | ❌ | Closed, **Unassigned**, the pending reasons above 0, On hold above 0, Active now; **(CA)** the same without Unassigned | Closed, the five pending reasons, On hold and Active now, **without numbers** | as Technician | |
 | D1.7 | Home shortcuts | "Pending approvals" only while ≥ 1 | My open, Due soon, Pending approvals | My open, Due soon (+ Pending approvals while ≥ 1) | My open, Due soon, Pending approvals | |
 | D1.8 | Home: "Pending approvals" opens… (iOS) | More › Approvals | the Approvals tab | More › Approvals | the Approvals tab | |
 | D1.9 | Home: create | **"Raise a ticket"**; ❌ no **+** | **+** | **+** | **+** | |
@@ -288,11 +294,11 @@ Setup: a `[MOBILE TEST]` ticket that has been **closed** (E7).
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
 | E12.1 | Admin (web) | **On the web portal**, submit a `[MOBILE TEST]` ticket for approval, with a test account as approver | — | |
-| E12.2 | the approver | Look at the tabs and Home | Technician or Admin: a count on the **Approvals** tab. User or L2: an **Approvals** row in More, with the count on **More**. Home: "Pending approvals (n)" | |
+| E12.2 | the approver | Look at the tabs and Home | Technician or Admin: a count on the **Approvals** tab. User or L2: the **Approvals** row in More (there always, since iOS-5e), with the count on **More**. Home: "Pending approvals (n)" | |
 | E12.3 | the approver | Open the approval; **Approve**; confirm | It is decided, and the count goes down | |
 | E12.4 | the approver | On another approval, try **Reject** with no comment | Reject stays disabled, with "Write a reason to enable Reject.". Write a reason, then reject (a red confirmation) | |
 | E12.5 | Any | Open an approval that isn't yours (from an alert, if any) | No decision is possible: the screen says it was decided, cancelled or moved, and points to the inbox | |
-| E12.6 | User, L2 Manager | With no pending approvals, look at More | No **Approvals** row. The tabs are unchanged | |
+| E12.6 | User, L2 Manager | Decide the last pending approval (E12.3, E12.4), then look at More and at the tabs | iOS-5e (Android G7): the **Approvals** row stays, first in More; only the badge on More goes. The tabs are unchanged: these two roles have no Approvals tab | |
 
 ### E13. Notifications
 
@@ -438,8 +444,8 @@ In each row, at both sizes:
 | ID | Screen | AX5 | xS |
 |---|---|---|---|
 | G10.1 | Login | | |
-| G10.2 | Home (tiles one per row at AX5) | | |
-| G10.3 | Tickets: chips, sort, country pill, cards | | |
+| G10.2 | Home (tiles one per row at AX5; the Period button; with Custom, From and To stacked at AX5) | | |
+| G10.3 | Tickets: chips (the period chip included), sort, country pill, cards | | |
 | G10.4 | Filters sheet (date rows) | | |
 | G10.5 | Ticket detail: header, tabs (2 × 2 at AX5), Properties, Conversation, History, Attachments, Tasks | | |
 | G10.6 | Create ticket | | |
@@ -459,6 +465,7 @@ In each row, at both sizes:
 | G10.20 | The ticket-link resolver | | |
 | G10.21 | Picker sheets (category, group, country, people, templates, date) | | |
 | G10.22 | Image viewer | | |
+| G10.23 | Audit log: the toolbar and its chips, the day headings, the entries. Admin account | | |
 
 ### G11. VoiceOver
 
@@ -505,6 +512,39 @@ Every 15 days Setu signs you out and Microsoft must ask for your sign-in again (
 | G15.4 | Admin | Signed in, set the time **9 hours ahead** (still within the 15 days). Return to Setu | Login says "Your session has ended. Please sign in again." in the **red** box, not the blue one. Signing in asks for the password too (the private sheet; on Android only the account picker shows). Then turn Set Automatically back on | |
 | G15.5 | Admin | Signed in, set the date **16 days ahead**. Swipe Setu away in the app switcher, then open it | Login with the blue "Signed out for security" box (the cold-start path). Turn Set Automatically back on, return, and sign in (you may be signed out once more, as in G15.3) | |
 | G15.6 | Admin | More › **Sign out**, confirm. Tap Sign in | Login shows **no** message after the sign-out. Microsoft asks for the password, and Home appears | |
+
+### G16. Home's period on iOS (iOS-5e, Android G6)
+
+The Period button sits under the navigation bar (UI-STANDARDS §iOS-A.14). L2 Managers have none (D1.6a).
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| G16.1 | Technician | Home › **Period**. Choose **Last 7 days**. Open it again and swipe the sheet down | A sheet titled **Period** lists Today, Yesterday, Last 7 days, Last 30 days, This week, This month, Quarterly, This year, All time and Custom, with ✓ on the current one. Choosing one closes the sheet, and the button and the counts change. The swipe down closes it and changes nothing | |
+| G16.2 | Technician | Swipe Setu away and open it, so Custom has no days yet. Home › Period › **Custom** | The sheet closes, then the **From** calendar opens by itself, with Cancel and Done. No day after today can be picked. Pick a day: From shows it, the gray "Pick a To day to see the counts." appears, and no counts load | |
+| G16.3 | Technician | Tap **To** and pick a day. Then tap **From** again | To starts at the From day and stops at today. Once To is picked, the counts load. From now stops at the To day | |
+| G16.4 | Technician | Choose **Last 7 days**. Switch to Tickets and back. Swipe Setu away and open it. Then sign out and sign in | The period is kept across tabs. After the restart, and after signing in again, Home is on **This month**, and Tickets has no period chip | |
+| G16.5 | Technician | Turn on VoiceOver and focus the Period button. Then restart Setu, choose Custom and pick only a From day | It reads "Period: <period>. Changes the period". After the From day, VoiceOver says "Pick a To day to see the counts." (Android's live region is TalkBack only) | |
+
+### G17. The period chip on Tickets (iOS-5e, Android G7)
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| G17.1 | Technician | Home › Period › **This month**, then tap **Resolved**. Look at the chips under the search | The red **This month ✕** chip comes first, then the **Resolved** chip from Home. The line under them shows "Created <first day> – <today>". At AX5 the chips ride at the top of the list instead | |
+| G17.2 | Technician | Repeat G17.1, open **Filters**, change the Created **From** day and apply. Then repeat G17.1 and tap **Clear all** | After the change, the period chip goes and the days stay, as your own Created filter. Clear all removes the chip, the days and the other filters | |
+| G17.3 | Technician | Repeat G17.1. With VoiceOver on, focus the period chip and double-tap | It reads "Period from Home: This month, Created <first day> – <today>. Clear the period". The double-tap clears the days; the Resolved filter stays | |
+
+### G18. Audit log (Admin account only; iOS-5e, Android G8)
+
+Android's plan has no audit-log check, so these are iOS's own. Run them after Section E, so that your changes are in the log.
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| G18.1 | Admin | More › **Audit log** (its own group, above Settings) | A screen titled **Audit log**. The entries sit under a heading per day, newest first, and your Section E changes are among them. Pull down to refresh | |
+| G18.2 | Admin | Type the E1 ticket's number in **Ticket number, e.g. 1234** and search. Then tap the ✕ on its chip | Only that ticket's entries, under a **#<n>** chip. ✕ brings every entry back | |
+| G18.3 | Admin | Tap **All types** and choose **Comment**. Then tap **Person** and choose the Technician account. Then tap **Clear all** | Each filter narrows the list, and they apply together. When nothing matches: "No entries match these filters". **Clear all** brings every entry back | |
+| G18.4 | Admin | Tap the ticket in an entry | The ticket opens **inside More**; the back chevron returns to the audit log | |
+| G18.5 | Admin | Scroll to the end of the list | More entries load as you go, up to 500. No entry shows an IP address | |
+| G18.6 | User, Technician, Technician-CA, L2 Manager | Open the **More** tab | **No** Audit log row, and nothing in the app opens the audit log (D1.3c) | |
 
 ---
 
