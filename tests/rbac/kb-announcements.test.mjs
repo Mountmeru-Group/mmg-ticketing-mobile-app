@@ -51,21 +51,15 @@ const paramsFor = (route) => (route === 'KbArticle' ? { slug: 'vpn' } : undefine
 // ── 1. Drawer rows (iOS: More rows) ──────────────────────────
 
 describe('KB and announcements: drawer rows (ADMIN only)', () => {
-  const STAFF = ['approvals', 'tasks', 'catalog', 'settings'];
-  const REQUESTER = ['tasks', 'catalog', 'settings'];
-  const ADMIN = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'settings'];
+  // G7: Approvals is on every drawer now (tests/rbac/approvals-visibility.test.mjs); it never brings KB or
+  // Announcements back. G8: ADMIN's Audit log row sits after Announcements (tests/rbac/audit-log.test.mjs).
+  const EVERYONE = ['approvals', 'tasks', 'catalog', 'settings'];
+  const ADMIN = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'settings'];
 
   forEachPersona(
-    'drawer rows, no pending approvals',
-    { END_USER: REQUESTER, AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: REQUESTER, ADMIN },
-    (p) => drawerItems(p.role, 0),
-  );
-
-  // A pending approval adds the Approvals row (08 S1) and nothing else: it never brings KB or Announcements back.
-  forEachPersona(
-    'drawer rows, 3 pending approvals',
-    { END_USER: STAFF, AGENT: STAFF, TRIAGE_AGENT: STAFF, L2_MANAGER: STAFF, ADMIN },
-    (p) => drawerItems(p.role, 3),
+    'drawer rows',
+    { END_USER: EVERYONE, AGENT: EVERYONE, TRIAGE_AGENT: EVERYONE, L2_MANAGER: EVERYONE, ADMIN },
+    (p) => drawerItems(p.role),
   );
 
   forEachPersona(
@@ -81,8 +75,8 @@ describe('KB and announcements: drawer rows (ADMIN only)', () => {
   );
 
   test('a role the app does not know gets neither row', () => {
-    assert.equal(drawerItems('GUEST', 5).includes('knowledge'), false);
-    assert.equal(drawerItems('GUEST', 5).includes('announcements'), false);
+    assert.equal(drawerItems('GUEST').includes('knowledge'), false);
+    assert.equal(drawerItems('GUEST').includes('announcements'), false);
   });
 
   test('the two More rows open the ADMIN-only routes (MoreScreen.tsx), and rows come only from moreSections() → drawerItems()', () => {
@@ -91,8 +85,8 @@ describe('KB and announcements: drawer rows (ADMIN only)', () => {
     assert.match(src, /announcements: \{ label: 'Announcements', icon: '[\w-]+' \}/);
     assert.match(src, /case 'knowledge':\s*return navigation\.navigate\('KnowledgeBase'\);/);
     assert.match(src, /case 'announcements':\s*return navigation\.navigate\('Announcements'\);/);
-    assert.match(src, /\{moreSections\(user\?\.role, pendingApprovals\)\.map\(\(section\) =>/);
-    assert.match(read('src/utils/permissions.ts'), /const rows = drawerItems\(who, pendingApprovals\);/);
+    assert.match(src, /\{moreSections\(user\?\.role\)\.map\(\(section\) =>/);
+    assert.match(read('src/utils/permissions.ts'), /const rows = drawerItems\(who\);/);
   });
 });
 
@@ -143,7 +137,7 @@ const ADMIN_STACKS = {
   HomeTab: ['Home', 'Announcements', ...R],
   MoreTab: [
     'More', 'ApprovalsInbox', 'TaskList', 'KnowledgeBase', 'KbArticle', 'ServiceCatalog', 'ServiceRequestForm',
-    'ServiceRequestDetail', 'Announcements', 'Profile', ...R,
+    'ServiceRequestDetail', 'Announcements', 'AuditLog', 'Profile', ...R,
   ],
 };
 const allStacks = (role) => Object.fromEntries(TABS.map((tab) => [tab, stackRoutes(tab, role)]));
@@ -165,13 +159,11 @@ describe('KB and announcements: the routes exist for ADMIN only', () => {
 
   test('every More row a person sees opens a route that is registered for them (no dead row, no dead "Read more")', () => {
     const ROW_ROUTE = moreRowRoutes();
-    assert.deepEqual(Object.keys(ROW_ROUTE).sort(), ['announcements', 'approvals', 'catalog', 'knowledge', 'myRequests', 'settings', 'tasks']);
+    assert.deepEqual(Object.keys(ROW_ROUTE).sort(), ['announcements', 'approvals', 'auditLog', 'catalog', 'knowledge', 'myRequests', 'settings', 'tasks']);
     for (const name of NAMES) {
       const role = PERSONAS[name].role;
-      for (const pending of [0, 1]) {
-        const routes = stackRoutes('MoreTab', role);
-        for (const row of moreSections(role, pending).flatMap((s) => s.items)) assert.ok(routes.includes(ROW_ROUTE[row]), `${name}: ${row}`);
-      }
+      const routes = stackRoutes('MoreTab', role);
+      for (const row of moreSections(role).flatMap((s) => s.items)) assert.ok(routes.includes(ROW_ROUTE[row]), `${name}: ${row}`);
       if (showAnnouncementBanner(role)) assert.ok(stackRoutes('HomeTab', role).includes('Announcements'), `${name}: the banner's "Read more"`);
     }
   });
@@ -419,12 +411,10 @@ function reachable(role) {
     }
   }
 
-  // More: every row, with 0–3 approvals waiting, opened in the More stack.
+  // More: every row, opened in the More stack. Since G7 no row follows the approvals count (moreSections takes none).
   const ROW_ROUTE = moreRowRoutes();
-  for (const pending of [0, 1, 2, 3]) {
-    for (const row of moreSections(role, pending).flatMap((s) => s.items)) {
-      for (const landed of landings('MoreTab', role, ROW_ROUTE[row])) by.more.add(landed);
-    }
+  for (const row of moreSections(role).flatMap((s) => s.items)) {
+    for (const landed of landings('MoreTab', role, ROW_ROUTE[row])) by.more.add(landed);
   }
 
   // Deep link: a link tapped in server HTML or pasted into search, in each tab (null: a sheet or sign-in on top).

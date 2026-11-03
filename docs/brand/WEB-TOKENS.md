@@ -111,6 +111,9 @@ The pending sub-status mini-tiles (lines 396-417) are staff only and shown only 
 | Master Data | `PENDING_MASTER_DATA` | `bg-teal-400` | `#2DD4BF` |
 | On Hold | `ON_HOLD` | `bg-gray-400` | `#9CA3AF` |
 
+**App only (G6, 2026-11-02):** `colors.kpi.active` = slate-500 `#64748B`, the dot on Home's "Active now" chip. The web
+dashboard has no Active count. The value is the web's `--muted-foreground`.
+
 ### 1.5 Status badges
 
 Source: `src/components/ui/StatusBadge.tsx:4-17`, fallback at line 20. Shape: `rounded-full px-2 py-0.5 text-xs

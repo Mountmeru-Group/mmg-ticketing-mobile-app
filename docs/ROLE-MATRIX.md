@@ -16,6 +16,30 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**Updated for Phase G8, 2026-11-02: the audit log (M20), ADMIN only.**
+- N9 (new): the "Audit log" drawer row and its route exist for ADMIN only. For the other four personas the route is not registered, so React Navigation's router refuses every way to open it.
+- The server agrees: AUD-1 is `requireAuth, adminOnly` (`BE:modules/auditLog/auditLog.router.ts:8`), a 403 for every other role. **This is a server guard, not only a hidden link**, so there is no §C finding.
+- The web page `/audit-log` is deployed but **not in the analysed clone**. Its Action and date filters have no parameter in the clone's endpoint, so mobile does not offer them. That is a ❌ for ADMIN in `docs/WEB-VS-MOBILE-ROLES.md`.
+- §19 has the evidence and the tests. Sources: `docs/G8-WEB-AUDIT.md`.
+
+**Updated for Phase G7, 2026-11-02: Approvals for every role, the Home period on the ticket list, and push (app side).**
+- N1: the Approvals drawer row is on every role's drawer, always (Ronit's decision). The route was already registered for every role. APR-1 answers every role, `[]` when nothing waits. No role is one that can never be an approver: the web names approvers from all active users.
+- H7: the Home shortcut keeps the old rule.
+- H3, H10: a tile now opens the list with the period as its created-date filter.
+- Push changes no gate. Every signed-in role registers its phone, and the server half is not deployed.
+- No mismatch count changes. §18 has the evidence and the tests. Sources: `docs/G7-PERIOD-APPROVALS-PUSH.md`.
+
+**Updated for Phase G6, 2026-11-02: Home's period row, and the KPI tiles at parity with the web dashboard.**
+- Staff tiles are now the web's five: Total, Open, In progress, Resolved, SLA breached.
+- The web's status chips sit beneath them. On hold, Active and Unassigned moved there from the grid; none was dropped.
+- A PERIOD row offers the web's ten ranges.
+- Who sees what is unchanged in substance:
+  - END_USER keeps Open and Resolved;
+  - Unassigned stays ADMIN / triage AGENT;
+  - L2 still gets no counts, and no period row.
+- §1.3, §2.2 (H2–H5, new H10–H12) and §7 are updated; §17 lists what G6 changed.
+- Web behaviour with sources: `docs/G6-WEB-DASHBOARD.md`.
+
 **iOS, Phase iOS-5 (2026-10-29): the §14 audit re-run on the iOS app** (`ios-dev` @ `a12a5be`), for all five personas. §iOS-A has the answers and the result (§16 until iOS-5b, when Android's §16 arrived):
 - **too permissive: none;**
 - one more restrictive case, deliberate: no files on a private note;
@@ -49,7 +73,7 @@ The sections above are Android's record, unchanged.
 
 | Question | Answer |
 |---|---|
-| Elements whose role gating differs from the web portal | **31** of the 95 rows in §2 (30 before 2026-10-29; 31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
+| Elements whose role gating differs from the web portal | **31** of the 98 rows in §2 (31 of 95 before G6; 30 before 2026-10-29; 31 of 94 after G4, 28 of 85 after G3, 29 after G2, 28 of 84 after G1, 30 before it). **0 are security problems** |
 | More permissive than the web UI | **2**, both deliberate and documented (N1, CR4). None exposes data or actions beyond what the server already scopes to the user. N4 was the third until 2026-10-29; it is now narrower. **G5 audit:** two too-permissive cases below the UI were fixed (§14.3); neither was reachable from a screen |
 | More restrictive than the web UI | **29**. Of these: **15** avoid a web defect, a 403, a mis-scoped list or a control that saves nothing (mobile is correct). **12** are documented product decisions. **2** are *simplified* (2026-10-29): N3 Knowledge base and N4 Announcements, ADMIN only by Ronit's decision to simplify the app, although both work on the web for every role that has them (§16). **0** are undocumented. G5: SC7 (My Requests for staff) is now a MATCH, settled against the web's source (§14.2). G4 added three: the request form's controls whose values the server discards (SC6) and the unscoped "My Requests" for staff (SC7), both *defect avoided*, and the admin "+ New Template" (SC3), a *decision*. G2 added one *defect avoided*: the technician and group filters, which the web shows END_USER and L2_MANAGER empty (L10). G3: delete a file (T22) is now a MATCH; submit for approval (T26) is a MATCH for ADMIN and AGENT and moves from *decision* to *defect avoided* for END_USER and L2 (the web's control returns 403); templates (C4) are a MATCH |
 | Private notes (check A) | **Hidden client-side, independent of the server.** There are three guards on the conversation and one on history. The Note option is absent for END_USER and L2, and the device refuses a PRIVATE post from them before it is sent. The premise "the API hides notes from L2" is only half true: TKT-7 sends them to L2 (§4) |
@@ -91,8 +115,9 @@ The sections above are Android's record, unchanged.
 ### 1.3 Dashboard (`FE:pages/dashboard/DashboardPage.tsx`)
 | KPI / widget | END_USER | AGENT | L2 | ADMIN | Source | Server scoping (05 §B.20, §C.19) |
 |---|---|---|---|---|---|---|
-| Total, Open, In Progress, Resolved, SLA Breached | ✅ ("My …" labels) | ✅ | ✅ | ✅ | `:342-375` | Correct. **L2: the cache is shared across all L2 managers** (`BE:modules/dashboard/dashboard.controller.ts:246-248`) |
-| Closed, **Unassigned**, pending sub-status cards | ❌ | ✅ | ✅ | ✅ | `:379-405` | Unassigned drops the scope for a non-triage AGENT |
+| Range selector: Today, Yesterday, Last 7 Days, Last 30 Days, This Week, This Month (default), Quarterly, This Year, All Time, Custom | ✅ | ✅ | ✅ | ✅ | `:61, :290-337` | n/a. Rolling windows under calendar names (05 B.36) |
+| Total, Open, In Progress, Resolved, SLA Breached | ✅ ("My …" labels) | ✅ | ✅ | ✅ | `:342-375`. Open reads `currentlyOpen` (any date, `:350`); Resolved reads `resolvedToday` for Today (`:364`) | Correct. **L2: the cache is shared across all L2 managers** (`BE:modules/dashboard/dashboard.controller.ts:246-248`) |
+| Closed, **Unassigned**, pending sub-status cards (Mgmt Review, With Partner, User Confirm, More Info, Master Data, On Hold; each hidden at 0) | ❌ | ✅ | ✅ | ✅ | `:379-417` | Unassigned drops the scope for an AGENT with no team who is not on the server's triage list (G6 re-check: `BE:dashboard.controller.ts:272-275, :339`). The others are correct |
 | Status / priority charts, technician breakdowns, workload, SLA trend | ❌ | ✅ | ✅ | ✅ | `:421-545` | Mixed |
 | Technician matrix, team matrix, Ticket Mode, **Country × Group** | ❌ | ✅ | ✅ | ✅ | `:550-660` | `countryGroupRows` is **unscoped** (`BE:dashboard.controller.ts:381-393`) |
 | Monthly trends, technician performance | ❌ | ✅ | ✅ | ✅ | `:668, :724` | Global for AGENT/L2 when no country is sent |
@@ -211,7 +236,7 @@ Full behaviour, with a source line for every statement: `docs/G4-WEB-CATALOGUE.m
 **Role gating source.** All gating now comes from `src/utils/permissions.ts`, abbreviated **perm**. Its functions:
 - `drawerItems`, `drawerRoutes`, `mainTabs` (2026-10-29: `drawerRoutes` decides which drawer routes are registered at all)
 - `canUseKnowledgeBase`, `canReadAnnouncements`, `showAnnouncementBanner` (2026-10-29: ADMIN only)
-- `homeVariant`, `homeTiles`
+- `homeVariant`, `homeTiles`, `homeChips`, `showHomePeriod` (G6: the status chips and the PERIOD row)
 - `ticketDetailPermissions`, `composerPermissions`
 - `ticketFieldPermissions`, `fieldEditProblem` (G1: the M4 property editors and their write guard)
 - `bulkActions`, `inlineStatusTransitions`
@@ -225,7 +250,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 ### 2.1 Drawer and tab bar
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
 |---|---|---|---|---|---|
-| N1 | Drawer · Approvals (badge) | ADMIN, AGENT always; END_USER and L2 while APR-1 ≥ 1 | ADMIN, AGENT; anyone by URL | **WIDER**, *decision* 08 S1. Not a security problem: APR-1 returns only approvals assigned to the caller, and the server lets any approver act | `src/navigation/DrawerContent.tsx:83` → perm `drawerItems` |
+| N1 | Drawer · Approvals (badge) | **every role, always** (G7, Ronit's decision; before: ADMIN, AGENT always, END_USER and L2 while APR-1 ≥ 1) | ADMIN, AGENT; anyone by URL (no route guard, `FE:router/index.tsx:141`) | **WIDER**, *decision* (G7; 08 S1 before). Not a security problem: APR-1 returns only approvals assigned to the caller (`[]` when none, never 403), and the server lets any approver act. The route is registered for every role (perm `drawerRoutes`) | `src/navigation/DrawerContent.tsx:92` → perm `drawerItems` |
 | N2 | Drawer · Tasks | all (END_USER read-only) | – (no standalone page) | N/A (mobile module, D4) | same |
 | N3 | Drawer · Knowledge base | ADMIN (2026-10-29; all before) | all | **NARROWER**, *simplified* (§16). The route is not registered for anyone else, so the screen is unreachable, not merely unlisted | perm `drawerItems`, `drawerRoutes`, `canUseKnowledgeBase`; `src/navigation/AppDrawer.tsx` |
 | N4 | Drawer · Announcements | ADMIN (2026-10-29; all before, which was **WIDER**, *decision* 08 S1) | ADMIN, AGENT, L2 | **NARROWER** for AGENT and L2, *simplified* (§16). MATCH for END_USER (neither side) and ADMIN. The route is not registered for anyone but ADMIN | perm `drawerItems`, `drawerRoutes`, `canReadAnnouncements`; `AppDrawer.tsx` |
@@ -233,19 +258,23 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | N6 | Sign out | all | all | MATCH | `DrawerContent.tsx` account card |
 | N7 | Locked-country chip | country AGENT | country AGENT (lock icon) | MATCH | `DrawerContent.tsx:59` |
 | N8 | Tabs Home · Tickets · Alerts | all, same three | all, five tabs | MATCH. KB and the catalogue (the web's "Requests" tab, SC1) are in the drawer | `src/navigation/MainTabs.tsx:46` → perm `mainTabs` |
+| N9 | Drawer · Audit log (M20, G8) | ADMIN (row and route) | ADMIN: the server's AUD-1 guard (`BE:modules/auditLog/auditLog.router.ts:8`). The page is not in the clone, so its sidebar visibility could not be read | **MATCH** with the server. The route is registered for ADMIN only, below a divider after Announcements. Its action and date filters are not built: the clone's endpoint has none (`docs/G8-WEB-AUDIT.md` §6) | perm `drawerItems`, `drawerRoutes`, `canViewAuditLog`; `src/navigation/AppDrawer.tsx`, `DrawerContent.tsx`; `src/hooks/useAuditLog.ts` |
 
 ### 2.2 Home (M2) vs Dashboard
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
 |---|---|---|---|---|---|
-| H1 | Raise a ticket (END_USER) / "+" FAB (staff) | all | all (New Ticket) | MATCH | `src/screens/dashboard/HomeScreen.tsx:153, :212-220` |
-| H2 | END_USER KPIs | Open, Resolved | Total, Open, In Progress, Resolved, SLA Breached | **NARROWER**, *decision* 04 M2 | perm `homeTiles` |
-| H3 | Staff KPIs open, inProgress, onHold, slaBreached, totalOpen | AGENT, L2 (no counts), ADMIN | AGENT, L2, ADMIN | MATCH | perm `homeTiles` |
-| H4 | Unassigned KPI | ADMIN, triage AGENT | AGENT, L2, ADMIN | **NARROWER**, *decision* 04 M2: the count drops the scope for anyone else (05 B.20) | perm `homeTiles` |
-| H5 | KPI numbers for L2 | none: tiles without counts, plus a notice | all | **NARROWER**, *defect avoided*: DSH-1 is cached per role for L2, so the numbers can be another manager's (05 C.19) | `HomeScreen.tsx:102, :147` |
+| H1 | Raise a ticket (END_USER) / "+" FAB (staff) | all | all (New Ticket) | MATCH | `src/screens/dashboard/HomeScreen.tsx:208, :276-287` |
+| H2 | END_USER KPIs | Open (G6: `currentlyOpen`, as the web's "My Open Requests"), Resolved | Total, Open, In Progress, Resolved, SLA Breached | **NARROWER**, *decision* 04 M2 (kept in G6) | perm `homeTiles` |
+| H3 | Staff KPI tiles (G6): Total, Open, In progress, Resolved, SLA breached, in the web's order and colours | AGENT, L2 (no counts), ADMIN | AGENT, L2, ADMIN | MATCH. Before G6: open, inProgress, onHold, slaBreached, totalOpen | perm `homeTiles` |
+| H4 | Unassigned count (G6: a status chip, no longer a tile) | ADMIN, triage AGENT | AGENT, L2, ADMIN | **NARROWER**, *decision* 04 M2: the count drops the scope for anyone else (05 B.20) | perm `homeChips` |
+| H5 | KPI numbers for L2 | none: tiles and chips without counts, plus a notice | all | **NARROWER**, *defect avoided*: DSH-1 is cached per role for L2, so the numbers can be another manager's (05 C.19) | `HomeScreen.tsx:172-176, :217-223` |
 | H6 | Matrices, Country × Group, trends, workload | none | AGENT, L2, ADMIN | **NARROWER**, *defect avoided* (unscoped or mis-scoped, 05 B.20) | `src/hooks/useHome.ts` `pickSafe` |
-| H7 | Pending approvals shortcut | as N1 | – | as N1 | perm `showApprovalsShortcut` |
-| H8 | Recent tickets | all, own scope | all | MATCH | `HomeScreen.tsx:180-188` |
-| H9 | My open / Due soon shortcuts | staff | – | N/A | `HomeScreen.tsx:167-168` |
+| H7 | Pending approvals shortcut | ADMIN, AGENT always; END_USER and L2 while APR-1 ≥ 1 (unchanged in G7: no longer "as N1") | – | N/A (mobile addition) | perm `showApprovalsShortcut` |
+| H8 | Recent tickets | all, own scope | all | MATCH | `HomeScreen.tsx:264-272` |
+| H9 | My open / Due soon shortcuts | staff | – | N/A | `HomeScreen.tsx:252-253` |
+| H10 | Status chips (G6): Closed, the five pending reasons, On hold (each of the last six hidden at 0) | AGENT, L2 (no counts, all shown), ADMIN | AGENT, L2, ADMIN | MATCH | perm `homeChips` |
+| H11 | PERIOD row (G6): the web's ten ranges, default This month | END_USER, AGENT, ADMIN | all | MATCH, except L2: **NARROWER**, *defect avoided*. L2 has no counts (H5), so a period would change nothing | perm `showHomePeriod` |
+| H12 | Active count (G6: a chip; a tile before) | AGENT, L2 (no count), ADMIN | – (the web dashboard never shows `totalOpen`) | MOBILE ONLY | perm `homeChips` |
 
 ### 2.3 Ticket list (M3)
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |
@@ -349,8 +378,9 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | SC8 | A request's detail (SCR-6): answers, notes, approvals | own, every role; only one's own rows are links | none (rows are not links) | N/A (mobile addition, ➕). Never another person's answers, as on the web | `src/screens/catalog/ServiceRequestDetailScreen.tsx`, `ServiceCatalogScreen.tsx` `canOpen` → perm `isOwnServiceRequest` |
 | SC9 | Cancel, edit, comment on, assign or change the status of a request | none | none | MATCH (the server's routes are staff-only and no web page calls them) | – |
 
-**Totals** (2026-10-29)
-- 95 rows (94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12). 2026-10-29 added no row.
+**Totals** (G6, 2026-11-02)
+- 98 rows (95 before G6, which added H10–H12; 94 after G4; G5 added CR8; 85 after G3; G4 added SC1–SC9; 84 after G1; G2 added L12). 2026-10-29 added no row.
+- G6: H10 (status chips) is a new MATCH. H11 (PERIOD row) is a new MATCH; its L2 exception follows H5 and, like K1 and AN1, is not counted a second time. H12 (Active) is a mobile addition (N/A), like SC8. H3 now names the web's five tiles (still MATCH); H4 is a chip now (still a *decision*). Mismatches unchanged at 31.
 - **31 mismatches** (30 after G5, 31 after G4, 28 after G3, 29 after G2, 28 after G1, 30 before it):
   - 2 WIDER: N1, CR4.
   - 29 NARROWER:
@@ -522,11 +552,11 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
 ## 7. Tests
 
 **`tests/rbac/role-gating.test.mjs`**
-- 122 tests, using the existing `node:test` harness. No new framework and no new library.
+- 139 tests (129 before G6), using the existing `node:test` harness. No new framework and no new library.
 - They cover the five personas: END_USER, AGENT, triage AGENT, L2_MANAGER and ADMIN.
 
 **What they assert**
-- Drawer rows (0 and 2 pending approvals), bottom tabs and their titles, Home variant and KPI tiles.
+- Drawer rows (0 and 2 pending approvals), bottom tabs and their titles, Home variant, KPI tiles, status chips and the PERIOD row (G6).
 - The ticket-detail action set:
   - for an OPEN and a CLOSED ticket, for every persona;
   - from every status, END_USER and L2 never get Pick up, Assign or Note.
@@ -716,6 +746,16 @@ So the premise "the API hides private notes from END_USER and L2" holds only for
   - C14: the afternoon band starts at 11 (3);
   - C15: Home stops re-reading the greeting on focus and foreground (1).
 - **No mutation survived; no test was changed after the run.**
+
+**iOS-5e (2026-11-03), on `ios-dev` after the Android sync to `8b522e3` (G6, G7a, G7b, G8): 1,391 tests in all (1,136 before).**
+- **How it was run:** as iOS-5b. Each mutation was applied alone in a scratch copy outside the repo, byte-identical to the working tree, with `node_modules` through a junction; the full suite ran, then the file was restored. The working tree was never touched.
+- **D. Thirty, for the new rules: 30 of 30 caught** (1–21 failures each):
+  - D1–D10, permissions and routes: `canViewAuditLog` lets AGENT in (20); `drawerItems` back to Approvals for staff only (21); the Audit log row for every role (18); `hasApprovalsTab` true for every role, i.e. Q1 (b) (20); no Approvals More row for END_USER/L2 (10); the Audit log section dropped (4); `showHomePeriod` true for L2 (1); Unassigned for every staff role (3); `showApprovalsShortcut` always (4); `AuditLog` registered for every role (21);
+  - D11–D19, the period: a period label changed (2); `week` before `last30` (4); Custom also sends `range=custom` (2); From after To accepted (7); local days instead of UTC (2); Last 30 days as 29 (19); the Open tile carries the period (2); the On hold chip doesn't (2); "Resolved today" dropped (1);
+  - D20–D27, the list chip and the query: `appliedTicketPeriod` ignores the date-filter permission (1, see below); ✕ also clears the tile's filter (2); DSH-1 enabled for an incomplete Custom range (1); the period left out of the query key (1); L2 tiles carry a period (1); the calendars allow a future day (1); Custom no longer opens From (1); the list chip's ✕ runs Clear all (2);
+  - D28–D30, the audit log: AUD-1 sent for every role (`useAuditLog`) (1); Person never sent (4); the screen's ADMIN gate removed (1).
+- **One first-draft mutation survived and was fixed (test only):** D20, `appliedTicketPeriod` without its `allowed.includes('date')` test. Every persona has the date filter, so no case reached the branch; Android's tests have the same gap. `tests/home/ios-period.test.mjs` now pins the rule itself (no date filter, no chip) and that every persona has the filter. Re-run: caught (1).
+- **No other test was changed after the run.**
 
 ---
 
@@ -1195,6 +1235,158 @@ Authoring (KB articles, announcements) was already out of scope for every role (
 - The auth flow, `auth.config.ts`, the dev-token screen; no library; no EAS build; nothing committed.
 - The web repo: not opened in this phase; `git status` clean at HEAD `d7f3887`.
 
+## 17. What Phase G6 changed (2026-11-02, uncommitted)
+
+The Home PERIOD row and the KPI tiles at parity with the web dashboard. Web behaviour, with a source for every statement:
+`docs/G6-WEB-DASHBOARD.md`.
+
+### 17.1 Per persona
+
+| Persona | Tiles before | Tiles now | Status chips (new) | PERIOD row |
+|---|---|---|---|---|
+| END_USER | Open (`open`), Resolved | Open (`currentlyOpen`), Resolved (Resolved today on Today) | none | yes |
+| AGENT | Open, In progress, On hold, SLA breached, Active | Total, Open, In progress, Resolved, SLA breached | Closed, 5 pending reasons, On hold, Active | yes |
+| triage AGENT | as AGENT + Unassigned | as AGENT | as AGENT + Unassigned (2nd) | yes |
+| L2_MANAGER | as AGENT, no counts | as AGENT, no counts | as AGENT, no counts, every chip shown | **no** (no counts) |
+| ADMIN | as triage AGENT | as AGENT | as triage AGENT | yes |
+
+- **Nothing was dropped.** On hold, Active and Unassigned moved from the tile grid to the chip row.
+  - Unassigned keeps its audience (ADMIN, triage AGENT; 05 B.20).
+  - Active is still the only count the web dashboard does not have.
+- **New counts, no new risk.** ADMIN and AGENT now also see Total, Resolved, Closed and the five pending reasons, as on the web. Each is a count the server scopes correctly for them (`docs/G6-WEB-DASHBOARD.md` §7). No role gained a count the server mis-scopes for it. L2 still gets none.
+- **No navigation, route or permission changed.** Each tile and chip opens the Tickets tab with a named filter, as tiles did. Five Home-only filters were added for the pending-reason chips (`ticket-filters.ts`, `MGMT_REVIEW_KPI` … `MASTER_DATA_KPI`). Each sends one status, and the list accepts them for every role (`isHomeTileFilter`).
+
+### 17.2 Where
+
+- `src/utils/permissions.ts`: `homeTiles` (new set), `homeChips` and `showHomePeriod` (new).
+- `src/utils/home-kpis.ts` (new): what each tile and chip counts, its label, and the list it opens.
+- `src/utils/dashboard-period.ts` (new): the ten periods, the default, the DSH-1 params, Custom validation.
+- `src/store/ui.store.ts`: `homePeriod`, `homeCustomRange`. In memory only, wiped on sign-out.
+- `src/hooks/useHome.ts`: DSH-1 for the period; `SafeDashboard.kpis` is now `HomeKpis`.
+- `src/api/dashboard.api.ts`: `range` is not sent alongside `from`.
+- `src/screens/dashboard/HomeScreen.tsx`: the PERIOD row, the Custom From and To, the tiles with a left edge, the chips. The two "last 30 days" captions are removed.
+
+### 17.3 Tests
+
+- `tests/rbac/role-gating.test.mjs`: KPI tiles re-pinned for all five personas; status chips and PERIOD row pinned (+10). The wiring check requires `homeChips(` and `showHomePeriod(` in HomeScreen.
+- `tests/home/dashboard.test.mjs` (new, 53):
+  - the request each period sends, through the real axios client;
+  - Custom validation;
+  - which KPI each tile and chip reads;
+  - the zero-hiding rule;
+  - each tile and chip's list filter, and that the list accepts it for each persona who sees it;
+  - the period's lifetime;
+  - the stale captions gone, and no timers.
+- `npm test`: 811 (748 before).
+
+**Not touched**
+- Auth, `auth.config.ts` and the 15-day re-auth.
+- Navigation structure, every permission outside Home, staleTime and polling.
+- No library added, no EAS build run, nothing committed.
+- The web repo was read only and is byte-for-byte unchanged at HEAD `d7f3887`.
+
+## 18. What Phase G7 changed (2026-11-02, uncommitted)
+
+Sources for every web and server statement: `docs/G7-PERIOD-APPROVALS-PUSH.md`.
+
+### 18.1 Approvals for every role (N1)
+
+| Persona | Drawer row before | Drawer row now | Route | APR-1 with nothing pending |
+|---|---|---|---|---|
+| END_USER | only while APR-1 ≥ 1 | always | registered (unchanged) | `200 []` → "Nothing waiting for you" |
+| AGENT | always | always | registered | `200 []` |
+| triage AGENT | always | always | registered | `200 []` |
+| L2_MANAGER | only while APR-1 ≥ 1 | always | registered (unchanged) | `200 []` |
+| ADMIN | always | always | registered | `200 []` |
+
+- **The web:** the sidebar shows Approvals to ADMIN and AGENT (`FE:layouts/AppLayout.tsx:32`). The `/approvals` route has no role guard (`FE:router/index.tsx:141`), so anyone can reach it by address.
+- **APR-1:** `requireAuth` only (`BE:modules/approvals/approvals.router.ts:10`). It returns the caller's PENDING rows, `[]` when there are none (`approvals.controller.ts:105-112`). **No role gets a 403**, so no 403 handling was added: there is nothing to hide.
+- **Who can be an approver:** any active user, END_USER and L2_MANAGER included.
+  - The web's ticket "Submit for approval" searches all users, with no role filter (`FE:TicketDetailPage.tsx:418-421`).
+  - The server checks no approver role (`approvals.controller.ts:16-38`).
+  - Approve and reject check only that the caller is the named approver (`:118`).
+  - **No role can never have an approval**, so there is none to report.
+- **Not changed:** the Home shortcut (H7) keeps its rule, so a requester's Home does not show a shortcut that almost always reads 0. The unscoped `GET /approvals` is still never called (05 C.16).
+
+### 18.2 The Home period on the ticket list (H3, H10)
+
+- **Which tiles carry the period:** Total, In progress, Resolved and SLA breached, as the web's links do (`FE:DashboardPage.tsx:346-374`). So do Closed and Unassigned (`:386`, `:393`), and the pending reasons and On hold.
+  - **Unlike the web** (`:407`), the pending reasons and On hold carry it, so their number and the list agree (05 B.37).
+- **Which don't:** Open and Active (counted right now, any date).
+- **No role gate changes.** The created-date filter is every role's (`ticketListFilters`). L2_MANAGER has no period row, so its tiles carry nothing.
+- **Count and list agreement:** see `docs/G7-PERIOD-APPROVALS-PUSH.md` §1.3. Two exceptions, both server-side:
+  - the server clock, if it is not UTC;
+  - Unassigned, for an AGENT whose server scope is "assigned to me" alone (05 B.20).
+
+### 18.3 Push (app side)
+
+- No gate. Every signed-in role registers its phone once the permission is granted (asked on the first visit to Alerts).
+- The server half is not deployed (01 NTF-5/NTF-6).
+
+### 18.4 Tests
+
+- `tests/rbac/role-gating.test.mjs`: drawer rows re-pinned (Approvals for all five personas, whatever is pending); the Home shortcut pinned at 0 and 2 pending (139 tests, unchanged in number).
+- `tests/rbac/kb-announcements.test.mjs` and `service-catalog.test.mjs`: re-pinned for the new first row. The "no dead row" check runs over the new rows.
+- `tests/rbac/approvals-visibility.test.mjs` (new, 25):
+  - the row for all five personas;
+  - the route registered, and opened by React Navigation's own drawer router with the row's action;
+  - APR-1 only, `[]` read as the empty state;
+  - no unscoped `GET /approvals` anywhere in `src/`.
+- `tests/home/period-list.test.mjs` (new, 30):
+  - the days per period, identical to the web's computation;
+  - the carry table;
+  - the TKT-1 request after each tile and chip, through the real client;
+  - the list's period chip: shown, cleared, combined with other filters, replaced by hand-picked days.
+- `tests/push/push.test.mjs` (new, 35).
+- `npm test`: 896 (811 before).
+
+## 19. What Phase G8 changed (2026-11-02, uncommitted)
+
+Sources for every web and server statement: `docs/G8-WEB-AUDIT.md`.
+
+### 19.1 The audit log, ADMIN only (N9)
+
+| Persona | Drawer row | Route | AUD-1 sent by the app | AUD-1 on the server |
+|---|---|---|---|---|
+| END_USER | no | not registered | never | 403 |
+| AGENT | no | not registered | never | 403 |
+| triage AGENT | no | not registered | never | 403 |
+| L2_MANAGER | no | not registered | never | 403 |
+| ADMIN | yes: after Announcements, below a divider, before Settings | registered | yes | 200 |
+
+- **One rule, three places:**
+  - `canViewAuditLog(role)` = ADMIN (`src/utils/permissions.ts`);
+  - it decides the row (`drawerItems`), the route (`drawerRoutes`) and the request (`useAuditLog` `enabled`).
+  - The screen also refuses to show the log to any other role, after its hooks. This is defence in depth: the route is not registered for them anyway.
+- **The server enforces the same rule** (`requireRole('ADMIN')`, `BE:middleware/rbac.middleware.ts:8-21`). Unlike the web's pages, it is not only a hidden link, so there is no §C finding.
+  - C.11 still applies: a demoted ADMIN keeps access until their cached session expires (≤ 8 h).
+- **The web side:**
+  - The page is deployed (Ronit) but not in the clone (G8 §1), so its sidebar rule could not be read.
+  - Whatever the page shows, the server returns 403 to every role but ADMIN.
+- **Not offered, and why:**
+  - **Action and date filters:** AUD-1 in the clone has no such parameter (G8 §6). Counted as ❌ for ADMIN in `docs/WEB-VS-MOBILE-ROLES.md`, gap 12.
+  - **The actor's role** ("(Consultant)" on the web page): not in the response (G8 §9).
+- **Mobile only:** the Person filter (AUD-1 `actorId`; the people search, USR-3, which ADMIN may use).
+
+### 19.2 Tests
+
+- `tests/rbac/audit-log.test.mjs` (new, 48):
+  - `canViewAuditLog`, the drawer row and the registered route, for all five personas;
+  - the row's position and its divider;
+  - for the four other personas, React Navigation's own drawer router refuses every action that could open the route (navigate, jumpTo, push, replace, preload, reset), and a stale saved state is rehydrated without it;
+  - ADMIN opens it with the row's action;
+  - the screen and the hook send AUD-1 for ADMIN only;
+  - AUD-1 is called from one module;
+  - filters → params through the real axios client: each filter alone, all three together, and stray keys dropped;
+  - the ticket number → id lookup takes an exact match only.
+- `tests/audit/audit-details.test.mjs` (new, 34):
+  - the Details formatter on every shape the server writes;
+  - its fallbacks, including a throwing getter;
+  - action labels, ticket links, the ticket-number box and the day groups;
+  - the pill colours: AA contrast, and lightness bands at least 15 L* apart.
+- Re-pinned for ADMIN's new row and route: `tests/rbac/role-gating.test.mjs`, `tests/rbac/kb-announcements.test.mjs` (including the "no dead row" check, which now covers the Audit log row).
+- `npm test`: 978 (896 before).
+
 ---
 
 ## iOS-A. Phase iOS-5: the §14 audit re-run on iOS (2026-10-29)
@@ -1306,3 +1498,34 @@ Key: per status O = OPEN, R = RESOLVED, C = CLOSED, X = CANCELED. e = edit, l = 
 - **Mutation check:** §7, iOS-5b.
 
 **Not touched:** every other route, row and permission; the KB and announcements screens themselves (ADMIN sees what everyone saw before); the auth flow and the `__DEV__` developer-token screen (Android deleted it in `4063df3`; on iOS it is on the iOS-9 list, `docs/ios/ANDROID-DELTA.md`); no library, no `eas`, no API call.
+
+### iOS-A.7 Phase iOS-5e: G6, G7a, G7b and G8 on iOS (2026-11-03)
+
+**The rules are Android's §17–§19, unchanged.** Ronit, 2026-11-03: iOS = Android `dev` (`8b522e3`); only the interface is iOS's. Of the 53 exports `permissions.ts` shares with Android, 51 are identical in their text (checked by script); the other two, `ticketDetailPermissions` and `bulkActions`, differ only by D5's placeholder guard (iOS-9 list). Android's `drawerRoutes` has no iOS copy: its iOS form is `stackRoutes` (`src/navigation/routes.ts`).
+
+**Per persona on iOS:**
+
+| Persona | Home (G6) | A tile → the list (G7a) | Approvals (G7b) | Audit log (G8) |
+|---|---|---|---|---|
+| END_USER | Period button + sheet (default This month); tiles Open ("right now") and Resolved / Resolved today; no chips | Resolved carries the period chip; Open does not | **More row, always** (before: only while one waited); no tab | none: no row, no route |
+| AGENT | Period; tiles Total, Open, In progress, Resolved, SLA breached; chips Closed, the pending reasons and On hold (at > 0), Active now | every tile and chip but Open and Active | the Approvals tab, unchanged | none |
+| triage AGENT | as AGENT, plus the Unassigned chip | as AGENT | the tab, unchanged | none |
+| L2_MANAGER | no period; the five tiles and eight chips without counts | never a period | **More row, always**; no tab | none |
+| ADMIN | as triage AGENT | as AGENT | the tab, unchanged | **More row "Audit log"** (its own section before Settings) and the screen |
+
+**iOS decisions (Ronit, the iOS-5e plan, 2026-11-03):**
+- **Q1 (a):** the Approvals tab stays the web sidebar's two roles (`hasApprovalsTab` = ADMIN, AGENT). END_USER and L2_MANAGER get Android's always-on drawer row as a permanent first More row, not a fifth tab that almost always reads 0. The tab bar is unchanged for everyone (compliance E1).
+- **Q2, Q3:** the period is a toolbar button and a period sheet; Custom's days use `DatePickerSheet` with Android's limits (UI-STANDARDS §iOS-A.14).
+- **Q4:** the audit log pages by 50, as Android.
+- **Q5:** no message for a future day. As on Android, the calendars stop at today.
+
+**Hidden AND unreachable (the audit log, as KB and Announcements in iOS-A.6):**
+- **Hidden:** `moreSections()` puts `auditLog` in an `admin` section only when `drawerItems()` has it, i.e. ADMIN (`canViewAuditLog`).
+- **Unreachable:** `stackRoutes('MoreTab', role)` registers `AuditLog` for ADMIN alone (`routes.ts` `isRegisteredFor`), and no other stack has it. For the other four personas React Navigation's own `StackRouter` refuses navigate, push, replace, popTo, preload and a reset naming it, in every tab, and a stale state is rehydrated without it.
+- **No other way in:** deep links open only the ticket-link resolver (a web `/audit-log` URL opens in Safari); a notification tap opens only a ticket or an approval; `useAuditLog` never sends AUD-1 for another role; the screen refuses to render for anyone else (after its hooks). The server agrees: AUD-1 is `adminOnly` (403).
+
+**Tests: 1,136 → 1,391, all passing.**
+- Android's, ported: `tests/home/dashboard.test.mjs` (53; one source check adapted), `tests/home/period-list.test.mjs` (30, unchanged), `tests/audit/audit-details.test.mjs` (34, verbatim), `tests/rbac/approvals-visibility.test.mjs` (Android's 25 on iOS navigation), `tests/rbac/audit-log.test.mjs` (Android's 48 on iOS navigation); Android's G6–G8 hunks merged into `role-gating`, `kb-announcements` and `service-catalog`.
+- iOS only: `tests/home/ios-period.test.mjs` (26: each period's request in full, Custom's messages and limits, one request per period change on the app's QueryClient, the toolbar and sheets, tile → chip for every persona, what ✕ clears); `approvals-visibility` §4 and its push section (24); `audit-log` §5 (5: reachability per persona) and §6 (5: the screen on iOS); `tests/navigation/shell.test.mjs` updated for the permanent More row and the Audit log section.
+- **Not ported:** `tests/push/push.test.mjs` (35), with G7c.
+- **Mutation check:** §7, iOS-5e: 30 of 30 caught.

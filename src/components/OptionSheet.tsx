@@ -24,6 +24,8 @@ interface OptionSheetProps<T extends string> {
   selected: T | null;
   onSelect: (value: T) => void;
   onClose: () => void;
+  /** Once the sheet has left the screen (PageSheet onDismiss): where a sheet that follows this one opens. */
+  onDismiss?: () => void;
   /** Shown in place of the options, e.g. a loading or error state. */
   children?: ReactNode;
 }
@@ -34,7 +36,7 @@ const FIRST_RENDER_ROWS = 20;
 const optionKey = (option: SheetOption<string>) => option.value;
 
 export function OptionSheet<T extends string>({
-  visible, title, options, selected, onSelect, onClose, children,
+  visible, title, options, selected, onSelect, onClose, onDismiss, children,
 }: OptionSheetProps<T>) {
   // One identity while the sheet is open (callers pass inline functions), so unchanged rows are not re-rendered.
   const pick = useStableCallback((value: string) => {
@@ -46,7 +48,7 @@ export function OptionSheet<T extends string>({
     [selected, pick],
   );
   return (
-    <PageSheet visible={visible} title={title} onClose={onClose}>
+    <PageSheet visible={visible} title={title} onClose={onClose} onDismiss={onDismiss}>
         {children ?? (
           <FlatList
             data={options as readonly SheetOption<string>[]}

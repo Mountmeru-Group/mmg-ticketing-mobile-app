@@ -61,7 +61,7 @@ Sizes are as the app rendered them before Phase C, at NativeWind's default 1rem 
 - The title is the section caption, 12 dp above the content.
 - `flush` gives a card of rows (`px-4` only).
 - Tinted variants (private note, unread notification, selected ticket, announcement banner) change colour only.
-- KPI tiles are this card with a coloured 32 dp square from `colors.kpi`, the label in `text-sm gray-500` and the count in `text-2xl font-bold`, like the web's KPICard.
+- KPI tiles are this card with a coloured 32 dp square from `colors.kpi`, the label in `text-sm gray-500` and the count in `text-2xl font-bold`, like the web's KPICard. Since G6 (§11) they also have a 4 dp left edge in the same colour.
   - Arrangement: the square top-left, the label under it at the tile's full width, the count at the tile's foot. The web puts the label beside the square, but a phone tile leaves only about 80 dp for that.
   - Grid: two per row, 12 dp apart both ways, built as explicit rows with tile widths in dp from the grid's measured width. An odd last tile spans its row. Tiles in a row stretch to the taller one, so the counts line up. Minimum height 128 dp (`min-h-32`).
   - Labels are never truncated and never break inside a word. Each word may take a line (two lines at most). A word that is still too wide shrinks to fit (`adjustsFontSizeToFit`, no `minimumFontScale`).
@@ -128,7 +128,7 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 **S10 Callouts.** Notice, InlineError, LookupError and the Login failure box are `rounded-lg p-3`. Errors use an 18 dp icon with `text-sm`; information uses a 16 dp icon with `text-xs`.
 
 **S11 States.**
-- Loading: a skeleton that mirrors the layout, with a soft brand-yellow band sweeping across it (yellow since 2026-10-30, §10.3; white in Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
+- Loading: a skeleton that mirrors the layout, with a soft brand-yellow band sweeping across it (yellow since 2026-10-30, §10.3; white in Phase A1; it pulsed before). Variants: `list`, `approvals`, `articles`, `announcements`, `notifications`, `tasks`, `comments`, `history`, `audit` (G8, §13), `attachments`, `detail`, `article`, `formPage`, plus the inline ones.
 - Empty: a 40 dp icon, a title, what would appear here, and an action where one helps. Examples: "Raise a ticket", "Show all tickets", "Clear search", "Show all articles", "Show all approvals", "Show all tasks".
   - An empty list screen shows an illustration instead of the icon (Phase A1, `EmptyState illustration`), 128 × 96 dp, flat, in brand tokens only (`assets/illustrations/`):
     - `empty` (an empty tray under the Meru drop): nothing here yet, or nothing matches. Tickets, tasks, knowledge base, announcements, the catalogue and My Requests.
@@ -143,7 +143,8 @@ SubmitButton tones are `success` green-700, `danger` red-600 and `muted` gray-70
 - Header left button: ☰ only on the three tab roots (Home, Tickets, Alerts). Every other screen, including the first screen of each drawer module, has the back arrow (44 dp button, 24 dp icon), which does exactly what Android back does. Sheets have ✕.
 - Drawer, top to bottom, as in the web sidebar:
   - Header band: white, 72 dp tall, the logo left at 44 dp, "Setu" beside it on one line (`text-lg font-bold text-gray-900`, S3's title step). Fixed; it does not scroll.
-  - Nav rows (Approvals when shown, Tasks, Knowledge base, Service Request, Announcements, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), so other roles have four rows at most.
+  - Nav rows (Approvals, Tasks, Knowledge base, Service Request, Announcements, Audit log, Settings): 48 dp, active `bg-primary` with white text, idle gray-600 (both as on the web). Only this list scrolls. Since 2026-10-29 Knowledge base and Announcements are ADMIN only (`docs/ROLE-MATRIX.md` §16), and since G8 the Audit log too (§13), so other roles have four rows. Approvals is on every drawer since G7 (§12).
+  - **Audit log (G8)** sits below a divider (`border-border`, 16 dp side margins, 8 dp above and below), after Announcements and before Settings: an administrator's tool, set apart from the modules everyone has.
   - A `border-border` separator, then the account card pinned to the bottom. It is the standard card (`rounded-xl border-border`, 8 dp from the drawer edges) and contains:
     - a row with a 40 dp avatar (S3), the name (up to 2 lines), the role, the country-lock chip when it applies, and an 18 dp chevron. Tapping it opens the profile;
     - a gray-100 line;
@@ -221,6 +222,8 @@ arithmetic, with Roboto advance widths and the dp values NativeWind compiles (`i
 no build in this phase.
 
 ### 5.1 Home KPI tiles
+
+> **G6 (2026-11-02) changed the tile set.** The grid rules below still hold, but the tiles are now the web's five, and Active and Unassigned are status chips. The current pattern and its 360 dp figures are in §11.
 
 **Before.** The tiles were six squeezed into one row, with the sixth wrapping alone. Labels showed as "I", "A" and
 "right now".
@@ -363,14 +366,14 @@ API call, query or permission changed. **Not run on a device:** there was no bui
   browser does. For example, back to a MainTabs visit that a drawer-screen tab press opened on Tickets lands on
   Tickets, even if the user had switched tabs after that press.
 
-### 7.3 Every route checked (25)
+### 7.3 Every route checked (26; AuditLog added in G8)
 
 | Host of the bar | Routes | Header left |
 |---|---|---|
 | Tab navigator (`tabBar`) | HomeTab, AlertsTab, TicketList | ☰ |
 | Tab navigator (`tabBar`) | TicketDetail, CreateTicket, TaskDetail, TicketLink | back |
 | Tab navigator (`tabBar`) | ReplyComposer, StatusClosure, AssignPicker, SubmitApproval, TaskEditor, TicketFilters (sheets) | ✕ |
-| Drawer (`screenLayout`) | ApprovalsInbox, TaskList, KnowledgeBase, ServiceCatalog, Announcements, Profile | back (was ☰) |
+| Drawer (`screenLayout`) | ApprovalsInbox, TaskList, KnowledgeBase, ServiceCatalog, Announcements, AuditLog (G8), Profile | back (was ☰) |
 | Drawer (`screenLayout`) | ApprovalDetail, TaskDetail, KbArticle, ServiceRequestForm, ServiceRequestDetail | back |
 | Drawer (`screenLayout`) | TaskEditor (sheet) | ✕ |
 
@@ -574,6 +577,208 @@ lines) + 44 = **397 dp**. The white area's content, with the chip: about **282 d
 Check on the next build: 360 dp phones at 100 %, 130 % and 200 % text; the headline's weight (800 is drawn with the
 nearest system weight, Roboto Black on most phones); the offline banner on the red card.
 
+## 11. Home: the PERIOD row, KPI tiles and status chips (G6, 2026-11-02)
+
+Home's counts now match the web dashboard: the same periods, the same five tiles, the same second row. Web behaviour with
+sources: `docs/G6-WEB-DASHBOARD.md`. **Not run on a device:** no build in this phase; the 360 dp figures are arithmetic.
+
+Order on Home:
+1. greeting;
+2. ADMIN's announcement banner;
+3. END_USER's "Raise a ticket";
+4. **PERIOD** (16 dp below);
+5. TICKETS: the tiles, then the chips 12 dp under the grid;
+6. Shortcuts;
+7. Recent tickets.
+
+### 11.1 The PERIOD row
+
+- **Caption:** "PERIOD", the S3 section caption (`text-xs font-semibold uppercase tracking-wide text-gray-500`), 4 dp above the chips.
+- **Chips:** `FilterChip` (S5), unchanged. 36 dp + 4 dp hit slop. Active `bg-primary` with white `font-medium` text (5.47:1); idle white with a `gray-300` border and gray-700 text.
+- **Row:** one horizontal `ScrollView`, no scroll bar, 8 dp between chips. The 16 dp gutters are *inside* the scrolling content, so chips scroll to the screen edge. `radiogroup` with `radio` chips.
+- **Periods:** the web's ten, in its order and with its words in sentence case. Today, Yesterday, Last 7 days, Last 30 days, This week, **This month (default)**, Quarterly, This year, All time, Custom.
+- **Scroll into view:** "This month" is the sixth chip, off-screen at 360 dp. On first layout the row scrolls so the chosen chip shows with about 48 dp of the chip before it, a hint that the row scrolls. Only once: a chip the person tapped is already in view.
+- **Who:** every role but L2_MANAGER (no counts, so nothing for a period to change; `showHomePeriod`).
+- **Lifetime:** in memory (`ui.store`). Kept across tabs while the app is open; back to This month after a restart or sign-out. Nothing on disk.
+
+**Custom.** Tapping Custom selects it and, if no From day is set, opens the system date dialog for From straight away.
+- **Fields:** under the row (8 dp), two buttons side by side, 8 dp apart.
+  - Each is ≥ 44 dp, `rounded-lg border-gray-300` white, with an 18 dp calendar icon.
+  - "From" or "To" in `text-xs gray-500` over the day: `text-sm font-medium gray-900`, or "Pick a day" in gray-500.
+- **Dialog:** the same system date dialog as the Filters sheet (`DateTimePickerAndroid`). From is capped at To, or today. To starts at From and is capped at today.
+- **Message,** `text-xs`, live region, under the fields:
+  - "Pick a From day to see the counts." / "Pick a To day…" in gray-500;
+  - "The From day must be on or before the To day." in red-700.
+- **No request until the range is valid.** Tiles show "–" (gray-500) in place of a count; the recent list keeps the last response.
+
+### 11.2 KPI tiles
+
+- **Card:** the S2 KPI card, unchanged, plus a **4 dp left edge** in the tile's colour (Ronit's brief; the 2026-10-09 web clone's card has none).
+- **Colours:** from the web (`colors.kpi`):
+
+  | Tile | Colour | Contrast on white |
+  |---|---|---|
+  | Total tickets | purple-500 | 3.96 |
+  | Open | blue-500 | 3.68 |
+  | In progress | yellow-500 | 1.92 |
+  | Resolved | green-500 | 2.28 |
+  | SLA breached | red-500 | 3.76 |
+
+  - The square and the edge are decoration: the white icon on its square is the web's, and the label carries the meaning.
+- **Set:**
+  - Staff: Total tickets, Open, In progress, Resolved, SLA breached, in that order. "Resolved today" when the period is Today.
+  - END_USER: Open and Resolved.
+- **Open's hint:** `text-xs` "right now" under the label. Open counts every open ticket whatever the period, as on the web.
+- **Grid:** S2, unchanged. Two per row, 12 dp apart. Five tiles make two rows plus a full-width **SLA breached**; END_USER has one row.
+- **No count:** "–" in `text-2xl` gray-500 when counts are expected but not available (Custom not picked; the error card shows above the grid). L2_MANAGER keeps "View tickets".
+
+**At 360 dp.**
+- **Width:** grid 328 dp, tile 158 dp. The label width is 121 dp: 158 − 4 (left edge) − 1 (right border) − 32 (padding). It was 124 dp before G6.
+- **Labels:** the widths below scale the §5.1 Roboto measurements at about 7 dp a character at 100 %, so they are estimates.
+
+| Label | 100 % | 130 % | 200 % |
+|---|---|---|---|
+| Total tickets | ~82 dp, 1 line | ~107 dp, 1 line | ~164 dp → 2 lines ("tickets" ~98) |
+| In progress | 69, 1 line | 89, 1 line | 137 → 2 lines ("progress" 108) |
+| Resolved today (Today only) | ~98, 1 line | ~127 → 2 lines | 2 lines ("Resolved" 111) |
+| SLA breached (full width, 291 dp) | 85 | 110 | 170, 1 line |
+
+- **Widest word:** "breached" (113 dp at 200 %) still fits a half-width tile, so no tile label needs to shrink. "Unassigned", the only word that did (§5.1), is a chip now.
+
+### 11.3 Status chips
+
+- **The web's second row** (staff only), as pills, in the web's order: Closed, Unassigned (ADMIN and the UI's triage AGENT only), Mgmt review, With partner, User confirm, More info, Master data, On hold. Then **Active now**, the app's own.
+- **Pill:** `h-9` (36 dp) + 4 dp hit slop = 44 dp (S8), `rounded-full`, white, `border-border`, `px-3`. Inside:
+  - an 8 dp dot in the chip's colour;
+  - the count, `text-sm font-semibold gray-900`;
+  - the label, `text-sm gray-700`, 6 dp apart.
+- **Row:** `flex-row flex-wrap`, 8 dp both ways. Every chip stays visible; nothing scrolls sideways.
+- **Shown:**
+  - As on the web, a pending reason or On hold appears only when its count is above 0. Closed, Unassigned and Active always appear.
+  - While counts load, only those three, with a small skeleton for the count, so a zero chip never flashes up.
+  - L2_MANAGER: every chip, without counts, as shortcuts.
+- **Tap:** opens the Tickets tab with that chip's filter, as a tile does. The list shows it as the "from Home" chip.
+- **Dot colours:**
+
+  | Chip | Colour | Source | Contrast on white |
+  |---|---|---|---|
+  | Closed | zinc-600 | web | 7.73 |
+  | Unassigned | orange-500 | web | 2.80 |
+  | Mgmt review | amber-400 | web | 1.67 |
+  | With partner | purple-400 | web | 2.64 |
+  | User confirm | sky-400 | web | 2.14 |
+  | More info | indigo-400 | web | 2.98 |
+  | Master data | teal-400 | web | 1.86 |
+  | On hold | gray-400 | web | 2.54 |
+  | Active now | slate-500 (`colors.kpi.active`) | app only, the web's muted-foreground | 4.76 |
+
+### 11.4 Reported, not changed
+
+- **Contrast:** most dots and tile edges are below 3:1 on white. They are the web's colours, and they are decoration: every chip and tile names itself in gray-700 or gray-500 text. They are kept for parity, like the UI graphics in §3.3.
+- **Device check:** check on the next build at 360 dp with 100 %, 130 % and 200 % text:
+  - the period row's first-layout scroll;
+  - the chips' wrap;
+  - the full-width SLA breached tile;
+  - the From → To flow.
+
+## 12. G7 (2026-11-02): the period on the list, Approvals, the push notice
+
+**The period chip on the ticket list.**
+- **When:** a tile that carries the Home period opens M3 with it as the Created filter (§11; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1). The quick-filter row then starts with a **period chip**.
+- **Look:** the active `FilterChip` look (36 dp, `rounded-full`, `bg-primary`, white `text-sm font-medium`). Inside: a 14 dp calendar icon, the period's name ("This month", "Custom"), and a 14 dp ✕. Hit slop 4 dp (S8).
+- **Tap:** clears the period (the Created days) and nothing else.
+- **Order:** it sits before the "from Home" filter chip, which keeps its home icon.
+- **Screen reader:** "Period from Home: This month, Created 03 Oct 2026 – 02 Nov 2026. Clear the period".
+- **When it goes:** it shows only while the Created days are still the tile's. Changing a day in the Filters sheet removes the chip; the days stay as the person's own. The summary line under the row still lists "Created … – …", and Clear all clears everything.
+
+**Approvals on every drawer.** The row is the first drawer row for every role (it was already first for ADMIN and AGENT), with the pending count as its badge. Its empty inbox is the S11 "clear" state: "Nothing waiting for you". No new component.
+
+**The Alerts push notice.**
+- **What changed:** the fixed sentence ("the Service Desk has no push yet") is replaced by the state of push on this phone (`src/utils/push.ts` `pushNotice`).
+- **Look:** the S10 info `Notice` (blue-50, a 16 dp icon, `text-xs`).
+- **Its button:** "Turn on notifications" or "Open settings", an `OutlineButton` in its `compact`, `align="start"` form (44 dp, S5) with an 18 dp icon. It shows only for the "off" and "not asked yet" states.
+- **Tone:** never the warning tone. "Not switched on at the Service Desk yet" is a fact, not a fault, and nothing on the screen is broken by it.
+- **Permission timing:** the system dialog for the permission appears on the first visit to Alerts only, never at launch (Android 13+; Android 12 and older grant it at install).
+
+**A notification in the status bar.**
+- **Icon:** the logo silhouette from `assets/adaptive-icon.png`. Android draws only its alpha channel, and the file is 92 % transparent around the logo.
+- **Tint:** `#D21121`.
+- **Channel:** "Ticket alerts" (`setu_tickets`, high importance).
+- **Device check:** check the icon's size on the next build. The adaptive-icon artwork keeps a safe-zone margin, so the logo may look small; a dedicated 24 dp white-on-transparent asset would fill the space.
+
+## 13. The audit log, M20 (G8, 2026-11-02; ADMIN only)
+
+**Why cards.** The web page is a six-column table (as Ronit describes it). At 390 dp that leaves about 60 dp per column, so the app stacks each entry into a card and groups the cards by day. The web page itself is not in the analysed clone (`docs/G8-WEB-AUDIT.md` §1), so there is no web file to copy its look from.
+
+**Frame (S1).** The standard screen frame:
+- ScreenHeader "Audit log" with the back arrow (a drawer screen, §7), then OfflineBanner;
+- a white filter bar (`px-4 py-2`), then QueryBanner;
+- the list, 12 dp below the bar, with insets + 24 at the bottom (no FAB).
+
+**The filter bar, top to bottom:**
+- **SearchField** (44 dp, S5): "Ticket number, e.g. 1234". It takes a number, "#1234" or a ticket link. On the keyboard's search key it looks the ticket up.
+- **The line under it**, while or after looking up (S10's info size: a 16 dp icon, `text-xs`):
+  - a brand-red spinner and "Finding ticket #1234…";
+  - "No ticket #1234." or "Couldn't look up ticket #1234. Try again." in red-700, read out as an alert;
+  - grey help when the text is not a number.
+- **The chip row** (S5 FilterChip, 36 dp + hit slop):
+  - when a ticket is set, a filled brand-red chip first (a ticket icon, "#1234" and ✕), the period chip's look from §12; tapping it clears the ticket;
+  - then "All types" (or the chosen type), which opens the Entity type sheet;
+  - then "Person" (or the person's name), which opens the people picker, with "Anyone" to clear.
+  - Active chips are brand red (S4).
+- **The count line:** "1,234 entries" (`text-xs gray-500`), and "Clear all" as a text link (S5) when any filter is on.
+
+**A day heading** sits above each day's cards. It uses the section caption (S3: `text-xs font-semibold uppercase tracking-wide text-gray-500`) and reads "Today", "Yesterday" or "Mon 02 Nov 2026", on the phone's calendar.
+
+**The card** (S2: `rounded-xl border-border bg-white p-4`, `mx-4 mb-3`):
+1. **The action pill**, then the entity ("Comment", `text-xs gray-500`), then the time on the right ("14:05", `text-xs gray-500`).
+2. **The ticket**, a 44 dp row (S8):
+   - "#1234" as a link (`text-sm font-semibold text-blue-700`, S4 links), then the title (`text-sm gray-700`, one line), then an 18 dp chevron;
+   - it opens the ticket through the deep-link resolver;
+   - no ticket: "No ticket linked" (`text-sm gray-500`).
+3. **The person:** the name (`text-sm font-semibold gray-900`; "System" for the auto-close job), and the email under it (`text-xs gray-500`). Never the IP address.
+4. **The details box**, tinted (`rounded-lg border-gray-100 bg-gray-50 p-3`, 12 dp below):
+   - readable lines in `text-sm gray-700`, 4 dp apart;
+   - anything shown raw in `font-mono text-xs gray-700`, selectable;
+   - no box when nothing was recorded.
+
+**The action pill.** S9's pill (`rounded-full px-2.5 py-0.5`, `text-xs font-medium`) with a 12 dp icon before the label. Every pill has a 1 dp border in its own fill colour, so all are the same height; the white one's border is gray-300.
+
+**Colours are told apart by lightness, not hue alone.**
+- The five actions the server writes most each have their own lightness band, at least 15 CIELAB L* from every other.
+- The bands are pinned by `tests/audit/audit-details.test.mjs`. Values from `src/theme/colors.ts` `auditAction`; contrast is WCAG 2.x on the exact values.
+
+| Action | Label | Icon | Fill (L*) | Text | Contrast |
+|---|---|---|---|---|---|
+| UPDATED | Updated | create | blue-900 (27) | white | 10.4:1 |
+| CREATED | Created | add-circle | green-700 (47) | white | 5.0:1 |
+| ASSIGNED | Assigned | person-add | orange-500 (64) | gray-900 | 6.3:1 |
+| STATUS_CHANGED | Status Changed | swap-horizontal | sky-300 (81) | blue-900 | 6.2:1 |
+| COMMENTED | Commented | chatbubble | white (100) + gray-300 outline | gray-700 | 10.3:1 |
+| ATTACHMENT_ADDED | Attachment Added | attach | purple-100 (93) | purple-700 | 5.9:1 |
+| DELETED | Deleted | trash | zinc-700 (27) | white | 10.4:1 |
+| SLA_BREACHED | SLA Breached | alarm | red-700 (40) | white | 6.5:1 |
+| ESCALATED | Escalated | trending-up | amber-500 (72) | gray-900 | 8.3:1 |
+| anything else | the value in words | ellipse | badgeFallback gray-100 | gray-600 | — |
+
+- The last four share a band with one of the first five and differ in hue.
+- DELETED, SLA_BREACHED and ESCALATED are never written today (G8 §7).
+- ATTACHMENT_ADDED shares the pale end with STATUS_CHANGED and COMMENTED. Its icon and label tell it apart.
+- **WCAG 1.4.1:** every pill has its label and its icon, so no meaning rests on colour.
+- **Not the web's colours.** The clone has no audit page, so the deployed page's colours could not be read (G8 §7). If Ronit wants them matched, they replace this table; the lightness test still applies.
+
+**States (S11):**
+- **Loading:** the `audit` skeleton, a day heading bar over cards with a pill, ticket, person and details box.
+- **Empty with filters:** "No entries match these filters", with "Clear all filters".
+- **Empty without filters:** "No audit entries yet". Both use the `empty` illustration.
+- **Error:** ErrorState with Retry.
+- **Offline:** OfflineState, then the footer's "More entries load when you reconnect".
+- **Footer:** "Loading more…", "Couldn't load more entries. Tap to retry", and at the 500 cap "Showing the first 500 of N — search or filter to narrow", the ticket list's words.
+
+**Sheets.**
+- **Entity type** is OptionSheet: All types, Ticket, Comment, Attachment. Each has a one-line description; Ticket's says automatic closes are not included (`05` B.38).
+- **Person** is PersonPickerSheet, searching every role.
+
 ## iOS-A. iOS (Phase iOS-4, 2026-10-29)
 
 > Numbered iOS-A, not 9, since iOS-5b (Ronit, 2026-10-30): Android's sections keep Android's numbers (Android's §9 is
@@ -736,3 +941,24 @@ S11 stands; the shared `EmptyState`, `ErrorState`, `OfflineState` and `LoadingSk
 - the end of every list: the last row fully above the tab bar and the "+";
 - Tickets: search, Filters and selection mode, at the default text size and at AX5;
 - one pushed screen and one sheet.
+
+### iOS-A.14 Home's period, the list's period chip and the audit log on iPhone (iOS-5e, 2026-11-03)
+Android's §11–§13 (G6–G8), on iOS. What is shown, counted and sent is Android's; these are the iOS controls.
+
+**The PERIOD row (§11.1) → a toolbar under the navigation bar** (Ronit, iOS-5e Q2):
+- Fixed under the solid bar, like the Tickets toolbar (§iOS-A.13): white, a hairline under it, not in the scroll view. Not shown to L2_MANAGER (`showHomePeriod`).
+- One button names the period: 📅 "PERIOD This month ⌄", at least 44 pt, growing with the text. VoiceOver: "Period: This month. Changes the period".
+- It opens the **period sheet** (`OptionSheet`, a native page sheet; swipe down or ✕ closes it): the web's ten periods in the web's order and Android's words, the current one ticked. Ten fixed rows are too many for an action sheet, and an action sheet cannot show which one is current.
+- **Custom** (Q3): Android's From and To buttons join the toolbar. Each opens `DatePickerSheet` (the iOS inline calendar, Cancel and Done) with Android's limits: From from 1 Jan 2000 to To (or today); To from From to today. No day after today can be picked; there is no extra message for it (Q5). Picking Custom with no From day opens From's calendar as soon as the period sheet has gone (`PageSheet` `onDismiss`: iOS shows one sheet at a time).
+- Custom's message is Android's (grey while a day is missing, red for From after To). VoiceOver reads it when it changes; Android's live region is TalkBack's only.
+- At the accessibility text sizes From and To stack, so a day is never cut off.
+
+**Tiles and chips (§11.2, §11.3):** Android's, with iOS-4's rules kept: one tile per row at the accessibility sizes, the icon square growing with the text, the counts capped at Title 1. A status chip is **at least** 36 pt (Android: exactly 36 dp) with the 4 pt hit slop, so it grows with the text; its dot grows too.
+
+**The list's period chip (§12):** the first chip of the toolbar's filter row (the list header at the accessibility sizes, §iOS-A.13), red with 📅 and ✕, at least 36 pt + 4 pt slop. VoiceOver: "Period from Home: This month, 03 Oct 2026 – 02 Nov 2026. Clear the period".
+
+**The audit log (§13):** pushed in the More stack, under the solid bar titled "Audit log"; Android's toolbar under it (ticket-number search, the Ticket, entity-type and Person chips, the count, Clear all); the pills, cards and colours are Android's (`colors.auditAction`). The list ends 24 pt above the tab bar (`listBottomInset()`); pull-to-refresh is tinted brand red; the ticket lookup's result is announced to VoiceOver; the footer's retry has a label.
+
+**Push notice (§12, G7c):** not on iOS. Alerts keeps its notice that the Service Desk has no push yet, which stays true on iOS.
+
+**Pinned by:** `tests/home/ios-period.test.mjs`, `tests/rbac/audit-log.test.mjs` §6, and the all-of-`src/` scans in `tests/screens/hig-polish.test.mjs` (44 pt, labels) and `read-screens.test.mjs` (no Android-only API, no colour outside the theme).

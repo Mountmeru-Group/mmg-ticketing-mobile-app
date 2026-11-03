@@ -2,23 +2,24 @@
 
 > This phase is planning only. No code is copied, nothing is installed, and no `eas` command is run.
 > Written on 2026-10-27 on branch `ios-dev`. The App Store side is in `APP-STORE-COMPLIANCE.md`, in this folder.
-> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b, iOS-3c, iOS-4, iOS-5, iOS-5b, iOS-5c and iOS-5d with what each phase actually built (§4.1–§4.5, §4.9–§4.17).
-> **iOS-5d (2026-11-01) moved the port source to `f4fad10`** (§0, §3.18, §4.17; `ANDROID-DELTA.md` §8). iOS-5c had moved it to `c5c63ac` (§3.17, §4.16; `ANDROID-DELTA.md` §7), and iOS-5b to `4063df3` (§3.16, §4.15; the delta and its decisions: `ANDROID-DELTA.md`).
+> Updated in iOS-1b, iOS-2, iOS-3a, iOS-6, iOS-3b, iOS-3c, iOS-4, iOS-5, iOS-5b, iOS-5c, iOS-5d and iOS-5e with what each phase actually built (§4.1–§4.5, §4.9–§4.18).
+> **iOS-5e (2026-11-03) moved the port source to `8b522e3`** (§0, §3.19, §4.18; `ANDROID-DELTA.md` §9). **iOS-5d (2026-11-01) moved it to `f4fad10`** (§0, §3.18, §4.17; `ANDROID-DELTA.md` §8). iOS-5c had moved it to `c5c63ac` (§3.17, §4.16; `ANDROID-DELTA.md` §7), and iOS-5b to `4063df3` (§3.16, §4.15; the delta and its decisions: `ANDROID-DELTA.md`).
 
 ## 0. Port source and fixed facts
 
 | | |
 |---|---|
-| **PORT SOURCE** | `origin/dev` @ **`f4fad10a1bd1aac9658f4c4be151b0172f683898`** (2026-10-30 16:59 +0530, "feat: 15-day forced re-authentication with prompt=login"), since iOS-5d (2026-11-01). On 2026-11-01 `f4fad10..origin/dev` is empty |
+| **PORT SOURCE** | `origin/dev` @ **`8b522e3bf063b26a808efee9d65776c3c6bbef3c`** (2026-11-02 16:22 +0530, "feat: G8 - ADMIN-only audit log screen"), since iOS-5e (2026-11-03). At planning (2026-11-03) `8b522e3..origin/dev` was empty; `e85c602` and `69a38ab` (2026-11-03, the polish pass with P7's window captions, and the SLA deadline) reached `dev` during iOS-5e and are **not** in it: the next sync |
+| Earlier port source (iOS-5d) | `origin/dev` @ `f4fad10a1bd1aac9658f4c4be151b0172f683898` (2026-10-30 16:59 +0530, "feat: 15-day forced re-authentication with prompt=login") |
 | Earlier port source (iOS-5c) | `origin/dev` @ `c5c63acff8d7296244876020069884364864a99b` (2026-10-30 15:44 +0530, "feat: arc-split Login and the four-stage open-and-sign-in motion") |
 | Earlier port source (iOS-5b) | `origin/dev` @ `4063df30421407e040a7dccc9399bb38557dd702` (2026-10-29 16:51 +0530, "feat: prepare first production build (Google Play internal testing)"). The commits between the first port source and it are in `ANDROID-DELTA.md` |
 | First port source (iOS-1 to iOS-5) | `origin/dev` @ `c84d53ac716b10a1d0084fb002f212225fb24763` (2026-10-27 12:50 +0530, "feat: inline "Change technician" editor on the ticket detail properties"). §3.1–§3.15 list its 230 files |
 | How it was read | Only through git: `git ls-tree -r origin/dev`, `git show origin/dev:<path>` and `git grep … origin/dev`. Nothing was checked out or pulled. The Android folder (`..\mmg-ticketing-mobile-app`) and the web folder (`..\MMG-Ticketing-Platform`) were not opened |
-| Files in the port source | **240** at `f4fad10` (239 at `c5c63ac`, plus 1 added: §3.18). 239 at `c5c63ac` (231 at `4063df3`, plus 8 added: §3.17). 231 at `4063df3` (230 at `c84d53a`, plus 4 added and minus 3 deleted: §3.16) |
+| Files in the port source | **262** at `8b522e3` (240 at `f4fad10`, plus 22 added: §3.19). 240 at `f4fad10` (239 at `c5c63ac`, plus 1 added: §3.18). 239 at `c5c63ac` (231 at `4063df3`, plus 8 added: §3.17). 231 at `4063df3` (230 at `c84d53a`, plus 4 added and minus 3 deleted: §3.16) |
 | Target | Branch `ios-dev`, which starts at `28621e5` with only `README.md`. That README is byte-identical to the one on `origin/dev` (blob `4d80835`) |
 | API | **UAT `https://uat-servicedesk.mountmerugroup.com/api/v1`, unchanged.** `src/config/env.ts` is copied as it is: UAT is the only allowed target, and PROD stays an empty placeholder |
 | Stack (from `package.json` at the port source) | Expo SDK 57 (`expo ~57.0.31`), React Native 0.86.3, React 19.2.3, React Navigation 7, TanStack Query 5, Zustand 5, NativeWind 4, expo-secure-store, Axios. EAS builds use Node 24.18.0 |
-| Syncing later Android work | Diff `f4fad10..origin/dev` and apply each changed file according to its row below. The rule (Ronit, 2026-10-30): iOS = Android `dev` exactly; unmerged Android branches are not ported; Android release items go to the iOS-9 list; in shared docs Android's section numbers win and iOS-only sections are lettered (§iOS-A…) |
+| Syncing later Android work | Diff `8b522e3..origin/dev` and apply each changed file according to its row below. The rule (Ronit, 2026-10-30): iOS = Android `dev` exactly; unmerged Android branches are not ported; Android release items go to the iOS-9 list; in shared docs Android's section numbers win and iOS-only sections are lettered (§iOS-A…) |
 
 Drift found at the port source (reported here, not fixed):
 - `CLAUDE.md` still says Expo SDK 52, React Navigation v6 and "documentation only". `package.json` is the truth: SDK 57 and Navigation 7.
@@ -47,7 +48,7 @@ Rules used:
   - `src/utils/approvals.ts` (reclassified KEEP → ADAPT in iOS-3c: `approvalOnScreen()`, the approval Approve and Reject act on; §4.12).
 - **The pre-SSO test login (§8) is not counted here.** It is a proposal, so the classification below covers only what the port itself needs. §8 lists the files the test login would change if it is approved.
 
-**Totals at `f4fad10` (iOS-5d): KEEP 163 · ADAPT 49 · SKIP 3 · SCREEN 25 = 240** (§3.18: the new `reauth.test.mjs` ADAPT; `tests/support/loader.mjs` moved from KEEP to ADAPT for its `expo-file-system` stub line). **Totals at `c5c63ac` (iOS-5c): KEEP 164 · ADAPT 47 · SKIP 3 · SCREEN 25 = 239** (§3.17: seven new files KEEP and the new test ADAPT; `LoginScreen.tsx` moved from KEEP to ADAPT for its `__DEV__` developer-token button). **Totals at `4063df3` (iOS-5b): KEEP 158 · ADAPT 45 · SKIP 3 · SCREEN 25 = 231** (§3.16: `greeting.ts` KEEP; the two new test files and `production-readiness.test.mjs` ADAPT; three files deleted on Android, one ADAPT and two KEEP, are still on iOS until iOS-9). Sixteen files carry a `4063df3` change that is on the iOS-9 list (their rows say so); three more were deleted on Android and stay on iOS until iOS-9; `production-readiness.test.mjs` is for iOS-9 too. **Totals at `c84d53a`: KEEP 159 · ADAPT 43 · SKIP 3 · SCREEN 25 = 230.** iOS-5 moved two docs from KEEP to ADAPT (`WEB-VS-MOBILE-ROLES.md`, `ROLE-MATRIX.md`: the iOS column and §iOS-A, which was §16 until iOS-5b; §4.14). iOS-3c moved one file from KEEP to ADAPT (`approvals.ts`, §4.12). iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
+**Totals at `8b522e3` (iOS-5e): KEEP 170 · ADAPT 56 · SKIP 10 · SCREEN 26 = 262** (§3.19: 10 new files KEEP, 4 ADAPT, 7 SKIP (G7c push), 1 SCREEN; `01-API-CONTRACT.md`, `notifications.api.ts` and `useNotifications.ts` moved from KEEP to ADAPT: the first gained an iOS section, the other two keep `f4fad10` because Android's change is push). **Totals at `f4fad10` (iOS-5d): KEEP 163 · ADAPT 49 · SKIP 3 · SCREEN 25 = 240** (§3.18: the new `reauth.test.mjs` ADAPT; `tests/support/loader.mjs` moved from KEEP to ADAPT for its `expo-file-system` stub line). **Totals at `c5c63ac` (iOS-5c): KEEP 164 · ADAPT 47 · SKIP 3 · SCREEN 25 = 239** (§3.17: seven new files KEEP and the new test ADAPT; `LoginScreen.tsx` moved from KEEP to ADAPT for its `__DEV__` developer-token button). **Totals at `4063df3` (iOS-5b): KEEP 158 · ADAPT 45 · SKIP 3 · SCREEN 25 = 231** (§3.16: `greeting.ts` KEEP; the two new test files and `production-readiness.test.mjs` ADAPT; three files deleted on Android, one ADAPT and two KEEP, are still on iOS until iOS-9). Sixteen files carry a `4063df3` change that is on the iOS-9 list (their rows say so); three more were deleted on Android and stay on iOS until iOS-9; `production-readiness.test.mjs` is for iOS-9 too. **Totals at `c84d53a`: KEEP 159 · ADAPT 43 · SKIP 3 · SCREEN 25 = 230.** iOS-5 moved two docs from KEEP to ADAPT (`WEB-VS-MOBILE-ROLES.md`, `ROLE-MATRIX.md`: the iOS column and §iOS-A, which was §16 until iOS-5b; §4.14). iOS-3c moved one file from KEEP to ADAPT (`approvals.ts`, §4.12). iOS-3b moved six files from KEEP to ADAPT (§4.11). iOS-6 moved three files from KEEP to ADAPT (`useProfile.ts` and two test stubs, §4.10). iOS-3a moved `useTickets.ts` from KEEP to ADAPT (§4.9). iOS-2 moved four files from KEEP to ADAPT (`deep-links.ts`, `permissions.ts`, `ModuleStacks.tsx`, `TicketStack.tsx`) and one from ADAPT to SKIP (`AppTabBar.tsx`). iOS-1a counted KEEP 176 · ADAPT 27 · SKIP 2.
 
 ## 2. Phase map
 
@@ -65,6 +66,7 @@ Rules used:
 | **iOS-5b** | **Android sync to `4063df3`** (Ronit, 2026-10-30): iOS = Android `dev` exactly. Knowledge base and Announcements ADMIN only, the time-of-day greeting, their tests and docs. Android's release items go to the iOS-9 list; unmerged Android branches are not ported. Built 2026-10-30 (§4.15; `ANDROID-DELTA.md`) |
 | **iOS-5c** | **Android sync to `c5c63ac`** (Ronit, 2026-10-30): the arc-split Login, the sign-in and start-up motion, the yellow shimmer, the KPI placeholder. The iOS sign-in flow untouched; Reduce Motion honoured. Built 2026-10-30 to 2026-10-31 (§4.16; `ANDROID-DELTA.md` §7). Android's `f4fad10` (15-day re-authentication) came after the plan and is not in it; it is iOS-5d |
 | **iOS-5d** | **Android sync to `f4fad10`** (Ronit, 2026-11-01): the 15-day forced re-authentication (`prompt=login`, "Signed out for security"), with Android's behaviour in every case. The date in the Keychain with the token's class; the reinstall wipes it. No change to the iOS redirect, PKCE or the exchange. Built 2026-11-01 (§4.17; `ANDROID-DELTA.md` §8) |
+| **iOS-5e** | **Android sync to `8b522e3`** (Ronit, 2026-11-03): G6 Home period selector and KPI parity, G7a the period on the ticket list, G7b Approvals for every role, G8 the ADMIN-only audit log; G7c (push) not ported; P7 not in these three commits (it reached `dev` in `e85c602` during iOS-5e: the next sync). Behaviour = Android; the iOS interface: a toolbar + period sheet, `DatePickerSheet`, a permanent More row for END_USER/L2, the audit log in More. No native change: ships to TestFlight 0.1.0 (1) by EAS Update. Built 2026-11-03 (§4.18; `ANDROID-DELTA.md` §9) |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
@@ -88,10 +90,10 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 |---|---|---|---|
 | `.env.example` | KEEP | iOS-1b | Comment says "for an APK" (wording only) |
 | `.gitignore` | KEEP | iOS-1b, iOS-3a | Already ignores `ios/`, `*.ipa`, `*.p8`, `*.p12`, `*.mobileprovision`, `GoogleService-Info.plist`. **iOS-3a:** `ios/` and `android/` anchored to the root (`/ios/`, `/android/`): the unanchored `ios/` also matched `docs/ios/`, so a new file there was silently ignored |
-| `App.tsx` | ADAPT | iOS-1b, iOS-2 | **iOS-1b:** a DEV ONLY foundation root: the React Query and safe-area providers and one `__DEV__` screen; a release bundle renders nothing. **iOS-2:** the Android root, byte for byte: gesture-handler root view, providers, `HtmlRenderProvider`, `ErrorBoundary`, splash hand-over and the connectivity monitor, around `RootNavigator`. Its `StatusBar` (`barStyle="dark-content"`) works on iOS unchanged; check it over native page-sheet modals on a device **`c5c63ac` (iOS-5c):** Android's version, verbatim: `<SplashIntro />` over `RootNavigator` (§4.16). |
+| `App.tsx` | ADAPT | iOS-1b, iOS-2 | **iOS-1b:** a DEV ONLY foundation root: the React Query and safe-area providers and one `__DEV__` screen; a release bundle renders nothing. **iOS-2:** the Android root, byte for byte: gesture-handler root view, providers, `HtmlRenderProvider`, `ErrorBoundary`, splash hand-over and the connectivity monitor, around `RootNavigator`. Its `StatusBar` (`barStyle="dark-content"`) works on iOS unchanged; check it over native page-sheet modals on a device **`c5c63ac` (iOS-5c):** Android's version, verbatim: `<SplashIntro />` over `RootNavigator` (§4.16). **`8b522e3` (iOS-5e):** Android's change is `<PushBridge />`, G7c (push), not ported: the iOS file is unchanged. |
 | `CLAUDE.md` | ADAPT | iOS-1b | §4.1 |
 | `README.md` | KEEP | — | Already on `ios-dev`, byte-identical |
-| `app.json` | ADAPT | iOS-1b | §4.2 **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
+| `app.json` | ADAPT | iOS-1b | §4.2 **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`8b522e3` (iOS-5e):** Android's change is the `expo-notifications` plugin, G7c (push), not ported: unchanged on iOS (no native change; ships by EAS Update). |
 | `babel.config.js` | KEEP | iOS-1b | — |
 | `eas.json` | ADAPT | iOS-1b, iOS-7 | §4.3 **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
 | `global.css` | KEEP | iOS-1b | — |
@@ -99,8 +101,8 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `index.ts` | KEEP | iOS-1b | — |
 | `metro.config.js` | KEEP | iOS-1b | — |
 | `nativewind-env.d.ts` | KEEP | iOS-1b | — |
-| `package-lock.json` | ADAPT | iOS-1b | Never edited by hand. Copied as it is: iOS-1b changes no dependency, so `npm ci` installs exactly the Android lockfile. `npm install` regenerates it when a dependency changes (§4.4) |
-| `package.json` | ADAPT | iOS-1b | §4.4 |
+| `package-lock.json` | ADAPT | iOS-1b | Never edited by hand. Copied as it is: iOS-1b changes no dependency, so `npm ci` installs exactly the Android lockfile. `npm install` regenerates it when a dependency changes (§4.4) **`8b522e3` (iOS-5e):** Android's change is `expo-notifications`, G7c (push), not ported: unchanged on iOS. |
+| `package.json` | ADAPT | iOS-1b | §4.4 **`8b522e3` (iOS-5e):** Android's change is `expo-notifications`, G7c (push), not ported: unchanged on iOS. |
 | `tailwind.config.js` | KEEP | iOS-1b | — |
 | `tsconfig.json` | KEEP | iOS-1b | — |
 
@@ -126,19 +128,19 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `docs/G3-WEB-BEHAVIOUR.md` | KEEP | iOS-1b | — |
 | `docs/G4-WEB-CATALOGUE.md` | KEEP | iOS-1b | — |
 | `docs/PERFORMANCE.md` | KEEP | iOS-1b | Android measurements. iOS figures, if needed, go in `docs/ios/` (iOS-4) **iOS-5b:** Android's `4063df3` version, verbatim (§11, the third bundle pass). **iOS-5c:** Android's `c5c63ac` version, verbatim (§12, the start-up and sign-in motion). The iOS bundle figure is in §4.16. |
-| `docs/RELEASE.md` | ADAPT | iOS-7 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-7 (§4.7). **iOS-5:** the iOS guide was written as a new file, `docs/ios/RELEASE-IOS.md` (the brief), so this file is still not copied. Whether iOS-7 brings it over at all is open (§4.14) **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`c5c63ac`:** not copied either. Its splash facts that apply to iOS are in `RELEASE-IOS.md` §6 (rule 8) and `UI-STANDARDS.md` §iOS-A.12; the Android 12+ circle and Android's fade do not apply. |
-| `docs/ROLE-MATRIX.md` | ADAPT | iOS-1b, iOS-5 | Role rules are platform-neutral. **iOS-5:** §iOS-A (§16 until iOS-5b), the §14 audit re-run on iOS for all five personas; §7, the iOS-5 mutation check. Android's sections are unchanged (§4.14) **iOS-5b:** Android's `4063df3` text merged in, verbatim (§16, KB and Announcements); the iOS-5 audit renumbered §iOS-A, with §iOS-A.6 for iOS-5b; §7, the iOS-5b mutation check. |
-| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is `docs/ios/UAT-TEST-PLAN-IOS.md`, written in iOS-5 (§4.14) **iOS-5b:** Android's `4063df3` version, verbatim (E14, E17 ADMIN only; E18 the greeting). The iOS rows are in `UAT-TEST-PLAN-IOS.md`. |
-| `docs/WEB-VS-MOBILE-ROLES.md` | ADAPT | iOS-1b, iOS-5 | **iOS-5:** an iOS column on all 112 rows, and §iOS-A (§9 until iOS-5b), the iOS parity summary. Android's columns and sections are unchanged (§4.14) **iOS-5b:** Android's `4063df3` text merged in, verbatim (✂ SIMPLIFIED, §5a, the four rows, §2); every changed row has a new iOS cell, every other iOS cell's line numbers were moved by script; §9 renumbered §iOS-A, with §iOS-A.5 for iOS-5b. |
-| `docs/brand/UI-STANDARDS.md` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b; adapted in iOS-4 (§4.8). Until then the iOS navigation chrome is described in §4.5 **iOS-5b:** Android's `4063df3` text merged in, verbatim (§9, the Home greeting; S1); the iOS-4 standard renumbered §iOS-A. **iOS-5c:** Android's `c5c63ac` text merged in, verbatim (§10, the login and the motion palette, and its notes in the intro, S0, S7, S12 and §6), with §iOS-A kept last; iOS notes in §iOS-A.3, §iOS-A.7 and the new §iOS-A.12. |
-| `docs/brand/WEB-TOKENS.md` | KEEP | iOS-1b | — |
+| `docs/RELEASE.md` | ADAPT | iOS-7 | Not copied in iOS-1b (it is the Android release guide). Rewritten for iOS in iOS-7 (§4.7). **iOS-5:** the iOS guide was written as a new file, `docs/ios/RELEASE-IOS.md` (the brief), so this file is still not copied. Whether iOS-7 brings it over at all is open (§4.14) **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`c5c63ac`:** not copied either. Its splash facts that apply to iOS are in `RELEASE-IOS.md` §6 (rule 8) and `UI-STANDARDS.md` §iOS-A.12; the Android 12+ circle and Android's fade do not apply. **`8b522e3` (iOS-5e):** Android's §2b (Firebase, `google-services.json`) is G7c (push), not ported. The iOS guide is `docs/ios/RELEASE-IOS.md`. |
+| `docs/ROLE-MATRIX.md` | ADAPT | iOS-1b, iOS-5 | Role rules are platform-neutral. **iOS-5:** §iOS-A (§16 until iOS-5b), the §14 audit re-run on iOS for all five personas; §7, the iOS-5 mutation check. Android's sections are unchanged (§4.14) **iOS-5b:** Android's `4063df3` text merged in, verbatim (§16, KB and Announcements); the iOS-5 audit renumbered §iOS-A, with §iOS-A.6 for iOS-5b; §7, the iOS-5b mutation check. **`8b522e3` (iOS-5e):** Android's hunks merged (`git merge-file`, base `f4fad10`): all 168 added lines present (checked by script); §17–§19 before §iOS-A; the iOS notes in §7 and §iOS-A.7. |
+| `docs/UAT-TEST-PLAN.md` | KEEP | iOS-1b | Android steps. The iOS test plan is `docs/ios/UAT-TEST-PLAN-IOS.md`, written in iOS-5 (§4.14) **iOS-5b:** Android's `4063df3` version, verbatim (E14, E17 ADMIN only; E18 the greeting). The iOS rows are in `UAT-TEST-PLAN-IOS.md`. **`8b522e3` (iOS-5e):** Android's version, verbatim. The iOS plan is `docs/ios/UAT-TEST-PLAN-IOS.md`. |
+| `docs/WEB-VS-MOBILE-ROLES.md` | ADAPT | iOS-1b, iOS-5 | **iOS-5:** an iOS column on all 112 rows, and §iOS-A (§9 until iOS-5b), the iOS parity summary. Android's columns and sections are unchanged (§4.14) **iOS-5b:** Android's `4063df3` text merged in, verbatim (✂ SIMPLIFIED, §5a, the four rows, §2); every changed row has a new iOS cell, every other iOS cell's line numbers were moved by script; §9 renumbered §iOS-A, with §iOS-A.5 for iOS-5b. **`8b522e3` (iOS-5e):** Android's hunks merged: all 81 added lines present, the rewritten and new rows with an iOS cell (22 cells); the other iOS cells' line numbers moved by script (`git diff -U0 HEAD`, 1 checked by hand); §iOS-A.6. |
+| `docs/brand/UI-STANDARDS.md` | ADAPT | iOS-1b as-is, iOS-4 | Copied unchanged in iOS-1b; adapted in iOS-4 (§4.8). Until then the iOS navigation chrome is described in §4.5 **iOS-5b:** Android's `4063df3` text merged in, verbatim (§9, the Home greeting; S1); the iOS-4 standard renumbered §iOS-A. **iOS-5c:** Android's `c5c63ac` text merged in, verbatim (§10, the login and the motion palette, and its notes in the intro, S0, S7, S12 and §6), with §iOS-A kept last; iOS notes in §iOS-A.3, §iOS-A.7 and the new §iOS-A.12. **`8b522e3` (iOS-5e):** Android's §11–§13 merged before §iOS-A (all 174 added lines present); the iOS form in §iOS-A.14. |
+| `docs/brand/WEB-TOKENS.md` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim. |
 | `docs/web-system/00-OVERVIEW.md` | KEEP | iOS-1b | Environments table unchanged: UAT only |
-| `docs/web-system/01-API-CONTRACT.md` | KEEP | iOS-1b | — |
+| `docs/web-system/01-API-CONTRACT.md` | ADAPT | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim, plus a lettered §iOS-A: NTF-5/NTF-6 describe Android only (G7c (push), not ported). Now ADAPT. |
 | `docs/web-system/02-AUTH.md` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b; adapted in iOS-6 (§4.6) **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`f4fad10` (iOS-5d):** Android's hunks merged verbatim (the header line, §5.4, §5.5, **§5.8**, §7.1, §7.3); the iOS notes in the new lettered §iOS-A at the end, and two lines in §7.7 (§4.17). |
-| `docs/web-system/03-DATA-MODEL.md` | KEEP | iOS-1b | — |
-| `docs/web-system/04-SCREEN-MAP.md` | KEEP | iOS-1b | — |
-| `docs/web-system/05-RULES-AND-GAPS.md` | KEEP | iOS-1b | — |
-| `docs/web-system/06-BACKEND-ASKS.md` | KEEP | iOS-1b | The iOS halves of A2, A5 and A18 are named there already |
+| `docs/web-system/03-DATA-MODEL.md` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (§C Audit log). |
+| `docs/web-system/04-SCREEN-MAP.md` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (M20). |
+| `docs/web-system/05-RULES-AND-GAPS.md` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (B.36–B.38). |
+| `docs/web-system/06-BACKEND-ASKS.md` | KEEP | iOS-1b | The iOS halves of A2, A5 and A18 are named there already **`8b522e3` (iOS-5e):** Android's version, verbatim; its push lines are Android's (G7c (push), not ported). |
 | `docs/web-system/07-DRIFT-CHECK.md` | KEEP | iOS-1b | — |
 | `docs/web-system/08-SDP-PARITY.md` | KEEP | iOS-1b | §8.1 lists the iOS work Android deferred. This manifest picks it up |
 | `docs/web-system/09-API-DRIFT.md` | KEEP | iOS-1b | — |
@@ -163,17 +165,17 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/api/auth.api.ts` | ADAPT | iOS-1b as-is, iOS-6 | Copied unchanged in iOS-1b. In iOS-6, pass `{ preferEphemeralSession: true }` to `request.promptAsync(...)`. Without it, iOS shows "'Setu' Wants to Use 'microsoftonline.com' to Sign In" before every sign-in, and the sign-in shares Safari's Microsoft cookies. With it, neither happens, which also suits shared phones (`prompt=select_account`). This is decision D5. **iOS-6 (built 2026-10-28):** done, through `AUTH_SESSION_OPTIONS` in `auth.config.ts`. Also: `codeChallengeMethod: S256` is stated, and `signOutAndWipe()` holds the sign-out sequence, moved unchanged out of `useSignOut` so the tests can run it (§4.10) **`f4fad10` (iOS-5d):** Android's `MicrosoftSignInOptions` merged: `challenge` sends `prompt=login`, otherwise `select_account`. The sheet options, the explicit S256 and the redirect are untouched. `signOutAndWipe()` passes `{ forgetFullAuth: true }`, because on iOS it holds Android's `useSignOut` sequence (iOS-6). |
 | `src/api/client.ts` | KEEP | iOS-1b | — **`f4fad10` (iOS-5d):** Android's version, verbatim (`endSessionIfReauthDue()`, `endSession(message, options)`; the request interceptor keeps only its 8-hour check). |
 | `src/api/comments.api.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** `createComment` also refuses a PRIVATE note that carries `attachmentIds` (05 §C.26: a note's files stay visible to the requester), a second layer under `sendComment` (§4.11) |
-| `src/api/dashboard.api.ts` | KEEP | iOS-1b | — |
+| `src/api/dashboard.api.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (G6: no `range` with `from`). |
 | `src/api/drift.ts` | KEEP | iOS-1b | — |
 | `src/api/errors.ts` | KEEP | iOS-1b | — |
 | `src/api/helpers.ts` | KEEP | iOS-1b | — |
 | `src/api/kb.api.ts` | KEEP | iOS-1b | — |
 | `src/api/lookups.api.ts` | KEEP | iOS-1b | — |
 | `src/api/network.ts` | KEEP | iOS-1b | NetInfo works on iOS |
-| `src/api/notifications.api.ts` | KEEP | iOS-1b | — |
+| `src/api/notifications.api.ts` | ADAPT | iOS-1b | — **`8b522e3` (iOS-5e):** Android's change is NTF-5/NTF-6, G7c (push), not ported: the iOS file stays at `f4fad10`. Now ADAPT. |
 | `src/api/pagination.ts` | KEEP | iOS-1b | — |
 | `src/api/queryClient.ts` | KEEP | iOS-1b | — |
-| `src/api/responseSpecs.ts` | KEEP | iOS-1b | — |
+| `src/api/responseSpecs.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (`AUDIT_LOG_ROW_SPEC`). |
 | `src/api/serviceCatalog.api.ts` | KEEP | iOS-1b | — |
 | `src/api/tasks.api.ts` | KEEP | iOS-1b | — |
 | `src/api/tickets.api.ts` | KEEP | iOS-1b | — |
@@ -199,7 +201,7 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/components/HtmlText.tsx` | KEEP | iOS-1b | `Linking.openURL` opens Safari |
 | `src/components/ImageViewerModal.tsx` | ADAPT | iOS-1b as-is, iOS-3a | Copied unchanged in iOS-1b. **Done in iOS-3a:** change the share icon from `share-social-outline` (the Android glyph) to `share-outline` (the iOS glyph). The `StatusBar` there works unchanged (verify). Because this shares images, the share sheet offers "Save Image", which needs `NSPhotoLibraryAddUsageDescription` (§4.2) |
 | `src/components/ListEntry.tsx` | KEEP | iOS-1b | — |
-| `src/components/LoadingSkeleton.tsx` | KEEP | iOS-1b | — |
+| `src/components/LoadingSkeleton.tsx` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's `audit` variant added; the iOS line kept. |
 | `src/components/OptionSheet.tsx` | KEEP | iOS-1b | Android-only Modal props are ignored. Whether this becomes a native iOS sheet is an iOS-4 design question, not a port change. **iOS-3b:** the short fixed choices moved to iOS action sheets (`utils/actionSheet.ts`); this sheet keeps the long server lists (categories, groups, countries, sort, country filter) |
 | `src/components/PersonPickerSheet.tsx` | KEEP | iOS-1b | Same as `OptionSheet` |
 | `src/components/PriorityBadge.tsx` | KEEP | iOS-1b | — |
@@ -226,8 +228,8 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `src/hooks/cache.ts` | KEEP | iOS-1b | — |
-| `src/hooks/index.ts` | KEEP | iOS-1b | — **iOS-5c:** exports `reduceMotionSettled` (Android's `c5c63ac` line), next to iOS-4's `useTextSize` line. |
-| `src/hooks/queryKeys.ts` | KEEP | iOS-1b | — |
+| `src/hooks/index.ts` | KEEP | iOS-1b | — **iOS-5c:** exports `reduceMotionSettled` (Android's `c5c63ac` line), next to iOS-4's `useTextSize` line. **`8b522e3` (iOS-5e):** Android's G8 export line added; the iOS line kept. |
+| `src/hooks/queryKeys.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (the period in the DSH-1 key; the audit-log keys). |
 | `src/hooks/useAnnouncements.ts` | KEEP | iOS-1b | — **iOS-5b:** Android's `4063df3` version, verbatim: ANN-1 for ADMIN only (`canReadAnnouncements`). |
 | `src/hooks/useApprovals.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useAssignTicket.ts` | KEEP | iOS-1b | — |
@@ -237,12 +239,12 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 | `src/hooks/useDebouncedValue.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDeleteAttachment.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useDiscardGuard.ts` | KEEP | iOS-1b | Uses `usePreventRemove`. In iOS-3, check on a device that it also stops the iOS swipe-back and the swipe-down that closes a sheet. If it doesn't, the affected screens set `gestureEnabled: false` while there is unsent input. **iOS-3b:** in the installed source, native-stack turns a prevented removal into iOS's `preventNativeDismiss` (`NativeStackView.native.tsx`), so the swipes ask too; pinned by `tests/screens/write-screens.test.mjs`, device check in iOS-7 |
-| `src/hooks/useHome.ts` | KEEP | iOS-1b | — |
+| `src/hooks/useHome.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (G6: the Home period, `HomeKpis`). |
 | `src/hooks/useKnowledgeBase.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useLookups.ts` | KEEP | iOS-1b | — |
-| `src/hooks/useNotifications.ts` | KEEP | iOS-1b | — |
+| `src/hooks/useNotifications.ts` | ADAPT | iOS-1b | — **`8b522e3` (iOS-5e):** Android's change is a push comment, G7c (push), not ported: the iOS file stays at `f4fad10`. Now ADAPT. |
 | `src/hooks/usePostComment.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** the write is the exported `sendComment(role, …)` (as `sendAssignment`), so the tests drive it; it refuses a PRIVATE note with files before anything is uploaded (05 §C.26, §4.11) |
-| `src/hooks/useProfile.ts` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** `useSignOut` calls `signOutAndWipe()` (`auth.api.ts`) instead of running AUTH-3 and `endSession` itself. Same sequence, same 5 s cap; now testable under Node **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`f4fad10` (iOS-5d):** comment only. Android's `endSession(null, { forgetFullAuth: true })` is in `signOutAndWipe()` (`auth.api.ts`). |
+| `src/hooks/useProfile.ts` | ADAPT | iOS-1b, iOS-6 | Copied unchanged in iOS-1b. **iOS-6:** `useSignOut` calls `signOutAndWipe()` (`auth.api.ts`) instead of running AUTH-3 and `endSession` itself. Same sequence, same 5 s cap; now testable under Node **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`f4fad10` (iOS-5d):** comment only. Android's `endSession(null, { forgetFullAuth: true })` is in `signOutAndWipe()` (`auth.api.ts`). **`8b522e3` (iOS-5e):** Android's change is `unregisterPushForSignOut()` in sign-out, G7c (push), not ported: unchanged on iOS (sign-out is AUTH-3, then the wipe, as before). |
 | `src/hooks/useReduceMotion.ts` | KEEP | iOS-1b | `AccessibilityInfo.isReduceMotionEnabled` reads iOS's Reduce Motion setting. The comment names only Android's equivalent **iOS-5c:** Android's `c5c63ac` version, verbatim (`reduceMotionSettled()`, the start-up intro's question). |
 | `src/hooks/useServiceCatalog.ts` | KEEP | iOS-1b | — |
 | `src/hooks/useSingleFlight.ts` | KEEP | iOS-1b | — |
@@ -261,10 +263,10 @@ iOS-1, iOS-2, iOS-8 and iOS-9 keep their numbers.
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `src/navigation/AppDrawer.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `AppTabs.tsx` (the tab bar) and `TabStacks.tsx` (one native stack per tab, More included) (§4.5) |
+| `src/navigation/AppDrawer.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `AppTabs.tsx` (the tab bar) and `TabStacks.tsx` (one native stack per tab, More included) (§4.5) **`8b522e3` (iOS-5e):** No iOS file: the AuditLog screen is registered in `TabStacks.tsx`, ADMIN only through `routes.ts` `stackRoutes` (§4.18). |
 | `src/navigation/AppTabBar.tsx` | SKIP | — | Not copied. It existed so the bar could sit under the drawer's screens. On iOS the tab navigator's own bar is on every pushed screen (§4.5, decision D4) |
 | `src/navigation/AuthStack.tsx` | KEEP | iOS-2 | Copied in iOS-2. The `__DEV__` gate is unchanged. §8 would change it only if approved **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
-| `src/navigation/DrawerContent.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `src/navigation/MoreScreen.tsx`: the same rows, labels, icons, account card, Sign out and version line, as an iOS grouped list from `moreSections()` (§4.5) |
+| `src/navigation/DrawerContent.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `src/navigation/MoreScreen.tsx`: the same rows, labels, icons, account card, Sign out and version line, as an iOS grouped list from `moreSections()` (§4.5) **`8b522e3` (iOS-5e):** No iOS file: `drawerItems(role)` and the Audit log row are in `MoreScreen.tsx` / `moreSections()` (§4.18). |
 | `src/navigation/MainTabs.tsx` | ADAPT | iOS-2 | Not copied. **Replaced** by `AppTabs.tsx` (tabs from `appTabs()`, badges from `tabBadges()`) |
 | `src/navigation/ModuleStacks.tsx` | ADAPT | iOS-2 | Not copied. **Replaced:** the four module stacks are flattened into the More stack (`routes.ts`), so each module's first screen swipes back to More. The `getId` functions moved to `routes.ts` (`RECORD_ID_PARAM`) |
 | `src/navigation/RootNavigator.tsx` | ADAPT | iOS-2, iOS-3b, iOS-3c | Written from the Android file: Auth \| App tabs, plus the seven sheets in a root modal group that covers the tab bar. The reinstall check (`installMarker.ts`) runs before `restoreSession()`. The 8-hour foreground check and the splash hand-over are unchanged. **iOS-3b:** registers the five write sheets, gives every sheet `getIdFor(name)`, and mounts `SuccessNoticeHost` above the navigator. **iOS-3c:** registers TaskEditor (getId by task); `SHEETS` is a complete table, so a sheet without its screen does not compile **`f4fad10` (iOS-5d):** Android's foreground hook: `endSessionIfReauthDue()` before the 8-hour check. The reinstall check still runs before `restoreSession()`. |
@@ -283,16 +285,16 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/screens/auth/LoginScreen.tsx` | ADAPT | iOS-2 | Copied in iOS-2. Nothing platform-specific. The `__DEV__` hint shows whichever redirect `auth.config.ts` returns, which is the Android one until iOS-6, so Microsoft sign-in can't finish on iOS before then **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **iOS-5c: ADAPT** (was KEEP). Android's `c5c63ac` file (the arc split), plus the `__DEV__` developer-token button and its hint, which stay until iOS-9 (D4). Android's comment that the screen was deleted is left out. Sign-in itself is unchanged (§4.16). **`f4fad10` (iOS-5d):** Android's hunk, verbatim: "Signed out for security" in the message slot, in the info tone (blue-50, lock icon). The `__DEV__` block is untouched. |
 | `src/screens/auth/signInAttempt.ts` | KEEP | iOS-2 | Copied in iOS-2. The stale-banner rule is platform-neutral. On iOS the Microsoft sheet leaves the app `inactive`, not `background`, so it still never counts as leaving. Checked in iOS-6. **iOS-6:** unchanged. `tests/auth/ios-sso.test.mjs` runs the iOS sequences: the sheet (`inactive`), a trip to Authenticator during sign-in (`background`), and Control Centre while idle (`inactive`). None of them clears the banner. On real AppState events in iOS-7 **`f4fad10` (iOS-5d):** Android's version, verbatim: it decides `prompt=login` from the in-memory date and writes `fullAuthAt` only after a challenged sign-in. |
 | `src/screens/approvals/ApprovalDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #14, §4.12 |
-| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c (built) | §6 #13, §4.12 |
+| `src/screens/approvals/ApprovalsInboxScreen.tsx` | SCREEN | iOS-3c (built) | §6 #13, §4.12 **`8b522e3` (iOS-5e):** Android's comment (G7: every role, always) merged, with the iOS line updated. |
 | `src/screens/catalog/ServiceCatalogScreen.tsx` | SCREEN | iOS-3c (built) | §6 #20, §4.12 |
 | `src/screens/catalog/ServiceFormFieldInput.tsx` | SCREEN | iOS-3c (built) | §6 #21, §4.12 |
 | `src/screens/catalog/ServiceRequestDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #23, §4.12 |
 | `src/screens/catalog/ServiceRequestFormScreen.tsx` | SCREEN | iOS-3c (built) | §6 #22, §4.12 |
 | `src/screens/dashboard/AnnouncementsScreen.tsx` | SCREEN | iOS-3c (built) | §6 #24, §4.12 **iOS-5b:** registered for ADMIN only (`stackRoutes`); header comment as `4063df3`. |
-| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #1, §4.9. **iOS-3b:** "Raise a ticket" and "+" back (§4.11) **iOS-5b:** as `4063df3`: the banner and ANN-1 refresh for ADMIN only (`showAnnouncementBanner`), and the time-of-day greeting (`utils/greeting.ts`), re-read on focus and on return to the foreground. **iOS-5c:** Android's `c5c63ac` KPI placeholder (an invisible "0" holds the count's line), with the count's `numberOfLines` and Title 1 cap copied onto it. |
+| `src/screens/dashboard/HomeScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #1, §4.9. **iOS-3b:** "Raise a ticket" and "+" back (§4.11) **iOS-5b:** as `4063df3`: the banner and ANN-1 refresh for ADMIN only (`showAnnouncementBanner`), and the time-of-day greeting (`utils/greeting.ts`), re-read on focus and on return to the foreground. **iOS-5c:** Android's `c5c63ac` KPI placeholder (an invisible "0" holds the count's line), with the count's `numberOfLines` and Title 1 cap copied onto it. **`8b522e3` (iOS-5e):** G6/G7 merged by hand: Android's tiles, chips, period logic and `openList(filter, carriesPeriod)`; the period row is an iOS toolbar + period sheet, Custom's days `DatePickerSheet` (§4.18). |
 | `src/screens/knowledge/KbArticleScreen.tsx` | SCREEN | iOS-3c (built) | §6 #19, §4.12 |
 | `src/screens/knowledge/KnowledgeBaseScreen.tsx` | SCREEN | iOS-3c (built) | §6 #18, §4.12 **iOS-5b:** registered for ADMIN only, with `KbArticle` (`stackRoutes`); header comment as `4063df3`. |
-| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a (planned), iOS-3c (built) | §6 #6, §4.12. Planned for iOS-3a, which left it the DEV placeholder (§4.9) |
+| `src/screens/notifications/NotificationsScreen.tsx` | SCREEN | iOS-3a (planned), iOS-3c (built) | §6 #6, §4.12. Planned for iOS-3a, which left it the DEV placeholder (§4.9) **`8b522e3` (iOS-5e):** Android's change is the push permission prompt and `PushNoticeBlock`, G7c (push), not ported: unchanged on iOS (its notice stays true there). |
 | `src/screens/profile/ProfileScreen.tsx` | SCREEN | iOS-3c (built) | §6 #25, §4.12 **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
 | `src/screens/tasks/TaskDetailScreen.tsx` | SCREEN | iOS-3c (built) | §6 #16, §4.12 |
 | `src/screens/tasks/TaskEditorScreen.tsx` | SCREEN | iOS-3c (built) | §6 #17, §4.12 **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
@@ -305,7 +307,7 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/screens/tickets/TicketDetailScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #4, §4.9. **iOS-3b:** every write back, More options as an action sheet (§4.11) |
 | `src/screens/tickets/TicketFiltersScreen.tsx` | SCREEN | iOS-3a (built) | §6 #3, §4.9 |
 | `src/screens/tickets/TicketLinkScreen.tsx` | SCREEN | iOS-3a (built) | §6 #5, §4.9 |
-| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #2, §4.9. **iOS-3b:** the status chip (action sheet), selection and "+" back (§4.11) |
+| `src/screens/tickets/TicketListScreen.tsx` | SCREEN | iOS-3a (built), iOS-3b | §6 #2, §4.9. **iOS-3b:** the status chip (action sheet), selection and "+" back (§4.11) **`8b522e3` (iOS-5e):** G7 merged: Android's period chip, first in the iOS-8a toolbar's filter row, `min-h-9`. |
 | `src/screens/tickets/TicketPropertyEditors.tsx` | SCREEN | iOS-3a as-is, iOS-3b (built) | §6 #11. Copied unchanged in iOS-3a, because TicketDetail imports it; its editors open since iOS-3b, with impact and urgency as action sheets (§4.11) |
 
 ### 3.11 `src/store/` (2)
@@ -313,14 +315,14 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
 | `src/store/auth.store.ts` | ADAPT | iOS-1b | Pass `{ keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY }` to every SecureStore call. This is the value `02-AUTH.md` §5.1 already specifies, and the iOS counterpart of Android's `allowBackup: false`: the token never moves to another device through a backup. Also fix the "Android Keystore" comment. The wipe after a reinstall goes in a separate file (§7), so this store stays loadable by the Node tests. **iOS-2:** `wipeStoredSession()` is exported for that file **`f4fad10` (iOS-5d):** Android's 15-day rule merged (`REAUTH_INTERVAL_MS`, `isReauthDue()`, `REAUTH_NOTICE`, `fullAuthAt` under `mmg.auth.fullAuthAt`). Its three Keychain calls pass `STORE_OPTIONS` like the rest. `forgetStoredFullAuth()` is exported (private on Android) for `installMarker.ts`. |
-| `src/store/ui.store.ts` | KEEP | iOS-1b | — |
+| `src/store/ui.store.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (G6 period, G7 `ticketPeriod`). |
 
 ### 3.12 `src/theme/` (5)
 
 | File | Class | Phase | iOS change / note |
 |---|---|---|---|
-| `src/theme/colors.ts` | KEEP | iOS-1b | — **iOS-5c:** Android's `c5c63ac` version, verbatim (`colors.login`, `colors.microsoft`, `colors.motion`). |
-| `src/theme/index.ts` | KEEP | iOS-1b | — **iOS-5c:** exports `loginLayout`, `splashArt` and `loginType` (Android's `c5c63ac`), next to iOS-4's exports. |
+| `src/theme/colors.ts` | KEEP | iOS-1b | — **iOS-5c:** Android's `c5c63ac` version, verbatim (`colors.login`, `colors.microsoft`, `colors.motion`). **`8b522e3` (iOS-5e):** Android's version, verbatim (`kpi.active`, `auditAction`). |
+| `src/theme/index.ts` | KEEP | iOS-1b | — **iOS-5c:** exports `loginLayout`, `splashArt` and `loginType` (Android's `c5c63ac`), next to iOS-4's exports. **`8b522e3` (iOS-5e):** Android's `AuditActionTone` export added; the iOS line kept. |
 | `src/theme/motion.ts` | ADAPT | iOS-1b, iOS-3b | Copied unchanged in iOS-1b. **iOS-3b:** adds `successNotice` (fade 200 ms, visible 3 s) for `components/SuccessNotice.tsx`; components hold no motion numbers of their own **iOS-5c:** Android's `c5c63ac` changes merged (the shimmer's opacities, `intro`, `signIn`, the `fall` curve); `successNotice` kept. |
 | `src/theme/spacing.ts` | KEEP | iOS-1b | dp values are used as pt on iOS, at the same numbers |
 | `src/theme/typography.ts` | KEEP | iOS-1b | No font is named, so iOS uses its system font, SF Pro. The web's `font-sans` stack also uses the Apple system font on Apple devices. The comment mentions Roboto only **iOS-5c:** Android's `loginType` (`c5c63ac`) added to the iOS-4 file, with one iOS comment line (SF Pro Heavy). |
@@ -336,11 +338,11 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/types/comment.ts` | KEEP | iOS-1b | — |
 | `src/types/dashboard.ts` | KEEP | iOS-1b | — |
 | `src/types/enums.ts` | KEEP | iOS-1b | — |
-| `src/types/index.ts` | KEEP | iOS-1b | — |
+| `src/types/index.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim. |
 | `src/types/kb.ts` | KEEP | iOS-1b | — |
 | `src/types/lookups.ts` | KEEP | iOS-1b | — |
 | `src/types/mobile-sso-contract.ts` | KEEP | iOS-1b | — |
-| `src/types/navigation.ts` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `types/index.ts` re-exports it. **iOS-2:** rewritten for the tabs (§4.5): `AppTabParamList`, one param list per tab stack, `RecordScreensParamList` (in every stack), `SheetsParamList` (in the root stack), and their screen props. The drawer types and the `@react-navigation/drawer` import are gone **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). |
+| `src/types/navigation.ts` | ADAPT | iOS-1b as-is, iOS-2 | Copied unchanged in iOS-1b, because `types/index.ts` re-exports it. **iOS-2:** rewritten for the tabs (§4.5): `AppTabParamList`, one param list per tab stack, `RecordScreensParamList` (in every stack), `SheetsParamList` (in the root stack), and their screen props. The drawer types and the `@react-navigation/drawer` import are gone **`4063df3`:** Android's change here is on the iOS-9 list, not synced in iOS-5b (`ANDROID-DELTA.md`). **`8b522e3` (iOS-5e):** `AuditLog` added to `MoreStackParamList` (Android: `AppDrawerParamList`). |
 | `src/types/notification.ts` | KEEP | iOS-1b | — |
 | `src/types/service-catalog.ts` | KEEP | iOS-1b | — |
 | `src/types/task.ts` | KEEP | iOS-1b | — |
@@ -360,13 +362,13 @@ The 25 SCREEN files are listed in porting order in §6. The remaining four are h
 | `src/utils/format.ts` | KEEP | iOS-1b | — |
 | `src/utils/html.ts` | KEEP | iOS-1b | — |
 | `src/utils/kb.ts` | KEEP | iOS-1b | — |
-| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers. **iOS-3a:** exports the existing `navRole()` (no user: END_USER's answers), so the screens no longer name a role themselves, which `tests/navigation/shell.test.mjs` forbids. **iOS-3c:** adds `taskPermissions()` (`edit`, `pickTechnician`, `mineFilter`): the answers Android's three task screens computed with `isStaff` and `isAgentOrAdmin`, pinned per role in `role-gating` **iOS-5b:** Android's `canUseKnowledgeBase()`, `canReadAnnouncements()`, `showAnnouncementBanner()` and the `drawerItems()` change, as on `4063df3`. Android's `drawerRoutes()` is not ported: its iOS form is `stackRoutes()` in `navigation/routes.ts` (§7). Android's other `4063df3` change here, Pick up without `canAssignToSelf()` (D5), is on the iOS-9 list: it differs only for the developer-token placeholder session, which no release build can hold. |
+| `src/utils/permissions.ts` | ADAPT | iOS-1b, iOS-2 | Copied unchanged in iOS-1b. **iOS-2:** adds `appTabs()`, `hasApprovalsTab()`, `moreSections()` and `tabBadges()` (§4.5), built on `drawerItems()` and `ticketsTitle()`. Every existing function is unchanged, so the role-gating test still pins the same answers. **iOS-3a:** exports the existing `navRole()` (no user: END_USER's answers), so the screens no longer name a role themselves, which `tests/navigation/shell.test.mjs` forbids. **iOS-3c:** adds `taskPermissions()` (`edit`, `pickTechnician`, `mineFilter`): the answers Android's three task screens computed with `isStaff` and `isAgentOrAdmin`, pinned per role in `role-gating` **iOS-5b:** Android's `canUseKnowledgeBase()`, `canReadAnnouncements()`, `showAnnouncementBanner()` and the `drawerItems()` change, as on `4063df3`. Android's `drawerRoutes()` is not ported: its iOS form is `stackRoutes()` in `navigation/routes.ts` (§7). Android's other `4063df3` change here, Pick up without `canAssignToSelf()` (D5), is on the iOS-9 list: it differs only for the developer-token placeholder session, which no release build can hold. **`8b522e3` (iOS-5e):** Android's G6–G8 rules line for line (51 of 53 shared exports identical; the 2 others are D5, iOS-9 list); `drawerRoutes` stays out (iOS: `stackRoutes`). iOS: `hasApprovalsTab` = ADMIN/AGENT (Q1 (a)), `moreSections(role)` with an `admin` section. |
 | `src/utils/roles.ts` | KEEP | iOS-1b | — |
 | `src/utils/service-catalog.ts` | KEEP | iOS-1b | — |
 | `src/utils/session.ts` | KEEP | iOS-1b | — **Deleted on Android at `4063df3`** (the developer-token screen and its placeholder guards). Kept on iOS until iOS-9 (`ANDROID-DELTA.md` D4, D5): it is never in a release or TestFlight bundle (`verify-release-bundle`). |
 | `src/utils/tasks.ts` | KEEP | iOS-1b | — |
 | `src/utils/templates.ts` | KEEP | iOS-1b | — |
-| `src/utils/ticket-filters.ts` | KEEP | iOS-1b | — |
+| `src/utils/ticket-filters.ts` | KEEP | iOS-1b | — **`8b522e3` (iOS-5e):** Android's version, verbatim (G6 KPI filters, G7 `appliedTicketPeriod`). |
 | `src/utils/ticket-properties.ts` | KEEP | iOS-1b | — |
 | `src/utils/ticket-rules.ts` | KEEP | iOS-1b | — |
 | `src/utils/writeCopy.ts` | KEEP | iOS-1b | — |
@@ -383,8 +385,8 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | `tests/rbac/list-filters.test.mjs` | KEEP | iOS-3a (copied) | Reads `TicketListScreen` and `TicketFiltersScreen`. Copied unchanged; all pass |
 | `tests/rbac/personas.mjs` | KEEP | iOS-1b | — |
 | `tests/rbac/property-editing.test.mjs` | KEEP | iOS-1b | Pure modules only |
-| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass. **iOS-3c:** Android's last four rows are back, byte-identical (the three catalogue screens, Profile); five rows Android did not have (the three task screens on `taskPermissions()`, the two approval screens on APR-1 and `approvalOnScreen()`); `taskPermissions()` pinned per persona and shown equal to Android's inline answers and to M4's `editTasks`; 145 pass. **iOS-5:** the TicketListScreen check cuts `ListEmpty` with `\r?\n` instead of `\n`, so it also passes on a CRLF checkout (§4.14); 145 pass **iOS-5b:** Android's 8 drawer-row cases for KB and Announcements ADMIN only. |
-| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack`. **Copied in iOS-3c**, every other expectation unchanged, plus one line (plan Q2): a number field's keyboard is `numbers-and-punctuation`, not `numeric`; 108 pass **iOS-5b:** Android's 4 catalogue-position cases, and the wiring check also requires `stackRoutes('MoreTab', role)` to hold the catalogue for every role. |
+| `tests/rbac/role-gating.test.mjs` | ADAPT | iOS-3a (copied), completed in iOS-3b and iOS-3c | Not copied in iOS-2: it reads screens that arrive in iOS-3. Its navigation part is already covered on iOS by `tests/navigation/shell.test.mjs` (§7). **Copied in iOS-3a, ahead of iOS-3c,** with every expectation unchanged; its `GATED` list holds only the screens ported so far, and a comment names the rows iOS-3b (CreateTicket, ReplyComposer, SubmitApproval) and iOS-3c (the catalogue, Profile) add back with their Android `forbid`. Changed on copy: the `GATED` entry for `src/navigation/DrawerContent.tsx` becomes `MoreScreen.tsx` calling `moreSections(` and `countrySelectorMode(` (`drawerItems(` is now called only inside `permissions.ts`); the `MainTabs.tsx` entry becomes `AppTabs.tsx` calling `appTabs(`. The `drawerItems()` and `mainTabs()` expectations are unchanged. **iOS-3b:** the three rows are back, byte-identical to Android's, plus two Android did not have (StatusClosure, AssignPicker) so every write sheet takes its role decisions from `permissions.ts`; 128 pass. **iOS-3c:** Android's last four rows are back, byte-identical (the three catalogue screens, Profile); five rows Android did not have (the three task screens on `taskPermissions()`, the two approval screens on APR-1 and `approvalOnScreen()`); `taskPermissions()` pinned per persona and shown equal to Android's inline answers and to M4's `editTasks`; 145 pass. **iOS-5:** the TicketListScreen check cuts `ListEmpty` with `\r?\n` instead of `\n`, so it also passes on a CRLF checkout (§4.14); 145 pass **iOS-5b:** Android's 8 drawer-row cases for KB and Announcements ADMIN only. **`8b522e3` (iOS-5e):** Android's G6–G8 changes merged (tiles, chips, period row, shortcut, drawer rows). |
+| `tests/rbac/service-catalog.test.mjs` | ADAPT | iOS-3c | Not copied in iOS-2: it reads the catalogue screens. When copied, lines 126–128 change: `MoreScreen.tsx` opens the catalogue with `navigate('ServiceCatalog', { view: 'catalog' })` (and My Requests with `view: 'requests'`), and the catalogue's routes are registered from `STACK_ROUTES.MoreTab` in `src/navigation/routes.ts`, not by a `Drawer.Screen` or a `CatalogStack`. **Copied in iOS-3c**, every other expectation unchanged, plus one line (plan Q2): a number field's keyboard is `numbers-and-punctuation`, not `numeric`; 108 pass **iOS-5b:** Android's 4 catalogue-position cases, and the wiring check also requires `stackRoutes('MoreTab', role)` to hold the catalogue for every role. **`8b522e3` (iOS-5e):** Android's G7 change merged (catalogue third on every drawer). |
 | `tests/rbac/technician-editor.test.mjs` | KEEP | iOS-3b (copied) | Reads AssignPicker, TicketDetail and TicketPropertyEditors. Copied unchanged; all pass |
 | `tests/support/loader.mjs` | ADAPT | iOS-1b, iOS-5d | — **iOS-5d: ADAPT** (was KEEP): one line maps `expo-file-system` to an iOS stub (`tests/support/stubs/expo-file-system.mjs`, §7), so `installMarker.ts` runs under Node. |
 | `tests/support/register.mjs` | KEEP | iOS-1b | — |
@@ -399,7 +401,7 @@ Several suites read screen or navigator source files as text. Each suite is copi
 |---|---|---|---|---|
 | `src/utils/greeting.ts` | added | KEEP | iOS-5b | Copied verbatim |
 | `tests/home/greeting.test.mjs` | added | ADAPT | iOS-5b | Android's 12 tests; one pattern allows iOS-4's `maxFontSizeMultiplier` on the Home header |
-| `tests/rbac/kb-announcements.test.mjs` | added | ADAPT | iOS-5b | Android's 56 tests on iOS's navigation: More rows instead of drawer rows, each tab's `StackRouter` instead of the `DrawerRouter`, `TabStacks.tsx` and `routes.ts` instead of `AppDrawer.tsx` and `ModuleStacks.tsx`. Plus 5 iOS tests: tab, More, deep link and notification tap per persona (§4.15) |
+| `tests/rbac/kb-announcements.test.mjs` | added | ADAPT | iOS-5b | Android's 56 tests on iOS's navigation: More rows instead of drawer rows, each tab's `StackRouter` instead of the `DrawerRouter`, `TabStacks.tsx` and `routes.ts` instead of `AppDrawer.tsx` and `ModuleStacks.tsx`. Plus 5 iOS tests: tab, More, deep link and notification tap per persona (§4.15) **`8b522e3` (iOS-5e):** Android's G7/G8 changes merged on iOS's version (`drawerItems(role)`; ADMIN's Audit log row and route). |
 | `tests/release/production-readiness.test.mjs` | added | ADAPT | iOS-9 | Not ported in iOS-5b: it checks Android's release (one-screen AuthStack, PROD URL, APK/AAB, `versionCode`). The part that applies goes with the iOS-9 items (`ANDROID-DELTA.md` D9) **`c5c63ac`:** its "Login navigates nowhere" case changed with the new button. Still iOS-9: on iOS, Login navigates to the developer-token screen in `__DEV__` until D4. **`f4fad10`:** its sign-in case gained `fullAuthAt` (only `signInAttempt` passes it; the profile save never does). Still iOS-9; iOS-5d checks the same in `tests/auth/ios-reauth.test.mjs`. |
 | `src/screens/PlaceholderScreen.tsx` | deleted | (ADAPT) | iOS-9 | Still on iOS, used only by `DevTokenScreen` |
 | `src/screens/auth/DevTokenScreen.tsx` | deleted | (KEEP) | iOS-9 | Still on iOS, `__DEV__` only, never in a release or TestFlight bundle |
@@ -427,6 +429,35 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | File | At `f4fad10` | Class | Phase | iOS change |
 |---|---|---|---|---|
 | `tests/auth/reauth.test.mjs` | added | ADAPT | iOS-5d | Android's 47 tests. iOS: the sign-out check reads `signOutAndWipe()` (`auth.api.ts`), and the RootNavigator check lets the reinstall check run before `restoreSession()`. The iOS-only cases are in `tests/auth/ios-reauth.test.mjs` (§7, §4.17) |
+
+### 3.19 Added at `8b522e3` (iOS-5e)
+
+`f4fad10..8b522e3` is three commits: `87aba2c` (G6), `51f5554` (G7) and `8b522e3` (G8). They changed 40 files, which are in §3.1–§3.16 with an iOS-5e note, and added these 22:
+
+| File | At `8b522e3` | Class | Phase | iOS change |
+|---|---|---|---|---|
+| `docs/G6-WEB-DASHBOARD.md` | added (G6) | KEEP | iOS-5e | Verbatim: the web dashboard's periods, KPIs and chips, with sources |
+| `docs/G7-PERIOD-APPROVALS-PUSH.md` | added (G7) | KEEP | iOS-5e | Verbatim. Its §3 (push) describes Android only: G7c is not ported |
+| `docs/G8-WEB-AUDIT.md` | added (G8) | KEEP | iOS-5e | Verbatim: AUD-1 and the web audit page, with sources |
+| `src/api/auditLog.api.ts` | added (G8) | KEEP | iOS-5e | Verbatim (AUD-1, `limit` 50, the three-filter allow-list) |
+| `src/hooks/useAuditLog.ts` | added (G8) | KEEP | iOS-5e | Verbatim (ADMIN-only `enabled`, 500-entry cap, de-duplication, the ticket-number lookup) |
+| `src/push/PushBridge.tsx` | added (G7) | SKIP | — | G7c push (§5) |
+| `src/push/platform.ts` | added (G7) | SKIP | — | G7c push (§5) |
+| `src/push/registration.ts` | added (G7) | SKIP | — | G7c push (§5) |
+| `src/push/taps.ts` | added (G7) | SKIP | — | G7c push (§5) |
+| `src/screens/audit/AuditLogScreen.tsx` | added (G8) | SCREEN | iOS-5e | Android's screen in the More stack: the native bar instead of `ScreenHeader`, `listBottomInset()`, `tintColor`, `min-h-9` chips, VoiceOver announcements instead of the live region, a label on the footer retry, `navRole()` (§4.18) |
+| `src/store/push.store.ts` | added (G7) | SKIP | — | G7c push (§5) |
+| `src/types/audit.ts` | added (G8) | KEEP | iOS-5e | Verbatim (03 §C) |
+| `src/utils/audit-log.ts` | added (G8) | KEEP | iOS-5e | Verbatim (labels, filters → params, day groups, `formatAuditDetails`) |
+| `src/utils/dashboard-period.ts` | added (G6, G7) | KEEP | iOS-5e | Verbatim (the ten periods, Custom validation, `periodListDates`) |
+| `src/utils/home-kpis.ts` | added (G6, G7) | KEEP | iOS-5e | Verbatim (what each tile and chip counts and opens, which carry the period) |
+| `src/utils/push.ts` | added (G7) | SKIP | — | G7c push (§5) |
+| `tests/audit/audit-details.test.mjs` | added (G8) | KEEP | iOS-5e | Verbatim, 34 tests |
+| `tests/home/dashboard.test.mjs` | added (G6) | ADAPT | iOS-5e | Android's 53 tests; one source check reads the period sheet and `DatePickerSheet` instead of `DateTimePickerAndroid` |
+| `tests/home/period-list.test.mjs` | added (G7) | ADAPT | iOS-5e | Android's 30 tests unchanged; an iOS note in the header only |
+| `tests/push/push.test.mjs` | added (G7) | SKIP | — | G7c push (§5) |
+| `tests/rbac/approvals-visibility.test.mjs` | added (G7) | ADAPT | iOS-5e | Android's 25 on iOS navigation (TabRouter, the More StackRouter, `MoreScreen`), plus 24 iOS: tabs, More rows and badges per persona (22), and no push code (2) |
+| `tests/rbac/audit-log.test.mjs` | added (G8) | ADAPT | iOS-5e | Android's 48 on each tab's StackRouter and `moreSections`, plus 5 reachability (tab, More, deep link, notification tap) and 5 iOS-screen checks |
 
 ## 4. ADAPT details
 
@@ -1398,6 +1429,7 @@ Whole files:
 | `assets/adaptive-icon-background.png` | Android adaptive-icon layer; iOS has no adaptive icons |
 | `assets/adaptive-icon.png` | Android adaptive-icon foreground and themed (monochrome) layer |
 | `src/navigation/AppTabBar.tsx` | (iOS-2) A custom bar so the tabs could sit under the drawer's screens. iOS has no drawer, and the tab navigator's own bar stays on every pushed screen (§4.5) |
+| `src/push/PushBridge.tsx`, `src/push/platform.ts`, `src/push/registration.ts`, `src/push/taps.ts`, `src/store/push.store.ts`, `src/utils/push.ts`, `tests/push/push.test.mjs` | (iOS-5e) G7c, Android's push client (`51f5554`). Out of iOS-5e by Ronit's brief: it needs `expo-notifications` (a new package and a native build), APNs rather than FCM, and the NTF-5/NTF-6 server half, which is not deployed (`ANDROID-DELTA.md` §9) |
 
 Android-only parts of ADAPT files, not brought over:
 

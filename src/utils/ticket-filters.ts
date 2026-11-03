@@ -31,13 +31,19 @@ export type TicketNamedFilter =
  *   ACTIVE_KPI       kpis.totalOpen  = OPEN + IN_PROGRESS + ON_HOLD + PENDING (the server's ACTIVE_STATUSES)
  *   BREACHED_KPI     kpis.slaBreached = slaStatus BREACHED and status not RESOLVED / CLOSED
  *   UNASSIGNED_KPI   kpis.unassigned = unassigned and ACTIVE_STATUSES
- * DSH-1 counts tickets CREATED in the last 30 days (range=month, 01 DSH-1) except totalOpen; the list has no date
- * filter, so it can hold more rows than the tile says. Home says so under the tiles.
+ *   MGMT_REVIEW_KPI, PARTNER_KPI, USER_CONFIRM_KPI, USER_INFO_KPI, MASTER_DATA_KPI (G6, Home's status chips)
+ *                    kpis.pendingMgmtReview … pendingMasterData = that one status (the server's byStatus groupBy)
+ * DSH-1 counts tickets CREATED in the Home period (G6; 01 DSH-1), except Open (currentlyOpen) and Active (totalOpen),
+ * which count right now. Since G7 a tile also hands the period to the list as its created-date filter (TicketListPeriod
+ * below), so the list holds the tickets the tile counts (docs/G7-PERIOD-APPROVALS-PUSH.md §1).
  */
-export type HomeTileFilter = 'IN_PROGRESS_KPI' | 'ON_HOLD_KPI' | 'ACTIVE_KPI' | 'BREACHED_KPI' | 'UNASSIGNED_KPI';
+export type HomeTileFilter =
+  | 'IN_PROGRESS_KPI' | 'ON_HOLD_KPI' | 'ACTIVE_KPI' | 'BREACHED_KPI' | 'UNASSIGNED_KPI'
+  | 'MGMT_REVIEW_KPI' | 'PARTNER_KPI' | 'USER_CONFIRM_KPI' | 'USER_INFO_KPI' | 'MASTER_DATA_KPI';
 
 export const HOME_TILE_FILTERS: readonly HomeTileFilter[] = [
   'IN_PROGRESS_KPI', 'ON_HOLD_KPI', 'ACTIVE_KPI', 'BREACHED_KPI', 'UNASSIGNED_KPI',
+  'MGMT_REVIEW_KPI', 'PARTNER_KPI', 'USER_CONFIRM_KPI', 'USER_INFO_KPI', 'MASTER_DATA_KPI',
 ];
 
 export function isHomeTileFilter(filter: TicketNamedFilter): filter is HomeTileFilter {
@@ -61,6 +67,12 @@ export const TICKET_FILTER_LABELS: Record<TicketNamedFilter, string> = {
   ACTIVE_KPI: 'Active',
   BREACHED_KPI: 'SLA breached (active)',
   UNASSIGNED_KPI: 'Unassigned (active)',
+  // The web's mini-card words (FE:DashboardPage.tsx:397-401), as on the Home chip that opens them.
+  MGMT_REVIEW_KPI: 'Mgmt review',
+  PARTNER_KPI: 'With partner',
+  USER_CONFIRM_KPI: 'User confirm',
+  USER_INFO_KPI: 'More info',
+  MASTER_DATA_KPI: 'Master data',
 };
 
 export const TICKET_SORT_LABELS: Record<TicketSortOption, string> = {
@@ -138,6 +150,17 @@ export function ticketFilterQuery(
       return { sla: 'BREACHED', status: NOT_RESOLVED_OR_CLOSED.join(',') };
     case 'UNASSIGNED_KPI':
       return { assignedToId: 'unassigned', status: KPI_ACTIVE_STATUSES.join(',') };
+    // The web's mini-cards link to `/tickets?status=<that status>` (FE:DashboardPage.tsx:407).
+    case 'MGMT_REVIEW_KPI':
+      return { status: 'PENDING_MGMT_REVIEW' };
+    case 'PARTNER_KPI':
+      return { status: 'PENDING_PARTNER' };
+    case 'USER_CONFIRM_KPI':
+      return { status: 'PENDING_USER_CONFIRM' };
+    case 'USER_INFO_KPI':
+      return { status: 'PENDING_USER_INFO' };
+    case 'MASTER_DATA_KPI':
+      return { status: 'PENDING_MASTER_DATA' };
   }
 }
 
@@ -247,6 +270,30 @@ export function namedFilterSetsTechnician(filter: TicketNamedFilter): boolean {
 export interface TicketFilterState {
   filter: TicketNamedFilter;
   advanced: TicketAdvancedFilters;
+}
+
+/**
+ * The Home period a tile handed to the list (G7): its name, and the created-date filter it set. The filter itself is
+ * the ordinary `fromDate` / `toDate` of the Filters sheet, so it combines with every other filter exactly as a date
+ * picked by hand does. This record only lets the list name it ("This month") and clear it in one tap.
+ */
+export interface TicketListPeriod {
+  label: string;
+  fromDate: string;
+  toDate: string;
+}
+
+/**
+ * The period the list should show as applied, or null. Only while the created-date filter is still exactly the one the
+ * tile set, and the person may use the date filter: once they change a day in the Filters sheet, it is their own dates.
+ */
+export function appliedTicketPeriod(
+  period: TicketListPeriod | null,
+  advanced: TicketAdvancedFilters,
+  allowed: readonly TicketListFilterKey[],
+): TicketListPeriod | null {
+  if (!period || !allowed.includes('date')) return null;
+  return advanced.fromDate === period.fromDate && advanced.toDate === period.toDate ? period : null;
 }
 
 /** Pick a named filter. "My open" or "Unassigned" drops a technician filter (one slot, last choice wins). */

@@ -16,6 +16,9 @@
 //                 link (…/ticket/<n>, …/tickets/<id>) opens the in-app link resolver instead (05 §A.11).
 //   Home tiles  → tile-only filters with the KPI's exact status set (ticket-filters.ts HomeTileFilter); shown as an
 //                 extra chip until another filter is picked.
+//   Home period → (G7) fromDate/toDate of the Created filter below, set by the tile; shown as its own chip ("This
+//                 month ✕") while those days are unchanged. ✕ clears the dates only; Clear all clears it too.
+//                 iOS-5e: the first chip of the toolbar's filter row (and of the list header at the large text sizes).
 //   Country     → countryId per 05 §A.12 (listCountryParam).
 //   Filters sheet (Phase G2, M3 → TicketFilters; the web's "More Filters", docs/G2-WEB-FILTERS.md):
 //     Priority  → priority=<LOW|MEDIUM|HIGH|URGENT>                    (every role)
@@ -82,9 +85,9 @@ import {
 } from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
 import {
-  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, activeAdvancedFilters, activeFilterLabels, availableTicketFilters,
-  countrySelectorMode, isHomeTileFilter, isTicketFilterAllowed, listCountryParam, normaliseTicketSearch,
-  type TicketNamedFilter, type TicketSortOption,
+  TICKET_FILTER_LABELS, TICKET_SORT_LABELS, activeAdvancedFilters, activeFilterLabels, appliedTicketPeriod,
+  availableTicketFilters, countrySelectorMode, dateRangeLabel, isHomeTileFilter, isTicketFilterAllowed, listCountryParam,
+  normaliseTicketSearch, type TicketNamedFilter, type TicketSortOption,
 } from '@/utils/ticket-filters';
 import { BULK_ACTION_LIMIT, isResolvedLocked, requiresClosureForm } from '@/utils/ticket-rules';
 import { bulkPickUpMessage, statusChangeMessage } from '@/utils/writeCopy';
@@ -103,8 +106,8 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   const role = navRole(user?.role);
   const {
     ticketFilter, ticketSort, ticketCountryId, ticketAdvanced, ticketSearchText: searchText, ticketSearch: search,
-    setTicketFilter, setTicketSort, setTicketCountryId, setTicketSearchText: setSearchText, setTicketSearch: setSearch,
-    clearTicketFilters,
+    ticketPeriod, setTicketFilter, setTicketSort, setTicketCountryId, setTicketSearchText: setSearchText,
+    setTicketSearch: setSearch, clearTicketFilters, clearTicketPeriod,
   } = useUiStore();
 
   // Home tiles open this tab with a named filter pre-applied (08 §3.3).
@@ -121,6 +124,8 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   const allowedMore = ticketListFilters(user);
   const activeMore = activeAdvancedFilters(ticketAdvanced, allowedMore);
   const activeLabels = activeFilterLabels({ filter: activeFilter, search, advanced: ticketAdvanced, allowed: allowedMore });
+  // G7: the Home period, while the Created days are still the ones the tile set.
+  const period = appliedTicketPeriod(ticketPeriod, ticketAdvanced, allowedMore);
   const openFilters = useCallback(() => navigation.navigate('TicketFilters'), [navigation]);
 
   const [sheet, setSheet] = useState<'sort' | 'country' | null>(null);
@@ -399,6 +404,20 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
         contentContainerClassName="gap-2 py-1"
         keyboardShouldPersistTaps="handled"
       >
+        {period ? (
+          // G7: the Home period a tile put on the list. ✕ clears only these days (clearTicketPeriod); Clear all clears it too.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Period from Home: ${period.label}, ${dateRangeLabel(period.fromDate, period.toDate) ?? ''}. Clear the period`}
+            onPress={clearTicketPeriod}
+            hitSlop={4}
+            className="min-h-9 flex-row items-center rounded-full border border-primary bg-primary px-3 py-1 active:opacity-80"
+          >
+            <Ionicons name="calendar-outline" size={14} color={colors.primaryForeground} />
+            <Text className="ml-1 text-sm font-medium text-primary-foreground">{period.label}</Text>
+            <Ionicons name="close" size={14} color={colors.primaryForeground} style={{ marginLeft: 4 }} />
+          </Pressable>
+        ) : null}
         {isHomeTileFilter(activeFilter) ? (
           <View
             accessible

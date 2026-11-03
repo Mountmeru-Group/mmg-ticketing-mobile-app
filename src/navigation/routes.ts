@@ -11,7 +11,7 @@ import type {
   TicketsStackParamList,
   UserRole,
 } from '@/types';
-import { appTabs, canReadAnnouncements, canUseKnowledgeBase, navRole, type AppTab } from '@/utils/permissions';
+import { appTabs, canReadAnnouncements, canUseKnowledgeBase, canViewAuditLog, navRole, type AppTab } from '@/utils/permissions';
 
 /** Registered in every tab stack, so a record opens in the tab the person is in (Android switched to Tickets). */
 export const RECORD_ROUTES = ['TicketDetail', 'TaskDetail', 'ApprovalDetail', 'TicketLink'] as const;
@@ -32,6 +32,7 @@ export const STACK_ROUTES = {
     'ServiceRequestForm',
     'ServiceRequestDetail',
     'Announcements',
+    'AuditLog',
     'Profile',
     ...RECORD_ROUTES,
   ],
@@ -69,8 +70,9 @@ export type SheetRoute = (typeof SHEET_ROUTES)[number];
  * The routes a tab stack REGISTERS for this role, root first: the iOS form of Android's drawerRoutes() (iOS-5b, Android
  * 2026-10-29). TabStacks.tsx registers exactly these. A route left out does not exist for that person: a navigate() to
  * it is handled by no navigator, so no More row, banner, link, back history or stale state can open it. The knowledge
- * base (KnowledgeBase, KbArticle: canUseKnowledgeBase) and Announcements (canReadAnnouncements) are ADMIN only; every
- * other route is registered for every role, as before. No user yet: END_USER's (navRole).
+ * base (KnowledgeBase, KbArticle: canUseKnowledgeBase), Announcements (canReadAnnouncements) and, since iOS-5e (G8), the
+ * Audit log (AuditLog: canViewAuditLog) are ADMIN only; every other route is registered for every role, as before. No
+ * user yet: END_USER's (navRole).
  */
 export function stackRoutes(tab: AppTab, role: UserRole | null | undefined): StackRoute[] {
   const who = navRole(role);
@@ -81,6 +83,7 @@ export function stackRoutes(tab: AppTab, role: UserRole | null | undefined): Sta
 function isRegisteredFor(name: StackRoute, role: UserRole): boolean {
   if (name === 'KnowledgeBase' || name === 'KbArticle') return canUseKnowledgeBase(role);
   if (name === 'Announcements') return canReadAnnouncements(role);
+  if (name === 'AuditLog') return canViewAuditLog(role);
   return true;
 }
 
@@ -151,6 +154,7 @@ function recordId(value: unknown): string | undefined {
 const TITLES: Record<Exclude<StackRoute | SheetRoute, 'TicketList'>, string> = {
   Home: 'Home',
   Announcements: 'Announcements',
+  AuditLog: 'Audit log',
   TicketDetail: 'Ticket',
   TaskDetail: 'Task',
   ApprovalDetail: 'Approval',

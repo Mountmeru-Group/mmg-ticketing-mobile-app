@@ -6,6 +6,7 @@
 - Endpoints per page: from each page's API calls. Endpoint IDs refer to `01-API-CONTRACT.md`.
 - **SDP parity (2026-10-14):** the MVP was revised to follow the ManageEngine ServiceDesk Plus Android structure wherever the backend allows. Feature verdicts, the navigation design and the list-view spec are in `08-SDP-PARITY.md`. Every change to this file is listed in §3.
 - **Phase G4 (2026-10-22):** the service catalogue (P2, P3) is built and is now MVP: M17–M19. The web's behaviour, with sources: `docs/G4-WEB-CATALOGUE.md`.
+- **Phase G8 (2026-11-02):** the audit log, ADMIN only: M20, AUD-1. The web page `/audit-log` is deployed but **not in the analysed clone**; the endpoint and its behaviour, with sources: `docs/G8-WEB-AUDIT.md`.
 
 **Key facts about the web UI**
 - **No web route has a role guard.** Roles only hide sidebar items, so any logged-in user can open any URL. The backend is the only enforcement, and it has gaps (`05` §C).
@@ -34,8 +35,9 @@
 | `/kb/new`, `/kb/edit/:slug` · `pages/kb/KBArticleFormPage.tsx` | Author articles | ADMIN, AGENT | — | **Skip** | *`POST/PUT /kb/articles`. Publish is never called; edit links are broken* |
 | `/service-catalog` · `pages/service-catalog/ServiceCatalogPage.tsx` | Catalog browse + "my requests" | ALL (sidebar "Service Request", bottom tab "Requests") | **M17 Service catalogue** (drawer "Service Request"; Catalog and My Requests views), **M19 Request detail** (mobile only) | **MVP** (G4; was Phase 2 P2) | SCR-1, SCR-2, SCR-4, SCR-6, SCR-3 (answer labels on M19) |
 | `/service-catalog/new/:itemId` · `ServiceRequestFormPage.tsx` | Dynamic request form | ALL | **M18 Service request form** | **MVP** (G4; was Phase 2 P3) | SCR-3, SCR-5. *The web never calls SCR-6* |
-| `/approvals` · `pages/approvals/ApprovalsPage.tsx` | My pending approvals; approve/reject | nav: ADMIN, AGENT. Server: any approver | **M12 Approvals inbox**, **M13 Approval detail** (drawer; END_USER/L2 only while they have pending approvals, `08` S1) | **MVP** (was Phase 2 P4) | APR-1, APR-2, APR-3, TKT-3/TKT-7/ATT-1 best-effort (ticket approvals carry no ticket data; `08` 1.49) |
+| `/approvals` · `pages/approvals/ApprovalsPage.tsx` | My pending approvals; approve/reject | nav: ADMIN, AGENT. Server: any approver | **M12 Approvals inbox**, **M13 Approval detail** (drawer; every role, always, since G7; before, END_USER/L2 only while they had pending approvals, `08` S1) | **MVP** (was Phase 2 P4) | APR-1, APR-2, APR-3, TKT-3/TKT-7/ATT-1 best-effort (ticket approvals carry no ticket data; `08` 1.49) |
 | `/announcements` · `pages/announcements/AnnouncementsPage.tsx` | Read; ADMIN manages | ADMIN, AGENT, L2 | **M16 Announcements** (drawer) + pinned banner on M2 Home | **MVP** (was Phase 2 P5) | ANN-1 |
+| `/audit-log` · **not in the clone** (deployed only; Ronit, G8) | Who did what, when: action, ticket, person, details; filters Action, Entity type, From, To, Ticket # (as Ronit describes the deployed page) | ADMIN (the server's AUD-1 guard; the page's own visibility is unknown) | **M20 Audit log** (drawer, ADMIN only) | **Built in G8** (P2) | AUD-1, TKT-1 (ticket number → id), USR-3 (person filter) |
 | `/reports`, `/reports/scheduled`, `/reports/query-builder` | 10 report tabs, ~20 charts, exports, scheduled reports, ad-hoc queries | ADMIN, AGENT, L2 (query builder: URL only) | — | **Skip** | *`/reports/*`, `/query-builder/*`* |
 | `/problems` · `pages/problems/ProblemsPage.tsx` | Problem management | ADMIN, AGENT | — | **Skip** | *`/problems/*`* |
 | `/changes` · `pages/changes/ChangesPage.tsx` | Change management, CAB flow | ADMIN, AGENT | — (approve via P4 later) | **Skip** | *`/changes/*`* |
@@ -63,7 +65,7 @@
 
 ## 2. Proposed mobile screens
 
-### 2.1 MVP: 19 screens (16, plus the service catalogue's three since G4)
+### 2.1 MVP: 20 screens (16, plus the service catalogue's three since G4, plus the audit log since G8)
 
 **Navigation** (full spec: `08-SDP-PARITY.md` §3)
 - A **side drawer** ("Menu", as in SDP), opened by ☰ top-left on every root screen or by an edge-swipe, wraps **three bottom tabs: Home · Tickets · Alerts**.
@@ -71,9 +73,10 @@
   - The Alerts tab shows the unread badge.
 - **Drawer header:** avatar, name, role, country chip. Tap → M10.
 - **Drawer items by role**
-  - **Approvals** (badge): ADMIN and AGENT always; END_USER and L2 only while APR-1 returns ≥ 1 (`08` S1).
-  - **Knowledge base** and **Announcements**: all roles.
+  - **Approvals** (badge): every role, always (G7). Before G7: ADMIN and AGENT always; END_USER and L2 only while APR-1 returned ≥ 1 (`08` S1).
+  - **Knowledge base** and **Announcements**: ADMIN only since 2026-10-29 (`docs/ROLE-MATRIX.md` §16); all roles before.
   - **Service Request** (the service catalogue, M17; G4): all roles, after Knowledge base, as in the web sidebar.
+  - **Audit log** (M20; G8): ADMIN only, after Announcements below a divider, before Settings. The route is registered for ADMIN only.
   - **Settings** and **Sign out**: all roles.
   - Footer: app version + environment.
   - Later (hidden until their asks ship): My tasks (A20), Assets (P18). The Service catalog (P2) is built (G4).
@@ -84,17 +87,17 @@
 | # | Screen | Who | Purpose and content | Endpoints | Rules |
 |---|---|---|---|---|---|
 | **M1** | **Login** | public | SSO button (A2) and/or username+password (A1), chosen by AUTH-1; error messages from `05` §A.13; environment label on non-prod builds | SYS-1, AUTH-1, AUTH-P1/P2, AUTH-2 | `02-AUTH.md` §4–§5 |
-| **M2** | **Home** | all | **END_USER:** "Raise a ticket" button, pinned-announcement banner, my 5 most recent tickets, open/resolved counts. **Staff:** tiles that open the Tickets tab with a named filter pre-applied: My open, Unassigned*, Overdue (`sla=BREACHED`), Due soon (`sla=DUE_SOON`); KPI counts (`open`, `inProgress`, `onHold`, `slaBreached`, `totalOpen`); Pending approvals tile (count, → M12); announcement banner; `recent` list | DSH-1, TKT-1, NTF-2, APR-1, ANN-1 | `01` DSH-1 (only the safe KPIs); *`unassigned` only for ADMIN and triage AGENT; no "Due today" until A23 (`08` S6) |
+| **M2** | **Home** | all | **END_USER:** "Raise a ticket" button, pinned-announcement banner, my 5 most recent tickets, open/resolved counts. **Staff:** tiles that open the Tickets tab with a named filter pre-applied: My open, Unassigned*, Overdue (`sla=BREACHED`), Due soon (`sla=DUE_SOON`); KPI counts (G6, 2026-11-02, as on the web: tiles `total`, `currentlyOpen`, `inProgress`, `resolved`, `slaBreached`; status chips `closed`, `unassigned`*, the five `pending*`, `onHold`, and `totalOpen` as "Active now"; a PERIOD row picks the window, as on the web; `docs/G6-WEB-DASHBOARD.md`. Before G6: `open`, `inProgress`, `onHold`, `slaBreached`, `totalOpen`); Pending approvals tile (count, → M12); announcement banner; `recent` list | DSH-1, TKT-1, NTF-2, APR-1, ANN-1 | `01` DSH-1 (only the safe KPIs); *`unassigned` only for ADMIN and triage AGENT; no "Due today" until A23 (`08` S6) |
 | **M3** | **Ticket list** | all | Infinite list (20/page). **Named-filter drop-down:** All · Open · My open · Unassigned (staff) · Pending · Overdue · Due soon · Resolved · Closed, plus an "Advanced" sheet (priority, group, category, created dates, country). **Search** box: digits = ticket #; text matches subject, requester and technician (no field selector, A22). **Requester** filter chip via USR-3 (ADMIN/AGENT). **Sort sheet:** Last updated · Priority · Due date (no other sorts or direction, A21). **Inline status chip** on each card (transition map only; hidden for END_USER). **Tap-and-hold multi-select** → bulk Pick up / Assign (ADMIN/AGENT) and Close (staff), max **20** per action, sequential, stop on first 429/5xx. Row: #, subject, status chip, priority, SLA badge (hold-adjusted), requester/technician, "new reply" highlight | TKT-1, TKT-5, TKT-6, LKP-2, LKP-4/5, USR-3 | `08` §4; `05` §A.1, §A.2, §A.9, §A.10, §A.12, §B.14; D8 |
 | **M4** | **Ticket detail** | all (actions by role) | **Header:** #, subject, **status drop-down** (staff; transition map), priority, SLA, attachments icon with **count badge** (`_count.attachments`). **"More options" sheet** (bottom-right): Pick up, Assign (M7), Close (M6), Submit for approval (G3, APR-4); ADMIN/AGENT only for Pick up, Assign and Submit for approval. **Attachments:** delete a file (G3, ATT-5; ADMIN, AGENT, L2, any status, confirmed). **Properties:** impact/urgency, category cascade, group, technician, country, requester card. **Sections:** Conversations (FAB → M5) · Notes (PRIVATE comments; ADMIN/AGENT only) · History · Resolution (resolution, closure code, FCR, closure comments) · Tasks (→ M11) · Attachments. Description as sanitised HTML | TKT-3, TKT-7, TKT-4, TKT-5, TKT-6, CMT-1, ATT-1, ATT-3, ATT-4, ATT-5, TSK-1, TSK-3, LKP-1, LKP-2, APR-4 and USR-3 (submit for approval) | `05` §A.1, §A.3, §A.6, §A.7, §A.9, §A.15; §C hygiene rules. No Worklog (A19) or Approvals (A27) sections |
 | **M5** | **Reply / Note composer** | all (Note: ADMIN/AGENT) | Reply, Reply-All (staff), Note; To/CC chips (staff); plain-text body; Templates (every role, every mode; G3); attach files/photos (camera, gallery, documents); send | CMT-2, ATT-2, TKT-9, USR-3, LKP-7 | `05` §A.5, §A.16; §B.11; client-side file checks (§B.9) |
 | **M6** | **Status & closure sheet** | ADMIN, AGENT, L2 | Transition buttons from the map; for RESOLVED/CLOSED/CANCELED: Resolution*, Closure code, FCR, Closure comments*, attachments. **Bulk mode** (from M3): one Close form applied to each eligible selected ticket. Tickets whose status has no Close transition are skipped and listed. The confirmation states how many requesters will be emailed | TKT-6, ATT-2 | `05` §A.1, §A.2; `08` §4.2 |
 | **M7** | **Assign picker** | ADMIN, AGENT | **Group selector** first (LKP-2, active groups), then its members with search; Recommended (country, TKT-10); user search (USR-3) when a group has no members; "Assign to me"; remove assignment. **Bulk mode** (from M3): the same picker, applied per ticket with `{assignedToId, teamId}` | TKT-10, LKP-2, USR-3, TKT-5 (or TKT-4) | `05` §A.4; §B.14, §B.30; `08` §4.2 |
 | **M8** | **Create ticket** | all | Title, description, 3-level category cascade; **staff only:** impact, urgency; **ADMIN, AGENT only:** the priority preview (G5: the G1 box, "Auto-computed from Impact × Urgency"; display only, no `priority` sent), team ("Auto (from category)"), assignee, requester (raise on behalf); attachments (photos/files) uploaded after create; END_USER routing banner. Roles from `createTicketPermissions()` | LKP-1, LKP-2, USR-3, LKP-6 (ADMIN, AGENT; G5), TKT-2, ATT-2 | `05` §A.8; D5; `ROLE-MATRIX.md` §14 |
-| **M9** | **Notifications** | all | List (unread first in the UI), tap → ticket (by `ticketId`), mark read, mark all read; tab badge from the count | NTF-1, NTF-2, NTF-3, NTF-4 | `05` §B.3, §B.4, §B.23 |
+| **M9** | **Notifications** | all | List (unread first in the UI), tap → ticket (by `ticketId`), mark read, mark all read; tab badge from the count. **G7:** the top notice shows the real push state, with "Turn on notifications" / "Open settings". The first visit asks for the notification permission, once (Android 13+) | NTF-1, NTF-2, NTF-3, NTF-4; NTF-5/NTF-6 (push registration, ⚠ NOT YET DEPLOYED, `docs/G7-PERIOD-APPROVALS-PUSH.md` §3) | `05` §B.3, §B.4, §B.23 |
 | **M10** | **Profile & settings** | all | Opened from the drawer header. Name, email, role label (`08` S3), phone, department, timezone (editable: name, phone, department, timezone); country selector (ADMIN, triage AGENT; locked display for country agents; hidden for L2); **theme: System / Light / Dark** (stored on the device); app version + environment; **Sign out** | AUTH-2, USR-1, USR-2, LKP-4, LKP-5, AUTH-3 | `02-AUTH.md` §5.5; `05` §A.12 |
 | **M11** | **Task editor** (sheet from M4 Tasks) | ADMIN, AGENT, L2 | Create, edit (title, description, technician, status, due date), delete with "Remove this task?" confirm. END_USER: read-only list in M4 (D4) | TSK-2, TSK-3, TSK-4 | `05` §A.15; B.25 (`dueDate` as full UTC ISO); C.3 (no server checks, so staff-only by UI) |
-| **M12** | **Approvals inbox** | ADMIN, AGENT; END_USER/L2 while they have pending approvals | Cards (entity type, title/number when available, requested date, stage); filter chips **All · Tickets · Service requests · Changes** (client-side on `entityType`); pull-to-refresh; drawer badge = count | APR-1 | `08` 1.47–1.48; S1, S2 |
+| **M12** | **Approvals inbox** | every role (G7, 2026-11-02; before: ADMIN, AGENT; END_USER/L2 while they had pending approvals) | Cards (entity type, title/number when available, requested date, stage); filter chips **All · Tickets · Service requests · Changes** (client-side on `entityType`); pull-to-refresh; drawer badge = count | APR-1 | `08` 1.47–1.48; S1, S2 |
 | **M13** | **Approval detail + Take action** | approver | Approval facts; for `ticket`: try TKT-3 by `entityId` and show subject, description, public conversation and attachments **only if it returns 200**. On 403, show "details not available on mobile". For `service_request`: embedded `serviceRequest`. For `change`: `{changeNumber, title, status}` only. **Take action** → comments → Approve (comment optional) / Reject (comment required). After a decision, show "Ticket stays Pending Management Review until a technician moves it" | APR-2, APR-3, TKT-3, TKT-7, ATT-1, ATT-3 | `05` B.22; `08` 1.49, S8. Never rely on the AGENT scope gap (C.6) |
 | **M14** | **Knowledge base** | all | Category list (hide `isPublic:false`), article list (paged), search (≥ 2 chars, KB-3) | KB-1, KB-2, KB-3 | `05` B.26; never send `published` |
 | **M15** | **KB article** | all | Sanitised HTML body, tags, "Was this helpful?" (one vote per article per device) | KB-4, KB-5 | `01` KB-4 (show "not available" if `isPublished` is false) |
@@ -102,6 +105,7 @@
 | **M17** | **Service catalogue + My Requests** (G4; drawer "Service Request") | all | The web's two views. **Catalog:** categories with their item counts, a category's services ("Requires approval" pill), search over every service's name and description, on the device; Android back leaves a category first. **My Requests:** as the web lists them (G5): **every request for ADMIN, AGENT and L2_MANAGER, the person's own for END_USER** (SR number, service, status, date; no requester column), newest first, pages of 50 read as the list scrolls. Only one's own rows open M19 | SCR-1, SCR-2, SCR-4 | `docs/G4-WEB-CATALOGUE.md` §2, §6; `01` SCR-4 (`limit` ≤ 50); `ROLE-MATRIX.md` §14.2 |
 | **M18** | **Service request form** (G4) | all | The item's custom fields in "Employee Details", **all seven types the web renders** (text, long text, date, phone, e-mail, number, drop-down; anything else as text); the web's checks; notes in a collapsed "Resolution"; for staff Impact, Urgency and the auto Priority (the web form's map). "Add Request" sends at once (no confirmation), shows the web's toast and returns to M17's Catalog view. Not shown: the web controls the server discards and the attachment box | SCR-3, SCR-5 | `05` §A.17, §B.24; `docs/G4-WEB-CATALOGUE.md` §3–§5 |
 | **M19** | **Request detail** (G4, mobile only) | all (own requests) | SR number, service, status, priority, dates, technician and group when set, the answers (labelled from the item's form), notes, approvals. Read-only: nothing to change or cancel, as on the web | SCR-6, SCR-3 | `docs/G4-WEB-CATALOGUE.md` §7 |
+| **M20** | **Audit log** (G8; drawer "Audit log") | ADMIN only (row and route; the server 403s everyone else) | Stacked cards grouped under a heading per day: the action as a coloured pill, entity and time, the ticket number as a link (deep-link resolver → M4), the person's name and email, the details in a tinted box, made readable where the stored JSON allows and raw otherwise (never the IP address). Filters, all server-side: Entity type, Ticket (a typed number, resolved to its id with TKT-1), Person (USR-3). No action or date filter: AUD-1 has none. Infinite scroll, 50 per page, capped at 500 with "search or filter to narrow" | AUD-1, TKT-1, USR-3 | `docs/G8-WEB-AUDIT.md`; `05` B.38 |
 
 **Shared components (not screens)**
 - Navigation drawer (§2.1 Navigation).
@@ -116,6 +120,7 @@
 **MVP endpoint coverage**
 - **44 endpoints:** the 33 from `01` Appendix B, plus KB-1..KB-5, APR-1..APR-3, ANN-1, TSK-2 and TSK-4.
 - G4 adds SCR-1..SCR-6 (M17–M19), which makes **50**. (G1–G3 also built LKP-6, LKP-7, ATT-5 and APR-4; see M4 and M5.)
+- G8 adds AUD-1 (M20), which makes **51**.
 - Plus the pending auth endpoint (A1 or A2).
 - ⚠ `01` Appendix B still labels these 11 as P2 until Ronit approves the label update (`08` §9 R7-1).
 
@@ -135,9 +140,10 @@
 | Edit category / impact / urgency | ❌ | ✅ | impact/urgency only | ✅ |
 | Notes section (read/write private notes) | ❌ | ✅ | ❌ | ✅ |
 | Tasks: toggle / add / edit / delete | ❌ (read-only, D4) | ✅ | ✅ | ✅ |
-| Approvals inbox and approve/reject | only while they have pending approvals (`08` S1) | ✅ | only while they have pending approvals | ✅ |
-| Knowledge base (published, public) | ✅ | ✅ | ✅ | ✅ |
-| Announcements | ✅ (`08` S1) | ✅ | ✅ | ✅ |
+| Approvals inbox and approve/reject | ✅ (G7; before, only while they had pending approvals, `08` S1) | ✅ | ✅ (G7; as END_USER before) | ✅ |
+| Knowledge base (published, public) | ❌ (ADMIN only since 2026-10-29) | ❌ | ❌ | ✅ |
+| Announcements | ❌ (ADMIN only since 2026-10-29) | ❌ | ❌ | ✅ |
+| Audit log (G8) | ❌ | ❌ | ❌ | ✅ |
 | Notifications | ✅ | ✅ | ✅ | ✅ |
 | Theme (System / Light / Dark) | ✅ | ✅ | ✅ | ✅ |
 | Service catalogue: browse, request a service, My Requests (own), request detail (G4) | ✅ | ✅ | ✅ | ✅ |
@@ -233,3 +239,10 @@ P-IDs are stable. Items moved into the MVP keep their ID and are marked as moved
 4. §2.1 retitled "MVP: 19 screens". The drawer gains **Service Request** (all roles); "Service catalog (P2)" leaves the "Later" list.
 5. §2.1 rows **M17, M18 and M19** added. Endpoint coverage: SCR-1..SCR-6, 50 in all. Role table: two catalogue rows.
 6. §2.2: P2 and P3 marked moved to the MVP (IDs kept). P2's drawer label is "Service Request" (the web sidebar's), not "Request a service".
+
+### 2026-11-02: Phase G8, the audit log (source: `docs/G8-WEB-AUDIT.md`)
+1. Header: a Phase G8 line.
+2. §1: a `/audit-log` row. The page is deployed but not in the analysed clone; it maps to M20, built in G8 (AUD-1, with TKT-1 and USR-3 for the ticket and person filters).
+3. §2.1 retitled "MVP: 20 screens". The drawer gains **Audit log** (ADMIN only, below a divider, before Settings).
+4. §2.1 row **M20** added. Endpoint coverage: AUD-1, 51 in all. Role table: an Audit log row (ADMIN only).
+5. Brought up to date in passing, in the drawer list and the role table: Approvals for every role (G7); Knowledge base and Announcements ADMIN only (2026-10-29). These lines still said what they said before those changes; `docs/ROLE-MATRIX.md` §16 and §18 already had the current rules.

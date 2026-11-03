@@ -4,11 +4,14 @@
 //   Ticket approvals carry no ticket data (01 §10.1): the first 10 are looked up with TKT-3 (cached, shared with the
 //   ticket screen) and show subject + requester only on a 200; otherwise "Details on open". Never relies on the AGENT
 //   scope gap (05 C.6) — a 403 just leaves the card generic.
-// - Visibility (08 S1): the drawer shows this module to ADMIN/AGENT always, to END_USER/L2 only while they have one.
+// - Visibility (G7): the drawer shows this module to every role, always, and the route is registered for every role
+//   (permissions.ts drawerItems, drawerRoutes). APR-1 never refuses a role: with nothing pending it returns `[]`
+//   (approvals.controller.ts:105-112), which is the "Nothing waiting for you" state below, not an error.
 // - No delegation: the backend has none (A26). Never the unscoped GET /approvals (05 C.16).
 //
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #13): the root of the Approvals tab (ADMIN, AGENT), and pushed from More for
-// END_USER and L2_MANAGER while they have one (permissions.ts moreSections). An approval opens in the stack it is in
+// END_USER and L2_MANAGER, always since G7 (iOS-5e; permissions.ts moreSections, hasApprovalsTab). The More stack
+// registers it for every role (navigation/routes.ts; Android's drawerRoutes). An approval opens in the stack it is in
 // (getId: one screen per approval).
 // iOS-8a (device finding: the chips sat under the status bar): a solid navigation bar with a standard title; under it,
 // as on Android, the offline banner, the type chips and the error banner, which do not scroll; then the list.

@@ -16,6 +16,7 @@ interface LoadingSkeletonProps {
    * - `tasks`:         task rows grouped in one card (standalone task list).
    * - `comments`:      conversation replies (M4 Conversation tab).
    * - `history`:       audit rows grouped in one card (M4 History tab).
+   * - `audit`:         a day heading over audit-log cards (M20, G8).
    * - `attachments`:   attachment cards (M4 Attachments tab).
    * - `detail`:        header, properties and a text card (M4 and every screen that opens one record).
    * - `article`:       title card and body card (M15).
@@ -28,7 +29,7 @@ interface LoadingSkeletonProps {
    */
   variant?:
     | 'list' | 'approvals' | 'articles' | 'announcements' | 'notifications' | 'tasks' | 'comments' | 'history'
-    | 'attachments' | 'detail' | 'article' | 'formPage' | 'rows' | 'form' | 'lines' | 'chips';
+    | 'audit' | 'attachments' | 'detail' | 'article' | 'formPage' | 'rows' | 'form' | 'lines' | 'chips';
   /** Number of placeholder items: cards, rows, fields, text lines or chips. */
   rows?: number;
   /** False when the screen already spaces the content from what is above it (e.g. under M4's tab bar). */
@@ -147,6 +148,26 @@ function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: numbe
             </View>
           ))}
         </Card>
+      );
+    case 'audit':
+      // M20: the day heading, then cards with the action pill and time, ticket, person and the detail box.
+      return (
+        <>
+          <Bar className="mx-4 mb-3 mt-1 h-3 w-24" />
+          {items.map((i) => (
+            <Card key={i}>
+              <View className="flex-row items-center">
+                <Bar className="h-5 w-24 rounded-full" />
+                <View className="flex-1" />
+                <Bar className="h-3 w-10" />
+              </View>
+              <Bar className="mt-3 h-4 w-3/4" />
+              <Bar className="mt-3 h-3 w-1/3" />
+              <Bar className="mt-1.5 h-3 w-1/2" />
+              <Bar className="mt-3 h-10 w-full rounded-lg" />
+            </Card>
+          ))}
+        </>
       );
     case 'attachments':
       return items.map((i) => (

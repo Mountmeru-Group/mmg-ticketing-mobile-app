@@ -20,23 +20,39 @@ export type Viewer = Pick<AuthUser, 'id' | 'role' | 'countryId'>;
 
 // ── Navigation (08 §3) ───────────────────────────────────────
 
-export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'settings';
+export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'auditLog' | 'settings';
 
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
- * Approvals: ADMIN/AGENT always; END_USER and L2_MANAGER only while APR-1 returns ≥ 1 (08 S1).
+ * Approvals: every role, always (G7, Ronit's decision 2026-11-02). Any active user can be named an approver on the web
+ * (no role filter, FE:TicketDetailPage.tsx:418-421) and APR-1 answers every role, `[]` when nothing waits
+ * (approvals.controller.ts:105-112). Before G7: ADMIN/AGENT always, END_USER and L2_MANAGER only while APR-1 had ≥ 1.
+ * The web's sidebar shows it to ADMIN and AGENT only (AppLayout.tsx:32): mobile is wider here, on purpose.
  * Knowledge base and Announcements: ADMIN only (2026-10-29, canUseKnowledgeBase, canReadAnnouncements).
  * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
+ * Audit log (G8): ADMIN only (canViewAuditLog), after Announcements below a divider (DrawerContent.tsx), before Settings.
  */
-export function drawerItems(role: UserRole, pendingApprovals: number): DrawerItem[] {
-  const items: DrawerItem[] = [];
-  if (isAgentOrAdmin(role) || pendingApprovals >= 1) items.push('approvals');
+export function drawerItems(role: UserRole): DrawerItem[] {
+  const items: DrawerItem[] = ['approvals'];
   items.push('tasks');
   if (canUseKnowledgeBase(role)) items.push('knowledge');
   if (canUseServiceCatalog(role)) items.push('catalog');
   if (canReadAnnouncements(role)) items.push('announcements');
+  if (canViewAuditLog(role)) items.push('auditLog');
   items.push('settings');
   return items;
+}
+
+// ── Audit log: ADMIN only (G8, docs/G8-WEB-AUDIT.md) ──────────
+// The server's own rule: AUD-1 is `requireAuth, adminOnly` (auditLog.router.ts:8), a 403 for every other role. Unlike
+// the web's pages, which have no route guards (ROLE-MATRIX.md §1), the server enforces this one; the app mirrors it for
+// the row AND the route, and useAuditLog never sends AUD-1 for anyone else.
+// iOS (iOS-5e): the row is a More row in its own section (moreSections), and the route is the More stack's AuditLog,
+// registered for ADMIN alone (navigation/routes.ts stackRoutes, the iOS form of drawerRoutes).
+
+/** M20 Audit log: the drawer row, the AuditLog route and the AUD-1 request itself. */
+export function canViewAuditLog(role: UserRole): boolean {
+  return role === 'ADMIN';
 }
 
 // ── Knowledge base and announcements: ADMIN only (Ronit, 2026-10-29) ──
@@ -92,11 +108,13 @@ export function navRole(role: UserRole | null | undefined): UserRole {
 }
 
 /**
- * Approvals is a tab only for the roles that ALWAYS have it: drawerItems() with nothing pending, i.e. ADMIN and AGENT,
- * as in the web nav (AppLayout.tsx:32). END_USER and L2_MANAGER get it as a More row while APR-1 returns ≥ 1 (08 S1).
+ * Approvals is a tab for ADMIN and AGENT, the roles the web's sidebar shows it to (AppLayout.tsx:32). Since G7 every
+ * role has the drawer row, always (drawerItems); on iOS END_USER and L2_MANAGER get it as a permanent More row, Android's
+ * drawer row in the iOS drawer, not as a fifth tab that almost always reads 0 (iOS-5e, Ronit's decision Q1 (a),
+ * 2026-11-03). Until G7 this read "drawerItems() with nothing pending", which gave the same two roles.
  */
 export function hasApprovalsTab(role: UserRole | null | undefined): boolean {
-  return drawerItems(navRole(role), 0).includes('approvals');
+  return isAgentOrAdmin(navRole(role));
 }
 
 /** Tabs, in order: Home · Tickets · Approvals (ADMIN, AGENT) · Alerts · More. Four or five, within the HIG's five. */
@@ -112,20 +130,23 @@ export function appTabs(role: UserRole | null | undefined): { name: AppTab; titl
 }
 
 /** Rows of the More list. `myRequests` opens the catalogue's My Requests view, its own row on iOS. */
-export type MoreItem = 'approvals' | 'tasks' | 'catalog' | 'myRequests' | 'knowledge' | 'announcements' | 'settings';
+export type MoreItem =
+  | 'approvals' | 'tasks' | 'catalog' | 'myRequests' | 'knowledge' | 'announcements' | 'auditLog' | 'settings';
 
 export interface MoreSection {
-  key: 'work' | 'information' | 'settings';
+  /** `admin` (iOS-5e): the Audit log, ADMIN only, in a section of its own where Android's drawer has a divider. */
+  key: 'work' | 'information' | 'admin' | 'settings';
   items: MoreItem[];
 }
 
 /**
  * The More list, as iOS list sections, top to bottom. Every row is a drawerItems() row that is not a tab; the account
  * card and Sign out sit under the last section on every role's list, as in the drawer, and are not listed here.
+ * Since G7 no row follows a count: END_USER and L2_MANAGER have Approvals here always (hasApprovalsTab).
  */
-export function moreSections(role: UserRole | null | undefined, pendingApprovals: number): MoreSection[] {
+export function moreSections(role: UserRole | null | undefined): MoreSection[] {
   const who = navRole(role);
-  const rows = drawerItems(who, pendingApprovals);
+  const rows = drawerItems(who);
   const work: MoreItem[] = [];
   if (rows.includes('approvals') && !hasApprovalsTab(who)) work.push('approvals');
   if (rows.includes('tasks')) work.push('tasks');
@@ -134,10 +155,13 @@ export function moreSections(role: UserRole | null | undefined, pendingApprovals
     if (serviceCatalogPermissions({ role: who }).myRequests) work.push('myRequests');
   }
   const information = (['knowledge', 'announcements'] as const).filter((item) => rows.includes(item));
+  // G8: after Announcements, below the drawer's divider, before Settings: an iOS list section of its own.
+  const admin: MoreItem[] = rows.includes('auditLog') ? ['auditLog'] : [];
   const settings: MoreItem[] = rows.includes('settings') ? ['settings'] : [];
   const sections: MoreSection[] = [
     { key: 'work', items: work },
     { key: 'information', items: [...information] },
+    { key: 'admin', items: admin },
     { key: 'settings', items: settings },
   ];
   return sections.filter((section) => section.items.length > 0);
@@ -155,7 +179,7 @@ export function tabBadges(
   if (counts.unread > 0) badges.AlertsTab = counts.unread;
   if (counts.pendingApprovals > 0) {
     if (hasApprovalsTab(role)) badges.ApprovalsTab = counts.pendingApprovals;
-    else if (moreSections(role, counts.pendingApprovals).some((s) => s.items.includes('approvals'))) {
+    else if (moreSections(role).some((s) => s.items.includes('approvals'))) {
       badges.MoreTab = counts.pendingApprovals;
     }
   }
@@ -173,19 +197,54 @@ export function homeVariant(role: UserRole): HomeVariant {
   return 'staff';
 }
 
-export type HomeTile = 'open' | 'resolved' | 'inProgress' | 'onHold' | 'slaBreached' | 'totalOpen' | 'unassigned';
+/** The KPI tiles: the web's first row of KPICards (G6, docs/G6-WEB-DASHBOARD.md §4). What each counts: utils/home-kpis.ts. */
+export type HomeTile = 'total' | 'open' | 'inProgress' | 'resolved' | 'slaBreached';
 
-/** KPI tiles in order. `unassigned` only for ADMIN and the UI's triage AGENT (04 M2; the count is mis-scoped otherwise). */
+/**
+ * The status chips under the tiles: the web's second row (Closed, Unassigned, the pending-reason mini-cards, On hold),
+ * plus Active, which the web dashboard does not show and which left the tile grid in G6.
+ */
+export type HomeChip =
+  | 'closed' | 'unassigned' | 'pendingMgmtReview' | 'pendingPartner' | 'pendingUserConfirm' | 'pendingUserInfo'
+  | 'pendingMasterData' | 'onHold' | 'active';
+
+/**
+ * KPI tiles in order. Staff: the web's five (FE:DashboardPage.tsx:341-375). END_USER keeps its own, narrower set
+ * (04 M2 decision): Open and Resolved, counted as the web counts "My Open Requests" and "Resolved".
+ */
 export function homeTiles(viewer: Pick<AuthUser, 'role' | 'countryId'>): HomeTile[] {
   if (viewer.role === 'END_USER') return ['open', 'resolved'];
-  const tiles: HomeTile[] = ['open', 'inProgress', 'onHold', 'slaBreached', 'totalOpen'];
-  if (viewer.role === 'ADMIN' || isTriageAgent(viewer)) tiles.push('unassigned');
-  return tiles;
+  return ['total', 'open', 'inProgress', 'resolved', 'slaBreached'];
 }
 
-/** "Pending approvals" shortcut on Home: the same rule as the drawer row (08 S1). */
+/**
+ * Status chips in the web's order (FE:DashboardPage.tsx:379-417), then Active. None for END_USER (the web hides the
+ * row from them, :379). `unassigned` only for ADMIN and the UI's triage AGENT (04 M2): for anyone else the count can
+ * drop the scope (05 B.20). The screen hides a pending-reason or On hold chip whose count is 0, as the web does (:405).
+ */
+export function homeChips(viewer: Pick<AuthUser, 'role' | 'countryId'>): HomeChip[] {
+  if (viewer.role === 'END_USER') return [];
+  const chips: HomeChip[] = ['closed'];
+  if (viewer.role === 'ADMIN' || isTriageAgent(viewer)) chips.push('unassigned');
+  chips.push('pendingMgmtReview', 'pendingPartner', 'pendingUserConfirm', 'pendingUserInfo', 'pendingMasterData', 'onHold', 'active');
+  return chips;
+}
+
+/**
+ * The PERIOD row: every role the web shows it to (all, FE:DashboardPage.tsx:290), except L2_MANAGER, whose Home shows
+ * no counts (DSH-1 is never called for L2, 05 C.19), so a period would change nothing.
+ */
+export function showHomePeriod(role: UserRole): boolean {
+  return homeVariant(role) !== 'l2';
+}
+
+/**
+ * "Pending approvals" shortcut on Home: ADMIN/AGENT always; END_USER and L2_MANAGER only while they have one (08 S1).
+ * This was "the drawer row's rule" until G7 made the row permanent. The shortcut keeps the old rule, so a requester's
+ * Home does not gain a shortcut that almost always reads 0; the drawer row is the way in when nothing waits.
+ */
 export function showApprovalsShortcut(role: UserRole, pendingApprovals: number): boolean {
-  return drawerItems(role, pendingApprovals).includes('approvals');
+  return isAgentOrAdmin(role) || pendingApprovals >= 1;
 }
 
 /**

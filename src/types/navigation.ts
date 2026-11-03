@@ -62,7 +62,7 @@ export type AlertsStackParamList = RecordScreensParamList & {
 export type MoreStackParamList = RecordScreensParamList & {
   /** The More list (permissions.ts moreSections). */
   More: undefined;
-  /** M12 for END_USER and L2_MANAGER, while APR-1 returns ≥ 1 (08 S1). */
+  /** M12 for END_USER and L2_MANAGER, always since G7 (iOS-5e; ADMIN and AGENT have the tab). */
   ApprovalsInbox: undefined;
   /** Standalone tasks. Built from the tickets in TKT-1 pages — there is no task-list endpoint (A20). */
   TaskList: undefined;
@@ -81,6 +81,8 @@ export type MoreStackParamList = RecordScreensParamList & {
   ServiceRequestDetail: { requestId: UUID };
   /** M16 */
   Announcements: undefined;
+  /** M20 Audit log (G8), ADMIN only: registered for ADMIN alone (routes.ts stackRoutes, canViewAuditLog). */
+  AuditLog: undefined;
   /** M10 — from the account card and the "Settings" row. */
   Profile: undefined;
 };

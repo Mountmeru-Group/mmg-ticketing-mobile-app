@@ -15,12 +15,17 @@ import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { colors } from '@/theme';
 
 export function PageSheet({
-  visible, title, onClose, left, right, children,
+  visible, title, onClose, onDismiss, left, right, children,
 }: {
   visible: boolean;
   title: string;
   /** A swipe down, the ✕, or (with `left`) whatever the caller's leading button does. */
   onClose: () => void;
+  /**
+   * Once the sheet has finished leaving the screen (Modal `onDismiss`). iOS presents one sheet at a time, so a sheet
+   * that should follow this one opens from here, not from onClose (iOS-5e: Home's period sheet → the From day).
+   */
+  onDismiss?: () => void;
   /** Replaces the ✕, e.g. DatePickerSheet's Cancel. */
   left?: ReactNode;
   /** The trailing button, e.g. DatePickerSheet's Done. */
@@ -36,6 +41,7 @@ export function PageSheet({
       animationType={reduceMotion ? 'fade' : 'slide'}
       allowSwipeDismissal
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <View className="flex-1 bg-white" style={{ paddingBottom: insets.bottom }}>
         <View className="min-h-14 flex-row items-center border-b border-border px-2">
