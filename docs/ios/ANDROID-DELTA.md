@@ -1,9 +1,9 @@
-# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d)
+# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5d: `origin/dev` @ `f4fad10a1bd1aac9658f4c4be151b0172f683898`** (§8). To sync later Android work, diff `f4fad10..origin/dev`: on 2026-11-01 that is empty.
-> iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
-> The build is in `00-PORT-MANIFEST.md` §4.15. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
+> **Port source since iOS-5e: `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c`** (§9). To sync later Android work, diff `8b522e3..origin/dev`: in this clone on 2026-11-03 that is `e85c602`, `69a38ab` and `0c0bbac` (§9.5).
+> iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
+> The builds are in `00-PORT-MANIFEST.md` §4.15–§4.18. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
 
 ## 1. The rule (Ronit, 2026-10-30)
 
@@ -158,7 +158,7 @@ Details are in manifest §4.15. In short:
 
 ## 6. Not ported: not in Android `dev`
 
-R1–R5, S1–S6, P2–P4: see §3.2 and §3.3. **If Android merges any of them into `dev`, the next sync (`c5c63ac..origin/dev` since iOS-5c) brings them across.** P1 is not needed: iOS has `dev`'s reply templates.
+R1–R5, S1–S6, P2–P4: see §3.2 and §3.3. **If Android merges any of them into `dev`, the next sync (`8b522e3..origin/dev` since iOS-5e) brings them across.** P1 is not needed: iOS has `dev`'s reply templates.
 
 ## 7. iOS-5c: the sync to `c5c63ac` (2026-10-30 to 2026-10-31)
 
@@ -220,3 +220,76 @@ At planning (`git fetch`, 2026-11-01), `c5c63ac..origin/dev` was **one commit**:
 ### 8.3 Section numbers
 
 No clash. Android's new §5.8 is free on iOS. The iOS notes are 02-AUTH's first lettered section, **§iOS-A**, at the end; §7.7 keeps its number.
+
+## 9. iOS-5e: the sync to `8b522e3` (2026-11-03)
+
+### 9.1 What came across
+
+At planning (`git fetch`, 2026-11-03), `f4fad10..origin/dev` was **three commits**, 62 files:
+- `87aba2c` "feat: G6 - Home period selector and KPI parity with the web portal" (2026-11-02 11:21 +0530, 21 files);
+- `51f5554` "feat: G7 - period-filtered tiles, approvals for all roles, push client" (2026-11-02 12:26 +0530, 39 files);
+- `8b522e3` "feat: G8 - ADMIN-only audit log screen" (2026-11-02 16:22 +0530, 28 files).
+
+Ronit OK'd the plan with all seven defaults (§9.2). The code went in as `33dc1f6`; the build is in `00-PORT-MANIFEST.md` §4.18. There is no endpoint outside 01, and no write: DSH-1, TKT-1 and APR-1 as before, plus AUD-1 (01 §10.5).
+
+| ID | Change | Commit | Files | What it does for the user | In iOS before iOS-5e | Type | **Outcome** |
+|---|---|---|---|---|---|---|---|
+| G6 | Home period and the web's KPIs | `87aba2c` | `dashboard.api`, `queryKeys`, `useHome`, `ui.store`, `colors`, `dashboard-period` (new), `home-kpis` (new), `permissions`, `ticket-filters`, `HomeScreen` | A period for Home's counts: the web's ten (Today … All time) and Custom, default This month. The web's tiles (Total tickets, Open "right now", In progress, Resolved, SLA breached) and its status chips (Closed, Unassigned, the pending reasons and On hold above 0, Active now). END_USER: Open and Resolved. L2_MANAGER: no period and no counts, as before | No (a fixed `range=month` and "last 30 days" captions) | feature | **Ported.** Data layer verbatim. iOS: a toolbar button under the solid bar opens the period sheet (`OptionSheet`); Custom's From and To open `DatePickerSheet` with Android's limits; VoiceOver announcements instead of the live region |
+| G7a | A tile hands its period to the list | `51f5554` | `dashboard-period`, `home-kpis`, `ui.store`, `ticket-filters`, `HomeScreen`, `TicketListScreen` | A tile or chip that counts "created in the period" opens Tickets with that period as its Created filter, shown as a removable "<period> ✕" chip. Open, Active and the shortcuts start the list clean | No | feature | **Ported.** The chip is first in the iOS-8a toolbar's filter row |
+| G7b | Approvals for every role | `51f5554` | `permissions` (`drawerItems`), `DrawerContent`, `ApprovalsInboxScreen` (comment) | Approvals is always in the menu. With nothing pending it opens "Nothing waiting for you" | Partly: ADMIN and AGENT had the tab; END_USER and L2_MANAGER had a More row only while ≥ 1 was pending | feature | **Ported**, Q1 (a): the tab for ADMIN and AGENT is unchanged; END_USER and L2_MANAGER get a permanent first More row |
+| G7c | Push client (FCM) | `51f5554` | `App.tsx`, `app.json`, `package.json` and the lock file (`expo-notifications`), `src/push/*` (4), `push.store`, `utils/push`, `notifications.api` (NTF-5, NTF-6), `useProfile`, `useNotifications`, `NotificationsScreen`, `tests/push/push.test.mjs` (35), `RELEASE.md` §2b | Android asks for the notification permission on the first visit to Alerts and registers the phone for push | No | feature | **Not ported** (§9.3) |
+| G8 | ADMIN-only audit log | `8b522e3` | `auditLog.api`, `useAuditLog`, `types/audit`, `utils/audit-log`, `AuditLogScreen` (all new); `responseSpecs`, `LoadingSkeleton`, `hooks/index`, `queryKeys`, `AppDrawer`, `DrawerContent`, `colors`, `theme/index`, `types/index`, `types/navigation`, `permissions` | ADMIN gets "Audit log" (AUD-1): entries by day, filtered by ticket number, entity type and person. A ticket link opens the ticket | No | feature | **Ported.** A More row in its own section before Settings. `stackRoutes()` registers `AuditLog` for ADMIN only, so no tab, More row, deep link or notification tap reaches it for any other role |
+| — | Docs | all three | `G6-WEB-DASHBOARD.md`, `G7-PERIOD-APPROVALS-PUSH.md`, `G8-WEB-AUDIT.md` (new); 01, 03, 04, 05, 06; ROLE-MATRIX §17–§19; WEB-VS-MOBILE-ROLES; UI-STANDARDS §11–§13; WEB-TOKENS; UAT-TEST-PLAN; RELEASE.md | Docs only | No | docs | **Verbatim:** the three new docs, 01–06, WEB-TOKENS and UAT-TEST-PLAN; 01 also gains §iOS-A (Q6). **Merged:** ROLE-MATRIX, WEB-VS-MOBILE-ROLES and UI-STANDARDS, every line Android added present (checked by script). RELEASE.md: not on iOS |
+| — | Tests | all three | `dashboard` (53), `period-list` (30), `approvals-visibility` (25), `audit-log` (48), `audit-details` (34), all new; `role-gating`, `kb-announcements`, `service-catalog`; `push` (35) | Tests only | No | release | **Ported**, all but `push` (manifest §3.19). iOS additions: `ios-period` (26), 24 in `approvals-visibility`, 10 in `audit-log` |
+
+### 9.2 iOS decisions (Ronit's OK, 2026-11-03)
+
+Ronit accepted every default in the plan:
+- **Q1 (a):** the Approvals tab stays for ADMIN and AGENT only, the web's sidebar rule. END_USER and L2_MANAGER get Approvals as a permanent first More row, which mirrors Android's drawer row. The More tab shows the pending count while ≥ 1. Every role's tabs stay fixed (compliance E1).
+- **Q2:** the period button sits in a toolbar under the navigation bar, not in the bar.
+- **Q3:** From and To each open the existing `DatePickerSheet`, as Android opens its date dialog. No new sheet.
+- **Q4:** AUD-1 asks for 50 entries a page, as Android does. The brief had said 20.
+- **Q5:** no message for a future day. As on Android, the calendar's latest day is today.
+- **Q6:** 01-API-CONTRACT gains §iOS-A: its NTF-5 and NTF-6 lines describe Android only.
+- **Q7:** a one-time exception to compliance C2's "fixes only". iOS-5e's features may reach build 0.1.0 (1) by EAS Update, on `ios-preview` only, for internal TestFlight testers only, and never on `production`. The App Store build ships them natively. Recorded in `APP-STORE-COMPLIANCE.md` C2 and `RELEASE-IOS.md` §6, rule 9.
+
+**One change outside the planned files:** an optional `onDismiss` on `PageSheet` and `OptionSheet`, so that the From calendar opens only after the period sheet has gone, with no timer.
+
+### 9.3 Not ported, and why
+
+| What | Why |
+|---|---|
+| **G7c, the push client** (`51f5554`): 7 new files, and the push parts of `App.tsx`, `app.json`, `package.json`, the lock file, `notifications.api.ts`, `useProfile.ts`, `useNotifications.ts` and `NotificationsScreen.tsx` | Out of the brief ("OUT: G7c"). It needs `expo-notifications`, a new dependency (CLAUDE.md I7). Its `app.json` plugin is a native change, so it can't reach build 1 by update. On iOS it also needs the push entitlement (`aps-environment`), an APNs key, a compliance row of its own (C4) and the Service Desk's push (ask A5). iOS keeps its Alerts notice, which is still true: there is no push. `approvals-visibility.test.mjs` fails if `expo-notifications` appears in `src/`, `App.tsx`, `package.json`, the lock file or `app.json` |
+| `AppDrawer.tsx`, `DrawerContent.tsx` | No iOS files (manifest §4.5). Their G7 and G8 changes went into `routes.ts`, `TabStacks.tsx`, `MoreScreen.tsx` and `moreSections()` |
+| `drawerRoutes()` | Not on iOS since iOS-5b; `stackRoutes(tab, role)` decides which routes exist |
+| `docs/RELEASE.md` (§2b, Firebase) | Android's release guide; not copied to iOS (manifest §4.7) |
+| 2 of the 53 `permissions.ts` exports iOS shares with Android | They differ only by the placeholder-session guard (D5): the iOS-9 list, §5 item 1. The other 51 are identical to `8b522e3` |
+
+### 9.4 P7: not in these three commits; now pending (iOS-5f)
+
+The brief's **P7** is Home's window captions: "this month" or "right now" under each count, and the "Active now" chip renamed "Active". The brief said to port it **only if** it was part of `87aba2c`, `51f5554` or `8b522e3`.
+- **It was not.** At `8b522e3` the chip still reads "Active now" (`src/utils/home-kpis.ts:136`), and no count has a "this month" caption. The one caption there, "right now" under Open, belongs to G6, and came across with it.
+- **So iOS-5e did not port P7.** This is the sync rule at work, not a decision against P7: it was not on Android `dev` at the port source.
+- **It reached Android `dev` during iOS-5e**, in `e85c602` ("window captions under every count ("this month" ... / "right now" for Open and the Active chip)"). At `origin/dev` the chip reads "Active" (`home-kpis.ts:139`).
+- **Status: pending, in iOS-5f** (§9.5).
+
+### 9.5 Android `dev` after the plan: iOS-5f
+
+Three commits reached `dev` while iOS-5e was being built. None of them is in iOS-5e.
+
+| Commit | Date (+0530) | What | iOS |
+|---|---|---|---|
+| `e85c602` | 2026-11-03 10:42 | The polish pass: the people row on ticket cards, the Home greeting mark, **P7's window captions**, swipe actions on list rows, haptics, an SLA bar on ticket detail, press feedback | **Pending: iOS-5f** |
+| `69a38ab` | 2026-11-03 11:28 | The SLA deadline (in place of `e85c602`'s SLA countdown), a count cross-fade, a paperclip icon, VIBRATE kept | **Pending: iOS-5f** |
+| `0c0bbac` | 2026-11-03 12:24 | Android's second Play upload: `versionCode` 3, `RELEASE.md` §5a, and the production-readiness test asks for `versionCode` > 2 | **Not applicable.** `versionCode` and `RELEASE.md` are Android only. The test is already on the iOS-9 list (§5, item 5), which leaves `versionCode` out |
+
+**A first look for the iOS-5f plan.** This is not a plan, and nothing was ported:
+- `e85c602` and `69a38ab` together change 59 files (+3,091 / −249 lines).
+- **Packages:** they add `expo-haptics ~57.0.3`, which iOS already has. Their `app.json` changes cancel out (VIBRATE blocked in `e85c602`, kept in `69a38ab`) and are Android only. The new SVG illustrations are drawn by `expo-image`, already installed. So no native change shows yet; the iOS-5f plan must confirm it.
+- **Android-only code** for that plan to replace: haptics through `performAndroidHapticsAsync` (iOS has its own system patterns, UI-STANDARDS §iOS-A.6), and the swipe actions on list rows.
+- **The C2 exception (§9.2, Q7) doesn't cover iOS-5f.** Whether iOS-5f may ship by EAS Update needs its own decision.
+- **GitHub's `dev` has moved again.** `git ls-remote` shows `5b3c73a` on 2026-11-03. This clone's last fetch was at 12:28 +0530 (`0c0bbac`), and this docs-only task did not fetch. The iOS-5f plan's `git fetch` lists what came after `0c0bbac`.
+
+### 9.6 Section numbers
+
+No clash. Android's new UI-STANDARDS §11–§13 and ROLE-MATRIX §17–§19 were free on iOS; they sit before §iOS-A. The iOS notes are in lettered sections: UI-STANDARDS §iOS-A.14, ROLE-MATRIX §iOS-A.7 (and its §7, the mutation check), WEB-VS-MOBILE-ROLES §iOS-A.6, and 01-API-CONTRACT's first lettered section, §iOS-A.

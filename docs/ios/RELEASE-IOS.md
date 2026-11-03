@@ -143,6 +143,13 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
    - The launch screen is native: expo-splash-screen builds it from `assets/splash-icon.png` at build time. Since iOS-5c that image is the yellow drop alone, the first frame of the intro (`src/navigation/SplashIntro.tsx`, mounted in `App.tsx`). The first TestFlight build is the first to have it.
    - An update can change the intro but never the launch image. So an update must not remove `<SplashIntro />` or change `splashArt` (`src/theme/brand.ts`) or `motion.intro.dropDistance`: on a build with the drop-only image, the lone drop would show, then jump.
    - To go back to the old launch screen (the logo and "Setu"), restore `assets/splash-icon.png` from `4063df3` **and** remove `<SplashIntro />`, in one new build, as Android's release guide says (`docs/RELEASE.md` §7 at `c5c63ac`; not copied to iOS).
+9. **One exception to rule 1: iOS-5e** (Ronit, 2026-11-03; compliance C2; `ANDROID-DELTA.md` §9.2, Q7):
+   - **What may ship by update:** iOS-5e's features (`33dc1f6`) to build 0.1.0 (1): the Home period and the web's counts (G6), the period on the ticket list (G7a), Approvals for every role (G7b) and the ADMIN-only audit log, a new screen (G8).
+   - **On `ios-preview` only, for internal TestFlight testers only** (§4 step 4; compliance K2). While this update is on the channel, no 0.1.0 build goes to an external group: that group's builds need Beta App Review, and the update reaches every 0.1.0 binary (`runtimeVersion` policy `appVersion`).
+   - **Never on `production`.** The App Store build ships these features natively, in the binary App Review sees (iOS-9).
+   - **Why an update can carry them:** they are JavaScript only. `app.json`, `package.json`, `package-lock.json`, `eas.json` and `assets/` are unchanged since build 1 (`git diff 30cc239 33dc1f6`; build 1 is `30cc239`, compliance E4). There is no new permission, entitlement or native module: G7c (push), which would need all three, is not ported.
+   - **Every other rule still applies:** §2 in full first, both flags, `EXPO_PUBLIC_APP_ENV` unset or `UAT`, and the hotspot. The update's `--message` and its `UPDATES-LOG.md` entry name this exception.
+   - **One time only.** It covers iOS-5e's code, `33dc1f6`; its docs commit changes no code. Later features follow rule 1 again. iOS-5f (Android's `e85c602` and `69a38ab`) needs its own decision.
 
 ## 7. Before a `production` build (iOS-9)
 

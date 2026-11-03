@@ -1420,6 +1420,64 @@ No `eas` command, no API call, no new package. The Android folder was not opened
 
 **Recorded, not changed:** the 15-day sign-out doesn't call AUTH-3, so the server token lives until its own 8 hours. This is Android's behaviour, kept for parity (02 §iOS-A).
 
+### 4.18 iOS-5e: the Android sync to `8b522e3` (built 2026-11-03)
+
+**The brief (Ronit, 2026-11-03):** port G6, G7a, G7b and G8 from Android `dev` (`87aba2c`, `51f5554`, `8b522e3`), with Android's behaviour and an iOS interface. P7 only if it is in those commits. G7c (push) is out.
+- No `eas` command, no real API call (tests mock the network), no new package and no native change: `app.json`, `package.json`, `package-lock.json` and `runtimeVersion` stay as they are.
+- At planning, `f4fad10..origin/dev` was those three commits, 62 files. Ronit OK'd the plan with all seven defaults (`ANDROID-DELTA.md` §9.2).
+- Android was read only through git in this clone. The Android folder was not opened.
+
+**Built** (commit `33dc1f6`):
+- **G6, the Home period and the web's KPIs.**
+  - **Verbatim from `8b522e3`:** `dashboard-period.ts`, `home-kpis.ts`, `useHome.ts`, `dashboard.api.ts`, `queryKeys.ts`, `ui.store.ts`, `ticket-filters.ts`, `colors.ts`.
+  - **The period:** the web's ten and Custom, default This month. It is held in memory (`ui.store`): kept across tabs, and back to This month after a restart or a sign-out, as on Android.
+  - **Requests:** the DSH-1 key is `['dashboard', <range> | 'custom:<from>:<to>', countryId]`. A period change sends at most one request: none if that period was fetched less than 60 s ago, and none while Custom is incomplete. Custom sends `from` and `to` without `range`.
+  - **The iOS interface:**
+    - a toolbar under the solid bar, like the Tickets toolbar since iOS-8a, hidden for L2_MANAGER;
+    - one button of at least 44 pt, "Period: This month ⌄", which opens the period sheet (`OptionSheet`, ✓ on the current period);
+    - Custom adds From and To. Each opens `DatePickerSheet` with Android's limits: From up to To (or today), To from From up to today, nothing in the future;
+    - choosing Custom with no From day opens the From calendar once the period sheet has gone (`onDismiss`, no timer);
+    - Android's messages, which VoiceOver hears (`announceForAccessibility`) in place of Android's live region. At the accessibility sizes From and To stack.
+  - **Tiles and chips:** two tiles per row by measured width, an odd last tile spanning the row; one per row at the accessibility sizes. Chips show a dot, the count and the label; they are `min-h-9` with a 4 pt hit slop, and wrap.
+- **G7a, the period on the list.** A tile or chip that counts "created in the period" sets the list's Created days and a red "<period> ✕" chip, first in the iOS-8a filter row (in the list header at the large sizes).
+  - ✕ clears only those days; the tile's filter, search, sort and country stay. Clear all clears it too.
+  - Changing a day in Filters makes the days the person's own: the chip goes and the days stay.
+  - Open, Active and the shortcuts carry no period. A sign-out wipes it.
+- **G7b, Approvals for every role** (Q1 a).
+  - `drawerItems(role)` starts with Approvals for everyone.
+  - ADMIN and AGENT keep the tab. END_USER and L2_MANAGER get a permanent first More row, with the count on More while ≥ 1 is pending.
+  - `moreSections(role)` lost its pending-count argument, and `tabBadges` follows. No tab and no More row changes with a count (compliance E1).
+- **G8, the audit log, ADMIN only.**
+  - **Verbatim:** `auditLog.api.ts`, `useAuditLog.ts`, `types/audit.ts`, `utils/audit-log.ts`. AUD-1 sends `limit=50` (Q4), up to 500 entries. `ipAddress` arrives but is never shown.
+  - **Reachable for ADMIN only:** `AuditLogScreen.tsx` sits in the More stack, and `stackRoutes()` registers `AuditLog` only when `canViewAuditLog(role)`, as iOS-5b did for the knowledge base. ADMIN's More gets "Audit log" in a section of its own before Settings. No deep link or notification tap reaches it; a web `/audit-log` link opens in Safari.
+  - **The screen:** the native bar; Android's toolbar (the ticket-number search, the Ticket, Entity type and Person chips, the count, Clear all); a FlashList with a heading per day; pull-to-refresh; a new `audit` skeleton; the offline, error and two empty states; a labelled footer retry; `listBottomInset()`. A ticket link opens through `openTicketLinkInApp`, in the More tab.
+- **Merged by hand:** `permissions.ts` (51 of the 53 shared exports identical to `8b522e3`; the other 2 differ only by the D5 placeholder guard, iOS-9), `routes.ts`, `TabStacks.tsx`, `types/navigation.ts`, `MoreScreen.tsx`, `theme/index.ts`, `hooks/index.ts`, `LoadingSkeleton.tsx`, `HomeScreen.tsx`, `TicketListScreen.tsx` and `ApprovalsInboxScreen.tsx` (a comment).
+- **Outside the planned files:** an optional `onDismiss` on `PageSheet` and `OptionSheet`.
+- **Not ported:** G7c (§5; `ANDROID-DELTA.md` §9.3). P7 is not in the three commits (`ANDROID-DELTA.md` §9.4).
+
+**Tests: 1,136 → 1,391, all passing** (190 suites).
+- **+190 Android, in five new files:** `dashboard` (53; one source check reads the period sheet and `DatePickerSheet`), `period-list` (30), `audit-details` (34, verbatim), and Android's 25 of `approvals-visibility` and 48 of `audit-log`, on iOS navigation.
+- **+60 iOS:**
+  - `ios-period` (26): the exact DSH-1 params of every period and Custom through the real axios client; Custom's validation and today as the latest day; tile → chip → ✕; one request per period change and none within 60 s, on a real `QueryClient`;
+  - 24 in `approvals-visibility`: tabs, More rows and badges per persona (22), and no push code (2);
+  - 10 in `audit-log`: no tab, More row, deep link or notification tap reaches it for the four other personas, ADMIN as the control (5), and 5 checks on the iOS screen.
+- **Merged:** `role-gating` 145 → 155 (Android's +10), `kb-announcements` 61 → 56 (Android's −5), `service-catalog` (2 cases changed). Updated: `shell` (the More rows, Q1) and `read-screens`.
+
+**Verification (2026-11-03):**
+- `tsc`: 0 errors. `npm test`: 1,391/1,391. `npm ci --dry-run`: up to date.
+- `expo-doctor`: 20/21, the known `react-native-render-html` notice only.
+- `npx expo export --platform ios`, to the session's scratch folder and deleted: a 5,548,120-byte Hermes bundle, with the new strings and no push code.
+- `npm run verify:release-bundle`: **PASS (preview).** 2,305 modules, 195 of them app code (iOS-5d: 2,298 and 188). Developer-token strings: 0 of 12, while the control finds 12 of 12.
+- **Mutation check: 30 of 30 caught**, each in a scratch copy, never in the working tree. One survived the first run: removing `appliedTicketPeriod`'s date-filter check. Every persona has the date filter, so no test reached that branch (Android's tests miss it too). A test was added, and it is caught.
+- The 25 files copied as they are match `8b522e3` byte for byte. `app.json`, `package.json`, `package-lock.json` and `eas.json` are unchanged.
+- **Not run:** a device check. UAT C5–C5c, D1, E12 and G16–G18 cover it.
+
+**Android `dev` moved during the phase.** `e85c602` and `69a38ab` (P7 among them) reached `dev` while iOS-5e was being built. They are not in it: iOS-5f (`ANDROID-DELTA.md` §9.5). `0c0bbac` (Android's `versionCode` 3) is Android only.
+
+**Docs.**
+- **In `33dc1f6`:** the shared docs by the iOS-5b rule (ROLE-MATRIX §17–§19, §7 and §iOS-A.7; UI-STANDARDS §11–§13 and §iOS-A.14; WEB-VS-MOBILE-ROLES, iOS cells on 22 rows and §iOS-A.6), with every Android line present (checked by script). 01, 03, 04, 05, 06, UAT-TEST-PLAN, WEB-TOKENS and the G6, G7 and G8 docs verbatim; 01 §iOS-A (Q6). This manifest's §0, §2, §3.19, the rows, the totals and §5; CLAUDE.md's port source.
+- **In the follow-up docs commit (2026-11-03):** this section; `ANDROID-DELTA.md` §9; `UAT-TEST-PLAN-IOS.md`, 225 → 246 checks; compliance C2 (the EAS Update exception, Q7), with iOS-5e notes in A4, C4, E1 and H5; `RELEASE-IOS.md` §6, rule 9. No compliance row changes status.
+
 ## 5. SKIP
 
 Whole files:
