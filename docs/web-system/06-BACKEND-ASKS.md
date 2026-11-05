@@ -563,7 +563,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - **`POST /auth/test-login` must not be switched on in PROD for this.**
   - It does return a token in the body, but it is the Selenium skeleton key: no password, any user, outside the rate limiters, and it sets the cookie (`auth.controller.ts:67-97`).
   - On `fix/phase0-1-security` it also needs `TEST_AUTH_ENABLED=true`, precisely so that it stays off in production.
-- **No branch** of the clone (fetched 2026-11-02) has any other route that returns a token for a password.
+- **No branch** of the clone has any other route that returns a token for a password. This was first read on the clone fetched 2026-11-02, and re-read on 2026-11-05 on a fresh clone fetched 2026-11-04 16:36: same 13 branches, same commits, still none.
 - **Relation to A1** (2026-10-09). A1 asked for the same kind of endpoint so that UAT could be tested: `{ username, password }`, LDAP or local. A32 narrows it to what a reviewer needs, and adds PROD.
 
 **Ask**
@@ -580,6 +580,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
        "user": { "id": "<uuid>", "email": "<string>", "name": "<string>", "role": "ADMIN|AGENT|END_USER|L2_MANAGER",
                  "countryId": "<string|null>", "ldapSamAccount": "<string|null>", "department": "<string|null>", "phone": "<string|null>" } }
      ```
+     - **Do not return `loginWithLocal()`'s `user` as it stands** (added 2026-11-05). It is `{ id, email, displayName, role }` (`auth.service.ts:167`): `displayName`, not `name`, with no `countryId` or `ldapSamAccount`. The app would accept it, but show the email as the person's name and treat an AGENT as a triage agent. Build `user` as AUTH-P2 does (`docs/G9-PASSWORD-LOGIN.md`, "The `user` object, field by field").
      - The session is the ordinary one: a `sessions` row, plus the Redis entry with `countryId` and `ldapSamAccount`, lasting `SESSION_TTL_HOURS`.
      - So `Authorization: Bearer <token>` works on every route, and `POST /auth/logout` ends the session.
    - **No `Set-Cookie`.**
