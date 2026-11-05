@@ -14,6 +14,20 @@ import type { ApiError } from '@/types';
 export type ApiErrorKind = 'http' | 'not-json' | 'network' | 'timeout' | 'client' | 'shape';
 
 /**
+ * True when a GET found no route at all, so its HTML is not the route's own answer (01 §0.5): Express's HTML 404
+ * ("Cannot GET"), or the web app's index.html with 200, which a server in production mode serves for any unknown GET
+ * under /api/v1. A route's own errors are JSON; a 429 from the limiter is plain text. Neither counts.
+ */
+export function isNoSuchGetRoute(error: unknown): boolean {
+  return (
+    error instanceof ApiClientError &&
+    error.kind === 'not-json' &&
+    (error.status === 404 || error.status === 200) &&
+    (error.contentType ?? '').includes('text/html')
+  );
+}
+
+/**
  * Every rejection from src/api/ is an ApiClientError whose `body` is the documented error envelope
  * (`ApiError`, 03 §C / 01 §0.2), so screens handle one shape only.
  * Deliberately carries no request config: axios errors include headers, i.e. the Bearer token (02 §5.1).

@@ -1,12 +1,12 @@
-// G7: push notifications, the app side (the server side is NOT YET DEPLOYED: 01 NTF-5/NTF-6,
-// MOBILE-BACKEND-REQUIREMENTS.md §1). Web/backend facts and the design: docs/G7-PERIOD-APPROVALS-PUSH.md §3.
+// G7: push notifications, the app side (the server side, 01 NTF-5/NTF-6, confirmed in writing by the backend team on
+// 2026-11-05). Web/backend facts and the design: docs/G7-PERIOD-APPROVALS-PUSH.md §3.
 // These tests pin:
 //   1. registration on sign-in: NTF-5 `{ token, platform: "android" }`, only with the permission granted;
 //   2. the permission is never asked at sign-in, only on the first visit to Alerts (and by the explicit button);
 //   3. a refusal, a missing Firebase config and Expo Go all end quietly, with no request;
 //   4. a 404 (endpoint not deployed) and every other failure are SILENT: nothing thrown, no session ended, a `[push]`
 //      log line for us that never contains the token;
-//   5. sign-out: NTF-6 `{ token }` before AUTH-3, bounded in time; any sign-out deletes the token on the phone;
+//   5. sign-out: NTF-6 `{ token, platform }` before AUTH-3, bounded in time; any sign-out deletes the token on the phone;
 //   6. token rotation re-registers; taps open the ticket through the existing resolver's link format;
 //   7. the Alerts notice follows the real state; the wiring (no prompt at launch, no polling, the channel).
 // What is real: registration.ts, utils/push.ts, the stores, the NTF module and the axios client. Faked: the network
@@ -41,7 +41,14 @@ const TICKET_ID = '3f2b8c1e-9a4d-4e2f-8b7a-1c2d3e4f5a6b';
 const sent = [];
 let reply = () => ({ status: 200, body: { ok: true } });
 apiClient.defaults.adapter = (config) => {
-  sent.push({ method: config.method, url: config.url, data: config.data ? JSON.parse(config.data) : undefined, auth: config.headers?.Authorization });
+  sent.push({
+    method: config.method,
+    base: config.baseURL,
+    url: config.url,
+    data: config.data ? JSON.parse(config.data) : undefined,
+    auth: config.headers?.Authorization,
+    cookie: config.headers?.Cookie,
+  });
   const { status, body, html, hang } = reply(config);
   if (hang) return new Promise(() => undefined); // a request that never answers
   const response = {
@@ -270,13 +277,13 @@ describe('a 404 from the device-token endpoint is silent', () => {
 // ── 5. Sign-out ──────────────────────────────────────────────
 
 describe('removal on sign-out', () => {
-  test('DELETE /notifications/device-token { token } with the session token still valid', async () => {
+  test('DELETE /notifications/device-token { token, platform } with the session token still valid', async () => {
     installPushPlatform(fakePlatform().platform);
     await syncPushRegistration();
     sent.length = 0;
     await unregisterPushForSignOut();
     assert.deepEqual(sent.map((r) => `${r.method} ${r.url}`), ['delete /notifications/device-token']);
-    assert.deepEqual(sent[0].data, { token: FCM_TOKEN });
+    assert.deepEqual(sent[0].data, { token: FCM_TOKEN, platform: 'android' });
     assert.equal(sent[0].auth, 'Bearer session-token');
   });
 
@@ -400,6 +407,91 @@ describe('token rotation and taps', () => {
     assert.match(bridge, /navigationRef\.addListener\('ready', flushPushTap\)/);
     assert.match(bridge, /getLastNotificationResponseAsync\(\)/);
     assert.match(bridge, /addNotificationResponseReceivedListener\(onResponse\)/);
+  });
+});
+
+// ── The backend team's written contract (2026-11-05) ─────────
+
+describe('registration matches the confirmed contract exactly', () => {
+  // POST and DELETE /api/v1/notifications/device-token, body { "token": "<fcm-token>", "platform": "android" },
+  // header Authorization: Bearer <token>.
+  async function both() {
+    installPushPlatform(fakePlatform().platform);
+    await syncPushRegistration();
+    await unregisterPushForSignOut();
+    return sent;
+  }
+
+  test('method and path: POST, then DELETE, on /api/v1/notifications/device-token', async () => {
+    const calls = await both();
+    assert.deepEqual(calls.map((r) => r.method.toUpperCase()), ['POST', 'DELETE']);
+    for (const r of calls) assert.equal(`${new URL(r.base).pathname}${r.url}`, '/api/v1/notifications/device-token');
+  });
+
+  test('body: exactly { token, platform: "android" } on both, as JSON', async () => {
+    for (const r of await both()) {
+      assert.deepEqual(Object.keys(r.data).sort(), ['platform', 'token']);
+      assert.deepEqual(r.data, { token: FCM_TOKEN, platform: 'android' });
+    }
+  });
+
+  test('header: Authorization: Bearer <session token>, never a cookie', async () => {
+    for (const r of await both()) {
+      assert.equal(r.auth, 'Bearer session-token');
+      assert.equal(r.cookie, undefined);
+    }
+  });
+
+  test('a tap on the payload the server sends (fcm.service.ts: type, notificationId, ticketId, ticketNumber, all strings) opens that ticket', () => {
+    const data = { type: 'COMMENT_ADDED', notificationId: 'n-7', ticketId: TICKET_ID, ticketNumber: '19445' };
+    assert.deepEqual(parseTicketLink(pushTicketLink(data)), { ok: true, target: { kind: 'id', id: TICKET_ID } });
+    assert.match(read('src/push/PushBridge.tsx'), /handlePushTap\(response\.notification\.request\.identifier, response\.notification\.request\.content\.data\)/);
+  });
+});
+
+describe('Firebase in the build (google-services.json)', () => {
+  test('with Firebase and the permission granted, push is on and Alerts stops saying it cannot receive notifications', async () => {
+    installPushPlatform(fakePlatform({ permission: 'granted' }).platform);
+    await syncPushRegistration();
+    const { status, canAskAgain } = usePushStore.getState();
+    assert.equal(status, 'on');
+    const notice = pushNotice(status, canAskAgain).text;
+    assert.doesNotMatch(notice, /can't receive|cannot receive/);
+    assert.match(notice, /arrive on this phone as notifications/);
+  });
+
+  test('without it (getToken rejects) the notice says so: the one state that does', async () => {
+    installPushPlatform(fakePlatform({ token: new Error('FirebaseApp is not initialized') }).platform);
+    await syncPushRegistration();
+    assert.equal(usePushStore.getState().status, 'unavailable');
+    assert.match(pushNotice('unavailable', true).text, /can't receive notifications/);
+    const others = ['checking', 'not-asked', 'denied', 'not-deployed', 'failed', 'on'];
+    for (const s of others) assert.doesNotMatch(pushNotice(s, true).text, /can't receive/, s);
+  });
+
+  test('app.config.js sets android.googleServicesFile only from the EAS file variable, and keeps app.json as it is', async () => {
+    const appJson = JSON.parse(read('app.json')).expo;
+    const { default: dynamic } = await import('../../app.config.js');
+    const saved = process.env.GOOGLE_SERVICES_JSON;
+    try {
+      delete process.env.GOOGLE_SERVICES_JSON;
+      assert.equal(dynamic({ config: appJson }), appJson, 'no variable: the config is app.json, untouched');
+      process.env.GOOGLE_SERVICES_JSON = '/home/expo/workingdir/google-services.json';
+      const withFile = dynamic({ config: appJson });
+      assert.equal(withFile.android.googleServicesFile, '/home/expo/workingdir/google-services.json');
+      assert.deepEqual({ ...withFile.android, googleServicesFile: undefined }, { ...appJson.android, googleServicesFile: undefined });
+      assert.equal(withFile.android.package, 'com.mountmeru.servicedesk');
+    } finally {
+      if (saved === undefined) delete process.env.GOOGLE_SERVICES_JSON;
+      else process.env.GOOGLE_SERVICES_JSON = saved;
+    }
+    assert.equal(appJson.android.googleServicesFile, undefined, 'app.json names no file: a build without the variable never looks for one');
+  });
+
+  test('the file stays out of git (every copy of it), and the production profile is not given it', () => {
+    assert.match(read('.gitignore'), /^google-services\*\.json$/m, 'also "google-services (1).json" from a second download');
+    const eas = read('eas.json');
+    assert.doesNotMatch(eas, /GOOGLE_SERVICES_JSON|googleServicesFile/);
   });
 });
 

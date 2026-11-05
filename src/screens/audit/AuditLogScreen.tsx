@@ -5,19 +5,21 @@
 // - Layout: a heading per day ("Today", "Yesterday", "Mon 02 Nov 2026"), then one card per entry: the action pill, the
 //   entity and time, the ticket number (a link, through the deep-link resolver), the person and their email, and the
 //   details in a tinted box (utils/audit-log.ts formatAuditDetails). Never the IP address the row carries.
-// - Filters: every one is a server-side AUD-1 param, and they combine in one request (auditLog.controller.ts:7-13):
+// - Filters: every one is a server-side AUD-1 param (the backend team's written contract, 2026-11-05), and they combine
+//   in one request (auditLog.controller.ts:7-49):
+//     Ticket      → ticketNumber=<n>, typed in the search box; the server finds the ticket. A number with no ticket
+//                   filters nothing server-side, so the app spots that and says "No ticket #n" (05 B.40)
+//     Action      → action=<AuditAction> (exact)
+//     Dates       → dateFrom / dateTo: whole days on the phone's calendar, sent as their first and last instants
 //     Entity type → entityType=Ticket | Comment | Attachment (exact match)
-//     Ticket      → ticketId=<id>; the search box takes a ticket number, resolved to its id by TKT-1 as the deep-link
-//                   resolver does (there is no ticket-number param)
-//     Person      → actorId=<user id>, picked with USR-3 (active users only)
-//   The endpoint has NO action, date or free-text filter (G8 §2, §6), so the app offers none: filtering a page on the
-//   device would show a partial answer as if it were the whole one.
+//     Person      → actorId=<user id>, picked with USR-3 (active users only); in the source, not the written contract
+//   There is no free-text filter: filtering a page on the device would show a partial answer as if it were the whole one.
 // - Memory: capped at 500 entries (useAuditLog), with the ticket list's "search or filter to narrow" footer.
 // - No polling; pull-to-refresh reloads the first page only.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { FlashList } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
-import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,20 +28,24 @@ import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
   OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, ScreenHeader, SearchField, type Person, type SheetOption,
 } from '@/components';
-import { findTicketIdByNumber, queryKeys, useAuditLog } from '@/hooks';
+import { useAuditLog } from '@/hooks';
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette, type AuditActionTone } from '@/theme';
 import type { AppDrawerScreenProps, AuditAction, AuditLogEntry, UserRole } from '@/types';
 import {
-  AUDIT_ENTITY_TYPES, NO_AUDIT_FILTERS, activeAuditFilterCount, auditActionLabel, auditListRows, auditTicketLink, auditTime,
-  formatAuditDetails, isKnownAuditAction, parseAuditTicketNumber, type AuditEntityType, type AuditListRow,
-  type AuditLogFilters,
+  AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_DATE_PRESETS, AUDIT_ENTITY_TYPES, NO_AUDIT_FILTERS, activeAuditFilterCount,
+  auditActionLabel, auditDatesLabel, auditListRows, auditPresetDays, auditPresetOf, auditTicketLink, auditTime,
+  formatAuditDetails, isKnownAuditAction, parseAuditTicketNumber, withAuditDay, type AuditDatePreset, type AuditEntityType,
+  type AuditListRow, type AuditLogFilters,
 } from '@/utils/audit-log';
+import { notify } from '@/utils/dialogs';
 import { formatDisplayName } from '@/utils/format';
 import { canViewAuditLog } from '@/utils/permissions';
+import { DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 
 const ALL_TYPES = '__ALL__';
+const ALL_ACTIONS = '__ALL__';
 /** USR-3 for every role: anyone can appear in the log, requesters included. */
 const EVERY_ROLE: readonly UserRole[] = [];
 
@@ -52,6 +58,20 @@ const ENTITY_OPTIONS: readonly SheetOption<string>[] = [
   { value: ALL_TYPES, label: 'All types' },
   ...AUDIT_ENTITY_TYPES.map((t) => ({ value: t, label: t, description: ENTITY_DESCRIPTIONS[t] })),
 ];
+
+/** Written by no server code today (docs/G8-WEB-AUDIT.md §8): offered, because the enum has them, but said so. */
+const UNWRITTEN_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>(['DELETED', 'SLA_BREACHED', 'ESCALATED']);
+const ACTION_OPTIONS: readonly SheetOption<string>[] = [
+  { value: ALL_ACTIONS, label: 'All actions' },
+  ...AUDIT_ACTIONS.map((a) => ({
+    value: a,
+    label: AUDIT_ACTION_LABELS[a],
+    description: UNWRITTEN_ACTIONS.has(a) ? 'Not written by the Service Desk today' : undefined,
+  })),
+];
+
+/** Dates: the quick spans, then a day picked by hand for either end. */
+type DatesChoice = AuditDatePreset | 'pick-from' | 'pick-to';
 
 /** One icon per action, so a pill never relies on its colour (docs/brand/UI-STANDARDS.md §13). */
 const ACTION_ICONS: Record<AuditAction, keyof typeof Ionicons.glyphMap> = {
@@ -66,12 +86,6 @@ const ACTION_ICONS: Record<AuditAction, keyof typeof Ionicons.glyphMap> = {
   ESCALATED: 'trending-up-outline',
 };
 
-/** The ticket search: idle, or the state of the last ticket-number lookup. */
-type TicketLookup =
-  | { state: 'idle' }
-  | { state: 'busy' | 'none' | 'offline' | 'error'; ticketNumber: number }
-  | { state: 'invalid' };
-
 const rowKey = (row: AuditListRow) => row.key;
 const rowType = (row: AuditListRow) => row.kind;
 
@@ -83,15 +97,13 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
   const insets = useSafeAreaInsets();
   const role = useAuthStore((s) => s.user?.role) ?? 'END_USER';
   const offline = useIsOffline();
-  const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<AuditLogFilters>(NO_AUDIT_FILTERS);
   const [searchText, setSearchText] = useState('');
-  const [lookup, setLookup] = useState<TicketLookup>({ state: 'idle' });
-  const [sheet, setSheet] = useState<'entity' | 'person' | null>(null);
+  // The search box holds something that is not a ticket number.
+  const [invalidSearch, setInvalidSearch] = useState(false);
+  const [sheet, setSheet] = useState<'action' | 'dates' | 'entity' | 'person' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // Each ticket search gets a number; an answer that comes back after a newer search, or a clear, is dropped.
-  const attempt = useRef(0);
 
   const list = useAuditLog(filters);
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = list;
@@ -114,51 +126,52 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
-  // ── Ticket search: a number → its id (TKT-1) → ticketId ─────
+  // ── Ticket search: the number goes to the server as ticketNumber ─────
   const clearTicket = () => {
-    attempt.current += 1;
     setSearchText('');
-    setLookup({ state: 'idle' });
-    setFilters((f) => (f.ticket ? { ...f, ticket: null } : f));
+    setInvalidSearch(false);
+    setFilters((f) => (f.ticketNumber !== null ? { ...f, ticketNumber: null } : f));
   };
   const onChangeSearch = (text: string) => {
     setSearchText(text);
-    if (lookup.state !== 'idle' && lookup.state !== 'busy') setLookup({ state: 'idle' });
+    if (invalidSearch) setInvalidSearch(false);
   };
-  async function submitSearch() {
+  const submitSearch = () => {
     const text = searchText.trim();
     if (!text) {
       clearTicket();
       return;
     }
     const ticketNumber = parseAuditTicketNumber(text);
-    if (ticketNumber === null) {
-      setLookup({ state: 'invalid' });
+    setInvalidSearch(ticketNumber === null);
+    if (ticketNumber !== null) setFilters((f) => (f.ticketNumber === ticketNumber ? f : { ...f, ticketNumber }));
+  };
+
+  // ── Dates: a quick span, or either end picked in the system date dialog (Android) ─────
+  const pickDay = (end: 'from' | 'to') => {
+    const current = filters.dates[end];
+    DateTimePickerAndroid.open({
+      value: (current ? dateFromDay(current) : null) ?? new Date(),
+      mode: 'date',
+      minimumDate: DUE_DATE_MIN,
+      // Nothing is logged in the future.
+      maximumDate: new Date(),
+      onValueChange: (_event, date) => setFilters((f) => ({ ...f, dates: withAuditDay(f.dates, end, dayFromDate(date)) })),
+      onError: () => notify("Couldn't open the date picker."),
+    });
+  };
+  const pickDates = (choice: DatesChoice) => {
+    if (choice === 'pick-from' || choice === 'pick-to') {
+      pickDay(choice === 'pick-from' ? 'from' : 'to');
       return;
     }
-    if (filters.ticket?.ticketNumber === ticketNumber) return;
-    if (offline) {
-      setLookup({ state: 'offline', ticketNumber });
-      return;
-    }
-    const mine = ++attempt.current;
-    setLookup({ state: 'busy', ticketNumber });
-    try {
-      const found = await queryClient.fetchQuery({
-        queryKey: queryKeys.auditLog.ticket(ticketNumber),
-        queryFn: () => findTicketIdByNumber(role, ticketNumber),
-      });
-      if (mine !== attempt.current) return;
-      if (found) {
-        setFilters((f) => ({ ...f, ticket: found }));
-        setLookup({ state: 'idle' });
-      } else {
-        setLookup({ state: 'none', ticketNumber });
-      }
-    } catch {
-      if (mine === attempt.current) setLookup({ state: 'error', ticketNumber });
-    }
-  }
+    setFilters((f) => ({ ...f, dates: auditPresetDays(choice) }));
+  };
+  const dateOptions: readonly SheetOption<DatesChoice>[] = [
+    ...AUDIT_DATE_PRESETS,
+    { value: 'pick-from', label: 'From a day…', description: filters.dates.from ? auditDatesLabel({ from: filters.dates.from, to: null }) : undefined },
+    { value: 'pick-to', label: 'Until a day…', description: filters.dates.to ? auditDatesLabel({ from: null, to: filters.dates.to }) : undefined },
+  ];
 
   const clearAll = () => {
     clearTicket();
@@ -229,7 +242,15 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
         contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         ListEmptyComponent={
-          activeCount > 0 ? (
+          list.ticketMissing && filters.ticketNumber !== null ? (
+            <EmptyState
+              illustration="empty"
+              title={`No ticket #${filters.ticketNumber}`}
+              message="The Service Desk has no ticket with that number. Check it and search again."
+              actionLabel="Clear the ticket filter"
+              onAction={clearTicket}
+            />
+          ) : activeCount > 0 ? (
             <EmptyState
               illustration="empty"
               title="No entries match these filters"
@@ -271,12 +292,12 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
           value={searchText}
           onChangeText={onChangeSearch}
           onClear={clearTicket}
-          onSubmitEditing={() => void submitSearch()}
+          onSubmitEditing={submitSearch}
           returnKeyType="search"
           placeholder="Ticket number, e.g. 1234"
           accessibilityLabel="Filter by ticket number"
         />
-        <LookupLine lookup={lookup} />
+        <SearchLine invalid={invalidSearch} missingTicket={list.ticketMissing ? filters.ticketNumber : null} />
 
         <ScrollView
           horizontal
@@ -285,19 +306,33 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
           contentContainerClassName="gap-2 py-1"
           keyboardShouldPersistTaps="handled"
         >
-          {filters.ticket ? (
+          {filters.ticketNumber !== null ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Ticket #${filters.ticket.ticketNumber}. Clear the ticket filter`}
+              accessibilityLabel={`Ticket #${filters.ticketNumber}. Clear the ticket filter`}
               onPress={clearTicket}
               hitSlop={4}
               className="h-9 flex-row items-center rounded-full border border-primary bg-primary px-3 active:opacity-80"
             >
               <Ionicons name="ticket-outline" size={14} color={colors.primaryForeground} />
-              <Text className="ml-1 text-sm font-medium text-primary-foreground">#{filters.ticket.ticketNumber}</Text>
+              <Text className="ml-1 text-sm font-medium text-primary-foreground">#{filters.ticketNumber}</Text>
               <Ionicons name="close" size={14} color={colors.primaryForeground} style={{ marginLeft: 4 }} />
             </Pressable>
           ) : null}
+          <FilterChip
+            role="button"
+            icon="flash-outline"
+            label={filters.action ? AUDIT_ACTION_LABELS[filters.action] : 'All actions'}
+            active={!!filters.action}
+            onPress={() => setSheet('action')}
+          />
+          <FilterChip
+            role="button"
+            icon="calendar-outline"
+            label={auditDatesLabel(filters.dates)}
+            active={!!(filters.dates.from || filters.dates.to)}
+            onPress={() => setSheet('dates')}
+          />
           <FilterChip
             role="button"
             icon="pricetag-outline"
@@ -334,6 +369,22 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
       <ListEntryScope>{content}</ListEntryScope>
 
       <OptionSheet
+        visible={sheet === 'action'}
+        title="Action"
+        options={ACTION_OPTIONS}
+        selected={filters.action ?? ALL_ACTIONS}
+        onSelect={(value) => setFilters((f) => ({ ...f, action: value === ALL_ACTIONS ? null : (value as AuditAction) }))}
+        onClose={() => setSheet(null)}
+      />
+      <OptionSheet
+        visible={sheet === 'dates'}
+        title="Dates"
+        options={dateOptions}
+        selected={auditPresetOf(filters.dates)}
+        onSelect={pickDates}
+        onClose={() => setSheet(null)}
+      />
+      <OptionSheet
         visible={sheet === 'entity'}
         title="Entity type"
         options={ENTITY_OPTIONS}
@@ -355,26 +406,13 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
   );
 }
 
-/** Under the search box: what the last ticket-number search found, or why it found nothing. */
-function LookupLine({ lookup }: { lookup: TicketLookup }) {
-  if (lookup.state === 'idle') return null;
-  if (lookup.state === 'busy') {
-    return (
-      <View accessibilityLiveRegion="polite" className="mt-2 flex-row items-center">
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text className="ml-2 text-xs text-gray-500">Finding ticket #{lookup.ticketNumber}…</Text>
-      </View>
-    );
-  }
-  const text =
-    lookup.state === 'invalid'
-      ? 'Search takes a ticket number, like 1234. To see one person’s entries, tap Person.'
-      : lookup.state === 'none'
-        ? `No ticket #${lookup.ticketNumber}.`
-        : lookup.state === 'offline'
-          ? `You're offline. Ticket #${lookup.ticketNumber} can be looked up when you reconnect.`
-          : `Couldn't look up ticket #${lookup.ticketNumber}. Try again.`;
-  const error = lookup.state === 'error' || lookup.state === 'none';
+/** Under the search box: why the search text is not used, or that the number names no ticket. */
+function SearchLine({ invalid, missingTicket }: { invalid: boolean; missingTicket: number | null }) {
+  if (!invalid && missingTicket === null) return null;
+  const text = invalid
+    ? 'Search takes a ticket number, like 1234. To see one person’s entries, tap Person.'
+    : `No ticket #${missingTicket}.`;
+  const error = !invalid;
   return (
     <View accessibilityRole={error ? 'alert' : undefined} accessibilityLiveRegion="polite" className="mt-2 flex-row items-start">
       <Ionicons

@@ -6,6 +6,7 @@
 > - Written from the actual routers, validators (zod) and controllers in the web repo, read on 2026-10-09.
 > - **Not** from Swagger: `/api/docs` covers about 95 of 300 paths and has known errors.
 > - File references are relative to `backend/src/` unless prefixed.
+> - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
 
@@ -149,7 +150,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 | AUTH-P1 | Email and password sign-in. **⚠ ASSUMED, called by the app on UAT builds since 2026-11-05:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
 | AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }`. **Deployed on UAT, contract confirmed** (`02-AUTH.md` §7.5) | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
-| ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, ⚠ NOT YET DEPLOYED), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
+| ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, confirmed in writing 2026-11-05), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
 | AUTH-P5 | `GET /api/v1/tickets/by-number/:ticketNumber` | A8 | same as TKT-3 |
 
 ### AUTH-P1 email and password sign-in — ⚠ ASSUMED, NOT VERIFIED AGAINST SOURCE (2026-11-05)
@@ -858,6 +859,10 @@ Mounted at `/api/v1/users` (`app.ts:126`).
 ## 8. Dashboard / stats
 
 ### DSH-1 `GET /api/v1/dashboard/all` — MVP (simplified)
+- **Written contract (backend team, 2026-11-05):** `GET /api/v1/dashboard?range=last7`; ranges `today`, `yesterday`, `last7`, `last30`, `week`, `month`, `quarter`, `year`, `all`; custom `?from=2026-10-01&to=2026-10-31`.
+  - **Params: the same as the app sends** (below, and `tests/home/dashboard.test.mjs`). Confirmed, no longer read from the source alone.
+  - **Path: differs.** The source has no handler on `/dashboard` itself, only `/all`, `/kpis` and the other widgets (`dashboard.router.ts:8-15` at `7df97c8`), and the web dashboard in the same clone calls `/dashboard/all` with exactly these params (`FE:api/dashboard.api.ts:35`). The written path is read as the module's base. **Ronit's call (2026-11-05): keep `/dashboard/all`.** Calling `/dashboard` would answer the web app's `index.html` (production mode) or Express's 404, and Home would show its error for every role.
+  - `countryId` is not in the written list. The source reads it (`dashboard.controller.ts:242`) and the web sends it; the app keeps sending it from the country selector (not for L2).
 - **Purpose:** the role-scoped KPI counters and the recent-tickets list for the home screen.
 - **Auth:** any role. It is the only dashboard endpoint every role may call.
 - **Query** (`modules/dashboard/dashboard.controller.ts:206-302`):
@@ -944,7 +949,7 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - **Source:** `notifications.router.ts:8`, `notifications.controller.ts:25-28`.
 - **Mobile:** this drives the badge. Poll it on app foreground, on pull-to-refresh, and every ≥ 60 s while the app is in the foreground. It is the substitute for push until A5 ships.
   - In practice the app does not poll it: it reloads on pull-to-refresh and after a mark-read.
-  - Since G7 it also reloads when a push arrives while Setu is open; that does nothing until NTF-5/NTF-6 and the FCM send ship.
+  - Since G7 it also reloads when a push arrives while Setu is open. That needs a build with Firebase's `google-services.json` (`docs/RELEASE.md` §2b); NTF-5/NTF-6 and the FCM send are confirmed (2026-11-05).
 
 ### NTF-3 `POST /api/v1/notifications/:id/read` — MVP
 - **200:** `{ "message": "Marked as read" }`. Also returns 200 for unknown or foreign IDs, which are silently ignored.
@@ -954,13 +959,13 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - **200:** `{ "message": "All notifications marked as read" }`.
 - **Source:** `notifications.router.ts:11`, `notifications.controller.ts:38-44`.
 
-### NTF-5 `POST /api/v1/notifications/device-token` — ⚠ NOT YET DEPLOYED (G7)
-- **Status:** **does not exist on the server yet.**
-  - Specified by Ronit in MOBILE-BACKEND-REQUIREMENTS.md §1.5, sent to the backend team on 2026-11-02. It replaces AUTH-P4 (§1.4).
-  - Until it ships, Express answers `404` with an HTML body (`Cannot POST …`).
-- **Auth:** Bearer, the signed-in user.
-- **Body:** `{ "token": "<FCM registration token>", "platform": "android" }`.
-- **200 (as specified):** `{ "ok": true }`.
+### NTF-5 `POST /api/v1/notifications/device-token` — confirmed (G7; written contract 2026-11-05)
+- **Status: confirmed by the backend team in writing (2026-11-05)**, and in the source since `7df97c8`: `notifications.router.ts:14`, `deviceToken.controller.ts:4-22`.
+  - Specified by Ronit in MOBILE-BACKEND-REQUIREMENTS.md §1.5 (2026-11-02). It replaces AUTH-P4 (§1.4).
+  - A server without it answers `404` with an HTML body (`Cannot POST …`); the app still reads that as "not deployed" (below).
+- **Auth:** `Authorization: Bearer <token>`, the signed-in user (`requireAuth`).
+- **Body:** `{ "token": "<FCM registration token>", "platform": "android" }`. Both are required: `400 { error: 'token and platform are required' }`; a platform other than `android` or `ios` is `400` too.
+- **200:** `{ "ok": true }`.
   - Upsert on `token`.
   - A token already registered to a different user is **reassigned to the caller**.
   - `lastSeenAt` is updated.
@@ -969,13 +974,16 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
   - when Firebase rotates the token.
   - The token is the native FCM token (`getDevicePushTokenAsync`), not an Expo push token.
   - **A 404 is silent**: no banner, no dialog. The Alerts notice says "not switched on at the Service Desk yet", and `[push] register: 404, NTF-5 not deployed yet` is logged for developers.
+  - Checked against the written contract on 2026-11-05: path, method, body keys and header all match (`tests/push/push.test.mjs`, "registration matches the confirmed contract exactly").
+  - The phone needs Firebase's `google-services.json` in the build for a token at all (`docs/RELEASE.md` §2b).
   - No other failure is shown either. The token is never logged.
 
-### NTF-6 `DELETE /api/v1/notifications/device-token` — ⚠ NOT YET DEPLOYED (G7)
-- **Status:** **does not exist on the server yet** (same source as NTF-5).
-- **Auth:** Bearer.
-- **Body:** a JSON body, `{ "token": "<FCM registration token>" }`. It is not a path parameter.
-- **200 (as specified):** `{ "ok": true }`.
+### NTF-6 `DELETE /api/v1/notifications/device-token` — confirmed (G7; written contract 2026-11-05)
+- **Status: confirmed in writing (2026-11-05)**; in the source at `notifications.router.ts:15`, `deviceToken.controller.ts:24-35`.
+- **Auth:** `Authorization: Bearer <token>`.
+- **Body:** a JSON body, `{ "token": "<FCM registration token>", "platform": "android" }`, as the written contract gives for both calls. It is not a path parameter. The source reads only `token` (`400` without it) and deletes that token for the caller only.
+  - **Changed 2026-11-05:** the app sent `{ token }` alone. It now sends `platform` too, to match the written contract exactly.
+- **200:** `{ "ok": true }`.
 - **Mobile (G7):** `unregisterDeviceToken()`, called from `useSignOut` (`src/hooks/useProfile.ts`) on an explicit sign-out.
   - It is sent **before** AUTH-3, because AUTH-3 ends the session token NTF-6 needs.
   - Sign-out waits at most 3 s for it, and its failures are silent.
@@ -1172,23 +1180,29 @@ Mounted at `/api/v1/notifications` (`app.ts:132`). `requireAuth` only. Every rou
 - ⚠ Any other role can read **any** request by id. **Mobile (G4):** M19 opens only from My Requests, and shows the request only when `requesterId === me` (`isOwnServiceRequest`). The web never calls this endpoint.
 - **Source:** `serviceCatalog.router.ts:24`, `serviceCatalog.controller.ts:126-133`.
 
-### 10.5 Audit log (`/api/v1/audit-log`, `app.ts:136`) — G8, 2026-11-02
+### 10.5 Audit log (`/api/v1/audit-logs` written; `/api/v1/audit-log` in the source, `app.ts:137`) — G8, 2026-11-02; contract confirmed 2026-11-05
 
-Out of scope until G8 (Appendix A). Evidence for every line below, and what the web page shows that this endpoint cannot supply: `docs/G8-WEB-AUDIT.md`.
+Out of scope until G8 (Appendix A). Evidence for the G8 build, and what the web page shows: `docs/G8-WEB-AUDIT.md`. On 2026-11-05 the backend team sent Ronit the contract in writing; this section follows it, and says where the source differs.
 
-#### AUD-1 `GET /api/v1/audit-log` — P2 (ADMIN only; built in G8)
+#### AUD-1 `GET /api/v1/audit-logs` — P2 (ADMIN only; built in G8; confirmed in writing 2026-11-05)
+- **Written contract (backend team, 2026-11-05):** `GET /api/v1/audit-logs` (plural). Requires an ADMIN Bearer token. Params: `page`, `limit`, `action`, `entityType`, `dateFrom`, `dateTo`, `ticketId`, `ticketNumber`.
+- **The path: the written contract and the source differ.**
+  - The source at `7df97c8` mounts the module at `/api/v1/audit-log`, singular (`app.ts:137`), on every branch in the clone. No `/audit-logs` exists anywhere in it. The web portal's own audit page is not in the clone either (`docs/G8-WEB-AUDIT.md` §1), so UAT may run newer code.
+  - **Ronit's call (2026-11-05): the written path first, the source's as a fallback.** `src/api/auditLog.api.ts` calls `/audit-logs`. Only when the answer shows that no such route exists (an HTML body: Express's `404 Cannot GET`, or the web app's `index.html` with `200` in production mode, §0.5) does it call `/audit-log` with the same params, and it keeps whichever answered for the rest of that run of the app. A JSON error (401, 403, 500) or a 429 is the route's own answer and is never retried on the other path. Cost: at most one extra request per run, ADMIN only. A `[API drift]` line (`__DEV__`) says when the singular answered.
+  - So the G8 screen, which called `/audit-log`, was **not** failing against a server built from this source. Against a server that has only `/audit-logs`, it would have shown its error state.
 - **Auth:** `requireAuth, adminOnly` (`auditLog.router.ts:8`). **ADMIN only, enforced by the server:**
   - every other role gets `403 "Forbidden: insufficient role"` (`middleware/rbac.middleware.ts:13-15`);
   - no user gives `401 "Unauthorized"`.
-  - The one route in the module.
-- **Query:** pagination shape (a), §0.3. The server reads these five parameters and nothing else (`auditLog.controller.ts:6-7`):
-  - `page`, default 1;
-  - `limit`, default **25**, clamped 1–100;
+  - The one route in the module. (The controller also scopes AGENTs to their teams' tickets, `auditLog.controller.ts:20-32`; `adminOnly` means that code never runs.)
+- **Query:** pagination shape (a), §0.3. The written contract's params, as the source reads them (`auditLog.controller.ts:7-49`). They combine with AND; an empty string is ignored.
+  - `page`, default 1; `limit`, default **25**, clamped 1–100;
+  - `action`: an `AuditAction` (03 §A), exact. Any other value is a Prisma enum error, so a 500: send only the nine values;
   - `entityType`: an exact, case-sensitive match. Values written: `Ticket`, `Comment`, `Attachment`, and `ticket` from the auto-close job (`05` B.38);
-  - `actorId`: a user id, exact;
-  - `ticketId`: a ticket **id**, exact. No ticket-number form.
-  - An empty string is ignored. The filters combine with AND (`:9-13`).
-- **Not supported:** action, date range, ticket number, free text, sort. **Never send them** (rule 1).
+  - `dateFrom`, `dateTo`: `createdAt >= new Date(dateFrom)`, `<= new Date(dateTo)` (`:45-49`). No validation: an unreadable value is an Invalid Date and a 500. A bare `YYYY-MM-DD` is UTC midnight, so `dateTo=2026-11-05` drops all of the 5th but its first instant (`05` B.40). **The app sends full instants:** a picked day's first and last millisecond on the phone's clock, as ISO strings;
+  - `ticketId`: a ticket id, exact;
+  - `ticketNumber`: the server looks the ticket up (`:11-18`) and filters by its id. **A number with no ticket filters nothing: the whole log comes back** (`05` B.40). Ignored when `ticketId` is sent too;
+  - `actorId`: a user id, exact. **In the source (`:7, :37`), not in the written list.** The app keeps its Person filter on it.
+- **Not supported:** free text, sort. **Never send them** (rule 1).
 - **200:** `Paginated<AuditLogEntry>` (`03` §C):
   - each row is the full `audit_logs` row, `ipAddress` included;
   - plus `actor: { id, displayName, email } | null` and `ticket: { id, ticketNumber, title } | null` (`:19-22`);
@@ -1196,14 +1210,19 @@ Out of scope until G8 (Appendix A). Evidence for every line below, and what the 
   - `oldValues` / `newValues` are the stored JSON, **ids not resolved to names** (unlike TKT-7). Shapes per write site: `docs/G8-WEB-AUDIT.md` §8.
 - **Order:** `createdAt` desc (`:23`). Offset paging: rows repeat when entries are written between pages, so de-duplicate by `id`.
 - **Cost:** a `count` and a `findMany` per page. `ticketId`, `actorId` and `createdAt` are indexed; `entityType` is not (`schema.prisma:573-575`).
-- **Mobile (G8, M20):**
+- **Mobile (G8, M20; filters completed 2026-11-05):**
   - The request:
     - ADMIN only: the drawer row, the route and the request (`canViewAuditLog`);
     - `limit=50`, capped at 500 entries;
-    - only `entityType`, `actorId` and `ticketId` are sent, through an allow-list (`src/api/auditLog.api.ts`).
-  - The ticket filter turns a typed number into the id with TKT-1 `search=<n>&limit=5`, exact `ticketNumber` match only, as the deep-link resolver does. The person filter uses USR-3.
+    - only the written params plus `actorId` are ever sent, through an allow-list (`AUDIT_FILTER_KEYS`, `src/api/auditLog.api.ts`).
+  - Filters (`src/utils/audit-log.ts` `auditLogQuery`), all server-side:
+    - **Ticket** → `ticketNumber=<n>`, as typed. The TKT-1 number → id lookup of G8 is gone. Because an unknown number returns the whole log, the app checks the first page: if any entry belongs to another ticket (or none), it shows "No ticket #n" and loads nothing more (`auditTicketFilterIgnored`).
+    - **Action** → `action`, the nine `AuditAction` values (three of them are never written today, G8 §8, and say so).
+    - **Dates** → `dateFrom` / `dateTo`: Any date, Today, Yesterday, Last 7 days, Last 30 days, or either end picked in the system date dialog. Whole days on the phone's calendar, sent as instants (above).
+    - **Entity type** → `entityType`; **Person** → `actorId` (USR-3 picker).
   - `ipAddress` is never displayed.
-- **Source:** `app.ts:30, :136`; `modules/auditLog/auditLog.router.ts:8`; `auditLog.controller.ts:5-29`; `utils/pagination.ts:16-44`; `schema.prisma:558-577`.
+  - Tests: `tests/rbac/audit-log.test.mjs` (every param, the path fallback, the unknown-number check).
+- **Source:** `app.ts:30, :137`; `modules/auditLog/auditLog.router.ts:8`; `auditLog.controller.ts:5-67`; `utils/pagination.ts:16-44`; `schema.prisma:558-577` (all at `7df97c8`).
 
 ---
 
@@ -1233,7 +1252,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | templates (`/templates`) | all (`GET /`, `GET /:id`, writes). The web uses them only in admin |
 | custom-fields (`/custom-fields`) | all (definitions are not rendered anywhere in the web) |
 | reports (`/reports`) | all: 16 report GETs, `GET /ticket-log`, `POST /export`, `/scheduled*` |
-| audit-log (`/audit-log`) | none since G8: `GET /` is AUD-1 (§10.5), ADMIN only |
+| audit-log (`/audit-log`; written contract `/audit-logs`) | none since G8: `GET /` is AUD-1 (§10.5), ADMIN only |
 | problems (`/problems`) | all (incl. `/:id/status`, `/:id/link-ticket`) |
 | changes (`/changes`) | all (incl. `/:id/status`, `/:id/submit`, `/:id/link-ticket`, which **force-closes tickets**, `/link-problem`, `/link-project`) |
 | cab (`/cab`) | all |
@@ -1254,9 +1273,9 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**60 documented endpoints:** 33 MVP and 27 Phase 2 (APR-4 added in G3, AUD-1 in G8). A further 6 are PENDING backend asks:
-- AUTH-P1, P2, P3 and P5 (§1.4);
-- NTF-5 and NTF-6 (§9), ⚠ NOT YET DEPLOYED. The app calls them silently and they answer 404 until they ship (G7). They replace AUTH-P4.
+**60 documented endpoints:** 33 MVP and 27 Phase 2 (APR-4 added in G3, AUD-1 in G8). Also:
+- AUTH-P1, P2, P3 and P5 (§1.4), PENDING backend asks;
+- NTF-5 and NTF-6 (§9), confirmed in writing by the backend team on 2026-11-05 and in the source at `7df97c8`. They replace AUTH-P4.
 
 3 more are reference-only, do-not-call (§1.5). SCR-1..SCR-6 are used by the app since G4; their label stays P2, as for LKP-7 and APR-4.
 
@@ -1300,13 +1319,13 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | LKP-5 | GET | `/countries` | any | MVP |
 | LKP-6 | GET | `/priority-matrix` | ADMIN, AGENT | P2 |
 | LKP-7 | GET | `/canned-responses` | any (mobile: every role, G3) | P2 |
-| DSH-1 | GET | `/dashboard/all` | any (scoped) | MVP |
+| DSH-1 | GET | `/dashboard/all` (written contract: `/dashboard`, §8) | any (scoped) | MVP |
 | NTF-1 | GET | `/notifications` | own | MVP |
 | NTF-2 | GET | `/notifications/count` | own | MVP |
 | NTF-3 | POST | `/notifications/:id/read` | own | MVP |
 | NTF-4 | POST | `/notifications/read-all` | own | MVP |
-| NTF-5 | POST | `/notifications/device-token` `{ token, platform }` | own | ⚠ NOT YET DEPLOYED (G7) |
-| NTF-6 | DELETE | `/notifications/device-token` `{ token }` | own | ⚠ NOT YET DEPLOYED (G7) |
+| NTF-5 | POST | `/notifications/device-token` `{ token, platform }` | own | confirmed 2026-11-05 (G7) |
+| NTF-6 | DELETE | `/notifications/device-token` `{ token, platform }` | own | confirmed 2026-11-05 (G7) |
 | APR-1 | GET | `/approvals/pending` | own | P2 |
 | APR-2 | POST | `/approvals/:id/approve` | approver | P2 |
 | APR-3 | POST | `/approvals/:id/reject` | approver | P2 |
@@ -1323,4 +1342,4 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SCR-4 | GET | `/service-catalog/requests` | any (END_USER own) ⚠ (mobile: own rows only) | P2 (G4) |
 | SCR-5 | POST | `/service-catalog/requests` | any | P2 (G4) |
 | SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |
-| AUD-1 | GET | `/audit-log` | ADMIN | P2 (G8) |
+| AUD-1 | GET | `/audit-logs`, else `/audit-log` (§10.5) | ADMIN | P2 (G8; confirmed 2026-11-05) |

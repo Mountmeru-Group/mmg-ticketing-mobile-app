@@ -58,7 +58,8 @@ export const loginLayout = {
   /**
    * The email sign-in under the pill (2026-11-05, UI-STANDARDS.md §15.2). `submit` is the brand-red "Sign in": 52 dp
    * tall like the pill, and as wide as the form. Every touch target is at least 48 dp: the text action, the fields and
-   * the show/hide toggle.
+   * the show/hide toggle. `reveal` is the space Login keeps between "Sign in" and the keyboard (or the screen's foot)
+   * when it scrolls the button into view (src/screens/auth/emailFormLayout.ts).
    */
   emailForm: {
     dividerGap: 20,
@@ -71,5 +72,6 @@ export const loginLayout = {
     labelGap: 6,
     toggle: 48,
     submit: { height: 52, radius: 26, gap: 16 },
+    reveal: 16,
   },
 } as const;

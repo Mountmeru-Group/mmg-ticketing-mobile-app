@@ -10,8 +10,11 @@
 // - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
 // - Below the pill, on UAT builds only (EMAIL_SIGN_IN_ENABLED): email and password sign-in, ./EmailSignInForm.tsx
 //   (2026-11-05, ASSUMED contract, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
-//   single flight, and the pill is locked while an email sign-in runs. With the form open, Login scrolls to its end
-//   whenever the keyboard opens or the content grows, so the keyboard never covers the form's Sign in button.
+//   single flight, and the pill is locked while an email sign-in runs.
+// - With the form open, Login measures the form's "Sign in" and scrolls just enough to show all of it, 16 dp clear of
+//   the keyboard or the screen's foot (./emailFormLayout.ts revealScrollY). It does so when the button is laid out or
+//   moves (the form opens; an error appears above it), when the keyboard opens, and when the scroll view is resized
+//   (KeyboardAvoidingView's padding lands after the keyboard event). Events only, no timer.
 // - These are the only ways into the app: the __DEV__ developer-token screen was deleted on 2026-10-29.
 // TODO(later phase):
 // - AUTH-1 decides which buttons show; `microsoftEnabled` describes the WEB SSO only (01 AUTH-1).
@@ -32,6 +35,7 @@ import { colors, loginLayout, loginType, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { copyrightLabel, copyrightLine, copyrightYear } from '@/utils/copyright';
 import { EmailSignInForm } from './EmailSignInForm';
+import { revealScrollY, type ScrollViewport } from './emailFormLayout';
 import { SignInButton } from './SignInButton';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
@@ -59,27 +63,37 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
   // An email sign-in is running: the Microsoft pill is locked until it ends.
   const [emailBusy, setEmailBusy] = useState(false);
 
-  // The keyboard must never cover the email form's Sign in button. With the form open, Login scrolls to its end when the
-  // keyboard opens and whenever the content grows under it (a field error, a failure). Events only, no timer.
+  // The email form's "Sign in" must show, whole and tappable, as soon as the form opens, and stay above the keyboard.
+  // Refs, not state: none of this re-renders Login.
   const scroll = useRef<ScrollView>(null);
+  // Everything the scroll view scrolls: "Sign in" is measured against it, so `y` is in content coordinates.
+  const content = useRef<View>(null);
+  const submit = useRef<View>(null);
   const emailOpen = useRef(false);
-  const keyboardUp = useRef(false);
-  const keepSubmitInView = useCallback(() => {
-    if (emailOpen.current && keyboardUp.current) scroll.current?.scrollToEnd({ animated: !reduceMotionEnabled() });
+  // `top` is 0: Login has no header, its scroll view starts at the window's top.
+  const viewport = useRef<ScrollViewport>({ scrollY: 0, height: 0, top: 0, keyboardTop: null });
+  const revealSubmit = useCallback(() => {
+    if (!emailOpen.current || !content.current || !submit.current) return;
+    submit.current.measureLayout(content.current, (_x, y, _width, height) => {
+      const target = revealScrollY({ y, height }, viewport.current);
+      if (target === null) return;
+      viewport.current.scrollY = target;
+      scroll.current?.scrollTo({ y: target, animated: !reduceMotionEnabled() });
+    });
   }, []);
   useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', () => {
-      keyboardUp.current = true;
-      keepSubmitInView();
+    const shown = Keyboard.addListener('keyboardDidShow', (event) => {
+      viewport.current.keyboardTop = event.endCoordinates.screenY;
+      revealSubmit();
     });
     const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardUp.current = false;
+      viewport.current.keyboardTop = null;
     });
     return () => {
       shown.remove();
       hidden.remove();
     };
-  }, [keepSubmitInView]);
+  }, [revealSubmit]);
 
   // The footer's year: from the device clock on first render, again each time Login is focused, and again when the app
   // comes back to the foreground on Login (left open over New Year). Events only: no timer, no polling, as the Home
@@ -143,113 +157,130 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
           bounces={false}
           // A tap on "Sign in" with the keyboard up signs in; it does not just close the keyboard first.
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={keepSubmitInView}
+          // Resized (the keyboard's padding) or grown (a failure box above the form): "Sign in" may have left the view.
+          onLayout={(event) => {
+            viewport.current.height = event.nativeEvent.layout.height;
+            revealSubmit();
+          }}
+          onContentSizeChange={revealSubmit}
+          // Where the person left the scroll: read when a drag or fling ends, never on every frame.
+          onScrollEndDrag={(event) => {
+            viewport.current.scrollY = event.nativeEvent.contentOffset.y;
+          }}
+          onMomentumScrollEnd={(event) => {
+            viewport.current.scrollY = event.nativeEvent.contentOffset.y;
+          }}
         >
-          <View style={[styles.card, { minHeight: height * loginLayout.cardHeight, paddingTop: insets.top }]}>
-            {loginLayout.circles.map((c) => {
-              const size = c.size * sx;
-              return (
-                <View
-                  key={`${c.x},${c.y}`}
-                  style={[styles.circle, { width: size, height: size, borderRadius: size / 2, left: c.x * sx - size / 2, top: c.y * sy - size / 2 }]}
-                />
-              );
-            })}
-            {/* Same place as on every other screen: the top of the screen, full width. */}
-            <OfflineBanner />
-            <View style={styles.cardContent}>
-              <View style={styles.logoCard}>
-                <BrandLogo width={logoCard.width - 2 * logoCard.padX} height={logoCard.height - 2 * logoCard.padY} />
+          {/* Kept as a real view (never flattened away), because "Sign in" is measured against it. */}
+          <View ref={content} collapsable={false} style={styles.content}>
+            <View style={[styles.card, { minHeight: height * loginLayout.cardHeight, paddingTop: insets.top }]}>
+              {loginLayout.circles.map((c) => {
+                const size = c.size * sx;
+                return (
+                  <View
+                    key={`${c.x},${c.y}`}
+                    style={[styles.circle, { width: size, height: size, borderRadius: size / 2, left: c.x * sx - size / 2, top: c.y * sy - size / 2 }]}
+                  />
+                );
+              })}
+              {/* Same place as on every other screen: the top of the screen, full width. */}
+              <OfflineBanner />
+              <View style={styles.cardContent}>
+                <View style={styles.logoCard}>
+                  <BrandLogo width={logoCard.width - 2 * logoCard.padX} height={logoCard.height - 2 * logoCard.padY} />
+                </View>
+                <View style={styles.grow} />
+                <Text accessibilityRole="header" maxFontSizeMultiplier={loginType.headlineMaxScale} style={styles.headline}>
+                  {'One portal\nfor all your\nIT needs.'}
+                </Text>
+                <Text style={styles.subline}>Raise, track and resolve issues across the whole of Mount Meru Group.</Text>
               </View>
-              <View style={styles.grow} />
-              <Text accessibilityRole="header" maxFontSizeMultiplier={loginType.headlineMaxScale} style={styles.headline}>
-                {'One portal\nfor all your\nIT needs.'}
-              </Text>
-              <Text style={styles.subline}>Raise, track and resolve issues across the whole of Mount Meru Group.</Text>
             </View>
-          </View>
 
-          <View style={[styles.bottom, { paddingBottom: insets.bottom + 20 }]}>
-            {signOutMessage && !failure ? (
-              signOutMessage === REAUTH_NOTICE.message ? (
-                // The 15-day sign-out (02 §5.8): says why, in the info tone. It is not a failure.
-                <View accessibilityRole="alert" className="mb-4 self-stretch rounded-lg bg-blue-50 p-3">
-                  <View className="flex-row items-start">
-                    <Ionicons name="lock-closed" size={18} color={palette.blue[700]} />
-                    <View className="ml-2 flex-1">
-                      <Text className="text-sm font-semibold text-blue-900">{REAUTH_NOTICE.title}</Text>
-                      <Text className="mt-1 text-sm text-blue-800">{signOutMessage}</Text>
+            <View style={[styles.bottom, { paddingBottom: insets.bottom + 20 }]}>
+              {signOutMessage && !failure ? (
+                signOutMessage === REAUTH_NOTICE.message ? (
+                  // The 15-day sign-out (02 §5.8): says why, in the info tone. It is not a failure.
+                  <View accessibilityRole="alert" className="mb-4 self-stretch rounded-lg bg-blue-50 p-3">
+                    <View className="flex-row items-start">
+                      <Ionicons name="lock-closed" size={18} color={palette.blue[700]} />
+                      <View className="ml-2 flex-1">
+                        <Text className="text-sm font-semibold text-blue-900">{REAUTH_NOTICE.title}</Text>
+                        <Text className="mt-1 text-sm text-blue-800">{signOutMessage}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ) : (
-                <View className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
-                  <Text className="text-sm text-red-800">{signOutMessage}</Text>
-                </View>
-              )
-            ) : null}
-
-            {failure && copy ? (
-              <View accessibilityRole="alert" className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
-                <View className="flex-row items-start">
-                  <Ionicons name="alert-circle" size={18} color={palette.red[700]} />
-                  <View className="ml-2 flex-1">
-                    <Text className="text-sm font-semibold text-red-900">{copy.title}</Text>
-                    <Text className="mt-1 text-sm text-red-800">{copy.message}</Text>
-                    <Text className="mt-2 text-xs text-red-700">
-                      Ref: {failure.reason}
-                      {failure.status !== null ? ` · HTTP ${failure.status}` : ''}
-                    </Text>
-                    {__DEV__ ? <Text className="mt-1 font-mono text-xs text-red-700">{failure.detail}</Text> : null}
+                ) : (
+                  <View className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
+                    <Text className="text-sm text-red-800">{signOutMessage}</Text>
                   </View>
+                )
+              ) : null}
+
+              {failure && copy ? (
+                <View accessibilityRole="alert" className="mb-4 self-stretch rounded-lg bg-red-50 p-3">
+                  <View className="flex-row items-start">
+                    <Ionicons name="alert-circle" size={18} color={palette.red[700]} />
+                    <View className="ml-2 flex-1">
+                      <Text className="text-sm font-semibold text-red-900">{copy.title}</Text>
+                      <Text className="mt-1 text-sm text-red-800">{copy.message}</Text>
+                      <Text className="mt-2 text-xs text-red-700">
+                        Ref: {failure.reason}
+                        {failure.status !== null ? ` · HTTP ${failure.status}` : ''}
+                      </Text>
+                      {__DEV__ ? <Text className="mt-1 font-mono text-xs text-red-700">{failure.detail}</Text> : null}
+                    </View>
+                  </View>
+                  {copy.retryLabel ? (
+                    <View className="mt-3 self-end">
+                      <OutlineButton label={copy.retryLabel} tone="danger" onPress={startSignIn} disabled={signingIn || emailBusy} />
+                    </View>
+                  ) : null}
                 </View>
-                {copy.retryLabel ? (
-                  <View className="mt-3 self-end">
-                    <OutlineButton label={copy.retryLabel} tone="danger" onPress={startSignIn} disabled={signingIn || emailBusy} />
+              ) : null}
+
+              <View style={styles.signIn}>
+                <Text style={styles.wordmark}>Setu</Text>
+                <Text style={styles.prompt}>Sign in with your work account</Text>
+                {/* Locked (no touch, hidden from TalkBack) while an email sign-in runs: the two never overlap. */}
+                <View
+                  style={[styles.button, emailBusy ? styles.locked : null]}
+                  importantForAccessibility={emailBusy ? 'no-hide-descendants' : 'auto'}
+                >
+                  <SignInButton busy={signingIn} onPress={startSignIn} />
+                </View>
+                {EMAIL_SIGN_IN_ENABLED ? (
+                  <EmailSignInForm
+                    ssoBusy={signingIn}
+                    run={once}
+                    onBusyChange={emailBusyChanged}
+                    onMicrosoft={startSignIn}
+                    onOpen={() => {
+                      emailOpen.current = true;
+                    }}
+                    submitRef={submit}
+                    onSubmitLayout={revealSubmit}
+                  />
+                ) : null}
+                {/* Which backend this build talks to, for testers (04 M1). Never on a production build. */}
+                {SHOW_ENVIRONMENT_CHIP ? (
+                  <View accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">
+                    <Text className="text-xs font-semibold text-amber-800">{ENVIRONMENT_LABEL}</Text>
+                  </View>
+                ) : null}
+                {__DEV__ ? (
+                  <View className="mt-4 self-stretch rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
+                    <Text className="font-mono text-xs text-amber-900">
+                      Redirect URI sent to Microsoft: {describeRedirectUri()}
+                    </Text>
                   </View>
                 ) : null}
               </View>
-            ) : null}
 
-            <View style={styles.signIn}>
-              <Text style={styles.wordmark}>Setu</Text>
-              <Text style={styles.prompt}>Sign in with your work account</Text>
-              {/* Locked (no touch, hidden from TalkBack) while an email sign-in runs: the two never overlap. */}
-              <View
-                style={[styles.button, emailBusy ? styles.locked : null]}
-                importantForAccessibility={emailBusy ? 'no-hide-descendants' : 'auto'}
-              >
-                <SignInButton busy={signingIn} onPress={startSignIn} />
-              </View>
-              {EMAIL_SIGN_IN_ENABLED ? (
-                <EmailSignInForm
-                  ssoBusy={signingIn}
-                  run={once}
-                  onBusyChange={emailBusyChanged}
-                  onMicrosoft={startSignIn}
-                  onOpen={() => {
-                    emailOpen.current = true;
-                  }}
-                />
-              ) : null}
-              {/* Which backend this build talks to, for testers (04 M1). Never on a production build. */}
-              {SHOW_ENVIRONMENT_CHIP ? (
-                <View accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">
-                  <Text className="text-xs font-semibold text-amber-800">{ENVIRONMENT_LABEL}</Text>
-                </View>
-              ) : null}
-              {__DEV__ ? (
-                <View className="mt-4 self-stretch rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-                  <Text className="font-mono text-xs text-amber-900">
-                    Redirect URI sent to Microsoft: {describeRedirectUri()}
-                  </Text>
-                </View>
-              ) : null}
+              <Text style={styles.footer} accessibilityLabel={copyrightLabel(year)}>
+                {copyrightLine(year)}
+              </Text>
             </View>
-
-            <Text style={styles.footer} accessibilityLabel={copyrightLabel(year)}>
-              {copyrightLine(year)}
-            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -261,6 +292,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   keyboard: { flex: 1 },
   scroll: { flexGrow: 1 },
+  content: { flexGrow: 1 },
   // Under the status bar (paddingTop is the inset), rounded at the bottom only. It clips the circles.
   card: {
     backgroundColor: colors.login.card,

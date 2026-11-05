@@ -18,7 +18,7 @@ export const palette = {
   },
   slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 500: '#64748b', 700: '#334155' },
   zinc: { 600: '#52525b', 700: '#3f3f46' },
-  red: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' },
+  red: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 900: '#7f1d1d' },
   orange: { 100: '#ffedd5', 500: '#f97316', 700: '#c2410c' },
   amber: { 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
   yellow: { 100: '#fef9c3', 500: '#eab308', 600: '#ca8a04', 700: '#a16207' },
@@ -270,6 +270,22 @@ export const colors = {
     DUE_SOON: palette.amber[400],
     BREACHED: palette.red[700],
   },
+
+  /**
+   * The due line on a ticket card (2026-11-05, UI-STANDARDS.md §16): its clock icon and its words, by the same status as
+   * the dot above. These are TEXT, so each passes WCAG AA for 12 dp text (4.5:1) on the white card AND on the selected
+   * card's red-50, and they are told apart by LIGHTNESS (tests/polish/sla-deadline.test.mjs):
+   *   WITHIN_SLA  green-700  L* 47   5.0:1 on white, 4.6:1 on red-50
+   *   DUE_SOON    amber-800  L* 38   7.1:1, 6.5:1
+   *   BREACHED    red-900    L* 28   10.0:1, 9.2:1
+   * 9 L* apart, not the dots' 15: AA text leaves a green, an amber and a red only L* 28–48 between them. The words
+   * ("Due …", "Breached …") carry the meaning; the colour adds to them (WCAG 1.4.1).
+   */
+  slaDue: {
+    WITHIN_SLA: palette.green[700],
+    DUE_SOON: palette.amber[800],
+    BREACHED: palette.red[900],
+  } satisfies Record<SLAStatus, string>,
 
   /**
    * The two swipe actions on a ticket-list row (2026-11-03, UI-STANDARDS.md §14). L* 27 and 47; each has its icon and

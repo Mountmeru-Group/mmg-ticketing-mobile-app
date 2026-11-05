@@ -30,7 +30,9 @@ build/
 *.key
 *.mobileprovision
 *.pem
-google-services.json
+# Firebase config, any copy of it ("google-services (1).json" from a second download too): EAS gets it as a file
+# variable, never from git (docs/RELEASE.md §2b).
+google-services*.json
 GoogleService-Info.plist
 
 # Environment files — every variant ignored; only .env.example (names only) is committed

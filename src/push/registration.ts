@@ -1,7 +1,9 @@
 // Push registration (G7): this phone's FCM token on the Service Desk, from sign-in to sign-out.
-// The backend half is NOT YET DEPLOYED (MOBILE-BACKEND-REQUIREMENTS.md §1; 01 NTF-5, NTF-6). Until it is, NTF-5 and
-// NTF-6 answer 404, and everything here stays silent: no banner, no dialog, no error state. The Alerts screen's notice
-// says what state push is in (utils/push.ts pushNotice), and a `[push]` line goes to the log for us.
+// The backend half (01 NTF-5, NTF-6) is confirmed in writing by the backend team (2026-11-05). A server without it
+// answers 404, and everything here stays silent: no banner, no dialog, no error state. The Alerts screen's notice says
+// what state push is in (utils/push.ts pushNotice), and a `[push]` line goes to the log for us.
+// What the phone needs: the Firebase project's google-services.json in the build (docs/RELEASE.md §2b). Without it
+// Firebase gives no token and push is `unavailable`; with it, and the permission granted, NTF-5 runs and push is `on`.
 //
 // When each step runs (src/push/PushBridge.tsx wires the events; nothing here polls):
 //   sign-in or a restored session  → syncPushRegistration(): channel, permission (never asked here), token, NTF-5

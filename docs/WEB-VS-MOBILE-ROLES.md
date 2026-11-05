@@ -26,7 +26,7 @@
   - The web's sidebar still shows it to ADMIN and AGENT only.
 - **A Home tile carries the selected period to the ticket list** as its created-date filter, as the web's dashboard links do. The pending-reason and On hold chips also carry it, unlike the web's links, so the number and the list agree (`05` B.37).
 - **Push notifications: the app side is built, and not counted as a capability.**
-  - The server half does not exist yet (`01` NTF-5/NTF-6, ⚠ NOT YET DEPLOYED), so nobody receives a push today.
+  - The server half is confirmed by the backend team (2026-11-05, `01` NTF-5/NTF-6). A phone receives push once its build has Firebase's `google-services.json` (`docs/RELEASE.md` §2b, UAT builds first).
   - When it ships, push becomes a ➕ MOBILE ONLY row for every role. The web has no push.
 - Sources: `docs/G7-PERIOD-APPROVALS-PUSH.md`; evidence and tests: `docs/ROLE-MATRIX.md` §18.
 
@@ -312,7 +312,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Capability | WEB: who can | MOBILE: who can | Status | Note |
 |---|---|---|---|---|
 | Read the audit log: who did what and when, newest first, with the ticket, the person and the details; filter it by entity type or ticket number | ADMIN | ADMIN | ✅ SAME | G8 (2026-11-02). The web page `/audit-log` is deployed but **not in the analysed clone**, so the web column rests on Ronit's account of the page and on the server, which answers 403 to every other role (AUD-1). Mobile: a drawer row and route for ADMIN only; cards grouped by day; the ticket number opens the ticket. |
-| Filter the audit log by action, or by date (From, To) | ADMIN | Nobody | ❌ NOT BUILT | The deployed page offers these filters (Ronit). The endpoint in the analysed clone accepts no action or date parameter, so mobile has nothing to send. It needs the deployed server code checked (pull the clone), or a backend ask (`docs/G8-WEB-AUDIT.md` §11). Filtering loaded pages on the phone would show part of the answer as the whole, so it was not done. |
+| Filter the audit log by action, or by date (From, To) | ADMIN | ADMIN | ✅ SAME | Built 2026-11-05. AUD-1 reads `action`, `dateFrom` and `dateTo` since `7df97c8`, confirmed by the backend team in writing; M20 has Action and Dates chips, all server-side (`01` §10.5, UI-STANDARDS §13). |
 | Filter the audit log by person | Nobody | ADMIN | ➕ MOBILE ONLY | The endpoint takes `actorId`; the web page's filters, as Ronit lists them, have no person filter. Mobile uses the people search (active users only). |
 
 ### Admin
@@ -332,11 +332,11 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 
 The gaps are ranked by how much each one matters day to day. Each one uses an endpoint the backend already has, so none of them needs backend work. The numbers are those of the 2026-10-20 list, kept so that earlier references still work.
 
-**Still open: one, since G8 (2026-11-02).** All eleven gaps of the 2026-10-20 list are built (1–9, 11) or decided (10).
+**Still open: none since 2026-11-05.** All eleven gaps of the 2026-10-20 list are built (1–9, 11) or decided (10), and gap 12 (G8) closed when AUD-1 gained its filters.
 
 | # | Gap | Who | Why it is open |
 |---|---|---|---|
-| 12 | Filter the audit log by action, or by date (From, To) | ADMIN | **Unlike gaps 1–11, this one may need backend work.** The deployed web page offers these filters, but the page is not in the analysed clone, and the clone's AUD-1 reads no action or date parameter (`docs/G8-WEB-AUDIT.md` §2, §6). Next step, Ronit's: check the deployed server code (pull the clone). If it has the parameters, mobile adds two filter chips; if not, it is a backend ask (§11 there). |
+| 12 | ~~Filter the audit log by action, or by date (From, To)~~ | ADMIN | **Closed 2026-11-05.** The backend added `action`, `dateFrom`, `dateTo` and `ticketNumber` to AUD-1 (`7df97c8`, and the written contract), and M20 offers them. |
 
 **Built in Phase G5 (2026-10-22)** — the web's behaviour, with sources: `FE:pages/tickets/CreateTicketPage.tsx:26, :49-76, :346-387`; `BE:modules/tickets/tickets.controller.ts:185-201`
 

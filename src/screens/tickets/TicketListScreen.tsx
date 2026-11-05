@@ -28,9 +28,9 @@
 //   Who gets which: ticketListFilters() (utils/permissions.ts). All of the above combine in ONE request
 //   (ticketListQuery); "Clear all" is the web's Clear: named filter, search, the five and the sort (not the country).
 // CLIENT-SIDE — display only, never used to hide or reorder rows:
-//   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the hold-adjusted SLA badge (05 §A.9), which can
-//   disagree with the server slaStatus behind Overdue / Due soon. Results are never filtered on the device to
-//   "fix" the search-scope bug (05 C.7).
+//   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the card's hold-adjusted SLA due line (05 §A.9,
+//   slaDueLine), which can disagree with the server slaStatus behind Overdue / Due soon. Results are never filtered on
+//   the device to "fix" the search-scope bug (05 C.7).
 //
 // WRITES (Phase 3b) — every one is an explicit action with a confirmation naming who is emailed:
 //   Inline status chip (08 §4.1): staff only, transitions from ticket-rules.ts for that ticket only; RESOLVED /
@@ -47,7 +47,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, Pressable, RefreshControl, ScrollView, StatusBar, Text, View,
+  ActivityIndicator, Alert, AppState, BackHandler, Pressable, RefreshControl, ScrollView, StatusBar, Text, View,
 } from 'react-native';
 import type { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,6 +92,8 @@ const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
 
 const ALL_COUNTRIES = '__ALL__';
 const ticketKey = (t: Ticket) => t.id;
+/** The phone's clock to the minute: the cards' dates never need finer, and an unchanged minute re-renders nothing. */
+const currentMinute = () => Math.floor(Date.now() / 60_000) * 60_000;
 
 export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'TicketList'>) {
   const user = useAuthStore((s) => s.user);
@@ -230,6 +232,21 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
   );
   const selectedTickets = useMemo(() => list.tickets.filter((t) => selected.has(t.id)), [list.tickets, selected]);
 
+  // The cards' clock ("Raised", "updated", the due line), as the Home greeting reads its time (UI-STANDARDS.md §9):
+  // every render reads it, and focus or a return to the app makes a render happen if the minute has moved on, so a
+  // "Due today 16:30" seen at 16:31 reads "Breached". No timer.
+  const [shownAt, setShownAt] = useState(currentMinute);
+  useFocusEffect(
+    useCallback(() => {
+      setShownAt(currentMinute());
+      const sub = AppState.addEventListener('change', (next) => {
+        if (next === 'active') setShownAt(currentMinute());
+      });
+      return () => sub.remove();
+    }, []),
+  );
+  const now = Math.max(shownAt, currentMinute());
+
   // ── Inline status chip (08 §4.1) ───────────────────────────
   const changeStatus = useChangeStatus();
   const once = useSingleFlight();
@@ -352,13 +369,14 @@ export function TicketListScreen({ navigation, route }: TicketStackScreenProps<'
             onSwipeAction={onSwipeAction}
             onSwipeOpen={onSwipeOpen}
             onSwipeClose={onSwipeClose}
+            now={now}
           />
         </ListEntry>
       );
     },
     [
       role, onCardPress, canSelect, onCardLongPress, selectionMode, selected, onStatusPress, statusBusyId, swipeable, user,
-      onSwipeAction, onSwipeOpen, onSwipeClose,
+      onSwipeAction, onSwipeOpen, onSwipeClose, now,
     ],
   );
 

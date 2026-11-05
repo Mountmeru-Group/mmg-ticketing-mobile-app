@@ -50,7 +50,8 @@ describe('names', () => {
     assert.equal(peopleRowLabel(null, null, true), 'Requested by unknown requester, unassigned');
     assert.equal(peopleRowLabel('Me', 'Sarthak Darekar', false), 'Technician Sarthak Darekar');
     assert.equal(peopleRowLabel('Me', null, false), 'Unassigned');
-    assert.match(read('src/components/TicketCard.tsx'), /accessibilityLabel=\{`Ticket \$\{ticket\.ticketNumber\}: \$\{ticket\.title\}\$\{newReply \? ', new reply' : ''\}\. \$\{people\}`\}/);
+    // Then the dates and the due line (2026-11-05): "…. Raised 2 Nov, updated 2 days ago. Due Fri 7 Nov, 17:00".
+    assert.match(read('src/components/TicketCard.tsx'), /`Ticket \$\{ticket\.ticketNumber\}: \$\{ticket\.title\}\$\{newReply \? ', new reply' : ''\}\. \$\{people\}\. ` \+\s*`Raised \$\{raised\}, updated \$\{formatRelative\(ticket\.updatedAt, now\)\}\$\{due \? `\. \$\{due\.label\}` : ''\}`/);
   });
 });
 
