@@ -495,7 +495,7 @@ Reference phone 390 × 844 dp. Every value is a token: `loginLayout` in `src/the
   - the **environment chip** (amber-100 / amber-800 pill, as before), 12 dp below, **only when the build is not
     production** (10.6);
   - in `__DEV__` builds only, the redirect-URI hint (unchanged).
-- **"Mount Meru Group IT"**, 12 dp, `text.secondary`, at the bottom, 20 dp above the bottom inset + 20.
+- **"Copyright © <year> Mount Meru Group"**, 12 dp, `text.secondary`, at the bottom, 20 dp above the bottom inset + 20. The year is the device's (§15). Until 2026-11-04 the footer read "Mount Meru Group IT".
 
 ### 10.2 Colour and contrast (WCAG 2.x, on the exact values)
 
@@ -1045,3 +1045,32 @@ A real countdown needs the server's own figure: backend ask **A31** in `docs/web
    - pick a new period: the loading bar, then the numbers fade in;
    - pull to refresh: nothing fades.
 9. **Paperclip:** a reply with an inline e-mail image shows the drawn paperclip and "Image in attachments", sharp at the phone's density.
+
+## 15. Login: the footer's year, and the email sign-in that was not built (G9, 2026-11-04)
+
+### 15.1 The footer's year
+
+- **Text:** "Copyright © 2026 Mount Meru Group" in 2026, "… 2027 …" from 1 January 2027, and so on: the G9 brief's wording.
+  - It replaces "Mount Meru Group IT" (§10.1). That footer had no year: the brief's "copyright © 2026" had never been in the app.
+  - The new wording, without "IT", is the brief's. Ronit to confirm.
+- **Look:** unchanged. 12 dp, `text.secondary` (4.83 : 1 on white, §10.2), centred, same place.
+- **The year** is the device's local calendar year (`src/utils/copyright.ts`). It follows §9's pattern for time-dependent text:
+  - read on first render, on focus, and when the app returns to the foreground on Login, so an app left on Login over New Year shows the new year when it is picked up;
+  - never on a timer or by polling;
+  - the state is the year, not the time, so a check that finds the same year does not re-render Login.
+- **TalkBack** reads "Copyright 2026 Mount Meru Group" (`accessibilityLabel`). It reads "©" as "copyright", so the visible text would be spoken as "copyright copyright 2026 …".
+- **Width:** about 33 characters at 12 dp, roughly 210 dp: one line on a 360 dp phone at 100 % and 130 % text. At 200 % it wraps to two centred lines, and the page scrolls (§10.7).
+- **Rule for any later text:** no year is ever written into a user-facing string in `src/`.
+  - `tests/login/copyright-year.test.mjs` parses every source file and fails on a four-digit year in a string, template text, JSX text, or a number placed straight into text.
+  - In `src/`, years appear only in comments, and in the due-date picker's numeric bounds 2000–2100 (`src/utils/tasks.ts:60, 92-93`), which are not text.
+
+### 15.2 Email and password sign-in: not built
+
+- The G9 brief's design was "Sign in with Microsoft" unchanged, then an OR divider, then a quiet "Sign in with email instead", opening email and password fields in place.
+- It was **not built**: no backend endpoint can return a token for a password (`docs/G9-PASSWORD-LOGIN.md`; backend ask A32).
+- **Login's layout is otherwise unchanged:** the arc split, the single outlined Microsoft pill, the message slot and the environment chip.
+- When A32 ships, the design goes in as briefed:
+  - below the pill, an OR divider (hairline, "OR" in `text.secondary`, hairline);
+  - "Sign in with email instead" with a chevron, as text only;
+  - the fields open in place, by opacity and transform on the native driver, at once under "Remove animations";
+  - a 52 dp brand-red "Sign in" button that the keyboard never covers.

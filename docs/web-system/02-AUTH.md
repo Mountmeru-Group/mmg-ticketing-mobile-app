@@ -9,6 +9,7 @@
 > - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into every build.
 > - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
+> - **Email and password sign-in (G9, 2026-11-04): NOT built.** No endpoint returns a token for a password, on any branch. Backend ask **A32** was raised instead. See §8.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
 
@@ -173,6 +174,7 @@ and **no cookies** (§5.2).
 - It requires header `x-test-secret` to equal the server's `TEST_AUTH_SECRET`.
 - It accepts any email and does **not** check `isActive`.
 - It exists for Selenium tests. **The mobile app must never use it:** it is a skeleton key, and the secret must never ship in an app. See `05` §C.
+- **On `fix/phase0-1-security`** (`cb7b074`, 2026-10-28, not on `master`), it also needs `TEST_AUTH_ENABLED=true`, and the secret is compared in constant time. It still checks no password and still sets the cookie (`docs/G9-PASSWORD-LOGIN.md` §6).
 
 ---
 
@@ -578,3 +580,40 @@ Accept: application/json
     - One UUID-v4 literal: the EAS `extra.eas.projectId` in `app.json`. It is bundled because `src/config/env.ts` imports `app.json`. **This predates Phase 2.**
     - Once the real Entra IDs are filled in, those two GUIDs will be flagged the same way.
     - Suggested fix (not applied): match secret **values** instead of the property names, and allow-list the projectId and the two Entra IDs.
+
+---
+
+## 8. Email and password sign-in (G9, 2026-11-04): blocked, ask A32
+
+**The goal:** a Google Play reviewer, who has no Microsoft account in the MMG tenant, can sign in.
+
+**Finding.** The web source was read on every branch fetched by 2026-11-02 (`docs/G9-PASSWORD-LOGIN.md`, with a source for each point).
+- **`POST /auth/login` still returns the token only as the httpOnly cookie** (§1.3, unchanged since `d7f3887`).
+- **No endpoint** turns an email and password into a token a Bearer client can use.
+- **PROD has no password login for anyone:** no `LOCAL_AUTH_ENABLED` and no LDAP settings. So `GET /auth/config` reports `localAuthEnabled: false` there.
+- **UAT's setting is not in the source** (`00` B3).
+- **`test-login` is not a password sign-in** (§3), and stays forbidden (§6).
+
+**Decision (brief, Part 2).** The email form was **not built**. A form that cannot sign in would greet the reviewer with a failure.
+- The Login screen, the SSO flow, the auth store and `auth.config.ts` are unchanged.
+- The requirement went to the backend team as **A32** (`06-BACKEND-ASKS.md`). It asks for `POST /api/v1/auth/mobile/login` `{ email, password }`:
+  - it returns AUTH-P2's body (§7.5), with no cookie;
+  - it checks a local password only;
+  - it is restricted to an allow-list of reviewer accounts;
+  - it sits behind the login limiter;
+  - it is on **PROD** as well as UAT.
+
+**Why PROD.** The store AAB, which is what Google reviews, can only target PROD (`scripts/eas-build-guard.js:51-52`). A UAT-only password sign-in would not reach the reviewer.
+
+**When A32 ships**
+- Add the endpoint to `01-API-CONTRACT.md` as built (AUTH-P1, §1.4), then build the approved design (G9 brief, Part 3).
+- **Session:** stored through `setSession()`, exactly as after AUTH-P2. The 8-hour rule runs from `issuedAt` (§5.4).
+- **The 15-day clock (§5.8):** a password sign-in is a full credential entry, so it should set `fullAuthAt`. Confirm that with Ronit when building it.
+- **The password:** held in component state only. It is cleared on success, on failure and on unmount, and never logged, stored or put into an error.
+- **Errors:**
+  - 401 shows "Invalid credentials" without saying which field was wrong;
+  - 429 says plainly that there have been too many attempts.
+
+**Alternative with no new endpoint.** A dedicated Entra reviewer account, signing in through the existing Microsoft sign-in.
+- It needs AUTH-P2 on PROD (§7.6 item 1).
+- It also needs an MFA exclusion for that one account, which is IT's decision (`docs/G9-PASSWORD-LOGIN.md` §10).
