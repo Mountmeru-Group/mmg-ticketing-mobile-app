@@ -146,7 +146,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 ### 1.4 PENDING — not in the API yet (do not call until shipped; shape to be agreed)
 | ID | Endpoint | Ask | Proposed response |
 |---|---|---|---|
-| AUTH-P1 | `POST /api/v1/auth/mobile/login` `{ username, password }` | A1 | `{ token, expiresAt, user }`, no cookie |
+| AUTH-P1 | `POST /api/v1/auth/mobile/login` `{ username, password }`. **Narrowed by A32 (2026-11-04)** to `{ email, password }`: local password only, reviewer allow-list, on PROD as well. **Not in any branch of the web source** (`docs/G9-PASSWORD-LOGIN.md` §3); no mobile code calls it | A1, A32 | A32: AUTH-P2's body `{ token, expiresAt, user }` (`02-AUTH.md` §7.5), no cookie; 401 `"Invalid credentials"` whichever field is wrong; 429 from the login limiter (`06` A32) |
 | AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }` | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
 | ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, ⚠ NOT YET DEPLOYED), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
@@ -157,7 +157,13 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 |---|---|---|
 | `POST /api/v1/auth/login` `{ username, password }` → `200 { user:{id,email,displayName,role} }` + `Set-Cookie sd_session` | No token in the body. It puts a cookie into the native jar that overrides Bearer. Errors: `400 "Username and password are required"`, `401 "<raw message>"`, `429` | `auth.controller.ts:22-49` |
 | `GET /api/v1/auth/microsoft`, `GET /api/v1/auth/microsoft/callback` | Web confidential-client redirect flow; ends on the web domain with a cookie | `auth.controller.ts:101-224` |
-| `POST /api/v1/auth/test-login` | Selenium skeleton key (`x-test-secret`). Never ship its secret | `app.ts:117`, `auth.controller.ts:67-97` |
+| `POST /api/v1/auth/test-login` | Selenium skeleton key (`x-test-secret`). Never ship its secret. It checks **no password**, signs in any user and sets the cookie. On `fix/phase0-1-security` it also needs `TEST_AUTH_ENABLED=true`. **Not a password sign-in, and not a way in for a reviewer** (`docs/G9-PASSWORD-LOGIN.md` §6) | `app.ts:117`, `auth.controller.ts:67-97` (`:68-106` on `fix/phase0-1-security`) |
+
+**Re-checked 2026-11-04 (G9), on every branch fetched by 2026-11-02:**
+- `POST /auth/login` is unchanged: the token only as the cookie, the body `{ user }`.
+- No route returns a token for an email and password.
+- On PROD, `GET /auth/config` reports `localAuthEnabled: false`.
+- The sources are in `docs/G9-PASSWORD-LOGIN.md`.
 
 ---
 
