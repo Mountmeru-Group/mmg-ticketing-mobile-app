@@ -1,6 +1,53 @@
-# G9: email and password sign-in for a Google Play reviewer (first read 2026-11-04; re-read 2026-11-05)
+# G9: email and password sign-in for a Google Play reviewer (first read 2026-11-04; re-read and built 2026-11-05)
 
-**What this is.** Can the app sign in with an email and a password at all? Each brief asked for the answer to come from the web repo (read-only) before anything was built. Every statement here has a source. **Verdict, 2026-11-05: still no.** No endpoint in the web source turns an email and a password into a token in a JSON body. So the form is **not built**, and ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`) stays open. The Login footer's year (first G9 brief, Part 1) is in §8.
+**What this is.** Can the app sign in with an email and a password? Each brief asked for the answer to come from the web repo (read-only) before anything was built, and every statement here has a source.
+- **The source still has no such endpoint** (the sections from "What changed since the last read" on).
+- **Later on 2026-11-05,** Ronit confirmed with the backend team that one **is deployed on UAT**, with its source not pushed.
+- So the form was **built defensively, on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
+- Ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`) stays open, narrowed to "send us the contract, and push the source".
+- The Login footer's year (first G9 brief, Part 1) is in §8.
+
+## Built on 2026-11-05: defensively, against an ASSUMED contract (third G9 brief)
+
+**The clone was re-cloned at 09:56 that morning, and still has no such endpoint.** Checked read-only before this section was written:
+- **The fresh clone:** `master` is `7df97c8` (2026-11-05, "Merge pull request #14 from Mountmeru-Group/feature/setu-redesign"), with 15 refs, the new `origin/feature/setu-redesign` (`8f30fdf`) among them.
+- **What PR #14 changes** under `backend/src`: 14 files, none under `modules/auth` or `middleware`. They are push notifications, a bot, AI, the audit log, reports, SLA and tickets.
+- **The auth router** declares the same seven routes. The only JSON body carrying a token is still `test-login`'s (`auth.controller.ts:96`).
+- **On no ref, and in no commit** (`git log --all --no-textconv -S`), is there `auth/mobile`, `mobile/login`, `login/mobile` or `microsoft/mobile`.
+- **Not even AUTH-P2** is in the source.
+- **Untouched by this work:** no file in the clone is newer than its 09:56:07 index.
+
+**Why "defensively".** The endpoint is on UAT, but no readable contract exists. The last assumed auth contract cost a rebuild: the app required `displayName`, and the server sent `name`. So the app accepts several plausible shapes instead of one guess. Full design: `docs/web-system/02-AUTH.md` §8. The contract as assumed: `docs/web-system/01-API-CONTRACT.md` AUTH-P1.
+
+**What was built**
+
+| Part | What | Where |
+|---|---|---|
+| Request | `{ username, email, password }`, the same input under both names. Four paths, in order: `/auth/mobile/login`, `/auth/login/mobile`, `/auth/mobile`, `/auth/login`. The next only after a 404 with an HTML body. The answering path is remembered for the run of the app, and one `[auth]` debug line is logged per answer | `src/api/auth.api.ts` `signInWithPassword()`; `src/types/mobile-password-contract.ts` |
+| Response | **The same `readSession()` as Microsoft sign-in**, with per-endpoint options. Required: a token (`token` / `accessToken` / `sessionToken`), `user.id`, `user.role`. Name: `name` / `displayName` / `fullName`, else the email. Expiry: `expiresAt` / `expires_at` / `expiry`, unused (8-hour clock). Unknown fields are never read. Drift is logged through the existing mechanism | `src/api/auth.api.ts`; `src/api/responseSpecs.ts`; `src/api/drift.ts` `reportDrift()` |
+| `countryId` | A string or `null` is kept as sent. **Missing:** AUTH-2 `GET /auth/me` with the new token supplies it, or the sign-in is **refused** and the session ended (AUTH-3). A missing one never makes an AGENT a triage agent | `confirmFromAuthMe()` |
+| Session | `setSession()`, exactly as after Microsoft: same store, same 8-hour rule. `fullAuthAt = now` on every password sign-in, because a password is a full credential check; without it, the next cold start would sign the person out. **Ronit to confirm** | `src/screens/auth/signInAttempt.ts` `attemptPasswordSignIn()` |
+| Screen | Below the unchanged pill: OR divider, "Sign in with email instead" with a chevron. The fields open in place (opacity and translateY on the native driver, at once under "Remove animations"). Email keyboard; masked password with a show/hide toggle (`aria-label`); 52 dp brand-red "Sign in". The keyboard never covers "Sign in" (`KeyboardAvoidingView`, plus a scroll to the end when the keyboard opens or the content grows) | `src/screens/auth/EmailSignInForm.tsx`; `LoginScreen.tsx`; tokens in `src/theme/` |
+| Builds | **UAT only:** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`. A production build does not render it. The code is still in the production bundle, behind that flag | `src/config/env.ts` |
+| Errors | 400, 401, 403, other 4xx, 429, 5xx, none of the paths exists, no token, bad body, `countryId` unconfirmed, network, storage: each has its own message. **Never which field was wrong:** a server message naming one field is replaced | `PASSWORD_FAILURE_COPY`, `neutralCredentialMessage()` |
+| Password | Component state only. Sent in the sign-in request and nowhere else. Cleared on success, on failure and on unmount. Never logged, stored or put into an error | `EmailSignInForm.tsx` |
+| Tests | `tests/auth/password-sign-in.test.mjs`, 108 new tests. Existing guards updated for the new premise: two ways in (`tests/release/production-readiness.test.mjs`); nine animating files, plus the env import and the UAT-only flag (`tests/motion/start-up-and-login.test.mjs`). `npm test`: 1205 pass, 0 fail | |
+
+**Unchanged:** the Microsoft sign-in flow (`signInWithMicrosoft()`, `exchangeMicrosoftIdToken()`'s reader options are exactly its old fields), `SignInButton.tsx`, `auth.config.ts`, the Entra config, `eas.json` and the production profile, the 15-day rule, and the 8-hour rule. `tests/auth/mobile-sso.test.mjs` and `tests/auth/reauth.test.mjs` are untouched and pass.
+
+**Still to confirm** (`02-AUTH.md` §8.7 has the full list)
+1. Which path answers on UAT, which request key it reads, and which response keys it sends, `countryId` included.
+2. Whether it sets a cookie, its rate limit, and its error statuses and messages. In particular: do an unknown email and a wrong password get the same answer?
+3. Which accounts may use it (A32 proposed an allow-list).
+4. The 15-day clock after a password sign-in (`fullAuthAt = now`).
+5. PROD: the option stays off there until A32 ships on PROD and Ronit says so.
+6. **On a device** (no build was run): the reveal, the keyboard keeping "Sign in" visible on a 360 dp phone at 100 %, 130 % and 200 % text, and TalkBack on the toggle.
+
+**How to learn the real contract on the device** (`02-AUTH.md` §8.8). Sign in with email once against UAT, then read the lines:
+- **Development build:** in Metro, the `[auth] email sign-in: …` lines give the answering path, the status and the key names. `[API drift] AUTH-P1 …` lines name any optional field that is missing or of another type.
+- **`preview` APK:** `adb logcat -s ReactNativeJS:V` shows the same `[auth]` lines. Any failure box's Ref line also reads `<reason> · HTTP <status> · <path>`.
+
+---
 
 ## What changed since the last read: nothing
 
@@ -106,9 +153,11 @@ The 2026-11-05 brief said the clone had been updated and the endpoints were now 
 - `eas.json` has no separate `development` profile. Any build that does not ask for PROD resolves to UAT (`src/config/env.ts:21`).
 - The build guard refuses PROD on any profile but `production` (`scripts/eas-build-guard.js:32-35`).
 
-## So the brief's STOP applies
+## So the second brief's STOP applied (superseded later the same day)
 
-- **The email form is not built.** No endpoint returns a token in a JSON body for an email and a password. A form would greet every user, the Play reviewer included, with a failure.
+> **Superseded on 2026-11-05.** The backend team confirmed the endpoint is deployed on UAT, so the third brief had the form built against an ASSUMED contract (top of this file). This section is kept as the record of what the source showed.
+
+- **The email form was not built.** No endpoint in the source returns a token in a JSON body for an email and a password. A form would greet every user, the Play reviewer included, with a failure.
 - **Untouched:** `LoginScreen`, `SignInButton`, `signInAttempt`, `auth.api.ts`, `auth.store.ts`, `auth.config.ts`, `eas.json` and the SSO flow. Parts 3 and 4 of the brief did not run.
 - **What unblocks it:** the backend team's branch, or their contract in writing (above). When the endpoint is in the clone, re-run this read and build to what it says.
 

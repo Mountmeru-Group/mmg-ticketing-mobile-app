@@ -23,13 +23,19 @@ export class ApiClientError extends Error {
   /** HTTP status, or null when no response was received / the request never left the device. */
   readonly status: number | null;
   readonly body: ApiError;
+  /**
+   * The response's `content-type` for a `not-json` answer ('' when it had none), otherwise undefined. Email sign-in
+   * reads it to tell Express's HTML "Cannot POST" 404 (no such route, 01 §0.5) from any other non-JSON 404.
+   */
+  readonly contentType?: string;
 
-  constructor(kind: ApiErrorKind, status: number | null, body: ApiError) {
+  constructor(kind: ApiErrorKind, status: number | null, body: ApiError, contentType?: string) {
     super(body.error);
     this.name = 'ApiClientError';
     this.kind = kind;
     this.status = status;
     this.body = body;
+    if (contentType !== undefined) this.contentType = contentType;
   }
 }
 

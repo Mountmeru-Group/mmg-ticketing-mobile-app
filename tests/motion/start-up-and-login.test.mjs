@@ -61,6 +61,14 @@ describe('Login environment chip: never on a production build', () => {
     }
   });
 
+  // 2026-11-05: the email sign-in follows the same rule. Its endpoint is only on UAT, and its contract is ASSUMED.
+  test('email sign-in: off on a production release build, on for every UAT build', async () => {
+    assert.equal((await loadEnv(false, 'PROD')).EMAIL_SIGN_IN_ENABLED, false);
+    for (const [dev, appEnv] of [[false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
+      assert.equal((await loadEnv(dev, appEnv)).EMAIL_SIGN_IN_ENABLED, true, `dev=${dev} env=${appEnv}`);
+    }
+  });
+
   test('Login renders the chip, and its label, only inside the SHOW_ENVIRONMENT_CHIP branch', () => {
     const login = read('src/screens/auth/LoginScreen.tsx');
     const open = '{SHOW_ENVIRONMENT_CHIP ? (';
@@ -73,7 +81,8 @@ describe('Login environment chip: never on a production build', () => {
     assert.match(branch, /\{ENVIRONMENT_LABEL\}/);
     // Outside the branch the label is only imported, never rendered.
     assert.deepEqual(rest.match(/ENVIRONMENT_LABEL/g), ['ENVIRONMENT_LABEL']);
-    assert.match(rest, /^import \{ ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
+    // 2026-11-05: the same import also brings EMAIL_SIGN_IN_ENABLED (Login's email sign-in, UAT only).
+    assert.match(rest, /^import \{ EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
   });
 });
 
@@ -338,7 +347,7 @@ describe('Login, "arc split"', () => {
   });
 
   test('no colour is written into the login or motion code: every one comes from src/theme/colors.ts', () => {
-    for (const rel of ['src/screens/auth/LoginScreen.tsx', 'src/screens/auth/SignInButton.tsx', 'src/navigation/SplashIntro.tsx', 'src/components/Shimmer.tsx']) {
+    for (const rel of ['src/screens/auth/LoginScreen.tsx', 'src/screens/auth/SignInButton.tsx', 'src/screens/auth/EmailSignInForm.tsx', 'src/navigation/SplashIntro.tsx', 'src/components/Shimmer.tsx']) {
       assert.doesNotMatch(read(rel), /#[0-9a-f]{3,8}\b|rgba?\(/i, rel);
     }
   });
@@ -351,9 +360,9 @@ describe('motion rules hold in every animation in src/', () => {
   const animated = files.filter((rel) => /\bAnimated\.(timing|loop|spring|decay)\(/.test(read(rel)));
   const ALLOWED = new Set(['opacity', 'translateX', 'translateY', 'scale', 'scaleX', 'scaleY', 'rotate']);
 
-  test('the animating files are exactly these eight', () => {
+  test('the animating files are exactly these nine', () => {
     // 2026-11-03: + the greeting mark, the press feedback and the Home count fade (docs/PERFORMANCE.md §13;
-    // tests/motion/polish.test.mjs).
+    // tests/motion/polish.test.mjs). 2026-11-05: + Login's email form opening in place (UI-STANDARDS.md §15.2).
     assert.deepEqual(animated.sort(), [
       'src/components/CountFade.tsx',
       'src/components/GreetingMark.tsx',
@@ -362,6 +371,7 @@ describe('motion rules hold in every animation in src/', () => {
       'src/components/Shimmer.tsx',
       'src/components/StatusBadge.tsx',
       'src/navigation/SplashIntro.tsx',
+      'src/screens/auth/EmailSignInForm.tsx',
       'src/screens/auth/SignInButton.tsx',
     ]);
   });
@@ -438,6 +448,7 @@ describe('motion rules hold in every animation in src/', () => {
       'src/components/ListEntry.tsx': [/useEffect\(\(\) => \(\) => scope\.stopAll\(\), \[scope\]\);/],
       'src/components/StatusBadge.tsx': [/return \(\) => pulse\.stop\(\);/],
       'src/navigation/SplashIntro.tsx': [/return \(\) => play\.stop\(\);/, /return \(\) => fade\.stop\(\);/],
+      'src/screens/auth/EmailSignInForm.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/],
       'src/screens/auth/SignInButton.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/, /return \(\) => loop\.stop\(\);/],
     };
     assert.deepEqual(Object.keys(cleanups).sort(), animated.sort());
