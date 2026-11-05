@@ -28,7 +28,7 @@ export { useTaskFeed } from './useTasks';
 // Phase G4 reads
 export { useMyServiceRequests, useServiceCategories, useServiceItem, useServiceItems, useServiceRequest } from './useServiceCatalog';
 // Phase G8 reads
-export { AUDIT_LOG_CAP, findTicketIdByNumber, useAuditLog } from './useAuditLog';
+export { AUDIT_LOG_CAP, useAuditLog } from './useAuditLog';
 
 // Writes
 export { useCreateTicket, validateNewTicket, type CreateTicketVariables } from './useCreateTicket';

@@ -110,6 +110,17 @@ describe('PERIOD row: the web\'s buttons, in its order, sending what the web sen
     assert.deepEqual(sentParams(), { range: 'today' });
   });
 
+  test('the backend team\'s written contract (2026-11-05): its nine ranges and its custom example, sent exactly', async () => {
+    const WRITTEN = ['today', 'yesterday', 'last7', 'last30', 'week', 'month', 'quarter', 'year', 'all'];
+    assert.deepEqual(DASHBOARD_PERIODS.map((p) => p.value).filter((p) => p !== 'custom'), WRITTEN);
+    await getDashboard({ ...dashboardPeriodQuery('last7', NO_CUSTOM_RANGE) });
+    await getDashboard({ ...dashboardPeriodQuery('custom', { from: '2026-10-01', to: '2026-10-31' }) });
+    assert.deepEqual(sentParams(0), { range: 'last7' });
+    assert.deepEqual(sentParams(1), { from: '2026-10-01', to: '2026-10-31' });
+    // The written path is /dashboard; the app keeps /dashboard/all, which the source and the web dashboard use (01 DSH-1).
+    assert.deepEqual(sent.map((r) => r.url), ['/dashboard/all', '/dashboard/all']);
+  });
+
   test('getDashboard alone still defaults to range=month, and never sends to without from', async () => {
     await getDashboard();
     await getDashboard({ to: '2026-10-15' });

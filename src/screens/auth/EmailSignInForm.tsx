@@ -8,14 +8,17 @@
 // - The attempt itself is attemptPasswordSignIn() (./signInAttempt.ts), against an ASSUMED contract (src/api/auth.api.ts).
 // - The password lives in this component's state ONLY. It is never logged or stored, and it goes nowhere but that one
 //   call. It is cleared on success, on failure and on unmount.
-// - LoginScreen keeps the Sign in button above the keyboard: `onOpen` tells it the form is open.
+// - "Sign in" takes static styles only (./emailFormLayout.ts says why: a function `style` made it invisible on UAT).
+// - LoginScreen keeps "Sign in" in view and above the keyboard: `onOpen` tells it the form is open, `submitRef` and
+//   `onSubmitLayout` let it measure the button whenever it moves.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, Animated, AppState, Easing, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { OutlineButton } from '@/components';
 import { reduceMotionEnabled } from '@/hooks';
 import { colors, loginLayout, loginType, motion, palette } from '@/theme';
+import { submitStyle } from './emailFormLayout';
 import {
   PASSWORD_FAILURE_COPY,
   attemptPasswordSignIn,
@@ -44,9 +47,13 @@ export interface EmailSignInFormProps {
   onMicrosoft: () => void;
   /** The fields opened. */
   onOpen: () => void;
+  /** "Sign in" itself, for LoginScreen to measure. */
+  submitRef: RefObject<View | null>;
+  /** "Sign in" was laid out or moved (the form opened, a field error or a failure box appeared above it). */
+  onSubmitLayout: () => void;
 }
 
-export function EmailSignInForm({ ssoBusy, run, onBusyChange, onMicrosoft, onOpen }: EmailSignInFormProps) {
+export function EmailSignInForm({ ssoBusy, run, onBusyChange, onMicrosoft, onOpen, submitRef, onSubmitLayout }: EmailSignInFormProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -238,15 +245,21 @@ export function EmailSignInForm({ ssoBusy, run, onBusyChange, onMicrosoft, onOpe
           ) : null}
 
           <Pressable
+            ref={submitRef}
+            onLayout={onSubmitLayout}
             accessibilityRole="button"
             accessibilityLabel="Sign in"
             accessibilityState={{ disabled: locked, busy }}
             disabled={locked}
             onPress={startSubmit}
-            style={({ pressed }) => [styles.submit, ssoBusy ? styles.submitLocked : null, pressed ? styles.submitPressed : null]}
+            style={[submitStyle.button, ssoBusy ? submitStyle.locked : null]}
           >
-            {busy ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-            <Text style={[styles.submitLabel, busy ? styles.submitLabelBusy : null]}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+            {({ pressed }) => (
+              <View style={[submitStyle.face, pressed ? submitStyle.pressed : null]}>
+                {busy ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
+                <Text style={[styles.submitLabel, busy ? styles.submitLabelBusy : null]}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+              </View>
+            )}
           </Pressable>
         </Animated.View>
       )}
@@ -280,17 +293,6 @@ const styles = StyleSheet.create({
   fieldInvalid: { borderColor: palette.red[700] },
   fieldError: { marginTop: 4, color: palette.red[700], ...loginType.prompt },
   toggle: { position: 'absolute', right: 0, top: 0, width: form.toggle, height: form.toggle, alignItems: 'center', justifyContent: 'center' },
-  submit: {
-    height: form.submit.height,
-    marginTop: form.submit.gap,
-    borderRadius: form.submit.radius,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-  },
-  submitLocked: { opacity: 0.5 },
-  submitPressed: { opacity: motion.press.opacity },
   submitLabel: { color: colors.primaryForeground, ...loginType.button },
   submitLabelBusy: { marginLeft: 8 },
 });

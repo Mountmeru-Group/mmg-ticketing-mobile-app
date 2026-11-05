@@ -1,4 +1,9 @@
 // Dashboard (01 §8). DSH-1 is the only dashboard endpoint every role may call.
+// The backend team's written contract (2026-11-05): `GET /api/v1/dashboard?range=last7`, ranges today, yesterday, last7,
+// last30, week, month, quarter, year, all; custom `?from=2026-10-01&to=2026-10-31`. The params are exactly what this
+// sends. The path stays /dashboard/all (Ronit's call, 2026-11-05): the source has no handler on /dashboard itself
+// (dashboard.router.ts at 7df97c8), and the web dashboard calls /dashboard/all with these same params, so the written
+// path is read as the module's base. `countryId` is not in the written list; the source and the web both use it.
 import type { DashboardAll, DashboardRange } from '@/types';
 import { apiClient } from './client';
 

@@ -20,6 +20,10 @@
 > deadline, press feedback, a count cross-fade and a drawn paperclip. §13 records it. **Bundle +32.3 KB of Hermes
 > (+0.59 %). Every new animation is native, one-shot and transform/opacity only; no list row loops. The count roll is a
 > cross-fade, not a count-up (a count-up needs per-frame JavaScript).**
+>
+> **2026-11-05:** raised and due dates on ticket cards, the email form's "Sign in" fix, and the audit filters. §14
+> records the cost. **A card with a due line is 24 dp taller; the list skeleton grew to match. No animation, no timer,
+> no polling; the card's clock is read on render, kept to the minute.** Bundle not measured (no build this round).
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -1689,3 +1693,58 @@ Use the same phone and method as §6 and §10.9 (Profile HWUI rendering → bars
 - Rendered in desktop Chrome to check the drawings: the three greeting SVGs (26 px and 120 px) and the paperclip (16 px and 120 px). That is not the phone's renderer: UI-STANDARDS §14.10 items 2 and 9.
 - No EAS build. No call to the backend. The web repo was not opened, and no database was touched.
 - Branch `dev`. The first round is `e85c602`; the second round is not committed.
+
+## 14. Ticket-card dates, the "Sign in" fix and the audit filters (2026-11-05)
+
+UAT only. No library added, no build, no polling, no `staleTime` change. Design: `docs/brand/UI-STANDARDS.md` §15.3 and §16.
+
+### 14.1 The card's height, FlashList and the skeleton
+
+**Height, per card** (rem 16: `text-xs` is a 16 dp line, `mt-2` is 8 dp):
+
+| Change | Height |
+|---|---|
+| Top line: "#19445 · Raised 2 Nov · updated 2d ago" | 0: still one line (`numberOfLines={1}`; only "Raised …" shrinks) |
+| SLA chip removed from the badge row | 0, as a rule: status and priority are the same height. −28 dp where the three chips used to wrap to a second row (a long breach label, "First Response & Resolution SLA Breached", on a 360 dp phone) |
+| Due line added under the people row | **+24 dp** (8 dp gap + the 16 dp line; the 14 dp clock fits inside it) |
+| No due line (Resolved, Closed, Canceled, no SLA) | 0: the row is absent, not an empty 24 dp |
+
+A typical open card with a one-line title goes from about 153 dp to about 177 dp, plus its 12 dp gap. On a 360 × 640 phone the list shows about 2.2 cards instead of 2.6.
+
+**FlashList (v2, `TicketListScreen.tsx`).**
+- v2 measures every item; there is no `estimatedItemSize` or `overrideItemLayout` to update, and none is set. Cards of 153 and 177 dp in one list are what it handles already (titles of one or two lines, chips that wrap).
+- One item type (`TicketCard`): a card with a due line and one without recycle into each other. The line is a conditional child; recycling re-lays the cell, as it does for the title and the "New reply" badge today.
+- No `maintainVisibleContentPosition` change (still `NO_SCROLL_ANCHOR`).
+
+**The skeleton (`LoadingSkeleton` `list`).** It gained the same row (8 dp gap, a 16 dp-tall line with a 14 dp circle and a bar) and lost its third chip, so it is 24 dp taller, like an open card. Most cards in a list are open, so the first load does not jump. It was already 4 dp shorter than a one-line-title card (its title bar is 16 dp, the title's line 24 dp); that is unchanged. My Requests (`ServiceCatalogScreen`) borrows the `list` skeleton for its own, different rows; its placeholder grows by the same 24 dp.
+
+### 14.2 What the due line costs
+
+- **No animation**, and nothing on the row is an `Animated` value. Tested (`tests/polish/sla-deadline.test.mjs`).
+- **No timer.** The card computes its line on render: `slaDueLine(ticket, now)`, a few `Date` operations.
+- **The clock.** `TicketListScreen` reads the time on every render, to the minute, and sets a minute in state on focus and on return to the app. Within the same minute that state does not change, so nothing re-renders. When the minute has moved on, `renderItem` changes and FlashList re-renders the cells on screen (about 3–6), the same work as a selection change.
+- Cards are still `memo`: a refetch that returns unchanged tickets re-renders none of them.
+
+### 14.3 Login: "Sign in" in view
+
+- Measuring the button is one `measureLayout` per event (the form opening, the button moving, the keyboard opening, the scroll view resizing, the content growing). No `onScroll`: the scroll position is read when a drag or fling ends.
+- The scroll uses `scrollTo`, animated unless "Remove animations" is on, as before.
+- `collapsable={false}` keeps one plain view in the native tree, so there is something to measure against.
+
+### 14.4 The audit log
+
+- The path fallback (`01` §10.5) costs at most one extra request per run of the app, for an ADMIN, and only if the server has no `/audit-logs`.
+- A ticket number now goes to the server as `ticketNumber`: one request where G8 made two (TKT-1, then AUD-1).
+- Each filter combination is its own query, as before; the 500-entry cap and the page size of 50 are unchanged.
+
+### 14.5 Verification
+
+- `npx tsc --noEmit`: clean.
+- `npm test`: **1,265 / 1,265** passing (1,205 before this round). New or rewritten:
+  - `tests/login/sign-in-button.test.mjs` (new): the button through NativeWind's own runtime, the src/-wide style-function scan, and the scroll rule on measured layouts;
+  - `tests/support/nativewind.mjs` and `tests/support/stubs/react-native.cjs` (new): run react-native-css-interop in Node;
+  - `tests/polish/sla-deadline.test.mjs`: the card's line (today, tomorrow, this week, later, breached, no SLA, on hold, resolved, closed, canceled, never a countdown, one rule), AA and lightness of its colours, the card and skeleton;
+  - `tests/rbac/audit-log.test.mjs`: every confirmed param, the path fallback, the unknown ticket number, the Dates filter;
+  - `tests/push/push.test.mjs`: the confirmed device-token contract, the notice with and without Firebase, `app.config.js`;
+  - `tests/home/dashboard.test.mjs`: the written contract's ranges and custom example.
+- No EAS build, no bundle build, no call to UAT or PROD. The web clone was read only (`7df97c8`), and no database was touched.

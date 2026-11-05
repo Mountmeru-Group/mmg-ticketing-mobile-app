@@ -5,8 +5,8 @@
 //   and expo-notifications is never touched (Metro's inlineRequires loads it on first use, metro.config.js).
 // - The token is the native FCM registration token (getDevicePushTokenAsync), as MOBILE-BACKEND-REQUIREMENTS.md §1
 //   asks: the backend sends through FCM directly, not through Expo's push service. Firebase needs the project's
-//   google-services.json in the build (app.json `android.googleServicesFile`); without it getToken() rejects and push
-//   is `unavailable` (docs/RELEASE.md §2b).
+//   google-services.json in the build (`android.googleServicesFile`, set by app.config.js from the EAS file variable
+//   GOOGLE_SERVICES_JSON); without it getToken() rejects and push is `unavailable` (docs/RELEASE.md §2b).
 import { isRunningInExpoGo } from 'expo';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';

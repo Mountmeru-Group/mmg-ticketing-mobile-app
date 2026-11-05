@@ -1,5 +1,5 @@
-// The SLA deadline on ticket detail (2026-11-03, Ronit's option C; docs/brand/UI-STANDARDS.md §14.6). Pure functions,
-// no new SLA rule:
+// The SLA deadline on ticket detail (2026-11-03, Ronit's option C; docs/brand/UI-STANDARDS.md §14.6) and, since
+// 2026-11-05, on ticket cards (slaDueLine, §16): ONE rule, two wordings. Pure functions, no new SLA rule:
 // - The deadline is effectiveResolveDue(), the web's own hold-adjusted resolve deadline (05 §A.9), the same value as
 //   the Properties card's "Resolve by" row. It is shown as a time ("Due Mon 11:00"), never as a countdown.
 // - Why not a countdown: slaResolveDue is a business-hours deadline (03 §B SLAPolicy), and the API does not say how
@@ -10,7 +10,7 @@
 //   Amber is the server's own DUE_SOON (≤ 30 min left, jobs/slaBreachChecker.job.ts:62-65); the app sets no threshold.
 import type { SLAStatus } from '@/types';
 import { HOLD_STATUSES } from '@/types';
-import { effectiveResolveDue, getDisplaySlaStatus, type SlaFields } from './format';
+import { effectiveResolveDue, formatShortDate, getDisplaySlaStatus, type SlaFields } from './format';
 
 /** Statuses where the resolution clock has stopped for good: no deadline to show. */
 const STOPPED: ReadonlySet<string> = new Set(['RESOLVED', 'CLOSED', 'CANCELED']);
@@ -24,10 +24,19 @@ export interface SlaDeadline {
   label: string;
   /** The status is a hold status: the SLA clock is paused, and the deadline moves later for as long as it lasts. */
   paused: boolean;
+  /** effectiveResolveDue(): the deadline itself, or, once breached, the moment it was missed. */
+  due: Date;
 }
 
 const pad2 = (n: number) => (n < 10 ? `0${n}` : String(n));
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+const clockOf = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+/** Calendar days from today to `due` on the phone's calendar: 0 today, 1 tomorrow. */
+function daysUntil(due: Date, now: number): number {
+  // Rounded: a day that has 23 or 25 hours (a clock change) still counts as one day.
+  return Math.round((startOfDay(due) - startOfDay(new Date(now))) / 86_400_000);
+}
 
 /**
  * When a future deadline falls, on the phone's clock and calendar: "today 11:00", "tomorrow 11:00", "Mon 11:00" for the
@@ -35,10 +44,9 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
  * days away, so "Mon" is never next week's Monday.
  */
 export function formatDueTime(due: Date, now: number = Date.now()): string {
-  const clock = `${pad2(due.getHours())}:${pad2(due.getMinutes())}`;
+  const clock = clockOf(due);
   const today = new Date(now);
-  // Rounded: a day that has 23 or 25 hours (a clock change) still counts as one day.
-  const days = Math.round((startOfDay(due) - startOfDay(today)) / 86_400_000);
+  const days = daysUntil(due, now);
   if (days <= 0) return `today ${clock}`;
   if (days === 1) return `tomorrow ${clock}`;
   if (days <= 6) return `${DAYS[due.getDay()]} ${clock}`;
@@ -56,8 +64,26 @@ export function slaDeadline(ticket: SlaFields, now: number = Date.now()): SlaDea
   const due = effectiveResolveDue(ticket, now);
   if (!due) return null;
   const paused = HOLD_STATUSES.includes(ticket.status);
-  if (due.getTime() <= now) return { tone: 'BREACHED', label: 'Breached', paused };
+  if (due.getTime() <= now) return { tone: 'BREACHED', label: 'Breached', paused, due };
   // Not breached on resolution here, so the only BREACHED left is a first-response breach: a different clock.
   const tone: SLAStatus = getDisplaySlaStatus(ticket, now).status === 'DUE_SOON' ? 'DUE_SOON' : 'WITHIN_SLA';
-  return { tone, label: paused ? 'Paused while on hold' : `Due ${formatDueTime(due, now)}`, paused };
+  return { tone, label: paused ? 'Paused while on hold' : `Due ${formatDueTime(due, now)}`, paused, due };
+}
+
+/**
+ * The due line on a ticket card (2026-11-05, UI-STANDARDS.md §16): slaDeadline() above, same deadline, same colour,
+ * same cases with nothing to show, worded with the date every time, because a list mixes many days:
+ *   "Due today 5 Nov, 16:30", "Due tomorrow 6 Nov, 09:00", "Due Fri 7 Nov, 17:00", "Due Mon 17 Nov, 10:00";
+ *   "Breached 3 Nov, 12:00": when it was missed, not only that it was.
+ * On hold it gives no time, as detail does: "Paused while on hold", or "Breached". Never a countdown.
+ */
+export function slaDueLine(ticket: SlaFields, now: number = Date.now()): SlaDeadline | null {
+  const deadline = slaDeadline(ticket, now);
+  if (!deadline || deadline.paused) return deadline;
+  const { due } = deadline;
+  const at = `${formatShortDate(due, now)}, ${clockOf(due)}`;
+  if (deadline.tone === 'BREACHED') return { ...deadline, label: `Breached ${at}` };
+  const days = daysUntil(due, now);
+  const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : DAYS[due.getDay()];
+  return { ...deadline, label: `Due ${day} ${at}` };
 }

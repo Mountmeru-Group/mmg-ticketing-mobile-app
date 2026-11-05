@@ -1,4 +1,10 @@
-// One row of the M3 ticket list (04 M3): #, subject, status, priority, hold-adjusted SLA, people, "new reply".
+// One row of the M3 ticket list (04 M3): #, raised and updated, subject, status, priority, people, the SLA deadline,
+// "new reply".
+// - Dates (2026-11-05, UI-STANDARDS.md §16): "#19445 · Raised 2 Nov · updated 2d ago" on top. When the line is short
+//   of room, "Raised …" gives way first: the number and "updated …" (how agents spot a stale ticket) always show.
+// - The due line at the foot replaces the SLA chip: a clock and "Due Fri 13 Nov, 17:00" / "Breached 3 Nov, 12:00" in the
+//   SLA colour, from slaDueLine() (utils/sla-deadline.ts), the detail screen's own rule. Never a countdown. Absent, not
+//   empty, when there is nothing to show (Resolved, Closed, Canceled, no SLA). Static: computed on render from `now`.
 // - Inline status chip (08 §4.1): tappable only when the list passes onStatusPress, i.e. staff with at least one valid
 //   transition for this ticket. The chip itself never writes; the list asks first.
 // - Selection (08 §4.2): tap-and-hold starts multi-select; the list owns the selection and its 20-ticket cap.
@@ -17,13 +23,13 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { reduceMotionEnabled } from '@/hooks';
 import { colors, motion, palette } from '@/theme';
 import type { Ticket, UserRole } from '@/types';
-import { formatRelative, peopleRowLabel, statusLabel } from '@/utils/format';
+import { formatRelative, formatRelativeShort, formatShortDate, peopleRowLabel, statusLabel } from '@/utils/format';
 import { ticketSwipeActions, type SwipeAction, type Viewer } from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
+import { slaDueLine } from '@/utils/sla-deadline';
 import { PeopleRow } from './PeopleRow';
 import { usePressFeedback } from './PressFeedback';
 import { PriorityBadge } from './PriorityBadge';
-import { SlaBadge } from './SlaBadge';
 import { StatusBadge } from './StatusBadge';
 
 interface TicketCardProps {
@@ -46,11 +52,13 @@ interface TicketCardProps {
   /** The list keeps one row open at a time and closes it when a scroll starts. */
   onSwipeOpen?: (row: Swipeable) => void;
   onSwipeClose?: (row: Swipeable) => void;
+  /** The phone's clock for the dates (ms). The list reads it on render, on focus and on return to the app. */
+  now?: number;
 }
 
 function TicketCardImpl({
   ticket, role, onPress, onLongPress, selectionMode = false, selected = false, onStatusPress, statusBusy = false,
-  swipeViewer, onSwipeAction, onSwipeOpen, onSwipeClose,
+  swipeViewer, onSwipeAction, onSwipeOpen, onSwipeClose, now = Date.now(),
 }: TicketCardProps) {
   const staff = isStaff(role);
   // 05 §A.9: highlight rows whose requester replied last. Staff only — for END_USER the requester is themselves.
@@ -69,6 +77,9 @@ function TicketCardImpl({
   // Meta text one shade darker on the selected tint: gray-500 on red-50 is 4.4:1, below WCAG AA.
   const meta = selected ? 'text-gray-600' : 'text-gray-500';
   const people = peopleRowLabel(ticket.requester?.displayName, ticket.assignedTo?.displayName, staff);
+  const raised = formatShortDate(ticket.createdAt, now);
+  const due = slaDueLine(ticket, now);
+  const dueColor = due ? colors.slaDue[due.tone] : undefined;
 
   const card = (
     // The card's 16 dp gutters and 12 dp gap sit on the swipe row when there is one (so its actions line up with the
@@ -77,7 +88,10 @@ function TicketCardImpl({
       <Pressable
         accessibilityRole="button"
         accessibilityState={selectionMode ? { selected } : undefined}
-        accessibilityLabel={`Ticket ${ticket.ticketNumber}: ${ticket.title}${newReply ? ', new reply' : ''}. ${people}`}
+        accessibilityLabel={
+          `Ticket ${ticket.ticketNumber}: ${ticket.title}${newReply ? ', new reply' : ''}. ${people}. ` +
+          `Raised ${raised}, updated ${formatRelative(ticket.updatedAt, now)}${due ? `. ${due.label}` : ''}`
+        }
         accessibilityHint={onLongPress && !selectionMode ? 'Long press to select several tickets' : undefined}
         onPress={() => onPress(ticket.id)}
         onLongPress={onLongPress ? () => onLongPress(ticket.id) : undefined}
@@ -89,12 +103,16 @@ function TicketCardImpl({
           {selectionMode ? (
             <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.primary : colors.text.secondary} style={{ marginRight: 6 }} />
           ) : null}
-          <Text className={`text-xs font-semibold ${meta}`}>#{ticket.ticketNumber ?? '—'}</Text>
-          <Text className={`ml-2 flex-1 text-xs ${meta}`} numberOfLines={1}>
-            Updated {formatRelative(ticket.updatedAt)}
-          </Text>
+          {/* Only "Raised …" may shrink (and end in …); the number and "updated …" never do. */}
+          <View className="flex-1 flex-row items-center">
+            <Text className={`text-xs font-semibold ${meta}`}>#{ticket.ticketNumber ?? '—'}</Text>
+            <Text className={`shrink text-xs ${meta}`} numberOfLines={1}>
+              {` · Raised ${raised}`}
+            </Text>
+            <Text className={`text-xs ${meta}`}>{` · updated ${formatRelativeShort(ticket.updatedAt, now)}`}</Text>
+          </View>
           {newReply ? (
-            <View className="rounded-full bg-blue-600 px-2.5 py-0.5">
+            <View className="ml-2 rounded-full bg-blue-600 px-2.5 py-0.5">
               <Text className="text-xs font-semibold text-white">New reply</Text>
             </View>
           ) : null}
@@ -126,7 +144,6 @@ function TicketCardImpl({
             <StatusBadge status={ticket.status} recordId={ticket.id} />
           )}
           <PriorityBadge priority={ticket.priority} />
-          <SlaBadge ticket={ticket} />
         </View>
 
         {/* People (2026-11-03): a hairline rule, then requester → technician. */}
@@ -138,6 +155,16 @@ function TicketCardImpl({
             onTint={selected}
           />
         </View>
+
+        {/* The SLA deadline (2026-11-05): absent, not empty, when there is none to show. */}
+        {due ? (
+          <View className="mt-2 flex-row items-center">
+            <Ionicons name="time-outline" size={14} color={dueColor} />
+            <Text className="ml-1 flex-1 text-xs font-semibold" style={{ color: dueColor }} numberOfLines={1}>
+              {due.label}
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
     </Animated.View>
   );

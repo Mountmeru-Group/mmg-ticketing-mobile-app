@@ -119,19 +119,37 @@ For every later upload, raise `android.versionCode` by 1. Play rejects a version
 - An over-the-air JavaScript update cannot add native code. Setu has no OTA channel anyway (no `expo-updates`).
 - A build made before G7 has no push code at all.
 
-**Firebase configuration (Ronit / backend team)**
-1. Someone creates MMG's Firebase project with Cloud Messaging on (MOBILE-BACKEND-REQUIREMENTS.md §1.3). The backend uses the same project's service account to send.
-2. Download its `google-services.json` for the Android app `com.mountmeru.servicedesk`. Put it at the repo root and add `"googleServicesFile": "./google-services.json"` under `expo.android` in `app.json`.
-3. **Decide how it reaches EAS.**
-   - Committed: Google treats this file as configuration, not a secret; its API key is restricted to the app.
-   - Or an EAS file environment variable: EAS does not upload git-ignored files.
-4. **Without it, the build still succeeds, but push stays off, silently.** Firebase gives no token, and the Alerts notice says "This version of Setu can't receive notifications". Nothing else changes.
+**Firebase configuration (decided 2026-11-05)**
 
-**State on 2026-11-03:** there is no `google-services.json` in the repo (it is git-ignored) and no `googleServicesFile` in `app.json`. So the versionCode 3 build succeeds with push off (point 4). Without that key, prebuild does not apply the Google Services Gradle plugin. Firebase Messaging is linked but never initialised, so `getDevicePushTokenAsync` rejects and the app records `unavailable` (`tests/push/push.test.mjs`, "no Firebase config in the build").
+Ronit has `google-services.json` from the Firebase project **`mmg-setu`**, Android app **`com.mountmeru.servicedesk`**. The backend sends with the same project's service account (`FIREBASE_SERVICE_ACCOUNT_JSON`, `fcm.service.ts`).
 
-**Behaviour until the server half ships** (01 NTF-5/NTF-6, ⚠ NOT YET DEPLOYED)
-- After sign-in the app tries to register the phone. NTF-5 answers 404.
-- The Alerts notice says notifications "aren't switched on at the Service Desk yet", and logcat shows `[push] register: 404, NTF-5 not deployed yet`.
+1. **Put the file at the repo root:** `mmg-ticketing-mobile-app/google-services.json`, next to `app.json`. It stays git-ignored (`.gitignore`, with the signing material). The rule is `google-services*.json` since 2026-11-05: a second download saved as `google-services (1).json` sat in the root, outside the old exact-name rule. Delete such copies; only `google-services.json` is used.
+2. **Give it to EAS as a secret file variable, for the `preview` environment only.** From the repo root:
+   ```
+   eas env:set --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --environment preview
+   ```
+   - `eas env:set` is the current name; older EAS CLIs call it `eas env:create` with the same flags. `eas env:set --help` shows which.
+   - The `preview` profile builds in the `preview` environment: EAS picks the environment from the profile when `environment` is not set (store distribution → `production`, internal → `preview`). `eas.json` is unchanged.
+   - Check it with `eas env:list --environment preview`: `GOOGLE_SERVICES_JSON`, type file, secret.
+3. **The config is already wired: nothing to add to `app.json`.** `app.config.js` (new, 2026-11-05) takes `app.json` as it is and adds `android.googleServicesFile` from `GOOGLE_SERVICES_JSON` when the build has it. On the EAS server the variable holds the path of the written file, so prebuild copies it into `android/app/` and applies the Google Services plugin.
+   - Without the variable, `googleServicesFile` is not set at all, so prebuild never looks for a file that is not there (it would stop with "Cannot copy google-services.json").
+   - A local native build uses the file only when asked: `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`.
+4. **Production is unchanged.** The `production` environment has no `GOOGLE_SERVICES_JSON`, so a production build is exactly as before: no Firebase, push `unavailable`. When push should reach production, run step 2 again with `--environment production` (and check §5).
+
+**Why a secret file variable, not a commit** (the repo is private either way):
+- The repo already keeps this file out of git on purpose (`.gitignore`), and **EAS uploads only what git tracks**: a file placed at the root but ignored never reaches an EAS build by itself. Committing it means reversing that rule.
+- Scoping: an EAS variable can be given to `preview` and not `production`. A committed file would put Firebase into production builds too, which this round (UAT only) must not change.
+- Not secrecy. Google treats this file as configuration: its API key ships inside every APK, where anyone can read it. Restrict that key in Google Cloud (Credentials → the Android key → Android apps: `com.mountmeru.servicedesk` and the EAS keystore's SHA-1, §3.1).
+- Committing would also work for EAS. The variable keeps the rule and the scope.
+
+**Without the file (or the variable), the build still succeeds, but push stays off, silently.** Firebase gives no token, and the Alerts notice says "This version of Setu can't receive notifications". Nothing else changes (`tests/push/push.test.mjs`, "no Firebase config in the build").
+
+**With it, and the permission granted,** the app registers the phone (NTF-5) and the notice reads "Alerts also arrive on this phone as notifications, even when Setu is closed." It no longer says the app cannot receive them (tested).
+
+**The server half** (01 NTF-5/NTF-6): confirmed in writing by the backend team on 2026-11-05, and in the source at `7df97c8`.
+- POST and DELETE `/api/v1/notifications/device-token`, body `{ "token": "<fcm-token>", "platform": "android" }`, `Authorization: Bearer <token>`. The app matches it exactly (the DELETE gained `platform` on 2026-11-05).
+- A tap opens the ticket in `data.ticketId` (the server sends `type`, `notificationId`, `ticketId`, `ticketNumber`, all strings).
+- If a server answers 404 (one without the routes), the Alerts notice says notifications "aren't switched on at the Service Desk yet", and logcat shows `[push] register: 404, NTF-5 not deployed yet`.
 - No banner, no dialog. The app retries on each sign-in and app start, and when Firebase rotates the token: no polling.
 - The permission dialog appears **only on the first visit to Alerts**, and only on Android 13+ (older versions grant it at install).
 - Expo Go never receives push on Android (SDK 53 and later). Test push on an installed APK.
@@ -385,7 +403,7 @@ No `.env` file exists in the repo, and EAS uploads none.
 | Permissions | **PASS** | Table below: 12 after the badge block, 3 of them inherited and unused (flag 2) |
 | 15-day re-authentication active | **PASS** | `REAUTH_INTERVAL_MS` = 15 days (`src/store/auth.store.ts`). It is checked on cold start (`restoreSession`) and on every return to the foreground (`endSessionIfReauthDue`, `RootNavigator`). When it is due, the next sign-in sends `prompt=login`. 47 cases in `tests/auth/reauth.test.mjs`, all passing |
 | Push silent when the backend endpoint is missing | **PASS** | A 404 from NTF-5 or NTF-6 sets status `not-deployed` and writes one `[push]` log line, with no banner, dialog or toast (`src/push/registration.ts`). Tests: "a 404 from the device-token endpoint is silent" and "a 404 on sign-out is silent too" |
-| `google-services.json` | **Absent**: the build succeeds with push off | Not in the repo, and no `googleServicesFile` in `app.json` (§2b). Firebase gives no token, the app records `unavailable`, and Alerts says "This version of Setu can't receive notifications" |
+| `google-services.json` | **Absent**: the build succeeds with push off | Not in the repo, and no `googleServicesFile` in `app.json` (§2b). Firebase gives no token, the app records `unavailable`, and Alerts says "This version of Setu can't receive notifications". **Since 2026-11-05** `app.config.js` adds the file from the EAS file variable `GOOGLE_SERVICES_JSON`, which only the `preview` environment has: production builds stay as described here |
 | Dev-token screen absent | **PASS** | Above |
 | `npx tsc --noEmit` / `npm test` | **PASS** | Clean / 1086 pass, 0 fail |
 

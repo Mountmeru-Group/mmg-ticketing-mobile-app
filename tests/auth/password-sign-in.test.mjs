@@ -801,9 +801,9 @@ describe('the screen, read from its source (React Native does not run under Node
     assert.match(formSrc, /aria-label=\{shown \? 'Hide password' : 'Show password'\}/);
   });
 
-  test('"Sign in": brand red, 52 dp, disabled while in flight', () => {
+  test('"Sign in": brand red, 52 dp, disabled while in flight (laid out and tappable: tests/login/sign-in-button.test.mjs)', () => {
     assert.equal(read('src/theme/brand.ts').includes('submit: { height: 52, radius: 26, gap: 16 }'), true);
-    assert.match(formSrc, /backgroundColor: colors\.primary,/);
+    assert.match(read('src/screens/auth/emailFormLayout.ts'), /backgroundColor: colors\.primary,/);
     assert.match(formSrc, /accessibilityState=\{\{ disabled: locked, busy \}\}\s*disabled=\{locked\}/);
     assert.match(formSrc, /const locked = busy \|\| ssoBusy;/);
   });
@@ -815,12 +815,10 @@ describe('the screen, read from its source (React Native does not run under Node
     assert.match(formSrc, /opacity: reveal,\s*transform: \[\{ translateY: reveal\.interpolate\(/);
   });
 
-  test('the keyboard never covers "Sign in": the screen avoids it, keeps taps, and scrolls to the end', () => {
+  test('the keyboard never covers "Sign in": the screen avoids it and keeps taps (the scroll itself: sign-in-button.test.mjs)', () => {
     assert.match(login, /<KeyboardAvoidingView behavior="padding" style=\{styles\.keyboard\}>/);
     assert.match(login, /keyboardShouldPersistTaps="handled"/);
-    assert.match(login, /onContentSizeChange=\{keepSubmitInView\}/);
-    assert.match(login, /Keyboard\.addListener\('keyboardDidShow', \(\) => \{\s*keyboardUp\.current = true;\s*keepSubmitInView\(\);/);
-    assert.match(login, /if \(emailOpen\.current && keyboardUp\.current\) scroll\.current\?\.scrollToEnd\(/);
+    assert.match(login, /onContentSizeChange=\{revealSubmit\}/);
   });
 
   test('the Microsoft pill stays visible, and is locked while an email sign-in runs', () => {

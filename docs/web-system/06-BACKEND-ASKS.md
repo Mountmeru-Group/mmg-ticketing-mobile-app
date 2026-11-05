@@ -217,7 +217,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
 > - `DELETE /api/v1/notifications/device-token` `{ token }`;
 > - the FCM send, with `data.ticketId` and channel `setu_tickets`.
 >
-> The app side is built against that and is silent until it ships (`01` NTF-5/NTF-6, ⚠ NOT YET DEPLOYED). The original wording below is kept for the record.
+> The app side is built against that (`01` NTF-5/NTF-6). **2026-11-05:** the backend team confirmed the server half in writing, and it is in the source at `7df97c8`; its written body for the DELETE is `{ token, platform }`, which the app now sends. The original wording below is kept for the record.
 
 **Ask**
 1. New table `DeviceToken`:

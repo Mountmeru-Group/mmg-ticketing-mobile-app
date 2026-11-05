@@ -10,7 +10,9 @@ property-editor pattern on the ticket, now that the technician has one too. §9 
 time-of-day greeting on Home. §10 (2026-10-30) is the login's "arc split" layout and the motion palette (white
 ground, yellow accent); the motion itself is `docs/PERFORMANCE.md` §12. §14 (2026-11-03) is the polish pass: the people
 row on ticket cards, the greeting mark, the window captions on Home's counts, swipe actions, haptics, the SLA deadline,
-press feedback, the count cross-fade and the drawn paperclip (its motion is `docs/PERFORMANCE.md` §13).
+press feedback, the count cross-fade and the drawn paperclip (its motion is `docs/PERFORMANCE.md` §13). §15 is Login's
+footer year and the email sign-in, with the fix for its missing "Sign in" (§15.3, 2026-11-05). §16 (2026-11-05) is the
+ticket card's raised and due dates.
 
 Not touched: `DevTokenScreen.tsx` and its dev-only `PlaceholderScreen.tsx` (both deleted in Phase 8), the auth flow and
 `auth.config.ts`, every API call, query, mutation and business rule, and the navigation structure.
@@ -721,16 +723,17 @@ Order on Home:
 - a white filter bar (`px-4 py-2`), then QueryBanner;
 - the list, 12 dp below the bar, with insets + 24 at the bottom (no FAB).
 
-**The filter bar, top to bottom:**
-- **SearchField** (44 dp, S5): "Ticket number, e.g. 1234". It takes a number, "#1234" or a ticket link. On the keyboard's search key it looks the ticket up.
-- **The line under it**, while or after looking up (S10's info size: a 16 dp icon, `text-xs`):
-  - a brand-red spinner and "Finding ticket #1234…";
-  - "No ticket #1234." or "Couldn't look up ticket #1234. Try again." in red-700, read out as an alert;
+**The filter bar, top to bottom** (filters completed 2026-11-05, from the backend team's written AUD-1 contract; `01` §10.5):
+- **SearchField** (44 dp, S5): "Ticket number, e.g. 1234". It takes a number, "#1234" or a ticket link. On the keyboard's search key the number goes to the server as `ticketNumber`: no lookup of its own any more.
+- **The line under it** (S10's info size: a 16 dp icon, `text-xs`):
+  - "No ticket #1234." in red-700, read out as an alert, when the server had no such ticket (it then returns the whole log, which the app does not show: `05` B.40);
   - grey help when the text is not a number.
-- **The chip row** (S5 FilterChip, 36 dp + hit slop):
+- **The chip row** (S5 FilterChip, 36 dp + hit slop), scrolling sideways:
   - when a ticket is set, a filled brand-red chip first (a ticket icon, "#1234" and ✕), the period chip's look from §12; tapping it clears the ticket;
-  - then "All types" (or the chosen type), which opens the Entity type sheet;
-  - then "Person" (or the person's name), which opens the people picker, with "Anyone" to clear.
+  - "All actions" (or the chosen action; a `flash` icon), which opens the Action sheet;
+  - "Any date" (or the span: "Today", "Last 7 days", "2 Nov", "28 Oct – 2 Nov", "From 1 Nov", "Until 5 Nov"; a `calendar` icon), which opens the Dates sheet;
+  - "All types" (or the chosen type), which opens the Entity type sheet;
+  - "Person" (or the person's name), which opens the people picker, with "Anyone" to clear.
   - Active chips are brand red (S4).
 - **The count line:** "1,234 entries" (`text-xs gray-500`), and "Clear all" as a text link (S5) when any filter is on.
 
@@ -775,6 +778,7 @@ Order on Home:
 
 **States (S11):**
 - **Loading:** the `audit` skeleton, a day heading bar over cards with a pill, ticket, person and details box.
+- **No such ticket:** "No ticket #1234", "The Service Desk has no ticket with that number. Check it and search again.", with "Clear the ticket filter".
 - **Empty with filters:** "No entries match these filters", with "Clear all filters".
 - **Empty without filters:** "No audit entries yet". Both use the `empty` illustration.
 - **Error:** ErrorState with Retry.
@@ -782,6 +786,8 @@ Order on Home:
 - **Footer:** "Loading more…", "Couldn't load more entries. Tap to retry", and at the 500 cap "Showing the first 500 of N — search or filter to narrow", the ticket list's words.
 
 **Sheets.**
+- **Action** is OptionSheet: All actions, then the nine actions by their pill labels. Deleted, SLA Breached and Escalated say "Not written by the Service Desk today" (G8 §8).
+- **Dates** is OptionSheet: Any date, Today, Yesterday, Last 7 days (today and the 6 before), Last 30 days, then "From a day…" and "Until a day…", which open the system date dialog (no day after today). A picked end never lands on the wrong side of the other: the other moves with it. The days are the phone's calendar days; the server gets each as its first or last instant (`01` §10.5).
 - **Entity type** is OptionSheet: All types, Ticket, Comment, Attachment. Each has a one-line description; Ticket's says automatic closes are not included (`05` B.38).
 - **Person** is PersonPickerSheet, searching every role.
 
@@ -949,7 +955,7 @@ Not touched: every count, query and API call; navigation; every permission (the 
 
 A real countdown needs the server's own figure: backend ask **A31** in `docs/web-system/06-BACKEND-ASKS.md`, with that example.
 
-- **Place:** in the header card, under the badges, never on a list card (`components/SlaDeadline.tsx`). One `text-xs font-semibold` row:
+- **Place:** in the header card, under the badges (`components/SlaDeadline.tsx`). Since 2026-11-05 the same deadline is also on every ticket card, in its own words (§16). One `text-xs font-semibold` row:
   - "Resolution" in gray-500 on the left;
   - on the right, an 8 dp dot in the status colour, then the deadline in gray-900. "Breached" is red-700 (6.5:1).
 - **Words** (`formatDueTime` in `utils/sla-deadline.ts`), on the phone's clock and calendar:
@@ -1099,9 +1105,91 @@ Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11
 
 **Motion.** Opening fades the form in and lifts it 8 dp, over 220 ms on the `enter` curve: opacity and translateY only, on the native driver. With "Remove animations" it shows at once. No layout property is animated: the fields take their place in the first frame. It is stopped on unmount. `tests/motion/start-up-and-login.test.mjs` now lists nine animating files.
 
-**The keyboard never covers "Sign in."**
+**The keyboard never covers "Sign in."** (Rebuilt on 2026-11-05: §15.3.)
 - Login sits in a `KeyboardAvoidingView` (`padding`, as the app's other forms), and its scroll view keeps taps (`keyboardShouldPersistTaps="handled"`), so one tap on "Sign in" signs in with the keyboard up.
-- With the form open, Login scrolls to its end when the keyboard opens, and whenever the content grows while it is up (a field error, a failure box). Events only, no timer.
+- With the form open, Login measures "Sign in" and scrolls just enough to show all of it (§15.3). Events only, no timer.
 - **Arithmetic, 360 × 640 dp at 100 %, with a 280 dp keyboard:** about 336 dp is visible. From the bottom: footer and insets (about 76), the chip (32), "Sign in" (52), and both fields with their labels (about 160). That is about 320 dp, so the focused field and "Sign in" fit together. At 130 % and 200 % text, or with a failure box, the email field may scroll above the top while the password field and "Sign in" stay in view. **Check on a device.**
 
 **The Microsoft pill while an email sign-in runs:** half opacity, `pointerEvents: 'none'`, and hidden from TalkBack. It never collapses into a spinner for a sign-in it is not running. Its own failure box's "Try again" is disabled too.
+
+### 15.3 The missing "Sign in" (UAT, fixed 2026-11-05)
+
+**What testers saw.** "Sign in with email instead" opened the Email and Password fields, then the UAT chip and the copyright line followed straight after the password field: no "Sign in".
+
+**Why.** The button's Pressable took a **function** as `style`: `({ pressed }) => [...]`.
+- NativeWind wraps every Pressable in the app (`babel.config.js`, `jsxImportSource: 'nativewind'`) and merges `style` as data. A function has no keys, so it came out as `{}` (`react-native-css-interop`, `native-interop.js` `applyRules`). Reproduced in Node with NativeWind's own runtime (`tests/support/nativewind.mjs`).
+- The button kept its label but lost its 52 dp height, its brand-red fill, its radius and its 16 dp top margin. What was left was the 20 dp line of the label: **white text on the white page**. It was laid out and tappable in a thin strip, but invisible.
+- It was the only Pressable in `src/` with a function style; every other one uses `className` (with `active:`) or a static style.
+- Not the keyboard, not a conditional, not clipping. The keyboard scroll had a second, smaller flaw, fixed too (below).
+- The tests passed because they read the source and found a "Sign in" Pressable.
+
+**The fix** (`src/screens/auth/emailFormLayout.ts`, `EmailSignInForm.tsx`):
+- The Pressable has static styles: 52 dp tall, `alignSelf: 'stretch'` (the form's full width), radius 26, 16 dp below the password field. Half opacity while Microsoft sign-in runs.
+- An inner face, drawn through the Pressable's children function, carries the brand red (`colors.primary`) and the centred spinner and label. Held, it dims to the app's press opacity (0.85).
+- A tap runs `startSubmit` → `attemptPasswordSignIn`, as before.
+- **Rule for the whole app:** never a function as `style`. A pressed look goes on an inner view through the children function. `tests/login/sign-in-button.test.mjs` scans `src/` for it.
+
+**Keeping it in view** (`LoginScreen.tsx`, `revealScrollY`):
+- When the form opens, Login measures "Sign in" against its scroll content and scrolls just enough to show all of it, 16 dp clear of the screen's foot. So it shows **at once, without the person scrolling**: on a 360 × 640 phone the fields open below the fold (the button starts about 797 dp down).
+- When the keyboard opens, the visible area ends at the keyboard's top (`endCoordinates.screenY`), and Login scrolls so the button sits 16 dp above it.
+- It runs again whenever the button moves (a field error or failure box above it), the content grows, or the scroll view is resized. The old code scrolled to the end on `keyboardDidShow` only: that event arrives before KeyboardAvoidingView's padding lands, so the scroll could be computed for the full-height view.
+- Events only, no timer. Refs, so none of it re-renders Login.
+
+**What the tests now check** (`tests/login/sign-in-button.test.mjs`):
+- the old function style, run through NativeWind's runtime, reaches the native Pressable as `{}`;
+- the new styles reach it as 52 dp, `stretch`, 16 dp margin, and a brand-red face;
+- after Login's scroll rule, on measured layouts, the whole button is in view and at least 48 dp tall: keyboard down, keyboard up before and after the padding lands, an error above it, 200 % text. The broken 20 dp label fails the same check wherever it sits.
+
+**Device checks (next UAT build):**
+1. Open the form: "Sign in" shows at once, red, full width, 52 dp, with the keyboard up.
+2. Close the keyboard (back): still in view. Reopen it: "Sign in" sits just above it.
+3. Submit empty: the field errors appear and "Sign in" stays in view.
+4. One tap on "Sign in" with the keyboard up signs in.
+5. 360 dp phone at 200 % text: same.
+
+## 16. Ticket cards: raised and due dates (approved design, 2026-11-05)
+
+`src/components/TicketCard.tsx`. Only the M3 ticket list's cards; Home's recent-ticket rows are unchanged.
+
+**Top line:** "#19445 · Raised 2 Nov · updated 2d ago", `text-xs` gray-500 (gray-600 on the selected tint), the number semibold.
+- The raised date is `createdAt` on the phone's calendar, "2 Nov", with the year only outside the current one ("30 Dec 2025"): `formatShortDate`.
+- "updated 2d ago" stays: how agents spot a stale ticket. It is the short form of the old "Updated 2 days ago", as the approved design writes it: "just now", "5m", "3h", "2d", "4mo", "1y" ago (`formatRelativeShort`).
+- **Room:** on a 360 dp phone a card with the "New reply" badge has about 213 dp for this line, and it needs about 235 at 100 % text. Only "· Raised …" shrinks and ends in "…"; the number and "· updated …" never do. On wider phones, and on cards without the badge, it fits.
+- The "New reply" badge keeps its place at the right, 8 dp from the text.
+
+**Badge row:** status (with its chevron where it is tappable) and priority. **The SLA chip is gone**: the due line says the same, more precisely.
+- One thing it said that the due line does not: a **first-response** breach. The due line follows detail's rule, where a first-response breach alone leaves the resolution deadline green. On detail the SLA badge still shows it; on the card nothing does now. Ronit to decide whether the card should say so.
+
+**Due line**, at the foot, 8 dp under the people row: a 14 dp `time-outline` clock and the words, `text-xs font-semibold`, both in the SLA colour.
+
+| When | Reads |
+|---|---|
+| Later today | "Due today 5 Nov, 16:30" |
+| Tomorrow | "Due tomorrow 6 Nov, 09:00" |
+| Any later day | "Due Fri 13 Nov, 17:00" (weekday, date, time; the year only outside the current one) |
+| Missed | "Breached 3 Nov, 12:00": when it was missed |
+| On hold or any pending status | "Paused while on hold" (or "Breached" if it was missed before): no time, as detail |
+| No SLA; Resolved, Closed or Canceled | **no line at all**: the row is absent, not empty |
+
+- **One rule:** `slaDueLine()` words what `slaDeadline()` (detail, §14.6) decides: the same deadline (`effectiveResolveDue`), the same colour, the same cases with nothing to show (`utils/sla-deadline.ts`). There is no second SLA implementation.
+- **Never a countdown.** The SLA runs in business hours, so "66h left" on a Friday evening would be wrong (§14.6, ask A31). No label says "left", or hours or minutes to go (tested).
+- **Colours** (`colors.slaDue`): green on track, amber only when the **server** says due soon, red when breached. These are text, so each passes AA as 12 dp text on the white card and on the selected card's red-50, and they differ in **lightness**:
+
+| Status | Colour | L* | On white | On red-50 |
+|---|---|---|---|---|
+| Within SLA | green-700 | 47 | 5.0:1 | 4.6:1 |
+| Due soon | amber-800 | 38 | 7.1:1 | 6.5:1 |
+| Breached | red-900 | 28 | 10.0:1 | 9.2:1 |
+
+  - 9 L* apart, not the detail dots' 15: three colours that all pass AA as text only have L* 28–48 between them. The words carry the meaning (WCAG 1.4.1).
+  - red-900 is new in `palette` (Tailwind 3.4's `#7f1d1d`).
+- **Static.** No animation on the row. The time is read when the card renders, from the list's clock: read on every list render, and on focus and return to the app, kept to the minute (§9's pattern). So "Due today 16:30" seen again at 16:31 reads "Breached 5 Nov, 16:30". Never a timer.
+- **Screen readers:** the card's label now ends "… Raised 2 Nov, updated 2 days ago. Due Fri 13 Nov, 17:00".
+
+**Height:** +24 dp for a card with a due line (8 dp gap + the 16 dp line); unchanged for one without. A card whose three chips used to wrap to a second row (a long breach label on a 360 dp phone) is now 4 dp shorter. The list skeleton gained the same 24 dp row and lost its third chip, so the first load does not jump (`docs/PERFORMANCE.md` §14).
+
+**Device checks (next UAT build), 360 dp at 100 / 130 / 200 % text:**
+1. A card with "New reply": the number and "updated …" whole, "Raised …" shortened if anything is.
+2. The three colours on white and on a selected card; "Breached …" with its date and time.
+3. A ticket on hold: "Paused while on hold", no time. A resolved one: no line, no gap.
+4. First load: the skeleton and the cards line up; no jump.
