@@ -96,6 +96,17 @@ export const motion = {
     spin: 900,
   },
 
+  /**
+   * Login's email form opening in place under "Sign in with email instead" (screens/auth/EmailSignInForm.tsx,
+   * 2026-11-05): one fade and rise. The fields take their place at once; only their opacity and position move.
+   */
+  emailReveal: {
+    duration: 220,
+    /** How far below its place the form starts, dp. */
+    rise: 8,
+    curve: curve.enter,
+  },
+
   /** List rows when a list first shows its data (components/ListEntry.tsx). */
   listEntry: {
     /** One row's fade and lift, ms. */

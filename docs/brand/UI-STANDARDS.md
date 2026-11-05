@@ -1046,7 +1046,7 @@ A real countdown needs the server's own figure: backend ask **A31** in `docs/web
    - pull to refresh: nothing fades.
 9. **Paperclip:** a reply with an inline e-mail image shows the drawn paperclip and "Image in attachments", sharp at the phone's density.
 
-## 15. Login: the footer's year, and the email sign-in that was not built (G9, 2026-11-04)
+## 15. Login: the footer's year (G9, 2026-11-04), and the email sign-in (built 2026-11-05)
 
 ### 15.1 The footer's year
 
@@ -1064,13 +1064,44 @@ A real countdown needs the server's own figure: backend ask **A31** in `docs/web
   - `tests/login/copyright-year.test.mjs` parses every source file and fails on a four-digit year in a string, template text, JSX text, or a number placed straight into text.
   - In `src/`, years appear only in comments, and in the due-date picker's numeric bounds 2000–2100 (`src/utils/tasks.ts:60, 92-93`), which are not text.
 
-### 15.2 Email and password sign-in: not built
+### 15.2 Email and password sign-in: built 2026-11-05, UAT builds only
 
-- The G9 brief's design was "Sign in with Microsoft" unchanged, then an OR divider, then a quiet "Sign in with email instead", opening email and password fields in place.
-- It was **not built**: no backend endpoint can return a token for a password (`docs/G9-PASSWORD-LOGIN.md`; backend ask A32).
-- **Login's layout is otherwise unchanged:** the arc split, the single outlined Microsoft pill, the message slot and the environment chip.
-- When A32 ships, the design goes in as briefed:
-  - below the pill, an OR divider (hairline, "OR" in `text.secondary`, hairline);
-  - "Sign in with email instead" with a chevron, as text only;
-  - the fields open in place, by opacity and transform on the native driver, at once under "Remove animations";
-  - a 52 dp brand-red "Sign in" button that the keyboard never covers.
+Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11-05 against an ASSUMED contract, after the backend team confirmed the endpoint is on UAT (`docs/web-system/02-AUTH.md` §8). It shows only where `EMAIL_SIGN_IN_ENABLED` (`src/config/env.ts`) is true: UAT builds. A production build has none of it. Code: `src/screens/auth/EmailSignInForm.tsx`. Tokens: `loginLayout.emailForm`, `loginType.orLabel` / `link` / `fieldLabel` / `field`, `motion.emailReveal`. **Not run on a device:** no build.
+
+**Above the fold: unchanged.** The arc split, the message slot, "Setu", the prompt, and the outlined Microsoft pill as the primary action, with "Opening Microsoft…" under it. Then, centred in the white area:
+- **OR divider**, 20 dp below the caption: hairline (`StyleSheet.hairlineWidth`, `colors.border`), "OR" (12 dp, weight 600, letter spacing 1), hairline.
+  - "Muted grey" in the brief. The word is `text.secondary` (gray-500, 4.83 : 1), the lightest grey that passes AA (§10.2). `text.muted` is never text.
+- **"Sign in with email instead"** with a 16 dp `chevron-forward`: 14 dp weight 600 in `text.body` (gray-700), the chevron `text.muted`.
+  - Text only: no border, no fill. The touch target is 48 dp tall.
+  - Pressed, the label darkens to `text.primary`.
+
+**The form, opened in place** (no route, no new screen). The text action is replaced by:
+- "Email", 13 dp weight 500 `text.body`, over a 48 dp field.
+  - Radius 12, 1 dp gray-300 border (the pill's), 16 dp text.
+  - Email keyboard (`keyboardType="email-address"`, `inputMode="email"`), no autocapitalise, no autocorrect, no spell check.
+  - Autofill `email`. Return key "next". It takes focus when the form opens.
+- "Password", 12 dp below, over the same field.
+  - Masked (`secureTextEntry`), no autocapitalise, no autocorrect. Autofill `current-password`. Return key "go" signs in.
+  - **Show/hide toggle:** a 48 × 48 dp eye icon inside the field's right end, with `aria-label` "Show password" / "Hide password". The field keeps 48 dp of right padding for it.
+- **Field errors** under the field, 13 dp red-700, announced politely. The fields are checked on "Sign in" before anything is sent:
+  - "Enter your email address.";
+  - "Enter a valid email address, like name@mountmerugroup.com.";
+  - "Enter your password.".
+  - An invalid field's border turns red-700.
+- **The failure box**, 16 dp above "Sign in", in the same style as the Microsoft failure box (red-50, alert icon):
+  - title, message, "The Service Desk said: “…”" where its words are fit to show;
+  - `Ref: <reason> · HTTP <status> · <path>`, and the developer detail in `__DEV__`;
+  - "Sign in with Microsoft" (outline, danger tone) where only Microsoft can get past the failure (`02-AUTH.md` §8.6).
+- **"Sign in"**: brand red (`colors.primary`), white 15 dp weight 600 label, **52 dp tall**, radius 26, as wide as the form, 16 dp below the last field.
+  - Pressed: opacity 0.85.
+  - While signing in: disabled, a white spinner, and "Signing in…".
+  - While Microsoft sign-in runs: disabled, at half opacity.
+
+**Motion.** Opening fades the form in and lifts it 8 dp, over 220 ms on the `enter` curve: opacity and translateY only, on the native driver. With "Remove animations" it shows at once. No layout property is animated: the fields take their place in the first frame. It is stopped on unmount. `tests/motion/start-up-and-login.test.mjs` now lists nine animating files.
+
+**The keyboard never covers "Sign in."**
+- Login sits in a `KeyboardAvoidingView` (`padding`, as the app's other forms), and its scroll view keeps taps (`keyboardShouldPersistTaps="handled"`), so one tap on "Sign in" signs in with the keyboard up.
+- With the form open, Login scrolls to its end when the keyboard opens, and whenever the content grows while it is up (a field error, a failure box). Events only, no timer.
+- **Arithmetic, 360 × 640 dp at 100 %, with a 280 dp keyboard:** about 336 dp is visible. From the bottom: footer and insets (about 76), the chip (32), "Sign in" (52), and both fields with their labels (about 160). That is about 320 dp, so the focused field and "Sign in" fit together. At 130 % and 200 % text, or with a failure box, the email field may scroll above the top while the password field and "Sign in" stay in view. **Check on a device.**
+
+**The Microsoft pill while an email sign-in runs:** half opacity, `pointerEvents: 'none'`, and hidden from TalkBack. It never collapses into a spinner for a sign-in it is not running. Its own failure box's "Try again" is disabled too.

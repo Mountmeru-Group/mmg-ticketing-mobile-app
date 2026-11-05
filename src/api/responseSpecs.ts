@@ -379,3 +379,24 @@ export const MOBILE_SSO_OPTIONAL_SPEC: readonly FieldSpec[] = [
   { path: 'user.department', kinds: S_NULL },
   { path: 'user.phone', kinds: S_NULL },
 ];
+
+/**
+ * AUTH-P1 200 body (ASSUMED, src/types/mobile-password-contract.ts): the OPTIONAL single-name fields only. The alias
+ * groups (the token, the name, the expiry) are reported by readSession() itself, as "none of … present".
+ * A missing `user.countryId` is also what makes the app ask AUTH-2 for it (auth.api.ts).
+ */
+export const MOBILE_PASSWORD_OPTIONAL_SPEC: readonly FieldSpec[] = [
+  { path: 'user.email', kinds: S },
+  { path: 'user.countryId', kinds: S_NULL },
+  { path: 'user.ldapSamAccount', kinds: S_NULL },
+];
+
+/**
+ * AUTH-2 body when it is read during an email sign-in, to confirm `countryId` (01 AUTH-2, 03 §C `AuthUser`): the
+ * OPTIONAL fields only. `user.id`, `user.role` and the presence of `user.countryId` are checked by readUser().
+ */
+export const AUTH_ME_OPTIONAL_SPEC: readonly FieldSpec[] = [
+  { path: 'user.email', kinds: S },
+  { path: 'user.displayName', kinds: S },
+  { path: 'user.ldapSamAccount', kinds: S_NULL },
+];

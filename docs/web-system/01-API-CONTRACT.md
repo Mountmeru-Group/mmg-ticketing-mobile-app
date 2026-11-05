@@ -98,7 +98,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 
 ## 1. Auth
 
-> **The mobile login endpoint does not exist yet.** See `02-AUTH.md` §4. The pending endpoints are listed in §1.4 so that nobody invents their own.
+> **Sign-in endpoints.** AUTH-P2 (Microsoft) is deployed on UAT with a confirmed contract (`02-AUTH.md` §7.5). AUTH-P1 (email and password) is reported deployed on UAT, but its contract is **⚠ ASSUMED, not verified against source** (AUTH-P1 below; `02-AUTH.md` §8). The other pending endpoints are listed in §1.4 so that nobody invents their own.
 
 ### SYS-1 `GET /health` — MVP
 - **Purpose:** connectivity and maintenance check, e.g. on app start or after a network error.
@@ -146,22 +146,46 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 ### 1.4 PENDING — not in the API yet (do not call until shipped; shape to be agreed)
 | ID | Endpoint | Ask | Proposed response |
 |---|---|---|---|
-| AUTH-P1 | `POST /api/v1/auth/mobile/login` `{ username, password }`. **Narrowed by A32 (2026-11-04)** to `{ email, password }`: local password only, reviewer allow-list, on PROD as well. **Not in any branch of the web source** (`docs/G9-PASSWORD-LOGIN.md` §3); no mobile code calls it | A1, A32 | A32: AUTH-P2's body `{ token, expiresAt, user }` (`02-AUTH.md` §7.5), no cookie; 401 `"Invalid credentials"` whichever field is wrong; 429 from the login limiter (`06` A32) |
-| AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }` | A2 | `{ token, expiresAt, user }`, no cookie |
+| AUTH-P1 | Email and password sign-in. **⚠ ASSUMED, called by the app on UAT builds since 2026-11-05:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
+| AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }`. **Deployed on UAT, contract confirmed** (`02-AUTH.md` §7.5) | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
 | ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, ⚠ NOT YET DEPLOYED), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
 | AUTH-P5 | `GET /api/v1/tickets/by-number/:ticketNumber` | A8 | same as TKT-3 |
 
+### AUTH-P1 email and password sign-in — ⚠ ASSUMED, NOT VERIFIED AGAINST SOURCE (2026-11-05)
+> **Why assumed.** On 2026-11-05 the backend team told Ronit that a mobile password-login endpoint is deployed on UAT, with local auth on there. Its source has not been pushed: no branch of the web clone has it, neither the clone fetched 2026-11-04 16:36 nor the fresh one of 2026-11-05 09:56 (`master` `7df97c8`) (`docs/G9-PASSWORD-LOGIN.md`). Ronit authorised the four assumed paths in writing (G9 brief, 2026-11-05), under CLAUDE.md rule 1. **Nothing below is from source.** It is what the app sends, and what it accepts. Confirm it with the backend team (ask A32), then replace this entry with the real contract.
+
+- **Code:** every wire name is in `src/types/mobile-password-contract.ts`. The call is `signInWithPassword()` in `src/api/auth.api.ts`.
+- **Builds:** UAT only (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`). Production builds never call it.
+- **Auth:** none. Sent without `Authorization` and without cookies.
+- **Paths, tried in this order;** the next only after a **404 with an HTML body** (Express's "Cannot POST", §0.5):
+  1. `POST /api/v1/auth/mobile/login`
+  2. `POST /api/v1/auth/login/mobile`
+  3. `POST /api/v1/auth/mobile`
+  4. `POST /api/v1/auth/login`: the clone's web login (§1.5), in case a token was added to its body.
+  - Any JSON answer means the route exists: the app stops and reports it. The app remembers that path for the rest of the run; a 429 is not remembered.
+- **Body:** `{ "username": "<email>", "email": "<email>", "password": "<password>" }`: one input under both names. The clone reads `username`, A32 proposed `email`.
+- **200 accepted.** Any other field is ignored.
+  - **REQUIRED:** a token under `token`, `accessToken` or `sessionToken`; then `user.id`, and `user.role` (one of the four values).
+  - **Optional:** `user.email` (the typed email stands in), and the name under `user.name`, `user.displayName` or `user.fullName` (the email stands in). Also the expiry under `expiresAt`, `expires_at` or `expiry`: unused, the 8-hour clock applies. Also `user.countryId` (string or null) and `user.ldapSamAccount`.
+  - **`user.countryId` missing:** the app calls AUTH-2 with `Bearer <new token>` before completing. If AUTH-2 fails or disagrees, the sign-in is refused and the app sends AUTH-3 for that token (`02-AUTH.md` §8.4).
+- **Errors, as the app maps them** (`02-AUTH.md` §8.6):
+  - 400 `bad-request`; 401 `credentials-rejected`, showing the server's message unless it says which field was wrong; 403 `account-disabled`;
+  - any other JSON 4xx is `refused`; 429 is `rate-limited`; 5xx is `server`;
+  - all four paths answering HTML 404 is `unavailable`; a 2xx without a token is `no-token`.
+- **Rate limit:** unknown for the new route. On `/auth/login`, the clone's login limiter allows 20 per 15 minutes per IP (§0.4).
+- **To confirm:** the list in `02-AUTH.md` §8.7. How to read it off a device: `02-AUTH.md` §8.8.
+
 ### 1.5 Reference only — exists, but mobile must NOT call it
 | Endpoint | Why not | Source |
 |---|---|---|
-| `POST /api/v1/auth/login` `{ username, password }` → `200 { user:{id,email,displayName,role} }` + `Set-Cookie sd_session` | No token in the body. It puts a cookie into the native jar that overrides Bearer. Errors: `400 "Username and password are required"`, `401 "<raw message>"`, `429` | `auth.controller.ts:22-49` |
+| `POST /api/v1/auth/login` `{ username, password }` → `200 { user:{id,email,displayName,role} }` + `Set-Cookie sd_session` | No token in the body. Errors: `400 "Username and password are required"`, `401 "<raw message>"`, `429`. **Exception since 2026-11-05:** AUTH-P1's last fallback path (above), in case a token was added to its body. A 200 without one is `no-token`. Its cookie cannot reach the native jar: `withCredentials: false` makes React Native's Android networking use `CookieJar.NO_COOKIES` (`02-AUTH.md` §5.2) | `auth.controller.ts:22-49` |
 | `GET /api/v1/auth/microsoft`, `GET /api/v1/auth/microsoft/callback` | Web confidential-client redirect flow; ends on the web domain with a cookie | `auth.controller.ts:101-224` |
 | `POST /api/v1/auth/test-login` | Selenium skeleton key (`x-test-secret`). Never ship its secret. It checks **no password**, signs in any user and sets the cookie. On `fix/phase0-1-security` it also needs `TEST_AUTH_ENABLED=true`. **Not a password sign-in, and not a way in for a reviewer** (`docs/G9-PASSWORD-LOGIN.md` §6) | `app.ts:117`, `auth.controller.ts:67-97` (`:68-106` on `fix/phase0-1-security`) |
 
-**Re-checked 2026-11-04 (G9), on every branch fetched by 2026-11-02:**
+**Re-checked 2026-11-04 (G9), on every branch fetched by 2026-11-02; again on 2026-11-05 on a fresh clone with the same commits:**
 - `POST /auth/login` is unchanged: the token only as the cookie, the body `{ user }`.
-- No route returns a token for an email and password.
+- No route in the source returns a token for an email and password. The one on UAT (AUTH-P1, above) is not in the source.
 - On PROD, `GET /auth/config` reports `localAuthEnabled: false`.
 - The sources are in `docs/G9-PASSWORD-LOGIN.md`.
 

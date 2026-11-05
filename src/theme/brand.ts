@@ -55,4 +55,21 @@ export const loginLayout = {
    * of the spinner's ring and arc.
    */
   button: { height: 52, radius: 26, padX: 24, border: 1.5, logo: 21, logoGap: 12, ring: 3, captionGap: 8 },
+  /**
+   * The email sign-in under the pill (2026-11-05, UI-STANDARDS.md §15.2). `submit` is the brand-red "Sign in": 52 dp
+   * tall like the pill, and as wide as the form. Every touch target is at least 48 dp: the text action, the fields and
+   * the show/hide toggle.
+   */
+  emailForm: {
+    dividerGap: 20,
+    orGap: 12,
+    actionHeight: 48,
+    fieldHeight: 48,
+    fieldRadius: 12,
+    fieldPadX: 14,
+    fieldGap: 12,
+    labelGap: 6,
+    toggle: 48,
+    submit: { height: 52, radius: 26, gap: 16 },
+  },
 } as const;

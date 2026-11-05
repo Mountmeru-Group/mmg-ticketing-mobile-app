@@ -22,7 +22,9 @@ function sourceFiles(dir) {
   });
 }
 
-describe('sign-in: Microsoft is the only way into the app', () => {
+// 2026-11-05: email and password became the second way in (UAT builds only, ASSUMED contract; 02-AUTH.md §8). Both run
+// from signInAttempt.ts; tests/auth/password-sign-in.test.mjs covers the email path itself.
+describe('sign-in: Microsoft, and email on UAT, are the only ways into the app', () => {
   test('the auth stack registers one screen, Login, and its param list has nothing else', () => {
     const stack = read('src/navigation/AuthStack.tsx');
     assert.equal(stack.split('<Stack.Screen').length - 1, 1);
@@ -40,21 +42,28 @@ describe('sign-in: Microsoft is the only way into the app', () => {
     assert.deepEqual(leftovers, []);
   });
 
-  test('only the Microsoft flow creates a session; the profile save re-stores the same token', () => {
+  test('only the two sign-in flows create a session; the profile save re-stores the same token', () => {
     const callers = sourceFiles('src').filter((rel) => /\.setSession\(\{/.test(read(rel)));
     assert.deepEqual(callers.sort(), ['src/hooks/useProfile.ts', 'src/screens/auth/signInAttempt.ts']);
+    const attempt = read('src/screens/auth/signInAttempt.ts');
+    assert.equal(attempt.split('.setSession({').length - 1, 2, 'one call per sign-in flow');
     // fullAuthAt (02 §5.8) is set only after a challenged sign-in; the profile save never passes it, so it keeps the date.
-    assert.match(read('src/screens/auth/signInAttempt.ts'), /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);
+    assert.match(attempt, /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);
+    // A password is a full credential check, so an email sign-in always starts a new 15 days.
+    assert.match(attempt, /setSession\(\{ token: session\.token, user: session\.user, fullAuthAt: Date\.now\(\) \}\)/);
     assert.match(read('src/hooks/useProfile.ts'), /const \{ token, issuedAt, user: current \} = useAuthStore\.getState\(\);/);
     assert.doesNotMatch(read('src/hooks/useProfile.ts'), /fullAuthAt/);
   });
 
-  test('the Login screen navigates nowhere: its one action is "Sign in with Microsoft"', () => {
+  test('the Login screen navigates nowhere: its primary action is "Sign in with Microsoft"', () => {
     // Since the "arc split" layout (2026-10-30) the action is SignInButton; it was a SubmitButton labelled
-    // 'Signing in…' / 'Sign in with Microsoft' before.
+    // 'Signing in…' / 'Sign in with Microsoft' before. The email form (2026-11-05) opens in place, on the same screen.
     const login = read('src/screens/auth/LoginScreen.tsx');
     const button = read('src/screens/auth/SignInButton.tsx');
-    for (const source of [login, button]) assert.doesNotMatch(source, /navigation\.|navigate\(/);
+    const email = read('src/screens/auth/EmailSignInForm.tsx');
+    for (const source of [login, button, email]) assert.doesNotMatch(source, /navigation\.|navigate\(/);
+    assert.equal(login.split('<EmailSignInForm').length - 1, 1);
+    assert.ok(login.indexOf('<EmailSignInForm') > login.indexOf('<SignInButton'), 'the email option sits below the pill');
     assert.equal(login.split('<SignInButton').length - 1, 1);
     assert.match(login, /<SignInButton busy=\{signingIn\} onPress=\{startSignIn\} \/>/);
     assert.match(button, /const LABEL = 'Sign in with Microsoft';/);

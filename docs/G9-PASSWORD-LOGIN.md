@@ -1,12 +1,174 @@
-# G9: email and password sign-in for a Google Play reviewer (2026-11-04)
+# G9: email and password sign-in for a Google Play reviewer (first read 2026-11-04; re-read and built 2026-11-05)
 
-**What this is.** Part 2 of the G9 brief: can the app sign in with an email and a password at all? The brief asked for this to be established from the web repo (read-only) before anything was built. Every statement has a source. **Verdict: no.** No endpoint in the web source turns an email and a password into a token a Bearer client can use. So the form was **not built** (brief Part 3), and the requirement went to the backend team as ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`). Part 1 of the brief, the Login footer's year, is in §8.
+**What this is.** Can the app sign in with an email and a password? Each brief asked for the answer to come from the web repo (read-only) before anything was built, and every statement here has a source.
+- **The source still has no such endpoint** (the sections from "What changed since the last read" on).
+- **Later on 2026-11-05,** Ronit confirmed with the backend team that one **is deployed on UAT**, with its source not pushed.
+- So the form was **built defensively, on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
+- Ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`) stays open, narrowed to "send us the contract, and push the source".
+- The Login footer's year (first G9 brief, Part 1) is in §8.
+
+## Built on 2026-11-05: defensively, against an ASSUMED contract (third G9 brief)
+
+**The clone was re-cloned at 09:56 that morning, and still has no such endpoint.** Checked read-only before this section was written:
+- **The fresh clone:** `master` is `7df97c8` (2026-11-05, "Merge pull request #14 from Mountmeru-Group/feature/setu-redesign"), with 15 refs, the new `origin/feature/setu-redesign` (`8f30fdf`) among them.
+- **What PR #14 changes** under `backend/src`: 14 files, none under `modules/auth` or `middleware`. They are push notifications, a bot, AI, the audit log, reports, SLA and tickets.
+- **The auth router** declares the same seven routes. The only JSON body carrying a token is still `test-login`'s (`auth.controller.ts:96`).
+- **On no ref, and in no commit** (`git log --all --no-textconv -S`), is there `auth/mobile`, `mobile/login`, `login/mobile` or `microsoft/mobile`.
+- **Not even AUTH-P2** is in the source.
+- **Untouched by this work:** no file in the clone is newer than its 09:56:07 index.
+
+**Why "defensively".** The endpoint is on UAT, but no readable contract exists. The last assumed auth contract cost a rebuild: the app required `displayName`, and the server sent `name`. So the app accepts several plausible shapes instead of one guess. Full design: `docs/web-system/02-AUTH.md` §8. The contract as assumed: `docs/web-system/01-API-CONTRACT.md` AUTH-P1.
+
+**What was built**
+
+| Part | What | Where |
+|---|---|---|
+| Request | `{ username, email, password }`, the same input under both names. Four paths, in order: `/auth/mobile/login`, `/auth/login/mobile`, `/auth/mobile`, `/auth/login`. The next only after a 404 with an HTML body. The answering path is remembered for the run of the app, and one `[auth]` debug line is logged per answer | `src/api/auth.api.ts` `signInWithPassword()`; `src/types/mobile-password-contract.ts` |
+| Response | **The same `readSession()` as Microsoft sign-in**, with per-endpoint options. Required: a token (`token` / `accessToken` / `sessionToken`), `user.id`, `user.role`. Name: `name` / `displayName` / `fullName`, else the email. Expiry: `expiresAt` / `expires_at` / `expiry`, unused (8-hour clock). Unknown fields are never read. Drift is logged through the existing mechanism | `src/api/auth.api.ts`; `src/api/responseSpecs.ts`; `src/api/drift.ts` `reportDrift()` |
+| `countryId` | A string or `null` is kept as sent. **Missing:** AUTH-2 `GET /auth/me` with the new token supplies it, or the sign-in is **refused** and the session ended (AUTH-3). A missing one never makes an AGENT a triage agent | `confirmFromAuthMe()` |
+| Session | `setSession()`, exactly as after Microsoft: same store, same 8-hour rule. `fullAuthAt = now` on every password sign-in, because a password is a full credential check; without it, the next cold start would sign the person out. **Ronit to confirm** | `src/screens/auth/signInAttempt.ts` `attemptPasswordSignIn()` |
+| Screen | Below the unchanged pill: OR divider, "Sign in with email instead" with a chevron. The fields open in place (opacity and translateY on the native driver, at once under "Remove animations"). Email keyboard; masked password with a show/hide toggle (`aria-label`); 52 dp brand-red "Sign in". The keyboard never covers "Sign in" (`KeyboardAvoidingView`, plus a scroll to the end when the keyboard opens or the content grows) | `src/screens/auth/EmailSignInForm.tsx`; `LoginScreen.tsx`; tokens in `src/theme/` |
+| Builds | **UAT only:** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`. A production build does not render it. The code is still in the production bundle, behind that flag | `src/config/env.ts` |
+| Errors | 400, 401, 403, other 4xx, 429, 5xx, none of the paths exists, no token, bad body, `countryId` unconfirmed, network, storage: each has its own message. **Never which field was wrong:** a server message naming one field is replaced | `PASSWORD_FAILURE_COPY`, `neutralCredentialMessage()` |
+| Password | Component state only. Sent in the sign-in request and nowhere else. Cleared on success, on failure and on unmount. Never logged, stored or put into an error | `EmailSignInForm.tsx` |
+| Tests | `tests/auth/password-sign-in.test.mjs`, 108 new tests. Existing guards updated for the new premise: two ways in (`tests/release/production-readiness.test.mjs`); nine animating files, plus the env import and the UAT-only flag (`tests/motion/start-up-and-login.test.mjs`). `npm test`: 1205 pass, 0 fail | |
+
+**Unchanged:** the Microsoft sign-in flow (`signInWithMicrosoft()`, `exchangeMicrosoftIdToken()`'s reader options are exactly its old fields), `SignInButton.tsx`, `auth.config.ts`, the Entra config, `eas.json` and the production profile, the 15-day rule, and the 8-hour rule. `tests/auth/mobile-sso.test.mjs` and `tests/auth/reauth.test.mjs` are untouched and pass.
+
+**Still to confirm** (`02-AUTH.md` §8.7 has the full list)
+1. Which path answers on UAT, which request key it reads, and which response keys it sends, `countryId` included.
+2. Whether it sets a cookie, its rate limit, and its error statuses and messages. In particular: do an unknown email and a wrong password get the same answer?
+3. Which accounts may use it (A32 proposed an allow-list).
+4. The 15-day clock after a password sign-in (`fullAuthAt = now`).
+5. PROD: the option stays off there until A32 ships on PROD and Ronit says so.
+6. **On a device** (no build was run): the reveal, the keyboard keeping "Sign in" visible on a 360 dp phone at 100 %, 130 % and 200 % text, and TalkBack on the toggle.
+
+**How to learn the real contract on the device** (`02-AUTH.md` §8.8). Sign in with email once against UAT, then read the lines:
+- **Development build:** in Metro, the `[auth] email sign-in: …` lines give the answering path, the status and the key names. `[API drift] AUTH-P1 …` lines name any optional field that is missing or of another type.
+- **`preview` APK:** `adb logcat -s ReactNativeJS:V` shows the same `[auth]` lines. Any failure box's Ref line also reads `<reason> · HTTP <status> · <path>`.
+
+---
+
+## What changed since the last read: nothing
+
+The 2026-11-05 brief said the clone had been updated and the endpoints were now present. **The clone on disk is the one already read on the morning of 2026-11-05. It has no new commit and no such endpoint.**
+
+**The clone,** `Service Desk Mobile APP\MMG-Ticketing-Platform`
+- **When it was made.**
+  - Cloned on 2026-11-04 at 16:32: `.git` and every working file carry that time.
+  - Fetched from GitHub at 16:36 (`.git/FETCH_HEAD`).
+  - **No file in it is newer than `FETCH_HEAD`** (`find . -newer .git/FETCH_HEAD` is empty).
+- **What is checked out.**
+  - `master` at `d7f3887`, with no local edits and no untracked files (`git status --porcelain --untracked-files=all` is empty).
+  - Git's index is still dated 2026-11-04 16:32:53. Nothing has touched the checkout since it was cloned.
+- **Every branch is at the commit that fetch wrote.** No new branch, and no new commit on any branch. The four October commits are the ones the first read (2026-11-04, previous clone) named in §2 and Sources.
+
+| Branch | Commit | Last commit |
+|---|---|---|
+| `master` (checked out) | `d7f3887` | 2026-10-09 |
+| `fix/phase0-1-security` | `cb7b074` | 2026-10-28 |
+| `setu-changes-oct-2026` | `8aaf522` | 2026-10-28 |
+| `features-enhancement-oct` | `7d65310` | 2026-10-28 |
+| `ui/compact-dashboard` | `04efd64` | 2026-10-28 |
+| `uat-local-features` | `49b7d97` | 2026-10-07 |
+| `claude/manifest-auth-errors-pqil6p` | `7aebd47` | 2026-09-08 |
+| `dashboard-improvements` | `925066e` | 2026-07-21 |
+| `feature/sow-gaps` | `71c8513` | 2026-04-09 |
+| `claude/adoring-booth` | `cb4f3db` | 2026-04-09 |
+| `feat/manageengine-parity-modules` | `94e0bb7` | 2026-04-04 |
+| `feature/uat-bugfixes-observations` | `97f27ca` | 2026-03-24 |
+| `fix/code-review-security-and-quality` | `acc8413` | 2026-03-17 |
+
+- **Auth files changed: none.**
+  - With no new commit, no file can have changed.
+  - `git diff master <branch> -- backend/src/modules/auth/auth.service.ts backend/src/app.ts` is empty for `fix/phase0-1-security`, `setu-changes-oct-2026` and `features-enhancement-oct`.
+  - Their `auth.controller.ts` differs from `master` only by the `test-login` gate (§2).
+- **The searches were re-run on 2026-11-05, on all 13 branch tips plus local `master`.**
+  - The only JSON body under `backend/src` that carries a `token` is still `test-login`'s, `res.json({ user: userPayload, token })`. It is at `auth.controller.ts:96`, and at `:105` on `fix/phase0-1-security`, `setu-changes-oct-2026` and `features-enhancement-oct`.
+  - The auth router declares the same seven routes on every ref: `/login`, `/test-login` (9 of the 14 refs), `/logout`, `/me`, `/microsoft`, `/microsoft/callback`, `/config`.
+  - No file on any ref mentions `auth/mobile`, `mobile/login`, `microsoft/mobile`, `mobileLogin`, `loginMobile` or a `MOBILE_PASSWORD` / `MOBILE_LOGIN` / `MOBILE_AUTH` flag.
+  - `git log --all --no-textconv -S` finds no commit, ever, that added or removed `mobile/login`, `auth/mobile`, `microsoft/mobile` or `mobileLogin`.
+
+**Other backends on this machine.** The home folder was searched for every `auth.controller.ts` and `auth.router.ts` outside `node_modules`.
+
+| Folder | What it is | Auth routes | Token in a JSON body |
+|---|---|---|---|
+| `Desktop\Service Desk Mobile APP\MMG-Ticketing-Platform` | **The clone the brief names.** Everything above | The seven above | `test-login` only |
+| `Desktop\Service Desk Web Clone` | An **older** copy: files dated 2026-10-09, no `.git` | The same seven | `test-login` only (`auth.controller.ts:96`) |
+| `Desktop\Mamastops service Desk Mobile App\Mamastops-ServiceDesk` | **A different product:** `Mountmeru-Group/Mamastops-ServiceDesk`, HEAD `d38d197` (2026-10-20) | The same seven | `test-login` only (`:96`) |
+| `Desktop\Service Desk Mobile APP\IOS MMG` | A copy of this mobile app, not a backend | n/a | n/a |
+
+**So where could the endpoint be?**
+- AUTH-P2 (`POST /auth/microsoft/mobile`) has run on UAT since 2026-10-20 (`docs/web-system/02-AUTH.md` §7.5), yet it is on **no** branch of `Mountmeru-Group/MMG-Ticketing-Platform`.
+  - So the backend team deploys code they have not pushed.
+  - If they have now built a password endpoint, it is most likely in that same unpushed place.
+- **Ask them for the branch name, or for the contract in writing,** as they gave AUTH-P2's on 2026-10-19. Then pull it into the clone and re-run this read.
+
+## The brief's six questions, from the current source
+
+| # | Question | Answer | Source |
+|---|---|---|---|
+| 1 | Every endpoint that authenticates an email and a password | **One: `POST /api/v1/auth/login`.**<br>Request body `{ username: string, password: string }`, both `z.string().min(1)`. The field is **`username`, not `email`**. On the local path, a username without `@` becomes `<username>@dev.local`.<br>Response body `{ user: { id: string, email: string, displayName: string, role: UserRole } }` | `BE:modules/auth/auth.controller.ts@master:9-12, 22-44`; `auth.router.ts:7`; `auth.service.ts:107, 126, 167` |
+| 2 | Token in the JSON body, or a cookie? | **Cookie only.** The handler runs `res.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);` and then `return res.json({ user: result.user });`. The cookie is `sd_session`, `httpOnly` | `auth.controller.ts@master:43-44`, and the same lines on `fix/phase0-1-security` (§1) |
+| 3 | Errors | **400** `{ error: 'Username and password are required' }`: the body failed the schema.<br>**401** `{ error: <thrown message> }`: every failure.<ul><li>Local path: `'Invalid credentials'` for an unknown email **and** for a wrong password, so it does not tell which. Also `'Account is deactivated'`.</li><li>LDAP path: its own messages. One of them, `'User not found in Active Directory'`, does reveal an unknown user (`05` C.23).</li></ul>**429** from the limiter (row 4) | `auth.controller.ts@master:25, 45-47`; `auth.service.ts@master:129-140` |
+| 4 | Rate limiting | `express-rate-limit`: **20 requests per 15 minutes per client IP** (`keyGenerator: getClientIp`). It answers with the default status 429 and the body `{ error: 'Too many login attempts. Try again in 15 minutes.' }`. It applies to `/auth/login` only, not `/auth/config` or `/auth/me` | `BE:app.ts@master:87-92, 122` |
+| 5 | `GET /auth/config` | `{ microsoftEnabled: msal !== null, localAuthEnabled: LOCAL_AUTH_ENABLED === 'true' \|\| REDIS_URL === 'redis://mock' \|\| NODE_ENV === 'development' }`. Unchanged.<br>**PROD: `localAuthEnabled` is `false`.** The tracked `.env.production@master` sets `NODE_ENV=production` (`:7`) and a real `REDIS_URL` (`:14`), and has no `LOCAL_AUTH_ENABLED` and no `LDAP_*`.<br>**UAT: unknown from the source.** No ref tracks a UAT env file, and no tracked env file on any ref sets `LOCAL_AUTH_ENABLED` | `auth.controller.ts@master:226-232` (`@phase0-1:235-241`); §4 |
+| 6 | Does the response's `user` match `AuthUser`? | **No: the same class of mismatch as SSO, in reverse.** Field by field below | `src/types/user.ts:7-10`; `src/api/auth.api.ts:342-373` |
+
+**Question 5: a one-line check would settle UAT.** It is an unauthenticated GET and was not run, because the brief asked for the source: `curl -s https://uat-servicedesk.mountmerugroup.com/api/v1/auth/config`. Even `localAuthEnabled: true` would change nothing here. It would still mean a token in a cookie (row 2).
+
+### The `user` object, field by field
+
+- `POST /auth/login` returns what `loginWithLocal()` or `loginWithLdap()` returns. Both return `{ id, email, displayName, role }` (`auth.service.ts@master:107, 167`).
+- The app reads a session through `readSession()` and `readUser()` (`src/api/auth.api.ts:342-400`). These were built for AUTH-P2's body (`src/types/mobile-sso-contract.ts`).
+
+| `AuthUser` field (`src/types/user.ts:7-10`) | `/auth/login` sends | AUTH-P2 sends (what `readUser` reads) | If `readUser()` were handed `/auth/login`'s body |
+|---|---|---|---|
+| `id: UUID` | `id` | `id` | Matches |
+| `email: string` | `email` | `email` | Matches |
+| `displayName: string` | **`displayName`** | **`name`** | **Mismatch.** `readUser` reads `user.name` (`:361`), finds none, and shows the email instead (`:367`) |
+| `role: UserRole` | `role` (the same Prisma enum) | `role` | Matches |
+| `ldapSamAccount: string \| null` | **absent** | `ldapSamAccount` | Falls back to `null` (`:368`). Harmless |
+| `countryId: string \| null` | **absent** | `countryId` | Falls back to `null` (`:370`). **An AGENT then reads as a triage agent in the UI** (`05` §A.12). The server still scopes the data from its Redis copy, which does hold `countryId` (`auth.service.ts:151-158`) |
+| (session) `token` | **absent from the body** | `token` | **Sign-in refused:** `token` is required (`:377`) |
+| (session) `expiresAt` | **absent** | `expiresAt` | **Sign-in refused:** required |
+
+- **It is the SSO mismatch turned round.**
+  - AUTH-P2 sends `name` where `AuthUser` says `displayName`.
+  - `/auth/login` sends `displayName`, as `AuthUser` does. But the app's one reader looks for `name`.
+- **The trap for A32.**
+  - Suppose the backend team adds a token to a password route and returns `loginWithLocal()`'s `user` as it stands.
+  - The app would **accept** it: both fields are optional.
+  - But it would show the email in place of the person's name, and it would lose `countryId`.
+  - A32 already asks for AUTH-P2's exact body. On 2026-11-05 a line was added to A32 naming `loginWithLocal()`'s return value as the thing **not** to send.
+
+## Build profiles (2026-11-05 brief, Part 2): checked and left unchanged
+
+| Profile | Environment | Distribution | Source |
+|---|---|---|---|
+| Development (`npx expo start`, any `__DEV__` build) | UAT. A development build refuses PROD and throws at start-up | n/a: local only | `src/config/env.ts:21-24` |
+| `preview` | UAT (`EXPO_PUBLIC_APP_ENV=UAT`) | `internal`, APK | `eas.json`, profile `preview` |
+| `production` | PROD (`EXPO_PUBLIC_APP_ENV=PROD`), **not touched** | `store`, AAB | `eas.json`, profile `production` |
+
+- `eas.json` has no separate `development` profile. Any build that does not ask for PROD resolves to UAT (`src/config/env.ts:21`).
+- The build guard refuses PROD on any profile but `production` (`scripts/eas-build-guard.js:32-35`).
+
+## So the second brief's STOP applied (superseded later the same day)
+
+> **Superseded on 2026-11-05.** The backend team confirmed the endpoint is deployed on UAT, so the third brief had the form built against an ASSUMED contract (top of this file). This section is kept as the record of what the source showed.
+
+- **The email form was not built.** No endpoint in the source returns a token in a JSON body for an email and a password. A form would greet every user, the Play reviewer included, with a failure.
+- **Untouched:** `LoginScreen`, `SignInButton`, `signInAttempt`, `auth.api.ts`, `auth.store.ts`, `auth.config.ts`, `eas.json` and the SSO flow. Parts 3 and 4 of the brief did not run.
+- **What unblocks it:** the backend team's branch, or their contract in writing (above). When the endpoint is in the clone, re-run this read and build to what it says.
+
+---
 
 **Sources**
-- Web repo clone `MMG-Ticketing-Platform`, read-only. It was byte-for-byte unchanged before and after this work (§9).
+- Web repo clone `MMG-Ticketing-Platform`, read-only. It was byte-for-byte unchanged before and after each read (§9).
   - Read through `git show <ref>:<path>` and `git grep <pattern> <refs>`, with `--no-optional-locks` so that git did not even refresh its index. No checkout, no fetch.
   - `master` HEAD is `d7f3887` (2026-10-09).
-  - The remote-tracking branches were last fetched on **2026-11-02 16:38** (the time on `.git/FETCH_HEAD`). Nothing pushed after that is seen here.
+  - It is a fresh clone of 2026-11-04 16:32, fetched at **2026-11-04 16:36** (the time on `.git/FETCH_HEAD`). Nothing pushed after that is seen here.
+  - §1 to §7 were first read on 2026-11-04 from the previous clone, fetched 2026-11-02 16:38. The fresh clone has the same commits on every branch (above), so every line number below still holds.
 - Branch notation: `@master` is `d7f3887`. `@phase0-1` is `origin/fix/phase0-1-security` at `cb7b074` (2026-10-28).
 - Path prefixes:
   - `BE:` = `backend/src/`
@@ -94,7 +256,7 @@
   - **No commit, ever,** added or removed `auth/mobile`, `microsoft/mobile`, `mobile/login` or `X-Client`.
   - `TEST_AUTH_ENABLED` appears only in `cb7b074`.
 - **The clone lags UAT.** AUTH-P2 (`POST /auth/microsoft/mobile`) is deployed on UAT (`docs/web-system/02-AUTH.md` §7.5), but **no branch here contains it** (the grep in §3 finds no such route).
-  - So UAT runs backend code that was never pushed to these branches, or was pushed after 2026-11-02 16:38.
+  - So UAT runs backend code that was never pushed to these branches, or was pushed after 2026-11-04 16:36 (the fresh clone's fetch).
   - **"Not in the source" therefore means "not in the source we can see".** Under R1 the clone was not fetched. The backend team's answer to A32 is the authority (§10).
 
 ---
@@ -282,6 +444,7 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 | Docs | This file. `06-BACKEND-ASKS.md` gains ask **A32**. `02-AUTH.md` §8, `01-API-CONTRACT.md` §1.4 / §1.5, `05-RULES-AND-GAPS.md` C.13 and `docs/brand/UI-STANDARDS.md` §10.1 / §15 are updated |
 | Web repo | Read-only. Every file's path, size and modification time were hashed before and after: `61421ED4…6882`, 882 files, both times. No fetch, no checkout; git ran with `--no-optional-locks` |
 | Not run | No EAS build. No database. Neither UAT nor PROD was called |
+| **2026-11-05 re-read** | **Built: nothing.** The STOP applies (top of this file). **Docs:** the top of this file was rewritten, §2, §9 and Sources were brought up to date, and A32 in `06-BACKEND-ASKS.md` gained one line on the `user` shape. **Web repo:** read-only. Path, size and modification time of every file, `.git` included, were hashed after the reads and before any write, and again at the end: `1C2104AF…1CFC`, 871 files (840 outside `.git`), both times. That hash cannot be compared with the 2026-11-04 one, which came from the previous clone. The two other backends (top) were only grepped. **Not run:** no EAS build, no database, no `npm`; neither UAT nor PROD was called; nothing committed |
 
 ## 10. What Ronit needs from the backend team
 

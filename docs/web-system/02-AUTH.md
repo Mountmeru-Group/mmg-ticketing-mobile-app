@@ -6,10 +6,10 @@
 > - **Backend:** AUTH-P2 is **deployed to UAT**: `https://uat-servicedesk.mountmerugroup.com/api/v1/auth/microsoft/mobile`. Production is **not confirmed** (`10-A2-STATUS.md` §0).
 > - **The contract is CONFIRMED, not assumed.** The backend team gave the real shape on **2026-10-19**; recorded here 2026-10-20 (§7.5).
 >   - Its `user` has **`name`**, not `displayName`, plus `department` and `phone`. It is **not** the `GET /auth/me` user shape (§7.5).
-> - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into every build.
+> - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into a production build.
 > - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
-> - **Email and password sign-in (G9, 2026-11-04): NOT built.** No endpoint returns a token for a password, on any branch. Backend ask **A32** was raised instead. See §8.
+> - **Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, on UAT builds only.** The backend team says the endpoint is deployed on UAT, but its source is not pushed, so the app tolerates several request and response shapes instead of one. Nothing about it is verified against source. See §8.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
 
@@ -243,8 +243,9 @@ withCredentials:  false                               // never send/accept cooki
 headers:          { Accept: 'application/json' }
 request  → if token: headers.Authorization = `Bearer ${token}`   // capital B, one space
 ```
-- **Never call the cookie-setting web endpoints** (`POST /auth/login` in its current form, `/auth/microsoft*`). The mobile login must use the A1/A2 endpoint, which must not set a cookie.
+- **Never call the cookie-setting web endpoints `/auth/microsoft*`.** The mobile login must use an endpoint that does not set a cookie.
   - This keeps `sd_session` out of the native cookie jar, so it can never override the Bearer header (§2 #5).
+  - **One exception since 2026-11-05:** the email sign-in tries `POST /auth/login` **last**, in case the backend team added a token to its body (§8). Its `Set-Cookie` still cannot reach the jar. With `withCredentials: false`, React Native's Android networking builds the request with `CookieJar.NO_COOKIES`, so a cookie is neither sent nor stored (`node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/network/NetworkingModule.kt:371-373`, RN 0.86.3).
 - **Belt and braces:** if a dev build includes `@react-native-cookies/cookies`, call `clearAll()` on logout and login. Not possible in Expo Go.
 
 ### 5.3 Response interceptor
@@ -583,37 +584,131 @@ Accept: application/json
 
 ---
 
-## 8. Email and password sign-in (G9, 2026-11-04): blocked, ask A32
+## 8. Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, UAT builds only
 
 **The goal:** a Google Play reviewer, who has no Microsoft account in the MMG tenant, can sign in.
 
-**Finding.** The web source was read on every branch fetched by 2026-11-02 (`docs/G9-PASSWORD-LOGIN.md`, with a source for each point).
-- **`POST /auth/login` still returns the token only as the httpOnly cookie** (§1.3, unchanged since `d7f3887`).
-- **No endpoint** turns an email and password into a token a Bearer client can use.
-- **PROD has no password login for anyone:** no `LOCAL_AUTH_ENABLED` and no LDAP settings. So `GET /auth/config` reports `localAuthEnabled: false` there.
-- **UAT's setting is not in the source** (`00` B3).
-- **`test-login` is not a password sign-in** (§3), and stays forbidden (§6).
+> **⚠ ASSUMED, NOT VERIFIED AGAINST SOURCE.** On 2026-11-05 Ronit confirmed with the backend team that a mobile password-login endpoint is **deployed on UAT**, with local auth on there. Its source has **not been pushed**: no branch of the web clone has it (`docs/G9-PASSWORD-LOGIN.md`). That holds for the clone fetched 2026-11-04 16:36, and for the fresh one of 2026-11-05 09:56 (`master` `7df97c8`, 15 refs), whose auth module and middleware are unchanged since `d7f3887`. That is the same position AUTH-P2 was in before its contract arrived. So the app was built to work against **several plausible shapes, not one guessed shape**. The last guess cost a rebuild: the app required `displayName`, and the server sent `name`. Every wire name is in one file, `src/types/mobile-password-contract.ts`. Cut it down to the real contract when it arrives (ask A32).
 
-**Decision (brief, Part 2).** The email form was **not built**. A form that cannot sign in would greet the reviewer with a failure.
-- The Login screen, the SSO flow, the auth store and `auth.config.ts` are unchanged.
-- The requirement went to the backend team as **A32** (`06-BACKEND-ASKS.md`). It asks for `POST /api/v1/auth/mobile/login` `{ email, password }`:
-  - it returns AUTH-P2's body (§7.5), with no cookie;
-  - it checks a local password only;
-  - it is restricted to an allow-list of reviewer accounts;
-  - it sits behind the login limiter;
-  - it is on **PROD** as well as UAT.
+### 8.1 The two ways in
 
-**Why PROD.** The store AAB, which is what Google reviews, can only target PROD (`scripts/eas-build-guard.js:51-52`). A UAT-only password sign-in would not reach the reviewer.
+| | Microsoft (AUTH-P2, §7) | Email and password (AUTH-P1, this section) |
+|---|---|---|
+| Builds | Every build | **UAT builds only** (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`): development and `preview`. A production build does not render the option at all |
+| Contract | **Confirmed** by the backend team, 2026-10-19 | **Assumed**: endpoint reported deployed on UAT, source not pushed |
+| Where on Login | The outlined pill, the primary action, unchanged | Under the pill: OR divider, then "Sign in with email instead". The fields open in place (`docs/brand/UI-STANDARDS.md` §15.2) |
+| Request | `POST /auth/microsoft/mobile` `{ idToken }` | Up to four paths (§8.2), `{ username, email, password }` |
+| Response reader | `readSession()` with `AUTH_P2_READER`: its confirmed names only | **The same `readSession()`**, with `AUTH_P1_READER`: aliases, and fewer required fields (§8.3) |
+| `countryId` missing | Stored as `null` (unchanged) | Taken from AUTH-2 before the sign-in completes, or the sign-in is **refused** (§8.4) |
+| Session | `setSession({ token, user, fullAuthAt })`: same store, same 8-hour rule from `issuedAt` | **The same call, the same store, the same 8-hour rule** |
+| 15-day clock (§5.8) | `fullAuthAt` only after a challenged sign-in (`prompt=login`) | **`fullAuthAt = now` after every password sign-in** (§8.5) |
+| Code | `signInWithMicrosoft()` → `attemptSignIn()` | `signInWithPassword()` → `attemptPasswordSignIn()` (`src/api/auth.api.ts`, `src/screens/auth/signInAttempt.ts`) |
 
-**When A32 ships**
-- Add the endpoint to `01-API-CONTRACT.md` as built (AUTH-P1, §1.4), then build the approved design (G9 brief, Part 3).
-- **Session:** stored through `setSession()`, exactly as after AUTH-P2. The 8-hour rule runs from `issuedAt` (§5.4).
-- **The 15-day clock (§5.8):** a password sign-in is a full credential entry, so it should set `fullAuthAt`. Confirm that with Ronit when building it.
-- **The password:** held in component state only. It is cleared on success, on failure and on unmount, and never logged, stored or put into an error.
-- **Errors:**
-  - 401 shows "Invalid credentials" without saying which field was wrong;
-  - 429 says plainly that there have been too many attempts.
+- **The SSO path is unchanged.** `readSession()` gained per-endpoint options; AUTH-P2's reader holds exactly its old key names and required fields. All 34 tests of `tests/auth/mobile-sso.test.mjs`, a file not touched, still pass, and `tests/auth/password-sign-in.test.mjs` proves AUTH-P2 takes none of the email path's aliases.
+- **They never overlap.** Both run through Login's one single flight. The Microsoft pill is locked (no touch, hidden from TalkBack) while an email sign-in runs, and "Sign in" is disabled while Microsoft's runs.
 
-**Alternative with no new endpoint.** A dedicated Entra reviewer account, signing in through the existing Microsoft sign-in.
+### 8.2 The request, sent tolerantly
+
+- **Body:** `{ "username": <email>, "email": <email>, "password": <password> }`: the same trimmed input under both names.
+  - **Why both:** the clone's `/auth/login` reads `username` (`auth.controller.ts:9-12`), and A32 proposed `email`. A server ignores the key it does not read.
+  - The password is sent as typed, never trimmed.
+- **Headers:** JSON, no `Authorization` (`skipAuth`), no cookies (`withCredentials: false`).
+- **Checked first, on the phone:** a trimmed email of the form `name@domain.tld`, and a non-empty password. Nothing invalid is sent.
+- **Paths, in this order** (`MOBILE_PASSWORD_PATHS`):
+  1. `POST /api/v1/auth/mobile/login`
+  2. `POST /api/v1/auth/login/mobile`
+  3. `POST /api/v1/auth/mobile`
+  4. `POST /api/v1/auth/login`: the clone's web login, in case the backend team added a token to its body. Its cookie cannot reach the native jar (§5.2).
+- **The next path only after a 404 with an HTML body:** Express's `Cannot POST …`, which means "no such route" (01 §0.5).
+  - A JSON error of any status means the route exists and refused. The app stops there and shows the message.
+  - A 404 that is not HTML (for example plain text), a 200 with an HTML body, and a network failure also stop.
+- **Remembered:** the path that last gave a JSON answer is tried first by later attempts in the same run of the app. It is held in memory only. A 429 is not remembered, because the general limiter answers it in front of every route. A remembered path that later answers HTML 404 is forgotten, and the others are tried in order.
+- **Logged** at debug level, in every build (Metro, and logcat as `ReactNativeJS`): one `[auth] email sign-in: …` line per answer. It carries the path, the status, and which key names the token, name and expiry came under. Never the email, the password, a token or a server message.
+- **None answers:** reason `unavailable`, "Email sign-in isn't available … Sign in with Microsoft instead", with a "Sign in with Microsoft" button in the failure box. The button never stays on a spinner: every path ends in an outcome.
+
+### 8.3 The response, read tolerantly (`readSession()` with `AUTH_P1_READER`)
+
+| Field | Level | Accepted under | If missing |
+|---|---|---|---|
+| token | **REQUIRED** | `token`, `accessToken`, `sessionToken`: the first non-blank string | `no-token`: "Email sign-in isn't available", offering Microsoft |
+| `user` | **REQUIRED**, object | `user` | `unexpected-response` |
+| `user.id` | **REQUIRED** | `id` | `unexpected-response` |
+| `user.role` | **REQUIRED**, one of the four `UserRole` values | `role` | `unexpected-response`. An unknown role is refused, as on AUTH-P2 |
+| `user.email` | optional | `email` | The typed email stands in |
+| display name | optional | `name`, `displayName`, `fullName` | The email stands in; one drift line names all three keys |
+| expiry | optional | `expiresAt`, `expires_at`, `expiry` | Nothing. It is read but not used, as on AUTH-P2: the app's 8-hour clock applies (§5.4) |
+| `user.countryId` | optional, string or null | `countryId` | **AUTH-2 is asked** (§8.4) |
+| `user.ldapSamAccount` | optional, string or null | `ldapSamAccount` | `null` |
+| **Any other field, at any level** | ignored | | Never read, so it cannot fail sign-in |
+
+- A 200 with an HTML body, or HTML labelled JSON, is rejected (`unexpected-response`), as on AUTH-P2.
+- **Drift:** a missing or wrongly typed optional field is logged once as `[API drift] AUTH-P1 …` in `__DEV__` builds, through the existing mechanism (`checkFields()` with `MOBILE_PASSWORD_OPTIONAL_SPEC`, plus `reportDrift()` for the alias groups).
+
+### 8.4 `countryId`: a missing one can never make an agent a triage agent
+
+- **Why it matters.** In the UI, an AGENT with no `countryId` is a triage agent: they can switch country, and their lists are not locked (05 §A.12). The clone's `/auth/login` sends no `countryId` (`auth.service.ts:167`). A body without it would silently change an agent's scope in the app.
+- **What the app does** (`confirmFromAuthMe()`):
+  - **Sent as a string:** kept. An AGENT is locked to that country.
+  - **Sent as `null`:** kept as `null`. The server itself says this AGENT has no country.
+  - **Missing, or another type:** before the sign-in completes, the app calls `GET /api/v1/auth/me` (AUTH-2) with `Authorization: Bearer <the new token>`. AUTH-2 is the server's own record of the session (`auth.middleware.ts:46-53`), which holds `countryId` (`auth.service.ts:151-158`). Its `countryId` is used, string or `null`. Its `displayName`, `email` and `ldapSamAccount` fill only fields the sign-in answer did not have.
+  - **AUTH-2 fails or disagrees:** the sign-in is **refused**, with reason `session-unconfirmed`. That covers any HTTP error, no answer, a non-JSON body, no `user`, no `countryId` in it either, a different `user.id`, or a different `user.role`. The new session is ended on the server (`POST /auth/logout` with the same token, best effort), and nothing is stored.
+- Microsoft sign-in is unchanged: a missing `countryId` there is still stored as `null` (§7.5).
+
+### 8.5 The session and the 15-day clock
+
+- Stored through `setSession({ token, user, fullAuthAt: Date.now() })`: the same SecureStore keys, the same 8-hour rule from `issuedAt`, and the same 401 handling as after Microsoft sign-in.
+- **`fullAuthAt = now` on every password sign-in.** The rule itself is unchanged: the interval, the checks and the notice. Two reasons:
+  - A password is a full credential check, which is what the 15-day rule exists to force. It is the same as a challenged Microsoft sign-in.
+  - Without a date, `restoreSession()` treats re-authentication as due, so a phone that signed in by password would be signed out on its next cold start.
+- **Ronit to confirm.** This was the open question in this section's earlier version. The 15-day notice still says "a fresh Microsoft sign-in", because the notice was not to be changed.
+- **The password** is held in the form's component state only. It goes to the one sign-in request and nowhere else: not to AUTH-2, AUTH-3, a header, a log line, an error, the outcome, the store or SecureStore. It is cleared on success, on failure and on unmount. `tests/auth/password-sign-in.test.mjs` "R6" checks all of these.
+
+### 8.6 Failure reasons, as shown on Login
+
+Shown in a failure box above "Sign in": title, message, the server's own words where they are fit to show, and `Ref: <reason> · HTTP <status> · <path>` on every build. `__DEV__` builds also print the developer detail.
+
+| Reason | Trigger | User sees | Offers Microsoft |
+|---|---|---|---|
+| `credentials-rejected` | **401** JSON | "Sign-in was refused", then **the server's message**, or "The email or password isn't right. Check both, then try again." when the server's message would say which was wrong | No |
+| `account-disabled` | **403** JSON | "Account deactivated" (05 §A.13) | No |
+| `bad-request` | **400** JSON | "Sign-in request wasn't accepted". Report to IT | Yes |
+| `refused` | Any other 4xx JSON, a JSON 404 included | "Email sign-in wasn't accepted", then the server's message where it is fit to show | Yes |
+| `rate-limited` | **429**, JSON or plain text | "Too many attempts": "Too many sign-in attempts have been made from this network. Wait 15 minutes, then try again." The clone's login limiter is 20 per 15 minutes per IP (`app.ts:87-92`); the new route's is unknown | No |
+| `server` | **5xx**; a non-JSON error page (IIS); a 404 that is not HTML | "The Service Desk had a problem" | No |
+| `unavailable` | All four paths answered 404 with an HTML body | "Email sign-in isn't available" | Yes |
+| `no-token` | A 2xx JSON object with no token under any accepted key (the clone's `/auth/login`, for one) | "Email sign-in isn't available" | Yes |
+| `unexpected-response` | A 2xx that is not a JSON object, or `user`, `user.id` or `user.role` missing or wrong | "Sign-in couldn't be completed". Report to IT | Yes |
+| `session-unconfirmed` | `countryId` missing, and AUTH-2 failed or disagreed (§8.4) | "Sign-in couldn't be confirmed" | Yes |
+| `network` | No answer | "Can't connect" | No |
+| `storage` | SecureStore refused the session | "Couldn't save your sign-in" | No |
+
+- **Never which field was wrong** (`neutralCredentialMessage()`). A server message that names one field is replaced by the app's message, which names both. That covers the clone's LDAP "User not found in Active Directory" (05 C.23), "Incorrect password", "Unknown email" and the like. "Invalid credentials" and "Invalid email or password" are shown as sent. The same rule applies to every server message the app quotes.
+- A 401 here is a refused sign-in, not an expired session: no "Your session has ended" sign-out.
+
+### 8.7 Still to confirm (ask A32: "send us the contract, and push the source")
+
+1. **The path** that answers on UAT. The `[auth]` debug line names it after the first attempt (§8.8).
+2. **The request key:** `email`, `username`, or both.
+3. **The response keys:** the token's, the name's and the expiry's, and whether `user.countryId` is in the body.
+4. **No `Set-Cookie`** on the new route. `__DEV__` builds warn if one is visible to JavaScript. React Native keeps it out of the jar either way (§5.2).
+5. **The rate limit** on the new route, and its **error statuses** and messages: whether it says which field was wrong, and whether unknown emails get 401 or 404.
+6. **Which accounts may use it:** everyone with a local password, or an allow-list (A32's proposal).
+7. **PROD.** The option is off on production builds until the endpoint is on PROD and Ronit says so. A Play reviewer installs the production build (§8 goal; `docs/G9-PASSWORD-LOGIN.md` §7).
+8. **The 15-day clock** (§8.5).
+
+When the contract arrives: cut `src/types/mobile-password-contract.ts` and `AUTH_P1_READER` (`src/api/auth.api.ts`) down to it. Keep the tests for the real shape and drop the guesses. Then record it in `01-API-CONTRACT.md` as confirmed.
+
+### 8.8 How to learn the real contract on a device
+
+The email path needs no Microsoft redirect, so it also works in a development build or Expo Go against UAT.
+
+- **Development build** (`npx expo start`, Metro console):
+  - `[auth] email sign-in: POST /api/v1<path> → 404 with an HTML body (no such route)` for each path passed over;
+  - then `[auth] email sign-in: POST /api/v1<path> answered HTTP <status>: token as "<key>", name as "<key>", expiry as "<key>", countryId sent | not sent, so asking GET /auth/me`;
+  - `[API drift] AUTH-P1 …` for each optional field that is missing or of another type.
+- **`preview` APK** (no Metro, so no drift lines): `adb logcat -s ReactNativeJS:V` shows the same `[auth]` lines. A failure box's Ref line, `<reason> · HTTP <status> · <path>`, names the answering path without any tooling.
+- Send those lines to the backend team with the A32 question, or record them in `01-API-CONTRACT.md` AUTH-P1 with Ronit's OK.
+
+**Alternative with no new endpoint** (unchanged). A dedicated Entra reviewer account, signing in through the existing Microsoft sign-in.
 - It needs AUTH-P2 on PROD (§7.6 item 1).
 - It also needs an MFA exclusion for that one account, which is IT's decision (`docs/G9-PASSWORD-LOGIN.md` §10).
