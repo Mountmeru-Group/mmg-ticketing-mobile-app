@@ -54,7 +54,8 @@ import { describeError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   AttachmentPicker, Card, EmptyState, ErrorState, HtmlText, ImageViewerModal, LoadingSkeleton, NO_SCROLL_ANCHOR, Notice,
-  OfflineBanner, OfflineState, OutlineButton, PriorityBadge, QueryBanner, SlaBadge, StatusBadge, SubmitButton, TaskRow,
+  OfflineBanner, OfflineState, OutlineButton, PressableCard, PriorityBadge, QueryBanner, SlaBadge, SlaDeadline,
+  StatusBadge, SubmitButton, TaskRow,
 } from '@/components';
 import {
   useAccessibilityTextSize, useAssignTicket, useChangeStatus, useDeleteAttachment, useSingleFlight, useStableCallback, useTicket, useTicketAttachments,
@@ -572,6 +573,8 @@ const HeaderCard = memo(function HeaderCard({ ticket, can }: { ticket: TicketDet
         <PriorityBadge priority={ticket.priority} auto={autoPriority} />
         <SlaBadge ticket={ticket} />
       </View>
+      {/* 2026-11-03: the hold-adjusted resolve deadline as a time ("Due Mon 11:00"), coloured. Detail only. */}
+      <SlaDeadline ticket={ticket} />
       <Text className="mt-2 text-xs text-gray-500">
         Created {formatDateTime(ticket.createdAt)} · Updated {formatRelative(ticket.updatedAt)}
       </Text>
@@ -969,7 +972,7 @@ const AttachmentRow = memo(function AttachmentRow({
     ...(canDelete ? [{ name: 'delete', label: 'Delete' }] : []),
   ];
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${formatBytes(attachment.sizeBytes)}`}
       accessibilityState={{ busy: opening || deleting, expanded: detailsOpen }}
@@ -984,7 +987,7 @@ const AttachmentRow = memo(function AttachmentRow({
       disabled={opening || deleting}
       onPress={() => (onView ?? onOpen)(attachment)}
       onLongPress={() => onToggleDetails(attachment.id)}
-      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:bg-gray-50"
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4"
     >
       <View className="flex-row items-center">
         <Ionicons name={attachmentIcon(attachment.mimeType)} size={20} color={palette.gray[600]} />
@@ -1031,7 +1034,7 @@ const AttachmentRow = memo(function AttachmentRow({
           </Pressable>
         </View>
       ) : null}
-    </Pressable>
+    </PressableCard>
   );
 });
 

@@ -31,6 +31,7 @@ import type { MoreStackScreenProps, TicketImpact, TicketPriority } from '@/types
 import { chooseForField, type SheetChoice } from '@/utils/actionSheet';
 import { notify } from '@/utils/dialogs';
 import { formatDisplayName } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { serviceCatalogPermissions } from '@/utils/permissions';
 import {
   REQUEST_IMPACT_OPTIONS, REQUEST_URGENCY_OPTIONS, buildServiceRequestBody, formErrors, initialFormValues, nextRequestPriority,
@@ -115,7 +116,10 @@ export function ServiceRequestFormScreen({ navigation, route }: MoreStackScreenP
         notify(submittedMessage(item));
         leave(() => navigation.popTo('ServiceCatalog', { view: 'catalog', resetAt: Date.now() }));
       } catch (e) {
-        if (!isSessionEndedError(e)) setError(describeWriteError(e) || 'Failed to submit request');
+        if (!isSessionEndedError(e)) {
+          hapticOutcome('error'); // iOS-5f (A5): Android plays its error haptic here too
+          setError(describeWriteError(e) || 'Failed to submit request');
+        }
       }
     });
 

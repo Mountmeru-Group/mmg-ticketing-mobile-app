@@ -4,8 +4,8 @@
 // Which KPI is which is written out here from G6 §5 and §7 (BE:dashboard.controller.ts:331-442), not derived from the
 // code under test. No count changes: the values are pinned too.
 //
-// iOS (iOS-5f, STEP 4): ported from Android dev d8626bc. The rules are verbatim; "Home draws them" joins with the iOS
-// HomeScreen in STEP 6.
+// iOS (iOS-5f): ported from Android dev d8626bc. One iOS difference in "Home draws them": at the accessibility text
+// sizes a tile's caption wraps freely (the tile has the row to itself, UI-STANDARDS.md §iOS-A.3).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -124,5 +124,25 @@ describe('no count changed', () => {
   test('the dashboard query is untouched: the captions read the period, never the request', () => {
     const src = read('src/utils/home-kpis.ts');
     assert.doesNotMatch(src, /dashboardPeriodQuery|@\/api|useDashboard/);
+  });
+});
+
+describe('Home draws them', () => {
+  const home = read('src/screens/dashboard/HomeScreen.tsx');
+
+  test('each tile carries its caption; it shows under the count whenever counts do (loading too), small and muted', () => {
+    assert.match(home, /caption: homeTileCaption\(key, period, customRange\),/);
+    assert.match(home, /\{showCounts \? \(\s*<Text className="text-xs text-gray-500" numberOfLines=\{largeText \? undefined : 2\}>\s*\{t\.caption\}\s*<\/Text>\s*\) : null\}/);
+    // Under the number: the caption comes after the count's branches in the tile's foot.
+    const tile = home.slice(home.indexOf('function KpiTile('), home.indexOf('function StatusChip('));
+    assert.ok(tile.indexOf('{t.caption}') > tile.indexOf('{t.value}'), 'caption after the count');
+    // The old under-the-label hint is gone; the caption replaced it.
+    assert.doesNotMatch(home, /hint: 'right now'|t\.hint/);
+  });
+
+  test('the Active chip shows its caption; screen readers hear it too', () => {
+    assert.match(home, /caption=\{homeChipCaption\(chip\)\}/);
+    assert.match(home, /\{caption \? <Text className="ml-1 text-xs text-gray-500">\{caption\}<\/Text> : null\}/);
+    assert.match(home, /\$\{caption \? `, \$\{caption\}` : ''\}/);
   });
 });

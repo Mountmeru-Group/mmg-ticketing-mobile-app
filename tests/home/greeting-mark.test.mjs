@@ -2,8 +2,9 @@
 // "Good morning, Ronit", one per greeting band; flat SVG in brand yellow, never an emoji; one rise and fade when Home
 // mounts; hidden from screen readers. The band rule is src/utils/greeting.ts; the component is read as source.
 //
-// iOS (iOS-5f): ported from Android dev d8626bc (STEP 4: the band rule; STEP 5: the drawn mark). "On Home, quiet" joins
-// with the iOS HomeScreen in STEP 6. iOS addition at the end: no rise under Reduce Motion or while VoiceOver runs.
+// iOS (iOS-5f): ported from Android dev d8626bc, all of it. iOS addition at the end: no rise under Reduce Motion or
+// while VoiceOver runs.
+// One Android check is widened for that: the mount decision reads screenReaderEnabled() too.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -94,6 +95,32 @@ describe('greeting mark: drawn, not an emoji', () => {
     for (const cp of [0x2600, 0x26c5, 0x1f324, 0x1f325, 0x1f326, 0x1f319, 0x1f31a, 0x1f31b, 0x1f31e]) {
       assert.ok(!home.includes(String.fromCodePoint(cp)), cp.toString(16));
     }
+  });
+});
+
+describe('greeting mark: on Home, quiet', () => {
+  const mark = read('src/components/GreetingMark.tsx');
+  const home = read('src/screens/dashboard/HomeScreen.tsx');
+
+  test('Home draws it beside the greeting, for the band the greeting is in', () => {
+    assert.match(home, /\{greetingLine\(greeting, user\?\.displayName\)\}<\/Text>\s*<\/View>\s*<GreetingMark mark=\{greetingMark\(greeting\)\} \/>/);
+  });
+
+  test('hidden from screen readers: the greeting already says the time of day', () => {
+    assert.match(mark, /accessible=\{false\}\s*accessibilityElementsHidden\s*importantForAccessibility="no-hide-descendants"/);
+  });
+
+  test('about 26 dp', () => {
+    assert.match(mark, /art: \{ width: 26, height: 26 \}/);
+  });
+
+  test('ONE rise and fade: a single native timing, started once, never looped; none under "Remove animations"', () => {
+    assert.equal(mark.split('Animated.timing(').length - 1, 1);
+    assert.doesNotMatch(mark, /Animated\.loop|setInterval|setTimeout/);
+    // iOS: VoiceOver skips the rise too (below).
+    assert.match(mark, /useState\(\(\) => \(reduceMotionEnabled\(\) \|\| screenReaderEnabled\(\) \? null : new Animated\.Value\(0\)\)\)/);
+    assert.match(mark, /if \(!entry \|\| played\.current\) return;\s*played\.current = true;/);
+    assert.match(mark, /useNativeDriver: true/);
   });
 });
 

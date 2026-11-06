@@ -15,6 +15,13 @@
 // ADMIN only (2026-10-29): the active-announcement banner (ANN-1, dismissible for this session) and its "Read more".
 //   Other roles get no banner and no ANN-1 request, because the Announcements screen does not exist for them.
 // The greeting follows the device clock, read again whenever Home is shown or the app returns to it (utils/greeting.ts).
+//   Beside it, a drawn sun, sun-behind-cloud or moon for the band (components/GreetingMark.tsx): one rise and fade
+//   when Home mounts, hidden from screen readers.
+// Count fade (2026-11-03, Ronit's option 5 for the count roll): when the period changes, each tile's number fades from
+//   the old into the new instead of snapping (components/CountFade.tsx), only while Home is visible.
+// Window captions (2026-11-03): under every count, the window it covers ("this month", "last 7 days" … or "right now"
+//   for Open), and "right now" on the Active chip, the one chip counted differently from its neighbours
+//   (utils/home-kpis.ts HOME_TILE_WINDOW, HOME_CHIP_WINDOW). The counts themselves are unchanged: the web's (G6).
 // A tile or chip opens the Tickets tab with the matching filter (utils/home-kpis.ts: the same status set it counts) and,
 //   since G7, the period as the list's created-date filter when it counts "created in the period" (all but Open and
 //   Active), as the web's dashboard links do. The list names the period in a chip that clears it.
@@ -34,8 +41,12 @@
 // with Android's limits, instead of Android's system date dialog. Picking Custom with no From day opens its calendar
 // once the period sheet has gone, as Android opens its dialog at once. Custom's message is Android's, and VoiceOver
 // hears it change (Android's live region is TalkBack's only). What each period sends and counts is unchanged.
+// iOS-5f (Android's polish, 2026-11-03): the greeting mark skips its rise under Reduce Motion or while VoiceOver runs
+// (components/GreetingMark.tsx); a day picked in the Custom calendar counts as changing the period for the count fade,
+// as Android's date dialog does; at the accessibility text sizes a tile's caption wraps freely (the tile has the row
+// to itself). Every tile is a PressableCard; the chips stay Pressables, as on Android.
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -44,8 +55,9 @@ import {
 
 import { useIsOffline } from '@/api/network';
 import {
-  AnnouncementBanner, DatePickerSheet, EmptyState, ErrorState, FAB_BOTTOM, LIST_TOP_GAP, LoadingSkeleton, Notice,
-  OfflineBanner, OptionSheet, QueryBanner, RecentTicketRow, Skeleton, SubmitButton, listBottomInset, type SheetOption,
+  AnnouncementBanner, CountFade, DatePickerSheet, EmptyState, ErrorState, FAB_BOTTOM, GreetingMark, LIST_TOP_GAP,
+  LoadingSkeleton, Notice, OfflineBanner, OptionSheet, PressableCard, QueryBanner, RecentTicketRow, Skeleton,
+  SubmitButton, listBottomInset, type SheetOption,
 } from '@/components';
 import {
   queryKeys, useAccessibilityTextSize, useAnnouncements, useDashboard, usePendingApprovals, useRecentTickets, useScaledIconSize,
@@ -55,13 +67,13 @@ import { useUiStore } from '@/store/ui.store';
 import { colors, maxTextScale, shadows } from '@/theme';
 import type { DashboardRecentTicket, HomeStackScreenProps, Ticket } from '@/types';
 import {
-  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodLabel, dashboardPeriodQuery,
-  periodListDates, type CustomDayRange, type DashboardPeriod,
+  CUSTOM_RANGE_MESSAGES, DASHBOARD_PERIODS, customRangeProblem, dashboardPeriodKey, dashboardPeriodLabel,
+  dashboardPeriodQuery, periodListDates, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
-import { greetingLine, greetingNow } from '@/utils/greeting';
+import { greetingLine, greetingMark, greetingNow } from '@/utils/greeting';
 import {
   HOME_CHIP_CARRIES_PERIOD, HOME_CHIP_LABELS, HOME_CHIP_LIST_FILTER, HOME_TILE_CARRIES_PERIOD, HOME_TILE_LIST_FILTER,
-  homeChipValue, homeTileLabel, homeTileValue, visibleHomeChips, type HomeKpis,
+  homeChipCaption, homeChipValue, homeTileCaption, homeTileLabel, homeTileValue, visibleHomeChips, type HomeKpis,
 } from '@/utils/home-kpis';
 import {
   hasApprovalsTab, homeChips, homeTiles, homeVariant, navRole, showAnnouncementBanner, showApprovalsShortcut,
@@ -87,7 +99,8 @@ interface Tile {
   label: string;
   /** undefined = no count shown (L2_MANAGER, still loading, or a Custom period not picked yet). */
   value?: number;
-  hint?: string;
+  /** The window the count covers, under it: the period, or "right now" (homeTileCaption). */
+  caption: string;
   icon: keyof typeof Ionicons.glyphMap;
   /** The square behind the icon and the tile's left edge: the web KPI card's colour for this count (colors.kpi). */
   color: string;
@@ -115,7 +128,14 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
   const showPeriod = showHomePeriod(role);
   const dashboard = useDashboard(); // disabled for L2_MANAGER, and while a Custom period has no valid range
   // null = Custom without a valid From–To: DSH-1 waits, and pull-to-refresh must not ask for it.
-  const periodReady = dashboardPeriodQuery(period, customRange) !== null;
+  const periodQuery = dashboardPeriodQuery(period, customRange);
+  const periodReady = periodQuery !== null;
+  // Count fade: which period the numbers count, and whether they may fade. Only after the person has changed the period
+  // on this visit of Home (the first numbers appear as before), and only while Home is the screen in view.
+  const periodKey = periodQuery ? dashboardPeriodKey(periodQuery) : 'none';
+  const focused = useIsFocused();
+  const [periodTouched, setPeriodTouched] = useState(false);
+  const countsFade = focused && periodTouched;
   const recent = useRecentTickets({ enabled: isEndUser || isL2 });
   const showBanner = showAnnouncementBanner(role); // ADMIN only
   const announcements = useAnnouncements(); // disabled inside the hook for every other role
@@ -196,6 +216,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
     });
   };
   const pickPeriod = (next: DashboardPeriod) => {
+    setPeriodTouched(true);
     setPeriod(next);
     // "Custom" opens the From calendar straight away when there is no From yet (after the period sheet, above).
     if (next === 'custom' && customRangeProblem(customRange) === 'from-missing') openFromNext.current = true;
@@ -216,7 +237,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
   const showTileCounts = !isL2;
   const countsCurrent = showTileCounts && periodReady && !dashboard.isPlaceholderData;
   const kpis = countsCurrent ? dashboard.data?.kpis : undefined;
-  const tiles: Tile[] = user ? buildTiles(homeTiles(user), kpis, period, openList) : [];
+  const tiles: Tile[] = user ? buildTiles(homeTiles(user), kpis, period, customRange, openList) : [];
   const chips: HomeChip[] = user ? visibleHomeChips(homeChips(user), kpis, showTileCounts) : [];
   const countsMissing = showTileCounts && periodReady && (!dashboard.data || dashboard.isPlaceholderData);
   const countsLoading = countsMissing && dashboard.fetchStatus !== 'idle';
@@ -239,9 +260,12 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View className="mx-4 mb-4">
-          <Text accessibilityRole="header" className="text-xl font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title2}>
-            {greetingLine(greeting, user?.displayName)}
-          </Text>
+          <View className="flex-row items-center">
+            <View className="shrink">
+              <Text accessibilityRole="header" className="text-xl font-bold text-gray-900" maxFontSizeMultiplier={maxTextScale.title2}>{greetingLine(greeting, user?.displayName)}</Text>
+            </View>
+            <GreetingMark mark={greetingMark(greeting)} />
+          </View>
           <Text className="text-sm text-gray-500">{ROLE_LABELS[role]}</Text>
         </View>
 
@@ -272,6 +296,8 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
           <TileGrid
             tiles={tiles}
             showCounts={showTileCounts}
+            periodKey={periodKey}
+            countsFade={countsFade}
             loading={countsLoading}
             error={countsMissing && dashboard.isError ? dashboard.error : null}
             paused={countsMissing && dashboard.fetchStatus === 'paused'}
@@ -283,6 +309,7 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
                 <StatusChip
                   key={chip}
                   label={HOME_CHIP_LABELS[chip]}
+                  caption={homeChipCaption(chip)}
                   value={kpis ? homeChipValue(chip, kpis) : undefined}
                   loading={countsLoading}
                   color={CHIP_COLORS[chip]}
@@ -351,7 +378,10 @@ export function HomeScreen({ navigation }: HomeStackScreenProps<'Home'>) {
             minimumDate={dayPicker?.minimumDate}
             maximumDate={dayPicker?.maximumDate}
             onDone={(date) => {
-              if (dayPicker) setCustomRange({ [dayPicker.which]: dayFromDate(date) });
+              if (dayPicker) {
+                setPeriodTouched(true);
+                setCustomRange({ [dayPicker.which]: dayFromDate(date) });
+              }
             }}
             onClose={() => setDayPicker(null)}
           />
@@ -372,10 +402,9 @@ function clampDate(value: Date, min: Date, max: Date): Date {
 // Which tiles and chips show, per role, is homeTiles() / homeChips(); what each counts and which list it opens is
 // utils/home-kpis.ts. These tables only say how each one looks. Colours: the web's KPI card or mini-card for the same
 // count (FE:DashboardPage.tsx:341-402), via colors.kpi and colors.kpiPending; Active (app only) is colors.kpi.active.
-const TILE_LOOK: Record<HomeTile, Pick<Tile, 'icon' | 'color' | 'hint'>> = {
+const TILE_LOOK: Record<HomeTile, Pick<Tile, 'icon' | 'color'>> = {
   total: { icon: 'ticket-outline', color: colors.kpi.total },
-  // Open counts right now, whatever the period (the web's currentlyOpen): the hint says so.
-  open: { icon: 'folder-open-outline', color: colors.kpi.open, hint: 'right now' },
+  open: { icon: 'folder-open-outline', color: colors.kpi.open },
   inProgress: { icon: 'time-outline', color: colors.kpi.inProgress },
   resolved: { icon: 'checkmark-circle-outline', color: colors.kpi.resolved },
   slaBreached: { icon: 'warning-outline', color: colors.kpi.slaBreached },
@@ -398,11 +427,13 @@ function buildTiles(
   keys: readonly HomeTile[],
   kpis: HomeKpis | undefined,
   period: DashboardPeriod,
+  customRange: CustomDayRange,
   openList: (f: TicketNamedFilter, carriesPeriod: boolean) => void,
 ): Tile[] {
   return keys.map((key) => ({
     key,
     label: homeTileLabel(key, period),
+    caption: homeTileCaption(key, period, customRange),
     ...TILE_LOOK[key],
     value: kpis ? homeTileValue(key, kpis, period) : undefined,
     onPress: () => openList(HOME_TILE_LIST_FILTER[key], HOME_TILE_CARRIES_PERIOD[key]),
@@ -528,11 +559,14 @@ function DayButton({ label, day, wrap, onPress }: { label: string; day: string |
 const TILE_GAP = 12;
 
 function TileGrid({
-  tiles, showCounts, loading, error, paused, onRetry,
+  tiles, showCounts, periodKey, countsFade, loading, error, paused, onRetry,
 }: {
   tiles: readonly Tile[];
   /** false = L2_MANAGER: a tile shows "View tickets" instead of a count. */
   showCounts: boolean;
+  /** The period the counts belong to, and whether a new count may fade in (CountFade). */
+  periodKey: string;
+  countsFade: boolean;
   loading: boolean;
   error: unknown;
   paused: boolean;
@@ -569,7 +603,15 @@ function TileGrid({
         {rows.map((row) => (
           <View key={row.map((t) => t.key).join('+')} className="flex-row" style={{ columnGap: TILE_GAP }}>
             {row.map((t) => (
-              <KpiTile key={t.key} tile={t} width={row.length === 2 ? half : width} showCounts={showCounts} loading={loading} />
+              <KpiTile
+                key={t.key}
+                tile={t}
+                width={row.length === 2 ? half : width}
+                showCounts={showCounts}
+                loading={loading}
+                periodKey={periodKey}
+                countsFade={countsFade}
+              />
             ))}
           </View>
         ))}
@@ -578,7 +620,16 @@ function TileGrid({
   );
 }
 
-function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: number; showCounts: boolean; loading: boolean }) {
+function KpiTile({
+  tile: t, width, showCounts, loading, periodKey, countsFade,
+}: {
+  tile: Tile;
+  width: number;
+  showCounts: boolean;
+  loading: boolean;
+  periodKey: string;
+  countsFade: boolean;
+}) {
   const largeText = useAccessibilityTextSize();
   // The glyph grows with the text (HIG Typography: "Increase the size of meaningful interface icons"), and its square
   // with it: 32 pt around an 18 pt glyph at the default size.
@@ -587,13 +638,17 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
   // `text-sm text-gray-500`, the count in `text-2xl font-bold`. The web puts the label beside the square; a phone tile
   // is too narrow for that (about 80 dp at 360 dp), so the label goes under the square and gets the full width.
   // G6: a 4 dp left edge in the same colour (Ronit's brief; the 2026-10-09 web clone's card has no coloured edge).
+  // 2026-11-03: the window caption under the count, and the standard press feedback. The width is on the press
+  // wrapper, which the row stretches to the taller tile; the card grows to fill it (`grow`, basis auto, so it is still
+  // measured by its content first), and the counts stay aligned.
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
-      accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}` : ''}${t.hint && t.value !== undefined ? `, ${t.hint}` : ''}. Opens the list`}
+      accessibilityLabel={`${t.label}${t.value !== undefined ? `: ${t.value}, ${t.caption}` : ''}. Opens the list`}
       onPress={t.onPress}
-      style={{ width, borderLeftWidth: 4, borderLeftColor: t.color }}
-      className="min-h-32 justify-between rounded-xl border border-border bg-white p-4 active:opacity-80"
+      wrapperStyle={{ width }}
+      style={{ borderLeftWidth: 4, borderLeftColor: t.color }}
+      className="min-h-32 grow justify-between rounded-xl border border-border bg-white p-4"
     >
       <View>
         <View className="items-center justify-center rounded-lg" style={{ backgroundColor: t.color, width: iconSize + 14, height: iconSize + 14 }}>
@@ -609,43 +664,43 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
         >
           {t.label}
         </Text>
-        {t.hint && t.value !== undefined ? (
-          <Text className="text-xs text-gray-500">{t.hint}</Text>
-        ) : t.hint && loading ? (
-          // Phase P: the hint's line is kept (invisible, hidden from screen readers) while the count loads, so the row
-          // does not grow and push the screen down when the number arrives.
-          <Text className="text-xs text-gray-500" style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            {t.hint}
+      </View>
+      <View>
+        {t.value !== undefined ? (
+          // 2026-11-03: fades from the old number into the new when the period changes (components/CountFade.tsx), in
+          // iOS's count style with its Title 1 cap.
+          <CountFade value={t.value} periodKey={periodKey} active={countsFade} />
+        ) : loading ? (
+          // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the
+          // tile keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a
+          // fixed 32 dp line, which matched only at 100 %.
+          // iOS (iOS-5c): the "0" also takes the count's one line and its Title 1 cap, so the two lines are the same at
+          // every text size. On iOS the old 32 pt line was short even at the default size (`text-2xl` is 28 / 34 pt).
+          <View className="mt-1 justify-center">
+            <Text className="text-2xl font-bold" numberOfLines={1} maxFontSizeMultiplier={maxTextScale.title1} style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              0
+            </Text>
+            <View style={StyleSheet.absoluteFill} className="justify-center">
+              <Skeleton className="h-6 w-12" />
+            </View>
+          </View>
+        ) : showCounts ? (
+          // No count to show yet (a Custom period without both days, or an error shown above the grid).
+          <Text className="mt-1 text-2xl font-bold text-gray-500" maxFontSizeMultiplier={maxTextScale.title1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            –
+          </Text>
+        ) : (
+          <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>
+        )}
+        {/* The window (2026-11-03), small and muted under the number. Shown whenever counts are, loading included, so
+            nothing moves when the number arrives: it depends on the period, not on the data. */}
+        {showCounts ? (
+          <Text className="text-xs text-gray-500" numberOfLines={largeText ? undefined : 2}>
+            {t.caption}
           </Text>
         ) : null}
       </View>
-      {t.value !== undefined ? (
-        <Text className="mt-1 text-2xl font-bold text-gray-900" numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={maxTextScale.title1}>
-          {t.value}
-        </Text>
-      ) : loading ? (
-        // The count's own line holds the height (an invisible "0" in its style, hidden from screen readers), so the tile
-        // keeps its height at any system text size when the number replaces the bar. Until 2026-10-30 this was a fixed
-        // 32 dp line, which matched only at 100 %.
-        // iOS (iOS-5c): the "0" also takes the count's one line and its Title 1 cap, so the two lines are the same at
-        // every text size. On iOS the old 32 pt line was short even at the default size (`text-2xl` is 28 / 34 pt).
-        <View className="mt-1 justify-center">
-          <Text className="text-2xl font-bold" numberOfLines={1} maxFontSizeMultiplier={maxTextScale.title1} style={{ opacity: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            0
-          </Text>
-          <View style={StyleSheet.absoluteFill} className="justify-center">
-            <Skeleton className="h-6 w-12" />
-          </View>
-        </View>
-      ) : showCounts ? (
-        // No count to show yet (a Custom period without both days, or an error shown above the grid).
-        <Text className="mt-1 text-2xl font-bold text-gray-500" maxFontSizeMultiplier={maxTextScale.title1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          –
-        </Text>
-      ) : (
-        <Text className="mt-1 text-sm font-medium text-blue-700">View tickets</Text>
-      )}
-    </Pressable>
+    </PressableCard>
   );
 }
 
@@ -655,9 +710,11 @@ function KpiTile({ tile: t, width, showCounts, loading }: { tile: Tile; width: n
  * iOS: at least 36 pt rather than exactly, so it grows with the text size (UI-STANDARDS §iOS-A.3), and the dot with it.
  */
 function StatusChip({
-  label, value, loading, color, onPress,
+  label, caption, value, loading, color, onPress,
 }: {
   label: string;
+  /** Only on a chip counted differently from its neighbours: Active's "right now" (homeChipCaption). */
+  caption: string | null;
   value: number | undefined;
   loading: boolean;
   color: string;
@@ -667,7 +724,7 @@ function StatusChip({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}${value !== undefined ? `: ${value}` : ''}. Opens the list`}
+      accessibilityLabel={`${label}${value !== undefined ? `: ${value}` : ''}${caption ? `, ${caption}` : ''}. Opens the list`}
       onPress={onPress}
       hitSlop={4}
       className="min-h-9 flex-row items-center rounded-full border border-border bg-white px-3 py-1 active:bg-gray-50"
@@ -679,6 +736,7 @@ function StatusChip({
         <Skeleton className="ml-1.5 h-3.5 w-5" />
       ) : null}
       <Text className="ml-1.5 text-sm text-gray-700">{label}</Text>
+      {caption ? <Text className="ml-1 text-xs text-gray-500">{caption}</Text> : null}
     </Pressable>
   );
 }

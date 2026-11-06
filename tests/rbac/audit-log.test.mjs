@@ -18,7 +18,7 @@
 // of drawerRoutes); the drawer router's checks run on every tab's StackRouter. Section 5 is new on iOS: persona by
 // persona, no tab, More row, deep link or notification tap reaches the Audit log for anyone but ADMIN.
 // iOS-5f: Android's d8626bc version merged in (the written contract, the path fallback, the ticket number, the Dates
-// filter). The screen's Action and Dates chips join in STEP 6, with their wiring test.
+// filter, and its Action and Dates chips; on iOS the day pickers are the iOS calendar sheet).
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -529,6 +529,26 @@ describe('Audit log: the Dates filter', () => {
     assert.deepEqual(withAuditDay({ from: null, to: '2026-11-02' }, 'from', '2026-11-04'), { from: '2026-11-04', to: '2026-11-04' });
     assert.deepEqual(withAuditDay({ from: '2026-11-04', to: null }, 'to', '2026-11-01'), { from: '2026-11-01', to: '2026-11-01' });
     assert.deepEqual(withAuditDay({ from: '2026-11-01', to: '2026-11-05' }, 'to', '2026-11-03'), { from: '2026-11-01', to: '2026-11-03' });
+  });
+
+  test('the screen offers Action and Dates beside Entity type and Person', () => {
+    const screen = read('src/screens/audit/AuditLogScreen.tsx');
+    for (const chip of ['icon="flash-outline"', 'icon="calendar-outline"', 'icon="pricetag-outline"', 'icon="person-outline"']) assert.ok(screen.includes(chip), chip);
+    assert.match(screen, /title="Action"\s*options=\{ACTION_OPTIONS\}/);
+    assert.match(screen, /title="Dates"\s*options=\{dateOptions\}/);
+    // iOS: Android's `maximumDate: new Date(),` (its date dialog) is the iOS calendar's latest day, today, read when it
+    // opens; its earliest is Android's DUE_DATE_MIN.
+    assert.match(screen, /const today = new Date\(\);\s*setDayPicker\(\{ end, value: \(current \? dateFromDay\(current\) : null\) \?\? today, today \}\);/);
+    assert.match(screen, /<DatePickerSheet[\s\S]{0,260}minimumDate=\{DUE_DATE_MIN\}\s+maximumDate=\{dayPicker\?\.today\}/);
+  });
+
+  test('iOS: a hand-picked end opens the calendar once the Dates sheet has gone, and Done keeps From before To', () => {
+    const screen = read('src/screens/audit/AuditLogScreen.tsx');
+    assert.match(screen, /pickNext\.current = choice === 'pick-from' \? 'from' : 'to';/);
+    assert.match(screen, /title="Dates"[\s\S]{0,200}onDismiss=\{onDatesSheetGone\}/);
+    assert.match(screen, /const end = pickNext\.current;\s*pickNext\.current = null;\s*if \(end\) pickDay\(end\);/);
+    assert.match(screen, /if \(dayPicker\) setFilters\(\(f\) => \(\{ \.\.\.f, dates: withAuditDay\(f\.dates, dayPicker\.end, dayFromDate\(date\)\) \}\)\);/);
+    assert.doesNotMatch(screen, /DateTimePickerAndroid/);
   });
 });
 

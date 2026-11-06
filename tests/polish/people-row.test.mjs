@@ -1,8 +1,7 @@
 // The people row on ticket cards (2026-11-03, src/components/PeopleRow.tsx): [RJ] Rohit Jadhav → [SD] Sarthak D.
 // The words and colours run for real (format.ts, colors.ts); the row and the card are read as source.
 //
-// iOS (iOS-5f, STEP 5): ported from Android dev d8626bc. The words, the colours and the row are Android's tests; the
-// card's (its label, showRequester, the rule, the list) join with the iOS TicketCard in STEP 6. iOS additions at the end.
+// iOS (iOS-5f): ported from Android dev d8626bc, all of it. iOS additions at the end.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -47,6 +46,15 @@ describe('names', () => {
     assert.equal(shortName('sarthak_darekar@mountmerugroup.com'), 'Sarthak D.');
   });
 
+  test('screen readers hear the row in the card\'s label', () => {
+    assert.equal(peopleRowLabel('Rohit Jadhav', 'Sarthak Darekar', true), 'Requested by Rohit Jadhav, technician Sarthak Darekar');
+    assert.equal(peopleRowLabel('Rohit Jadhav', null, true), 'Requested by Rohit Jadhav, unassigned');
+    assert.equal(peopleRowLabel(null, null, true), 'Requested by unknown requester, unassigned');
+    assert.equal(peopleRowLabel('Me', 'Sarthak Darekar', false), 'Technician Sarthak Darekar');
+    assert.equal(peopleRowLabel('Me', null, false), 'Unassigned');
+    // Then the dates and the due line (2026-11-05): "…. Raised 2 Nov, updated 2 days ago. Due Fri 7 Nov, 17:00".
+    assert.match(read('src/components/TicketCard.tsx'), /`Ticket \$\{ticket\.ticketNumber\}: \$\{ticket\.title\}\$\{newReply \? ', new reply' : ''\}\. \$\{people\}\. ` \+\s*`Raised \$\{raised\}, updated \$\{formatRelative\(ticket\.updatedAt, now\)\}\$\{due \? `\. \$\{due\.label\}` : ''\}`/);
+  });
 });
 
 describe('avatars: told apart by lightness', () => {
@@ -96,6 +104,24 @@ describe('the row', () => {
     for (const tag of row.match(/<Text\b[^>]*className="[^"]*ml-1\.5[^"]*"[^>]*>|<Text className=\{`ml-1\.5[^`]*`\}[^>]*>/g) ?? []) {
       assert.match(tag, /numberOfLines=\{1\}/, tag);
     }
+  });
+
+  test('names come through formatDisplayName (as the drawer); END_USER sees the technician only', () => {
+    assert.match(row, /label=\{formatDisplayName\(requesterName\) \|\| 'Unknown requester'\}/);
+    assert.match(row, /label=\{shortName\(technicianName\)\}/);
+    assert.match(row, /\{showRequester \? \(/);
+    assert.match(card, /showRequester=\{staff\}/);
+  });
+
+  test('on the card: under the badges, after a hairline rule; the old "Technician:" line is gone', () => {
+    assert.match(card, /<View className="mt-3 border-border pt-2\.5" style=\{styles\.rule\}>\s*<PeopleRow/);
+    assert.match(card, /rule: \{ borderTopWidth: StyleSheet\.hairlineWidth \}/);
+    assert.doesNotMatch(card, /Technician: |Not yet assigned to a technician/);
+  });
+
+  test('FlashList v2 has no item-size estimate to update: it measures each card (nothing sets estimatedItemSize)', () => {
+    assert.match(JSON.parse(read('package.json')).dependencies['@shopify/flash-list'], /^2\./);
+    assert.doesNotMatch(read('src/screens/tickets/TicketListScreen.tsx'), /estimatedItemSize|overrideItemLayout/);
   });
 
   test('the list skeleton mirrors the new row, so the first load does not jump', () => {
