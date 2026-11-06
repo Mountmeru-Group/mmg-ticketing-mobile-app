@@ -94,7 +94,15 @@ const TSX = sourceFiles('src', /\.tsx$/);
  * `pill: { height: H, minWidth: H, … }` with H = loginLayout.button.height).
  */
 const TOKEN_SIZED = {
-  'src/screens/auth/SignInButton.tsx': { style: 'style={styles.pill}', height: loginLayout.button.height, width: loginLayout.button.height },
+  'src/screens/auth/SignInButton.tsx': [{ style: 'style={styles.pill}', height: loginLayout.button.height, width: loginLayout.button.height }],
+  // iOS-5g, Android's email form (UI-STANDARDS.md §15.2): "Sign in with email instead" (48 pt tall, as wide as its
+  // words), the show/hide toggle (48 × 48) and "Sign in" (at least 52 pt, the form's width). The sizes are pinned in
+  // tests/auth/ios-password-sign-in.test.mjs and tests/login/sign-in-button.test.mjs.
+  'src/screens/auth/EmailSignInForm.tsx': [
+    { style: 'style={styles.action}', height: loginLayout.emailForm.actionHeight, width: loginLayout.emailForm.actionHeight },
+    { style: 'style={styles.toggle}', height: loginLayout.emailForm.toggle, width: loginLayout.emailForm.toggle },
+    { style: 'style={[submitStyle.button,', height: loginLayout.emailForm.submit.height, width: loginLayout.emailForm.submit.height },
+  ],
 };
 
 /**
@@ -123,8 +131,8 @@ describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
         }
         checked += 1;
         const attrs = expandConstants(src, text);
-        const sized = TOKEN_SIZED[rel];
-        if (sized && attrs.includes(sized.style)) {
+        const sized = TOKEN_SIZED[rel]?.find((s) => attrs.includes(s.style));
+        if (sized) {
           if (sized.height < 44 || sized.width < 44) short.push(`${rel}:${line}`);
           continue;
         }

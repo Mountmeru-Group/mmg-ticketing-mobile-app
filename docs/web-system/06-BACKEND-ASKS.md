@@ -677,8 +677,9 @@ Keep the same login rate limiter (20 per 15 min per IP).
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc`.
 
 - **A32 on iOS.** The Google Play reviewer has an App Store twin: App Review needs a demo account (Guideline 2.1, `docs/ios/APP-STORE-COMPLIANCE.md` A4).
-  - iOS-5f builds the email sign-in for **UAT builds only**, against the contract the backend team confirmed in writing. **⏳ That contract was still a placeholder in the brief on 2026-11-06**; STEP 7 stops for it (`01` §iOS-A).
-  - Android's interim tolerance (four paths, two names for the email, several key names) is **not on iOS**. iOS makes one call to the confirmed path and never calls `POST /auth/login`.
+  - iOS builds the email sign-in for **UAT builds only**, in its own phase, **iOS-5g** (built 2026-11-06). **The path is confirmed:** `POST /api/v1/auth/mobile/login`, live on UAT (`01` §iOS-A).
+  - **⏳ Still to answer, and it blocks shipping the email sign-in to testers: does this endpoint send a `Set-Cookie`?** The iOS cookie proof rests on it sending none (`docs/ios/APP-STORE-COMPLIANCE.md`, G9 section). Ronit is asking. Also open: its rate limit, and which accounts may use it.
+  - Android's other paths are **not on iOS**. iOS makes one call to the confirmed path, with Android's body and reader for it (Ronit: 1a, 2a), and never calls `POST /auth/login`.
   - **Open decision (iOS-9):** whether the email sign-in, once the endpoint is on PROD with a reviewer account, becomes App Review's demo login in place of A4's Entra account. Recorded in compliance A4.
 - **A5 and NTF-5/NTF-6 (confirmed 2026-11-05):** Android only. iOS has no push client (G7c not ported; decision 4). iOS push would also need APNs, the `aps-environment` entitlement and compliance C4; that is its own future decision.
 - **A31 (business time left on the SLA):** applies to iOS unchanged. Until it ships, iOS shows the deadline, as Android does (UI-STANDARDS §14.6, built in iOS-5f).

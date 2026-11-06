@@ -9,17 +9,18 @@
 
 | | |
 |---|---|
-| **PORT SOURCE** | `origin/dev` @ **`8b522e3bf063b26a808efee9d65776c3c6bbef3c`** (2026-11-02 16:22 +0530, "feat: G8 - ADMIN-only audit log screen"), since iOS-5e (2026-11-03). At planning (2026-11-03) `8b522e3..origin/dev` was empty; `e85c602` and `69a38ab` (2026-11-03, the polish pass with P7's window captions, and the SLA deadline) reached `dev` during iOS-5e and are **not** in it: the next sync |
+| **PORT SOURCE** | `origin/dev` @ **`d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7`** (2026-11-05 14:17 +0530, "fix: visible email Sign in button; push config, audit and dashboard contracts; card dates"), since iOS-5f (2026-11-06). At planning and at STEP 8 (2026-11-06) `d8626bc..origin/dev` was empty. G9 (`999943e`, `d8626bc`: the email and password sign-in) came across in its own phase, **iOS-5g**, UAT builds only, to the one confirmed path (§4.20) |
+| Earlier port source (iOS-5e) | `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (2026-11-02 16:22 +0530, "feat: G8 - ADMIN-only audit log screen") |
 | Earlier port source (iOS-5d) | `origin/dev` @ `f4fad10a1bd1aac9658f4c4be151b0172f683898` (2026-10-30 16:59 +0530, "feat: 15-day forced re-authentication with prompt=login") |
 | Earlier port source (iOS-5c) | `origin/dev` @ `c5c63acff8d7296244876020069884364864a99b` (2026-10-30 15:44 +0530, "feat: arc-split Login and the four-stage open-and-sign-in motion") |
 | Earlier port source (iOS-5b) | `origin/dev` @ `4063df30421407e040a7dccc9399bb38557dd702` (2026-10-29 16:51 +0530, "feat: prepare first production build (Google Play internal testing)"). The commits between the first port source and it are in `ANDROID-DELTA.md` |
 | First port source (iOS-1 to iOS-5) | `origin/dev` @ `c84d53ac716b10a1d0084fb002f212225fb24763` (2026-10-27 12:50 +0530, "feat: inline "Change technician" editor on the ticket detail properties"). §3.1–§3.15 list its 230 files |
 | How it was read | Only through git: `git ls-tree -r origin/dev`, `git show origin/dev:<path>` and `git grep … origin/dev`. Nothing was checked out or pulled. The Android folder (`..\mmg-ticketing-mobile-app`) and the web folder (`..\MMG-Ticketing-Platform`) were not opened |
-| Files in the port source | **262** at `8b522e3` (240 at `f4fad10`, plus 22 added: §3.19). 240 at `f4fad10` (239 at `c5c63ac`, plus 1 added: §3.18). 239 at `c5c63ac` (231 at `4063df3`, plus 8 added: §3.17). 231 at `4063df3` (230 at `c84d53a`, plus 4 added and minus 3 deleted: §3.16) |
+| Files in the port source | **293** at `d8626bc` (262 at `8b522e3`, plus 31 added: §3.20). 262 at `8b522e3` (240 at `f4fad10`, plus 22 added: §3.19). 240 at `f4fad10` (239 at `c5c63ac`, plus 1 added: §3.18). 239 at `c5c63ac` (231 at `4063df3`, plus 8 added: §3.17). 231 at `4063df3` (230 at `c84d53a`, plus 4 added and minus 3 deleted: §3.16) |
 | Target | Branch `ios-dev`, which starts at `28621e5` with only `README.md`. That README is byte-identical to the one on `origin/dev` (blob `4d80835`) |
 | API | **UAT `https://uat-servicedesk.mountmerugroup.com/api/v1`, unchanged.** `src/config/env.ts` is copied as it is: UAT is the only allowed target, and PROD stays an empty placeholder |
 | Stack (from `package.json` at the port source) | Expo SDK 57 (`expo ~57.0.31`), React Native 0.86.3, React 19.2.3, React Navigation 7, TanStack Query 5, Zustand 5, NativeWind 4, expo-secure-store, Axios. EAS builds use Node 24.18.0 |
-| Syncing later Android work | Diff `8b522e3..origin/dev` and apply each changed file according to its row below. The rule (Ronit, 2026-10-30): iOS = Android `dev` exactly; unmerged Android branches are not ported; Android release items go to the iOS-9 list; in shared docs Android's section numbers win and iOS-only sections are lettered (§iOS-A…) |
+| Syncing later Android work | Diff `d8626bc..origin/dev` and apply each changed file according to its row below. The rule (Ronit, 2026-10-30): iOS = Android `dev` exactly; unmerged Android branches are not ported; Android release items go to the iOS-9 list; in shared docs Android's section numbers win and iOS-only sections are lettered (§iOS-A…) |
 
 Drift found at the port source (reported here, not fixed):
 - `CLAUDE.md` still says Expo SDK 52, React Navigation v6 and "documentation only". `package.json` is the truth: SDK 57 and Navigation 7.
@@ -67,6 +68,8 @@ Rules used:
 | **iOS-5c** | **Android sync to `c5c63ac`** (Ronit, 2026-10-30): the arc-split Login, the sign-in and start-up motion, the yellow shimmer, the KPI placeholder. The iOS sign-in flow untouched; Reduce Motion honoured. Built 2026-10-30 to 2026-10-31 (§4.16; `ANDROID-DELTA.md` §7). Android's `f4fad10` (15-day re-authentication) came after the plan and is not in it; it is iOS-5d |
 | **iOS-5d** | **Android sync to `f4fad10`** (Ronit, 2026-11-01): the 15-day forced re-authentication (`prompt=login`, "Signed out for security"), with Android's behaviour in every case. The date in the Keychain with the token's class; the reinstall wipes it. No change to the iOS redirect, PKCE or the exchange. Built 2026-11-01 (§4.17; `ANDROID-DELTA.md` §8) |
 | **iOS-5e** | **Android sync to `8b522e3`** (Ronit, 2026-11-03): G6 Home period selector and KPI parity, G7a the period on the ticket list, G7b Approvals for every role, G8 the ADMIN-only audit log; G7c (push) not ported; P7 not in these three commits (it reached `dev` in `e85c602` during iOS-5e: the next sync). Behaviour = Android; the iOS interface: a toolbar + period sheet, `DatePickerSheet`, a permanent More row for END_USER/L2, the audit log in More. No native change: ships to TestFlight 0.1.0 (1) by EAS Update. Built 2026-11-03 (§4.18; `ANDROID-DELTA.md` §9) |
+| **iOS-5f** | **Android sync to `d8626bc`** (Ronit, 2026-11-06): the polish pass (people row, greeting mark, window captions, swipe Assign/Resolve with VoiceOver actions, press feedback), the SLA deadline and the cards' due line, the count cross-fade, the paperclip, the copyright year, the audit log's written contract and filters. A5, A6, B4, C1, C2 and E2 not ported (Android native, or push). Ships natively in TestFlight **0.2.0 (2)** (`version` 0.2.0, a new runtime), not by update. Built 2026-11-06 (§4.19; `ANDROID-DELTA.md` §10) |
+| **iOS-5g** | **G9, email and password sign-in** (Android `999943e`, `d8626bc`), UAT builds only, one call to the backend team's confirmed path, never `POST /auth/login`. **Built 2026-11-06** against the confirmed `POST /api/v1/auth/mobile/login` (§4.20; `ANDROID-DELTA.md` §10.8). Ships in TestFlight build 0.2.0 (2) once the backend team confirms the endpoint sends no `Set-Cookie` |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
@@ -458,6 +461,44 @@ Several suites read screen or navigator source files as text. Each suite is copi
 | `tests/push/push.test.mjs` | added (G7) | SKIP | — | G7c push (§5) |
 | `tests/rbac/approvals-visibility.test.mjs` | added (G7) | ADAPT | iOS-5e | Android's 25 on iOS navigation (TabRouter, the More StackRouter, `MoreScreen`), plus 24 iOS: tabs, More rows and badges per persona (22), and no push code (2) |
 | `tests/rbac/audit-log.test.mjs` | added (G8) | ADAPT | iOS-5e | Android's 48 on each tab's StackRouter and `moreSections`, plus 5 reachability (tab, More, deep link, notification tap) and 5 iOS-screen checks |
+
+### 3.20 Added at `d8626bc` (iOS-5f)
+
+`8b522e3..d8626bc` is eight commits (`ANDROID-DELTA.md` §10.1; the IDs are §10.2's). They changed 71 files, listed by change in §4.19 and `ANDROID-DELTA.md` §10.2, and added these 31:
+
+| File | At `d8626bc` | Class | Phase | iOS change |
+|---|---|---|---|---|
+| `app.config.js` | added (E2) | SKIP | — | Android's `google-services.json` through EAS: push (§5) |
+| `assets/illustrations/greeting-cloud-sun.svg` | added (A2) | KEEP | iOS-5f | Verbatim; drawn by `expo-image` |
+| `assets/illustrations/greeting-moon.svg` | added (A2) | KEEP | iOS-5f | Verbatim |
+| `assets/illustrations/greeting-sun.svg` | added (A2) | KEEP | iOS-5f | Verbatim |
+| `assets/illustrations/paperclip.svg` | added (B3) | KEEP | iOS-5f | Verbatim |
+| `docs/G9-PASSWORD-LOGIN.md` | added (D2, D3) | KEEP | iOS-5f | Verbatim, plus §iOS-A: the contract table, the cookie proof. Updated in iOS-5g: the confirmed path, 1a and 2a, `Set-Cookie` open |
+| `src/components/CountFade.tsx` | added (B2) | ADAPT | iOS-5f | The number keeps iOS Home's Title 1 cap (`maxTextScale.title1`) |
+| `src/components/GreetingMark.tsx` | added (A2) | ADAPT | iOS-5f | No rise under Reduce Motion **or while VoiceOver runs**, checked at mount and on first display (`hooks/useScreenReader.ts`, iOS-only) |
+| `src/components/PeopleRow.tsx` | added (A1) | ADAPT | iOS-5f | `accessibilityElementsHidden` (VoiceOver), beside Android's `importantForAccessibility` |
+| `src/components/PressFeedback.tsx` | added (A7) | KEEP | iOS-5f | Android's code; an iOS comment |
+| `src/components/SlaDeadline.tsx` | added (B1) | KEEP | iOS-5f | Verbatim |
+| `src/screens/auth/EmailSignInForm.tsx` | added (D2, E1) | ADAPT | iOS-5g | VoiceOver announcements in place of live regions, the toggle's `accessibilityLabel`, `textContentType` `username`, `minHeight` (Dynamic Type), the password also cleared in the submit's `finally` (§4.20) |
+| `src/screens/auth/emailFormLayout.ts` | added (E1) | ADAPT | iOS-5g | `minHeight` in place of a fixed height (Dynamic Type); the scroll maths verbatim |
+| `src/types/mobile-password-contract.ts` | added (D2) | ADAPT | iOS-5g | One confirmed path, `MOBILE_PASSWORD_PATH` (Android: four). Android's request and response types (1a, 2a). Not re-exported from `src/types/index.ts` |
+| `src/utils/copyright.ts` | added (D1) | KEEP | iOS-5f | Android's code; a comment names VoiceOver |
+| `src/utils/haptics.ts` | added (A5) | SKIP | — | Android's `performAndroidHapticsAsync`. iOS keeps its own `src/utils/haptics.ts` (iOS-4, same path); `tests/polish/haptics-parity.test.mjs` checks every Android haptic event has an iOS one |
+| `src/utils/sla-deadline.ts` | added (B1, E4) | KEEP | iOS-5f | Verbatim |
+| `tests/auth/password-sign-in.test.mjs` | added (D2) | ADAPT | iOS-5g | Android's, "one path" in place of "path discovery", iOS module names (103) |
+| `tests/home/greeting-mark.test.mjs` | added (A2) | ADAPT | iOS-5f | Android's 11, one check widened for VoiceOver; +3 iOS |
+| `tests/home/window-captions.test.mjs` | added (A3) | ADAPT | iOS-5f | Android's 12; the caption wraps at the accessibility sizes |
+| `tests/login/copyright-year.test.mjs` | added (D1) | KEEP | iOS-5f | Android's 9, unchanged |
+| `tests/login/sign-in-button.test.mjs` | added (E1) | ADAPT | iOS-5g | Android's, for `minHeight` (14) |
+| `tests/motion/polish.test.mjs` | added (A7, B2) | ADAPT | iOS-5f | Android's 17, plus 4 iOS |
+| `tests/polish/cid-image.test.mjs` | added (B3) | ADAPT | iOS-5f | Android's 8; the renderer map also holds iOS-4's table renderer |
+| `tests/polish/haptics.test.mjs` | added (A5) | SKIP | — | Android's haptics; iOS: `tests/polish/haptics-parity.test.mjs` (20) |
+| `tests/polish/people-row.test.mjs` | added (A1) | ADAPT | iOS-5f | Android's 14, plus 3 iOS |
+| `tests/polish/sla-deadline.test.mjs` | added (B1, E4) | KEEP | iOS-5f | Android's 32, unchanged |
+| `tests/rbac/swipe-actions.test.mjs` | added (A4) | ADAPT | iOS-5f | Android's 21, plus 5 per-role pins and 9 VoiceOver checks (decision 3) |
+| `tests/support/nativewind.mjs` | added (E1) | KEEP | iOS-5g | Verbatim (NativeWind's runtime for the email button) |
+| `tests/support/stubs/expo-haptics.mjs` | added (A5) | SKIP | — | iOS has its own stub since iOS-4 |
+| `tests/support/stubs/react-native.cjs` | added (E1) | KEEP | iOS-5g | Verbatim (the NativeWind runtime's stand-in) |
 
 ## 4. ADAPT details
 
@@ -1478,6 +1519,66 @@ No `eas` command, no API call, no new package. The Android folder was not opened
 - **In `33dc1f6`:** the shared docs by the iOS-5b rule (ROLE-MATRIX §17–§19, §7 and §iOS-A.7; UI-STANDARDS §11–§13 and §iOS-A.14; WEB-VS-MOBILE-ROLES, iOS cells on 22 rows and §iOS-A.6), with every Android line present (checked by script). 01, 03, 04, 05, 06, UAT-TEST-PLAN, WEB-TOKENS and the G6, G7 and G8 docs verbatim; 01 §iOS-A (Q6). This manifest's §0, §2, §3.19, the rows, the totals and §5; CLAUDE.md's port source.
 - **In the follow-up docs commit (2026-11-03):** this section; `ANDROID-DELTA.md` §9; `UAT-TEST-PLAN-IOS.md`, 225 → 246 checks; compliance C2 (the EAS Update exception, Q7), with iOS-5e notes in A4, C4, E1 and H5; `RELEASE-IOS.md` §6, rule 9. No compliance row changes status.
 
+### 4.19 iOS-5f: the Android sync to `d8626bc` (built 2026-11-06)
+
+**The brief (Ronit, 2026-11-06):** port `8b522e3..d8626bc` (eight commits) with Android's behaviour and an iOS interface, one step at a time, each committed on Ronit's OK. Keep the 17 SAFER divergences and every iOS-only interface difference. Push (E2, G7c) stays out; A5, A6, B4, C1 and C2 are Android-native; E5 is docs only. Decisions: G9 only against the backend team's confirmed contract, never `POST /auth/login` (1); a new TestFlight build, not an EAS Update (2); VoiceOver actions for the swipe (3); no push (4).
+- No `eas` command, no real API call (tests mock the network), no new package. The only `app.json` change is `version` 0.1.0 → **0.2.0** (STEP 8, Ronit), so build 2's runtime is 0.2.0 (`RELEASE-IOS.md` §6, rule 10).
+- At planning `origin/dev` was `d8626bc`, the port target; at STEP 8 `d8626bc..origin/dev` was still empty. Android was read only through git in this clone.
+- **G9 (D2, E1) was not built:** the contract's fields were still placeholders when STEP 7 came, so Ronit moved G9 to its own phase, **iOS-5g** (`ANDROID-DELTA.md` §10.7). Built there (§4.20).
+
+**Built, step by step:**
+
+| Step | Commit | What |
+|---|---|---|
+| 1 | `0d2b623` | Docs: 03, 05, 06, PERFORMANCE §13–§14 and G9-PASSWORD-LOGIN verbatim (05, 06, G9 with §iOS-A); 01, UI-STANDARDS §14–§16 and WEB-VS-MOBILE-ROLES merged three-way; `docs/ios/UPDATES-LOG.md`; RELEASE-IOS §6 (`$env:EXPO_PUBLIC_APP_ENV="UAT"`, rule 10); ANDROID-DELTA §10 |
+| 2 | `8d87945` | A4's rule: `ticketSwipeActions()`, `canSwipeTickets()` in `permissions.ts`, verbatim. The lock is the CLOSED/CANCELED AGENT lock, not the country lock (Ronit) |
+| 3 | `9d2e820` | E3 and B3: AUD-1 on `/audit-logs`, then `/audit-log` only when no such route (`isNoSuchGetRoute`, `ApiClientError.contentType`); `action`, `dateFrom`, `dateTo`, `ticketNumber`; "No ticket #n"; the `<cid-image>` placeholder. Brought forward: `formatShortDate` and the audit screen's ticket filter |
+| 4 | `2467174` | A3, B1, D1 and the tokens: window captions ("Active"), the greeting mark rule, `formatRelativeShort`, `shortName`, `peopleRowLabel`, `slaDeadline`, `slaDueLine`, `copyright.ts`; `colors.ts` verbatim; the `press`, `countFade`, `greetingMark` and `swipe` motion tokens |
+| 5 | `82c6c12` | The components: PressFeedback, PeopleRow, GreetingMark + 3 SVGs, CountFade, SlaDeadline, HtmlText's paperclip, the list skeleton; `hooks/useScreenReader.ts` (iOS-only) |
+| 6 | `18a795e` | The screens: TicketCard and the list (dates line, due line, people row, swipe, **VoiceOver Assign/Resolve**), Home (captions, greeting mark, cross-fade), ticket detail (SLA deadline), the audit log (Action and Dates, the iOS calendar sheet), the Login footer, PressableCard on Android's cards and rows; A5's check, which added the error haptic to five inline form errors |
+| 8 | this commit | Verification, `version` 0.2.0, docs |
+
+**The iOS interface, where it differs from Android's:**
+- **VoiceOver:** the swipe's Assign and Resolve are the card's custom actions under exactly the swipe's rules; the people row, the greeting mark and the fading count are hidden; the audit search line and "No ticket #n" are announced.
+- **Reduce Motion:** Android's "Remove animations"; the greeting mark also skips its rise while VoiceOver runs.
+- **Dynamic Type:** at the accessibility sizes the card's dates stack, its due line and Home's captions wrap; the people row's names grow on one line, its initials stop at ×1.2; the count keeps Title 1's cap.
+- **Sheets, not dialogs:** the audit log's days in `DatePickerSheet`, once the Dates sheet has gone (`onDismiss`), with Android's limits.
+- **Haptics:** iOS-4's (A5). Every Android event is felt; a ticket created with failed attachments keeps iOS-4's warning (Android: error).
+- **Unchanged:** iOS-8a's toolbar and `listBottomInset`, the developer-token button (`__DEV__`), the 17 SAFER rows.
+
+**Tests: 1,391 → 1,589, all passing** (190 → 228 suites).
+- **+168 in nine new files:** `swipe-actions` 35, `sla-deadline` 32, `polish` 21, `haptics-parity` 20 (iOS), `people-row` 17, `greeting-mark` 14, `window-captions` 12, `copyright-year` 9, `cid-image` 8.
+- **+30 in existing files:** `audit-log` 58 → 84 (Android's d8626bc tests merged, the hook's cache, three fallback gaps the mutation check found, the iOS calendar), `dashboard` +1, `read-screens` +3 (the new animating files).
+- **Updated iOS guards:** nine animating files (`start-up-and-login`, `read-screens`); `PressableCard` in the 44 pt and label scans and the initials cap (`hig-polish`); two `ios-period` checks; the Login footer.
+
+**Verification (2026-11-06):** in `ANDROID-DELTA.md` §10.6.
+
+**Not run:** a device check. UAT G19.1–G19.17 cover it (`UAT-TEST-PLAN-IOS.md`).
+
+### 4.20 iOS-5g: G9 email and password sign-in (built 2026-11-06, UAT builds only)
+
+**The brief (Ronit, 2026-11-06):** port G9 (Android D2 `999943e` with E1 `d8626bc`), UAT builds only, against the contract the backend team confirmed: `POST /api/v1/auth/mobile/login`, live on UAT, the **only** sign-in path iOS calls. No fallback chain, never `POST /auth/login`. `Set-Cookie` is **not yet confirmed**: an open item that **blocks shipping to testers**.
+- Ronit's decisions: **1a** Android's body `{ username, email, password }`; **2a** Android's tolerant reader; a build-time gate on top of the run-time gate; a `Set-Cookie` logged (never its value) in every UAT build. G9 ships in the same TestFlight build as iOS-5f, **0.2.0 (2)**, after the backend team confirms no `Set-Cookie`.
+- No `eas` command, no real API call (tests mock the network), no new package, no `app.json` change (`version` stays 0.2.0). `d8626bc..origin/dev` was empty. Android was read only through git in this clone.
+
+**Built:** the files are in §3.20, with Android's `auth.api.ts` reader refactor and iOS's two new modules, `src/api/passwordSignIn.api.ts` and `src/screens/auth/passwordSignInAttempt.ts` (Android's code, moved out so the build-time gate can leave it out of a production bundle). The class and change of every file, and the results: `ANDROID-DELTA.md` §10.8.
+- **Behaviour = Android `d8626bc` for that one path:** the same reasons and words, the Ref line, the AUTH-2 `countryId` rule, the session (`setSession`, the Keychain, 8 hours), `fullAuthAt` on every password sign-in, sign-out (AUTH-3) and the single flight with Microsoft.
+- **Not ported:** Android's other three paths, the fallback after an HTML 404, the remembered path, and `/auth/login`.
+- **Two gates, both UAT only:** `EMAIL_SIGN_IN_ENABLED` at run time (Android's), and a guarded `require()` in `LoginScreen.tsx` that Metro folds away in a `production` bundle. `verify-release-bundle`: production 0 of 4 G9 modules and 0 of 7 strings; preview 4 of 4 and 7 of 7; `/auth/login` 0 in both.
+
+**The iOS interface, where it differs from Android's** (`docs/brand/UI-STANDARDS.md` §iOS-A.16, `02-AUTH.md` §iOS-B):
+- **Keyboard:** the email keyboard, `textContentType` `username` and `password` (iOS Password AutoFill), Return → the password → sign in, the form kept above the keyboard (E1).
+- **VoiceOver:** failures and field errors announced (iOS has no live region); the toggle labelled; the Microsoft pill hidden while an email sign-in runs.
+- **Dynamic Type:** the fields, the toggle and Sign in grow with the text (`minHeight`; 48 pt and 52 pt at least).
+- **Unchanged:** the developer-token button (`__DEV__`), the Microsoft pill, the footer.
+
+**Tests: 1,589 → 1,735, all passing** (228 → 247 suites).
+- **+144 in three new files:** `password-sign-in` 103 (Android's, "one path"), `ios-password-sign-in` 27 (iOS), `sign-in-button` 14 (E1).
+- **+2 in existing files:** the email gate in `start-up-and-login`, and `EmailSignInForm` under Reduce Motion in `read-screens`. Updated iOS guards: ten animating files; the form's action, toggle and Sign in in `hig-polish`'s token-sized scan; `passwordSignInAttempt.ts` among `ios-reauth`'s `setSession` callers.
+- **Mutation check: 14 of 14 caught** (7 on the gates, 7 on the one path; `ANDROID-DELTA.md` §10.8).
+
+**Not run:** a device check. UAT G20 covers it (`UAT-TEST-PLAN-IOS.md`).
+
 ## 5. SKIP
 
 Whole files:
@@ -1488,6 +1589,8 @@ Whole files:
 | `assets/adaptive-icon.png` | Android adaptive-icon foreground and themed (monochrome) layer |
 | `src/navigation/AppTabBar.tsx` | (iOS-2) A custom bar so the tabs could sit under the drawer's screens. iOS has no drawer, and the tab navigator's own bar stays on every pushed screen (§4.5) |
 | `src/push/PushBridge.tsx`, `src/push/platform.ts`, `src/push/registration.ts`, `src/push/taps.ts`, `src/store/push.store.ts`, `src/utils/push.ts`, `tests/push/push.test.mjs` | (iOS-5e) G7c, Android's push client (`51f5554`). Out of iOS-5e by Ronit's brief: it needs `expo-notifications` (a new package and a native build), APNs rather than FCM, and the NTF-5/NTF-6 server half, which is not deployed (`ANDROID-DELTA.md` §9) |
+| `app.config.js` | (iOS-5f) E2: Android's `google-services.json` reaches EAS as a secret file for push. iOS has no push (decision 4) |
+| `src/utils/haptics.ts` (Android's, `e85c602`), `tests/polish/haptics.test.mjs`, `tests/support/stubs/expo-haptics.mjs` | (iOS-5f) A5: Android's `performAndroidHapticsAsync`. iOS keeps its own `haptics.ts` and stub (iOS-4, the same paths); `tests/polish/haptics-parity.test.mjs` checks every Android haptic event has an iOS one |
 
 Android-only parts of ADAPT files, not brought over:
 

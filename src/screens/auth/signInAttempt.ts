@@ -1,5 +1,7 @@
 // M1 Login without the UI: one sign-in attempt, what each failure says, and when a failure banner goes stale.
 // Kept out of LoginScreen.tsx (which only renders) so tests run this exact code under Node: tests/auth/mobile-sso.test.mjs.
+// iOS (iOS-5g): the email and password attempt is ./passwordSignInAttempt.ts (Android keeps it here), so that only a UAT
+// build bundles it. The stale-banner guard below serves both.
 import type { AppStateStatus } from 'react-native';
 
 import {

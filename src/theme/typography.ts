@@ -78,6 +78,11 @@ export const loginType = {
   prompt: { fontSize: 13, lineHeight: 18 },
   button: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
   footer: { fontSize: 12, lineHeight: 16 },
+  // The email sign-in (2026-11-05, UI-STANDARDS.md §15.2): the OR divider's word, the quiet text action, the fields.
+  orLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600', letterSpacing: 1 },
+  link: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  fieldLabel: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  field: { fontSize: 16 },
 } as const;
 
 /** How the sizes combine (class names). */

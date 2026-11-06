@@ -50,4 +50,13 @@ export const ENVIRONMENT_LABEL: string = `${APP_ENV} · ${API_HOST}${__DEV__ ? '
  */
 export const SHOW_ENVIRONMENT_CHIP: boolean = APP_ENV !== 'PROD';
 
+/**
+ * Login's email and password sign-in (02-AUTH.md §8, 2026-11-05): UAT only. Its endpoint is known to be deployed only
+ * there, and its contract is ASSUMED (src/types/mobile-password-contract.ts). On a production build the option does not
+ * render at all, as the environment chip. Opening it to PROD needs A32 shipped there and Ronit's say-so.
+ * iOS (iOS-5g): the run-time gate, as on Android. On iOS the path is confirmed (POST /auth/mobile/login), and a second,
+ * build-time gate keeps the email sign-in's code out of a production bundle altogether (LoginScreen.tsx).
+ */
+export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';
+
 export const APP_VERSION: string = appJson.expo.version;

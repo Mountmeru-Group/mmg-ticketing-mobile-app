@@ -153,11 +153,15 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
    - **Why an update can carry them:** they are JavaScript only. `app.json`, `package.json`, `package-lock.json`, `eas.json` and `assets/` are unchanged since build 1 (`git diff 30cc239 33dc1f6`; build 1 is `30cc239`, compliance E4). There is no new permission, entitlement or native module: G7c (push), which would need all three, is not ported.
    - **Every other rule still applies:** §2 in full first, both flags, `EXPO_PUBLIC_APP_ENV` set to `UAT` (rule 4), and the hotspot. The update's `--message` and its `UPDATES-LOG.md` entry name this exception.
    - **One time only.** It covers iOS-5e's code, `33dc1f6`; its docs commit changes no code. Later features follow rule 1 again. iOS-5f (Android's `e85c602` to `d8626bc`) had its own decision: rule 10.
-10. **iOS-5f ships in a new build, never by update** (Ronit, 2026-11-06; `ANDROID-DELTA.md` §10, decision 2):
-    - Its features (the polish pass, the SLA deadline, the audit filters and the UAT-only email sign-in) reach testers in **TestFlight build 0.1.0 (2)**, built through §4.
-    - **The runtime is shared.** `runtimeVersion` follows `appVersion`, and build 2 keeps version 0.1.0, so builds 1 and 2 both take updates for runtime 0.1.0 on `ios-preview`.
-      - Build 2 starts on its own code: its embedded bundle is newer than the update already on the channel (`UPDATES-LOG.md` entry 1), and expo-updates launches the newest.
-      - **But any update published after build 2 also reaches build 1.** One built from iOS-5f code would bring iOS-5f's features to build 1 by update, which this rule forbids. Before the next update, either every tester has moved to build 2 (build 1 expired in TestFlight), or the version moves on (a new runtime). **Ronit decides when the next update comes.**
+10. **iOS-5f and iOS-5g ship in a new build, never by update** (Ronit, 2026-11-06; `ANDROID-DELTA.md` §10, decision 2, and §10.8):
+    - iOS-5f's features (the polish pass, the SLA deadline and the audit filters) reach testers in **TestFlight build 0.2.0 (2)**, built through §4.
+    - **iOS-5g (G9, the email sign-in, UAT only) is in the same build 0.2.0 (2)** (Ronit, iOS-5g): one build, not two. **Build 0.2.0 (2) is not started until the backend team confirms `POST /auth/mobile/login` sends no `Set-Cookie`** (`APP-STORE-COMPLIANCE.md`, G9 section). Then UAT G20.12 is checked on a device before testers get G20. If the answer is late, Ronit decides whether to ship iOS-5f first; that would be a new decision.
+    - Before that build, `npm run verify:release-bundle` must PASS for both profiles: `preview` with all of the email sign-in, `production` with none of it (§2).
+    - **A new version, so a new runtime** (Ronit, 2026-11-06). `app.json` `version` is **0.2.0** (the only `app.json` change in iOS-5f), and `runtimeVersion` follows `appVersion`, so build 2's runtime is **0.2.0**.
+      - An update for build 2 is published for runtime 0.2.0 and can never reach build 1 (runtime 0.1.0); `UPDATES-LOG.md` entry 1 (runtime 0.1.0) can never reach build 2.
+      - **Build 1 is retired once 0.2.0 is on TestFlight:** expire it in App Store Connect, so every tester moves to build 2. After that, nothing more is published for runtime 0.1.0.
+      - The build number still comes from EAS (`appVersionSource: remote`, `autoIncrement`); `app.json`'s `ios.buildNumber` only seeded it.
+    - Superseded: the first draft of this rule (iOS-5f STEP 1) kept 0.1.0 for build 2, so builds 1 and 2 would have shared runtime 0.1.0. Ronit chose the version bump instead.
 
 ## 7. Before a `production` build (iOS-9)
 

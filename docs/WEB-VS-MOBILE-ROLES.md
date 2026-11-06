@@ -331,7 +331,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Capability | WEB: who can | MOBILE: who can | Status | Note | iOS (`ios-dev`) |
 |---|---|---|---|---|---|
 | Read the audit log: who did what and when, newest first, with the ticket, the person and the details; filter it by entity type or ticket number | ADMIN | ADMIN | ✅ SAME | G8 (2026-11-02). The web page `/audit-log` is deployed but **not in the analysed clone**, so the web column rests on Ronit's account of the page and on the server, which answers 403 to every other role (AUD-1). Mobile: a drawer row and route for ADMIN only; cards grouped by day; the ticket number opens the ticket. | ✅ SAME · = Android: AUD-1, the same cards, filters and 500-entry cap; ≠ Android, **interface only**: a More row in its own section, and the route registered for ADMIN alone (`navigation/routes.ts:86`), so no tab, More row, deep link or notification tap reaches it for anyone else · `utils/permissions.ts:41, :54-56, :159`; `navigation/MoreScreen.tsx:43, :69`; `hooks/useAuditLog.ts:28, :46`; `screens/audit/AuditLogScreen.tsx:214, :231, :281` |
-| Filter the audit log by action, or by date (From, To) | ADMIN | ADMIN | ✅ SAME | Built 2026-11-05. AUD-1 reads `action`, `dateFrom` and `dateTo` since `7df97c8`, confirmed by the backend team in writing; M20 has Action and Dates chips, all server-side (`01` §10.5, UI-STANDARDS §13). | ⏳ iOS-5f: being built (STEP 3 data, STEP 6 screen); ✅ SAME with file:line at STEP 8 · = Android |
+| Filter the audit log by action, or by date (From, To) | ADMIN | ADMIN | ✅ SAME | Built 2026-11-05. AUD-1 reads `action`, `dateFrom` and `dateTo` since `7df97c8`, confirmed by the backend team in writing; M20 has Action and Dates chips, all server-side (`01` §10.5, UI-STANDARDS §13). | ✅ SAME · = Android: AUD-1's `action`, `dateFrom` and `dateTo`, server-side, whole days sent as instants (`api/auditLog.api.ts:28`, `utils/audit-log.ts:112`); ≠ Android, interface only: a hand-picked day in the iOS calendar sheet (`DatePickerSheet`), opened once the Dates sheet has gone · `screens/audit/AuditLogScreen.tsx:340, :347, :389, :397, :405` |
 | Filter the audit log by person | Nobody | ADMIN | ➕ MOBILE ONLY | The endpoint takes `actorId`; the web page's filters, as Ronit lists them, have no person filter. Mobile uses the people search (active users only). | ➕ MOBILE ONLY · = Android · `screens/audit/AuditLogScreen.tsx:324, :357`; `utils/audit-log.ts:81` |
 
 ### Admin
@@ -716,3 +716,22 @@ Android: 51, 23, 1, 22, 17, 3.
 2. **The tests:** `docs/ROLE-MATRIX.md` §iOS-A.7 (1,136 → 1,391), and the mutation check, §7 (30 of 30 caught).
 
 **iOS = Android on 115 of 117 rows**: the same two rows differ (iOS-A.3), and nothing else.
+
+### iOS-A.7 iOS-5f: the Android sync to `d8626bc` (2026-11-06)
+
+**What changed on iOS, as on Android (`e85c602` … `d8626bc`):** one row changed status, "Filter the audit log by action, or by date (From, To)", ❌ → ✅ for ADMIN (gap 12, closed on Android on 2026-11-05). Its iOS cell was written from the iOS-5f source. The polish pass (people row, swipe, captions, SLA deadline, press feedback, greeting mark) adds no capability row: each is a new look for one Android already counts. G9 (email sign-in) is not on iOS yet (iOS-5g) and is not a role capability row on Android either.
+
+**Figures (iOS), recounted from iOS-A.6 by the one row:**
+
+| ✅ SAME | ➕ MOBILE ONLY | ❌ NOT BUILT | ⊘ OUT OF SCOPE | 🔒 SAFER | ✂ SIMPLIFIED | Total |
+|---|---|---|---|---|---|---|
+| 52 | 22 | **0** | 22 | 18 | 3 | **117** |
+
+| Role | % parity, iOS | Genuine gaps |
+|---|---|---|
+| END_USER, AGENT, triage AGENT, L2_MANAGER | unchanged (iOS-A.6) | none |
+| ADMIN | **100%** (63 of 63) | none |
+
+- **Android's own section 2 still counts the ❌** (ADMIN 98%, "1: filter the audit log by action or date") at `d8626bc`: `d8626bc` changed the row and gap 12 but not the totals. Reported here, not changed: section 2 is Android's text (the iOS-5b rule).
+- **iOS = Android on 115 of 117 rows**: the same two rows differ (iOS-A.3), and nothing else.
+- **Where iOS differs in the polish: the interface only** (`docs/ios/ANDROID-DELTA.md` §10.3, `00-PORT-MANIFEST.md` §4.19): VoiceOver actions for the swipe, the greeting mark still under VoiceOver, the iOS calendar for the audit days, iOS-4's haptics.

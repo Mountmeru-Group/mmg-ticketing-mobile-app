@@ -13,8 +13,14 @@
 // src/types/mobile-sso-contract.ts. Only five response fields can fail sign-in (readSession()).
 // Every failure is a MicrosoftSignInError with its own `reason`, so the Login screen can tell them apart.
 // Never: scrape Set-Cookie, call /auth/test-login, lift the session out of a WebView, ship a secret (02 §6), or call
-// the cookie-setting web endpoints /auth/login and /auth/microsoft* (02 §5.2). No token, ID token or authorization
-// code is ever logged, shown, or put into an error.
+// the cookie-setting web endpoint /auth/microsoft* (02 §5.2). No token, ID token or authorization code is ever logged,
+// shown, or put into an error.
+//
+// ── Email and password sign-in (AUTH-P1, ask A32, 02-AUTH.md §8) ──
+// iOS (iOS-5g): not in this file. signInWithPassword() is src/api/passwordSignIn.api.ts, which only a UAT build bundles
+// (LoginScreen.tsx loads the form behind a build-time gate). It calls ONE path, POST /auth/mobile/login, and reads its
+// answer through the SAME readSession() below, with AUTH-P1's options (Android's, d8626bc). This file holds no
+// email-sign-in code or string, so a production bundle carries none.
 import * as AuthSession from 'expo-auth-session';
 
 import {
@@ -38,8 +44,9 @@ import {
   type MobileSsoUser,
   type UserRole,
 } from '@/types';
+import type { MobilePasswordUser } from '@/types/mobile-password-contract';
 import { apiClient, endSession, type MessageResponse } from './client';
-import { checkFields } from './drift';
+import { checkFields, reportDrift, type FieldSpec } from './drift';
 import { ApiClientError } from './errors';
 import { MOBILE_SSO_OPTIONAL_SPEC } from './responseSpecs';
 
@@ -186,7 +193,7 @@ export async function signInWithMicrosoft({ challenge }: MicrosoftSignInOptions)
 }
 
 /** The error's class name only: a message could quote a redirect URL, which carries the authorization code. */
-function errorName(error: unknown): string {
+export function errorName(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
@@ -289,7 +296,7 @@ export async function exchangeMicrosoftIdToken(idToken: string): Promise<MobileL
   } catch (e) {
     throw classifyExchangeFailure(e);
   }
-  return readSession(data);
+  return readSsoSession(data);
 }
 
 /** Maps an AUTH-P2 failure to the reason the Login screen shows. Server messages are quoted; they hold no token. */
@@ -331,7 +338,7 @@ function classifyExchangeFailure(error: unknown): MicrosoftSignInError {
   return new MicrosoftSignInError('server', `${http}${answer}`, status);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -341,11 +348,55 @@ function kindOf(value: unknown): string {
   return Array.isArray(value) ? 'array' : typeof value;
 }
 
-/**
- * A body seen through the contract's key names, with every value still unchecked. Reading a key the contract does not
- * name is a compile error; keys the contract does not name are never looked at.
- */
-type Unchecked<T> = { [K in keyof T]?: unknown };
+// ── Reading a sign-in answer: ONE reader, with options per endpoint ──
+//
+// readSession() turns a 200 body into the app's session and readUser() a `user` object into AuthUser, for AUTH-P2,
+// AUTH-P1 and AUTH-2 alike. They read only the key names their reader lists, by own-property lookup. Nothing walks a
+// body's keys or compares its key set, so an unknown extra field cannot fail sign-in. AUTH_P2_READER lists AUTH-P2's
+// confirmed names alone, so Microsoft sign-in reads exactly what it read before the options existed.
+
+/** How one endpoint's `user` maps onto AuthUser. A key list is tried first to last: the first non-blank string wins. */
+export interface UserReader {
+  /** Prefix of drift lines and failure details: 'AUTH-P2', 'AUTH-P1', 'AUTH-2'. */
+  readonly endpoint: string;
+  /** The name's keys. With none of them, the email stands in: formatDisplayName() turns "first.last@…" into "First Last". */
+  readonly name: readonly string[];
+  /** AUTH-P2: a missing email fails sign-in. AUTH-P1, AUTH-2: optional; the email already known stands in. */
+  readonly emailRequired: boolean;
+  /** The OPTIONAL single-name fields, for checkFields() (responseSpecs.ts). */
+  readonly optionalSpec: readonly FieldSpec[];
+}
+
+/** How one endpoint's 200 body maps onto the session. Each key list is checked against its contract type (`satisfies`). */
+export interface SessionReader extends UserReader {
+  readonly token: readonly string[];
+  readonly expiry: readonly string[];
+  /** AUTH-P2: a missing expiry fails sign-in. AUTH-P1: optional. Either way the app's 8-hour clock applies (02 §5.4). */
+  readonly expiryRequired: boolean;
+}
+
+/** AUTH-P2, confirmed 2026-10-19 (mobile-sso-contract.ts): one name per field; all required but the user's name. */
+const AUTH_P2_READER: SessionReader & { readonly expiryRequired: true } = {
+  endpoint: 'AUTH-P2',
+  token: ['token'] satisfies (keyof MobileSsoResponse)[],
+  expiry: ['expiresAt'] satisfies (keyof MobileSsoResponse)[],
+  expiryRequired: true,
+  name: ['name'] satisfies (keyof MobileSsoUser)[],
+  emailRequired: true,
+  optionalSpec: MOBILE_SSO_OPTIONAL_SPEC,
+};
+
+/** The value under `key` only when the object itself holds it, never one inherited from Object.prototype. */
+export function own(record: Record<string, unknown>, key: string): unknown {
+  return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+}
+
+/** Keys that every user shape the reader handles has under the same name: AUTH-P2, AUTH-P1 and AUTH-2 (AuthUser). */
+type SharedUserKey = keyof MobileSsoUser & keyof MobilePasswordUser & keyof AuthUser;
+
+function userField(user: Record<string, unknown>, key: SharedUserKey): unknown {
+  return own(user, key);
+}
 
 /** A REQUIRED string field: the value, or null after adding a problem. Blank counts as missing. */
 function requiredText(value: unknown, at: string, problems: string[]): string | null {
@@ -359,73 +410,171 @@ function optionalText(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/** An OPTIONAL string that must say something: null when missing, blank or not a string. */
+function nonBlankText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/** The first of `keys` that holds a non-blank string, with the key it was under; null when none does. */
+function firstText(record: Record<string, unknown>, keys: readonly string[]): { value: string; key: string } | null {
+  for (const key of keys) {
+    const value = nonBlankText(own(record, key));
+    if (value !== null) return { value, key };
+  }
+  return null;
+}
+
+/** `token`, or `user.name | user.displayName | user.fullName`: how drift lines and problems name a key list. */
+function keyList(keys: readonly string[], prefix = ''): string {
+  return keys.map((key) => `${prefix}${key}`).join(' | ');
+}
+
+/**
+ * A REQUIRED string under any of `keys`: the value and its key, or null after adding a problem. The problem names the
+ * type the first present key held, as requiredText() does, so a one-key list reads exactly like requiredText().
+ */
+function requiredAlias(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+  problems: string[],
+): { value: string; key: string } | null {
+  const found = firstText(record, keys);
+  if (found === null) {
+    const held = keys.map((key) => own(record, key)).find((value) => value !== undefined);
+    problems.push(`${keyList(keys)}: expected non-empty string, got ${typeof held === 'string' ? 'blank string' : kindOf(held)}`);
+  }
+  return found;
+}
+
 function isUserRole(value: unknown): value is UserRole {
   return typeof value === 'string' && USER_ROLES.includes(value as UserRole);
 }
 
+export interface UserReadout {
+  user: AuthUser;
+  /** The answer held `countryId` as a string or null. False: missing or another type, so `user.countryId` is null. */
+  countryIdSent: boolean;
+  /** The key the name came under; null when the email stands in. */
+  nameKey: string | null;
+  /** The answer held a non-blank email; false when the one already known stands in. */
+  emailSent: boolean;
+}
+
 /**
- * AUTH-P2 `user` as the app's AuthUser, or null after adding a problem per bad REQUIRED field.
- * The two shapes differ (mobile-sso-contract.ts). This is the one place that maps one onto the other.
+ * A `user` object as the app's AuthUser, or null after adding a problem per bad REQUIRED field. The wire shapes differ
+ * (mobile-sso-contract.ts, mobile-password-contract.ts, 03 §C): this is the one place that maps them onto AuthUser.
+ * `knownEmail` stands in for a missing email where the reader allows one: the typed email (AUTH-P1), or the sign-in
+ * answer's (AUTH-2).
  */
-function readUser(value: unknown, problems: string[]): AuthUser | null {
+export function readUser(value: unknown, reader: UserReader, problems: string[], knownEmail?: string): UserReadout | null {
   if (!isRecord(value)) {
     problems.push(`user: expected object, got ${kindOf(value)}`);
     return null;
   }
-  const user: Unchecked<MobileSsoUser> = value;
-  const id = requiredText(user.id, 'user.id', problems);
-  const email = requiredText(user.email, 'user.email', problems);
+  const id = requiredText(userField(value, 'id'), 'user.id', problems);
+  const sentEmail = reader.emailRequired
+    ? requiredText(userField(value, 'email'), 'user.email', problems)
+    : nonBlankText(userField(value, 'email'));
   // An unknown role is refused: every gate in the app is keyed on it, and the stored session would not load (auth.store).
-  const role = isUserRole(user.role) ? user.role : null;
+  const sentRole = userField(value, 'role');
+  const role = isUserRole(sentRole) ? sentRole : null;
   if (role === null) {
     problems.push(
-      typeof user.role === 'string'
-        ? `user.role: unknown value "${user.role}" (expected one of ${USER_ROLES.join(', ')})`
-        : `user.role: expected string, got ${kindOf(user.role)}`,
+      typeof sentRole === 'string'
+        ? `user.role: unknown value "${sentRole}" (expected one of ${USER_ROLES.join(', ')})`
+        : `user.role: expected string, got ${kindOf(sentRole)}`,
     );
   }
+  const email = sentEmail ?? knownEmail ?? null;
+  if (email === null && !reader.emailRequired) problems.push('user.email: expected non-empty string, got none');
   if (id === null || email === null || role === null) return null;
 
-  const name = optionalText(user.name);
+  const name = firstText(value, reader.name);
+  // A one-key list is covered by the reader's FieldSpec (AUTH-P2 `user.name`, AUTH-2 `user.displayName`).
+  if (name === null && reader.name.length > 1) {
+    reportDrift(reader.endpoint, `${keyList(reader.name, 'user.')}: none holds a non-blank string; the email stands in`);
+  }
+  const countryId = userField(value, 'countryId');
+  const countryIdSent = typeof countryId === 'string' || countryId === null;
   return {
-    id,
-    email,
-    role,
-    // `name` on the wire. Without one, the email: formatDisplayName() turns "first.last@…" into "First Last".
-    displayName: name !== null && name.trim() !== '' ? name : email,
-    ldapSamAccount: optionalText(user.ldapSamAccount),
-    // Without one, an AGENT reads as a triage agent in the UI (05 §A.12). The server still scopes the data.
-    countryId: optionalText(user.countryId),
-    // `department` and `phone` are not kept: AuthUser (03 §C) has neither. Profile reads them from USR-1.
+    user: {
+      id,
+      email,
+      role,
+      displayName: name?.value ?? email,
+      ldapSamAccount: optionalText(userField(value, 'ldapSamAccount')),
+      // Without one, an AGENT reads as a triage agent in the UI (05 §A.12). AUTH-P1 asks AUTH-2 instead (countryIdSent).
+      countryId: countryIdSent ? countryId : null,
+      // AUTH-P2's `department` and `phone` are not kept: AuthUser (03 §C) has neither. Profile reads them from USR-1.
+    },
+    countryIdSent,
+    nameKey: name?.key ?? null,
+    emailSent: sentEmail !== null,
   };
 }
 
+export interface SessionReadout<Expiry> extends UserReadout {
+  token: string;
+  /** null only where the reader allows it (AUTH-P1). Read but not used: the 8-hour clock applies (02 §5.4). */
+  expiresAt: Expiry;
+  /** The keys the token and the expiry came under. Key names only, for the email sign-in's log line. */
+  tokenKey: string;
+  expiryKey: string | null;
+}
+
+export type SessionRead<Expiry> =
+  | { ok: true; session: SessionReadout<Expiry> }
+  | { ok: false; problems: string[]; tokenMissing: boolean };
+
 /**
- * The 200 body as the app's session.
- * - REQUIRED: token, expiresAt, user.id, user.email, user.role. If one is missing, blank or the wrong type, the result is
- *   `unexpected-response`, naming each bad field. Nothing else can fail sign-in.
- * - OPTIONAL: every other field the contract names. checkFields() logs a missing or wrong one once as `[API drift]` in
- *   __DEV__, and readUser() falls back.
- * - Anything else: never read. The body is accessed only by the key names above. Nothing walks its keys or compares its
- *   key set, so an unknown extra field cannot fail sign-in.
+ * A 200 body as the app's session, read with `reader`'s options.
+ * - REQUIRED: the token; `user`, with its id and role; the email and the expiry where the reader says so. If one is
+ *   missing, blank or the wrong type, the result is `ok: false`, naming each bad field. Nothing else can fail sign-in.
+ * - OPTIONAL: every other field the reader names. checkFields() and reportDrift() log a missing or wrong one once as
+ *   `[API drift]` in __DEV__, and the reader falls back.
+ * - Anything else: never read. The body is accessed only by the key names the reader lists.
  */
-function readSession(data: unknown): MobileLoginResponse {
+export function readSession(data: unknown, reader: SessionReader & { readonly expiryRequired: true }): SessionRead<string>;
+export function readSession(data: unknown, reader: SessionReader, knownEmail?: string): SessionRead<string | null>;
+export function readSession(data: unknown, reader: SessionReader, knownEmail?: string): SessionRead<string | null> {
   const problems: string[] = [];
   if (!isRecord(data)) problems.push(`body: expected object, got ${kindOf(data)}`);
-  const body: Unchecked<MobileSsoResponse> = isRecord(data) ? data : {};
-  if (isRecord(data)) checkFields('AUTH-P2', data, MOBILE_SSO_OPTIONAL_SPEC);
+  const body: Record<string, unknown> = isRecord(data) ? data : {};
+  if (isRecord(data)) checkFields(reader.endpoint, data, reader.optionalSpec);
 
-  const token = requiredText(body.token, 'token', problems);
-  const expiresAt = requiredText(body.expiresAt, 'expiresAt', problems);
-  const user = readUser(body.user, problems);
+  const token = requiredAlias(body, reader.token, problems);
+  let expiry: { value: string; key: string } | null;
+  if (reader.expiryRequired) {
+    expiry = requiredAlias(body, reader.expiry, problems);
+  } else {
+    expiry = firstText(body, reader.expiry);
+    if (expiry === null && isRecord(data)) {
+      reportDrift(reader.endpoint, `${keyList(reader.expiry)}: none holds a non-blank string; the 8-hour clock applies`);
+    }
+  }
+  const user = readUser(own(body, 'user'), reader, problems, knownEmail);
 
-  if (token === null || expiresAt === null || user === null) {
-    if (__DEV__) for (const problem of problems) console.warn(`[API drift] AUTH-P2 ${problem}`);
+  if (token === null || (reader.expiryRequired && expiry === null) || user === null) {
+    if (__DEV__) for (const problem of problems) console.warn(`[API drift] ${reader.endpoint} ${problem}`);
+    // `tokenMissing`: a JSON object without a token, i.e. an answer with no session in it (AUTH-P1's `no-token`).
+    return { ok: false, problems, tokenMissing: token === null && isRecord(data) };
+  }
+  return {
+    ok: true,
+    session: { ...user, token: token.value, expiresAt: expiry?.value ?? null, tokenKey: token.key, expiryKey: expiry?.key ?? null },
+  };
+}
+
+/** AUTH-P2's 200 body as the app's session, or `unexpected-response` naming each bad field. */
+function readSsoSession(data: unknown): MobileLoginResponse {
+  const read = readSession(data, AUTH_P2_READER);
+  if (!read.ok) {
     throw new MicrosoftSignInError(
       'unexpected-response',
-      `${AUTH_P2} → 200, but a required field is missing or wrong: ${problems.join('; ')}`,
+      `${AUTH_P2} → 200, but a required field is missing or wrong: ${read.problems.join('; ')}`,
       200,
     );
   }
+  const { token, expiresAt, user } = read.session;
   return { token, expiresAt, user };
 }

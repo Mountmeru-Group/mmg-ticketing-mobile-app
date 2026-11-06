@@ -9,7 +9,10 @@
 //   - names the client-secret option outside expo-auth-session's own modules;
 //   - lacks the iOS redirect msauth.com.mountmeru.servicedesk://auth, or contains the Android form (msauth://);
 //   - (preview) lacks the UAT API URL, or names any mountmerugroup.com host that is not allowed;
-//   - reaches an Android-only API from app code (comments do not count), or bundles the drawer navigator.
+//   - reaches an Android-only API from app code (comments do not count), or bundles the drawer navigator;
+//   - (iOS-5g) holds the web login path "/auth/login" (iOS never calls it, 01 §iOS-A);
+//   - (iOS-5g) production: holds ANY email sign-in module or string (G9 is UAT only, behind a build-time gate in
+//     LoginScreen.tsx); preview: lacks any of them (proving the gate keeps the UAT build whole).
 // Android's false positives, fixed here (02-AUTH.md §7.6 item 8; PERFORMANCE.md §9.3):
 //   - `client_secret` / `clientSecret` are expo-auth-session's own option names. The names are now allowed only inside
 //     node_modules/expo-auth-session, and secret VALUES are searched instead (manifest §4.10, approved 2026-10-28);
@@ -68,7 +71,19 @@ const DEV_TOKEN_NEEDLES = [
 /** The iOS-2 route placeholders (deleted in iOS-3c): never again in a release bundle. */
 const PLACEHOLDER_NEEDLES = ['DEV PLACEHOLDER', 'DevPlaceholderScreen', 'replaced in iOS-3'];
 /** Test-login markers and the backend's secret names (02 §6). The client-secret option names are checked below. */
-const FORBIDDEN_NEEDLES = ['x-test-secret', 'TEST_AUTH_SECRET', '/auth/test-login', 'AZURE_AD', 'sd_session='];
+const FORBIDDEN_NEEDLES = ['x-test-secret', 'TEST_AUTH_SECRET', '/auth/test-login', 'AZURE_AD', 'sd_session=', '/auth/login'];
+/**
+ * iOS-5g: the email and password sign-in (G9, UAT only). Its modules, and strings only it holds. A production bundle must
+ * have none of them; a preview (UAT) bundle must have all of them.
+ */
+const EMAIL_SIGN_IN_MODULES = [
+  'src/screens/auth/EmailSignInForm.tsx', 'src/screens/auth/passwordSignInAttempt.ts', 'src/api/passwordSignIn.api.ts',
+  'src/types/mobile-password-contract.ts',
+];
+const EMAIL_SIGN_IN_NEEDLES = [
+  'Sign in with email instead', "Email sign-in isn't available", 'PasswordSignInError', '/auth/mobile/login', 'email sign-in:',
+  'Enter your password.', 'Hide password',
+];
 /**
  * Secret VALUES: an Entra client secret (`xxxNQ~…`, 40 characters); a string literal assigned to the client-secret
  * option; or `client_secret=<value>` inside a string (a hard-coded form body). expo-auth-session's own code copies the
@@ -185,12 +200,27 @@ const nameOwners = [...new Set(modules.filter((m) => SECRET_NAMES.some((n) => m.
 const strayOwners = nameOwners.filter((rel) => !SECRET_NAME_OWNERS.some((owner) => rel.includes(owner)));
 if (strayOwners.length) problems.push(`the client-secret option is named outside expo-auth-session: ${strayOwners.join(', ')}`);
 
+// iOS-5g: the email sign-in is in a preview bundle, whole, and in no production bundle, in any form.
+const emailModules = EMAIL_SIGN_IN_MODULES.filter((rel) => modules.some((m) => m.rel === rel));
+const emailStrings = Object.fromEntries(Object.entries(targets).map(([k, t]) => [k, EMAIL_SIGN_IN_NEEDLES.filter((n) => count(t, n) > 0).length]));
+if (profile === 'production') {
+  if (emailModules.length) problems.push(`the production bundle contains email sign-in module(s): ${emailModules.join(', ')}`);
+  for (const [k, c] of Object.entries(emailStrings)) if (c > 0) problems.push(`${k} (production) contains ${c} email sign-in string(s)`);
+} else {
+  const missing = EMAIL_SIGN_IN_MODULES.filter((rel) => !emailModules.includes(rel));
+  if (missing.length) problems.push(`the preview bundle lacks email sign-in module(s): ${missing.join(', ')}`);
+  const absent = EMAIL_SIGN_IN_NEEDLES.filter((n) => count(js, n) === 0);
+  if (absent.length) problems.push(`release JS (preview) lacks email sign-in string(s): ${absent.map((n) => JSON.stringify(n)).join(', ')}`);
+}
+
 // The iOS redirect, and never the Android one.
 if (!IOS_REDIRECT || count(js, IOS_REDIRECT) === 0) problems.push('release JS lacks the iOS redirect (src/config/auth.config.ts IOS_AUTH_REDIRECT_URI)');
 for (const [k, t] of Object.entries(targets)) if (count(t, 'msauth://') > 0) problems.push(`${k} contains the Android redirect form "msauth://"`);
 
 // Hosts, and the UAT API URL in a preview build.
-const hosts = [...new Set((js.match(/[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
+// iOS-5g: a domain right after "@" is an e-mail address (the email form's example, "name@mountmerugroup.com"), not a
+// host the app connects to: a host match starts at the start of its name and is not preceded by "@".
+const hosts = [...new Set((js.match(/(?<![@a-z0-9.-])[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
 const badHosts = hosts.filter((h) => !ALLOWED_HOSTS.includes(h));
 if (badHosts.length) problems.push(`release JS names hosts that are not allowed: ${badHosts.join(', ')}`);
 if (profile === 'preview' && (!UAT_API_URL || count(js, UAT_API_URL) === 0)) problems.push('release JS (preview) lacks the UAT API URL from src/config/env.ts');
@@ -221,6 +251,7 @@ if (drawer.length) problems.push(`the release bundle contains @react-navigation/
 
 console.log(`\nPlaceholder strings: ${PLACEHOLDER_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)} · forbidden markers: ${FORBIDDEN_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)}`);
 console.log(`Client-secret option names: ${nameCount} in release JS, defined by ${nameOwners.length} module(s), ${strayOwners.length} outside expo-auth-session · secret-value matches: ${SECRET_VALUE_PATTERNS.filter((re) => re.test(js)).length}`);
+console.log(`Email sign-in (G9, UAT only): ${emailModules.length}/${EMAIL_SIGN_IN_MODULES.length} modules · strings ${Object.entries(emailStrings).map(([k, c]) => `${k}: ${c}/${EMAIL_SIGN_IN_NEEDLES.length}`).join('  ')} (${profile === 'production' ? 'must be none' : 'must be all'}) · "/auth/login": ${count(js, '/auth/login')}`);
 console.log(`iOS redirect: ${IOS_REDIRECT && count(js, IOS_REDIRECT) > 0 ? 'present' : 'MISSING'} · Android "msauth://": ${count(js, 'msauth://')}`);
 console.log(`mountmerugroup.com hosts: ${hosts.join(', ') || 'none'} · UAT API URL: ${UAT_API_URL && count(js, UAT_API_URL) > 0 ? 'present' : 'absent'}${profile === 'preview' ? ' (required)' : ''}`);
 console.log(`UUID-v4 literals: ${v4.length} (${v4.filter((u) => PUBLIC_UUIDS.has(u)).length} public IDs, ${v4.filter((u) => !PUBLIC_UUIDS.has(u) && libraryUuid(u)).length} library constants, ${v4.filter((u) => debugIds.has(u)).length} build debug id, ${unexplained.length} unexplained)`);
