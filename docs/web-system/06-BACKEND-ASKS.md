@@ -13,6 +13,8 @@
 > - Close some permission holes (**A7**). For example, a normal user can read other people's tickets if they know the ticket's ID.
 >   - **The most urgent one is new and does not wait for the app.** A website update dated 9 October adds an "AI Summary" button that lets any user, a normal end user included, read a summary of the IT team's **internal notes** on a ticket. Wherever that update is live, it should be fixed now.
 > - Two small fixes (**A13** and **A14**) so that deactivated users are locked out promptly and phone users on the same office Wi-Fi don't throttle each other.
+> - A way in for Google's app reviewer (**A32**, added 4 November). Google Play needs a login it can use, and the only login is the company Microsoft account. The fix is one email-and-password account, on the live system, that works for the reviewer alone.
+>   - **Update, 5 November:** the backend team says the email-and-password endpoint is already on the test system (UAT). The app now supports it there, but only by trying several likely shapes, because its code is not in the repository. **What we need now:** the exact contract in writing, and the source pushed. Then the live system (PROD) as well.
 >
 > **Everything else is an improvement, not a blocker.** That includes push notifications, longer sessions, server-side workflow rules and quicker lists.
 >
@@ -45,6 +47,7 @@ Source of every item: `C:\Users\Ronit Chaudhari\mmg-ticketing-diagnostic.md` §1
 | **A7** | Close the authorization gaps. **Fix first:** the AI ticket summary (`POST /ai/summarise`) shows internal notes to end users. Then: ownership and team scope checks; strip privileged fields from END_USER writes; remove `passwordHash` leak; query-builder whitelist; and more | A mobile app hands every user a reusable Bearer token, so anyone can call the API directly. The holes in `05` §C stop being "hidden by the UI". The AI summary leak is not hidden by the UI at all: wherever the 2026-10-09 code is deployed, it is one click in the web UI | **BLOCKING — launch**; the AI summary item: **fix now** | L |
 | **A14** | Rate limiter: key on the Bearer token, not on IP | Bearer clients are bucketed by IP. Every phone on the same office Wi-Fi or carrier NAT shares 300 requests/minute, so they get 429s | **BLOCKING — launch** | XS |
 | **A13** | Session cache must re-check `isActive` and role | A deactivated user, or one whose role changed, keeps API access until the cached session expires (up to 8 h, longer if A3 extends sessions) | **BLOCKING — launch** (mandatory if A3 is done) | XS–S |
+| **A32** | **Narrowed 2026-11-05:** send the contract of the email + password endpoint now on UAT, and push its source. Then deploy it on **PROD**, restricted to reviewer accounts | The endpoint is reportedly on UAT, but its source is not on any branch, so the app runs against an ASSUMED contract (`02-AUTH.md` §8). Google Play's reviewer uses the store build, which talks to PROD only, and PROD has no password login (`docs/G9-PASSWORD-LOGIN.md`) | **BLOCKING — launch** (Google Play review) | XS for the contract and push; S for PROD (+ a reviewer account) |
 | A5 | Push notifications (device-token table, register/unregister endpoints, Expo/FCM/APNs fan-out) | There is no push at all, and the SSE stream is broken. Without push the app can only poll | Nice-to-have (MVP polls; required for Phase 2) | M–L |
 | A3 | Mobile session lifetime and refresh, plus a device sign-out list | Sessions are 8 h absolute with no refresh, so users are forced to re-login every shift | Nice-to-have (becomes blocking if A2 cannot re-login silently) | M |
 | A6 | Server-side ticket workflow: transition map, required closure fields, `allowedTransitions` in responses | Today the rules live only in web code. Mobile has to copy them and they will drift | Nice-to-have | M |
@@ -70,12 +73,14 @@ Source of every item: `C:\Users\Ronit Chaudhari\mmg-ticketing-diagnostic.md` §1
 | A28 | Ticket templates readable by every role (active only, minimal fields) | SDP "pick a template" before the form. `GET /templates` is ADMIN/AGENT only and returns inactive rows and creator emails | Nice-to-have (SDP parity) | XS |
 | A29 | Exact asset lookup by tag | QR scan → one asset. Today only a contains-search exists | Nice-to-have (Phase 2) | XS |
 | A30 | Requester acknowledgement on closure | SDP close-flow field. No column exists | Nice-to-have (SDP parity) | S |
+| A31 | Business time remaining on a ticket's SLA (`slaResolveRemainingMinutes`, `slaResolveTotalMinutes`) | The deadline is in business hours, but no field says how much business time is left. A wall-clock countdown reads "66h left" on a Friday evening with 3 working hours to go, so the app shows the deadline instead | Nice-to-have | S |
 
 **Totals**
-- **5 blocking asks:** A1, A2, A7, A13, A14.
-- **25 nice-to-have asks:**
+- **6 blocking asks:** A1, A2, A7, A13, A14, and A32 (added 2026-11-04).
+- **26 nice-to-have asks:**
   - the original 13: A3–A6, A8–A12, A15–A18;
-  - 12 SDP-parity asks added 2026-10-14: A19–A30. Source: `08-SDP-PARITY.md` §7. Rough effort for these 12 is another 3 to 5 weeks of one backend developer.
+  - 12 SDP-parity asks added 2026-10-14: A19–A30. Source: `08-SDP-PARITY.md` §7. Rough effort for these 12 is another 3 to 5 weeks of one backend developer;
+  - 1 added 2026-11-03: A31, a real SLA countdown (Ronit's decision; `docs/brand/UI-STANDARDS.md` §14.6).
 
 ---
 
@@ -212,7 +217,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
 > - `DELETE /api/v1/notifications/device-token` `{ token }`;
 > - the FCM send, with `data.ticketId` and channel `setu_tickets`.
 >
-> The app side is built against that and is silent until it ships (`01` NTF-5/NTF-6, ⚠ NOT YET DEPLOYED). The original wording below is kept for the record.
+> The app side is built against that (`01` NTF-5/NTF-6). **2026-11-05:** the backend team confirmed the server half in writing, and it is in the source at `7df97c8`; its written body for the DELETE is `{ token, platform }`, which the app now sends. The original wording below is kept for the record.
 
 **Ask**
 1. New table `DeviceToken`:
@@ -502,6 +507,148 @@ Keep the same login rate limiter (20 per 15 min per IP).
 
 **Acceptance criteria:** closing with `requesterAcknowledged: true` persists it and returns it on `GET /tickets/:id`.
 
+## Asks added 2026-11-03
+
+### A31 — Business time remaining on a ticket's SLA — Nice-to-have — S
+
+**Why (the Friday-evening example)**
+- A ticket is raised on Friday at 16:00. Its policy allows 4 working hours, 09:00–18:00, Monday to Friday. The server's calculator sets `slaResolveDue` to Monday 11:00: 2 hours on Friday, 2 on Monday.
+- At 17:00 that Friday, a client can only count wall-clock time to that deadline: **"66h left"**. Yet only **3 working hours** remain (1 on Friday, 2 on Monday).
+- Over the weekend, a progress bar on wall-clock time fills from 1 % to 97 % while the SLA clock stands still. On Monday morning a technician sees almost no time left, after a Friday evening that said there was plenty.
+- So the mobile app shows the deadline itself ("Due Mon 11:00", `docs/brand/UI-STANDARDS.md` §14.6) instead of a countdown. A real countdown needs the server's own figure.
+
+**Today**
+- The ticket carries the deadlines `slaResponseDue` and `slaResolveDue`, plus `slaHoldMinutes`, `slaHoldStartedAt` and `slaStatus`.
+  - The deadlines are business-hours times, computed server-side from the SLA policy (`businessHoursOnly`, `businessHoursStart`/`End`, `businessDays`, `timezone`, `operationalHoursId`).
+  - `slaStatus` is set by a job every 60 s; DUE_SOON means ≤ 30 min left (`jobs/slaBreachChecker.job.ts:62-65`).
+- `GET /tickets/:id` (TKT-3) returns the full SLA policy row. But no field says how much business time is left, or how much the policy allowed for this ticket.
+- A client could work it out only by re-implementing the calculator: business days, hours, timezone, operational hours, and the hold handling flagged in `05` B.27.
+  - The mobile rules forbid that duplication.
+  - Any difference from the server's own maths would make the app's countdown disagree with the server's breach.
+
+**Ask:** on `GET /tickets/:id`, and optionally on `GET /tickets` rows, computed by the same SLA calculator that sets `slaResolveDue`, at the time of the response:
+
+| Field | Meaning |
+|---|---|
+| `slaResolveRemainingMinutes: number \| null` | Business minutes left until the resolve deadline. While on hold, the value does not change. 0 or negative once breached. `null` without an SLA, or once the ticket is resolved, closed or canceled |
+| `slaResolveTotalMinutes: number \| null` | The policy's resolve budget for this ticket's priority, so a client can draw a true progress bar |
+| `slaClockPaused: boolean` | `true` while the ticket is in a hold status |
+| *Optional:* `slaResponseRemainingMinutes`, `slaResponseTotalMinutes` | The same pair for the first response |
+
+**Acceptance criteria**
+- The Friday example: policy 09:00–18:00, Monday to Friday, resolve budget 240 min, ticket created Friday 16:00, read Friday 17:00. The response has `slaResolveRemainingMinutes: 180` and `slaResolveTotalMinutes: 240`.
+- Read again on Saturday at noon: still 180.
+- During a hold, two reads an hour apart return the same remaining minutes, and `slaClockPaused: true`.
+- After the deadline passes, the remaining minutes are ≤ 0. After RESOLVED, `null`.
+
+**Mobile after this ships:** the deadline line on ticket detail becomes "3h left" in working time, with a bar. The client reads the server's figures and adds no SLA rule of its own.
+
+## Asks added 2026-11-04
+
+### A32 — Email and password sign-in for the Google Play reviewer — BLOCKING (launch: Play review) — OPEN, narrowed 2026-11-05
+
+**Status 2026-11-05: narrowed to "send us the contract, and push the source".**
+- **What changed.** Ronit confirmed with the backend team that a mobile password-login endpoint **is deployed on UAT**, with local auth on there. Its source is **not** on any branch of `Mountmeru-Group/MMG-Ticketing-Platform`. AUTH-P2 was in the same position before its contract arrived.
+- **What mobile did.** It built the sign-in defensively, **UAT builds only**, against an ASSUMED contract (`02-AUTH.md` §8; `01-API-CONTRACT.md` AUTH-P1).
+  - It tries four paths and sends both `username` and `email`.
+  - It accepts several key names for the token, the name and the expiry.
+  - It asks AUTH-2 for `countryId` when the answer has none.
+- **The ask now, in order:**
+  1. **The contract, in writing.** It must cover:
+     - the path and method;
+     - the request body's keys;
+     - the 200 body, field by field with types, including whether `user` carries `countryId`, and whether the name is `name` or `displayName`;
+     - every error status with its body and message, including whether an unknown email and a wrong password get the **same** answer;
+     - whether it sets a cookie;
+     - its rate limit;
+     - which accounts may use it.
+  2. **Push the source** of the endpoint, and of AUTH-P2, to a branch, so mobile can verify the contract read-only as it does for every other endpoint.
+  3. **PROD.** Deploy it there, restricted to reviewer accounts, as proposed below, with a reviewer account. Until then the email option does not render on production builds, and Google's reviewer, who uses the production build, cannot use it.
+- When 1 arrives, mobile cuts its tolerance down to the real contract (`02-AUTH.md` §8.7). Until then, the first sign-in on a device shows the answering path and key names (`02-AUTH.md` §8.8).
+- **The proposal below still stands for PROD.** It is what mobile asked for on 2026-11-04. If the UAT endpoint already differs from it, the backend team's contract wins, and this proposal is updated to match.
+
+**Why**
+- **Google Play needs a login its reviewer can use** (Play Console → App content → App access).
+  - The app's only way in is Microsoft sign-in to the MMG tenant, and the reviewer has no account there.
+- **The reviewer's build talks to PROD.**
+  - The reviewer installs the store AAB. That is the `production` EAS profile, which can only target PROD (`scripts/eas-build-guard.js:51-52`; `src/config/env.ts:15`).
+  - A sign-in that works on UAT alone lets testers in, but not the reviewer.
+
+**Today.** From the web source, read-only. Every point is sourced in `docs/G9-PASSWORD-LOGIN.md`.
+- **`POST /api/v1/auth/login` returns the session token only as a cookie,** `Set-Cookie: sd_session; HttpOnly` (`modules/auth/auth.controller.ts:43-44`). The body is `{ user }`.
+  - A native app cannot read that cookie.
+  - A cookie in the native jar also overrides the Bearer header (`middleware/auth.middleware.ts:7`).
+- **PROD has no password login for anyone.**
+  - Local auth is opt-in: `LOCAL_AUTH_ENABLED=true` or dev settings (`auth.controller.ts:33`). The production env has none of them, and no LDAP settings either (`.env.production` at `d7f3887`, the last commit that tracks it).
+  - `GET /auth/config` reports `localAuthEnabled: false` there.
+- **`POST /auth/test-login` must not be switched on in PROD for this.**
+  - It does return a token in the body, but it is the Selenium skeleton key: no password, any user, outside the rate limiters, and it sets the cookie (`auth.controller.ts:67-97`).
+  - On `fix/phase0-1-security` it also needs `TEST_AUTH_ENABLED=true`, precisely so that it stays off in production.
+- **No branch** of the clone has any other route that returns a token for a password. This was first read on the clone fetched 2026-11-02, and re-read on 2026-11-05 on a fresh clone fetched 2026-11-04 16:36: same 13 branches, same commits, still none.
+- **Relation to A1** (2026-10-09). A1 asked for the same kind of endpoint so that UAT could be tested: `{ username, password }`, LDAP or local. A32 narrows it to what a reviewer needs, and adds PROD.
+
+**Ask**
+1. **Backend: a new endpoint `POST /api/v1/auth/mobile/login`.** This is AUTH-P1's path (`01-API-CONTRACT.md` §1.4), with the contract below.
+   - **Request:** `Content-Type: application/json`, body `{ "email": string, "password": string }`. No `Authorization` header and no cookie are sent.
+   - **Check:** the local bcrypt password only, as `loginWithLocal()` does (`modules/auth/auth.service.ts:121-168`), including its lower-cased email match. Not LDAP.
+   - **Restricted to an allow-list** of reviewer emails, set in the server's environment (for example `MOBILE_PASSWORD_LOGIN_EMAILS`). The name is the backend team's choice.
+     - An email that is not on the list answers exactly as a wrong password does.
+     - With the list empty, the route answers 404, so each environment opts in.
+     - **Why:** without the list, the route would let every user with a password hash sign in around Microsoft MFA and Conditional Access.
+   - **Success 200.** The body is **the same as AUTH-P2's** (`02-AUTH.md` §7.5), so the app reads both with one reader:
+     ```json
+     { "token": "<opaque session UUID>", "expiresAt": "<ISO-8601>",
+       "user": { "id": "<uuid>", "email": "<string>", "name": "<string>", "role": "ADMIN|AGENT|END_USER|L2_MANAGER",
+                 "countryId": "<string|null>", "ldapSamAccount": "<string|null>", "department": "<string|null>", "phone": "<string|null>" } }
+     ```
+     - **Do not return `loginWithLocal()`'s `user` as it stands** (added 2026-11-05). It is `{ id, email, displayName, role }` (`auth.service.ts:167`): `displayName`, not `name`, with no `countryId` or `ldapSamAccount`. The app would accept it, but show the email as the person's name and treat an AGENT as a triage agent. Build `user` as AUTH-P2 does (`docs/G9-PASSWORD-LOGIN.md`, "The `user` object, field by field").
+     - The session is the ordinary one: a `sessions` row, plus the Redis entry with `countryId` and `ldapSamAccount`, lasting `SESSION_TTL_HOURS`.
+     - So `Authorization: Bearer <token>` works on every route, and `POST /auth/logout` ends the session.
+   - **No `Set-Cookie`.**
+   - **Errors** are all JSON `{ "error": "…" }`:
+
+     | Status | When |
+     |---|---|
+     | 400 | The body is not `{ email, password }` as strings |
+     | 401 | `"Invalid credentials"` for an unknown email, an email not on the list, **or** a wrong password: **one message for all three**, so the answer never tells which |
+     | 403 | Account deactivated. It is checked only after a correct password, in the order `loginWithLocal` already uses |
+     | 404 | The allow-list is empty in this environment |
+     | 429 | The existing login limiter, 20 per 15 min per IP, with its JSON body (`app.ts:87-92`) |
+     | 500 | Server error |
+2. **Backend / ops: one reviewer account on PROD (and one on UAT for testing).**
+   - Role `END_USER`, active, with a local password. Use a strong one, and rotate it after each review.
+   - It is on the allow-list.
+   - It has a few sample tickets, so the reviewer sees a working app.
+   - Ronit gives Google the credentials in Play Console. **They never go into the app, its builds or this repo.**
+3. **AUTH-P2 on PROD as well** (`docs/RELEASE.md:283`). Without it, nobody (reviewer or employee) can sign in to a Play build with Microsoft.
+
+**Effort**
+- **S** (about 1 day): one route that reuses `loginWithLocal()`, the allow-list, tests, and a deploy to UAT and PROD.
+- **XS** for the account.
+- **Plus a security sign-off.** Even limited to one account, this is a password path that bypasses Entra MFA.
+
+**Acceptance criteria**
+- On UAT and on PROD, the reviewer account's email and password return 200 with the body above, and **no** `Set-Cookie`.
+- `GET /api/v1/auth/me` with `Authorization: Bearer <token>` returns 200 as that user.
+- `POST /api/v1/auth/logout` with the same header ends the session; `/auth/me` then returns 401.
+- These all return the **same** 401 body:
+  - a wrong password;
+  - an unknown email;
+  - a real employee's email with that employee's correct password.
+- The 21st attempt within 15 minutes from one IP returns 429.
+- With the allow-list empty, the route returns 404, and the web is unchanged: `GET /auth/config` and the web login page are as before.
+
+**Alternative without this endpoint**
+- A dedicated **Entra ID reviewer account**, signing in through the Microsoft sign-in the app already has.
+- It needs AUTH-P2 on PROD (item 3), plus a Conditional Access exclusion from MFA for that one account. That is IT's decision.
+- See `docs/G9-PASSWORD-LOGIN.md` §10.
+
+**Mobile: built 2026-11-05, UAT builds only** (`02-AUTH.md` §8)
+- The approved design is in, under "Sign in with Microsoft", on the same Login screen. An OR divider, then "Sign in with email instead", then email and password fields that open in place.
+- The session is stored exactly as AUTH-P2's is: same store, same 8-hour rule, same 15-day re-authentication clock.
+- The password is held in component state only, and is never logged or stored.
+- **For PROD:** set `EMAIL_SIGN_IN_ENABLED` in `src/config/env.ts` to include PROD, once this ask ships there and Ronit says so.
+
 ---
 
 ## Also flagged for the backend owner (not mobile asks; listed so they are not lost)
@@ -524,3 +671,14 @@ Keep the same login rate limiter (20 per 15 min per IP).
 **Environment questions** (see `00-OVERVIEW.md` BLOCKERS)
 - Confirm whether PROD, UAT and QA share one Redis/Memurai database. If they do, a session token minted in one environment may be accepted by the others through the Redis fast path.
 - The deployment guide's smoke test `GET /api/health` hits no route. The health route is `GET /health`.
+
+## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06)
+
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc`.
+
+- **A32 on iOS.** The Google Play reviewer has an App Store twin: App Review needs a demo account (Guideline 2.1, `docs/ios/APP-STORE-COMPLIANCE.md` A4).
+  - iOS-5f builds the email sign-in for **UAT builds only**, against the contract the backend team confirmed in writing. **⏳ That contract was still a placeholder in the brief on 2026-11-06**; STEP 7 stops for it (`01` §iOS-A).
+  - Android's interim tolerance (four paths, two names for the email, several key names) is **not on iOS**. iOS makes one call to the confirmed path and never calls `POST /auth/login`.
+  - **Open decision (iOS-9):** whether the email sign-in, once the endpoint is on PROD with a reviewer account, becomes App Review's demo login in place of A4's Entra account. Recorded in compliance A4.
+- **A5 and NTF-5/NTF-6 (confirmed 2026-11-05):** Android only. iOS has no push client (G7c not ported; decision 4). iOS push would also need APNs, the `aps-environment` entitlement and compliance C4; that is its own future decision.
+- **A31 (business time left on the SLA):** applies to iOS unchanged. Until it ships, iOS shows the deadline, as Android does (UI-STANDARDS §14.6, built in iOS-5f).

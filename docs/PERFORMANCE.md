@@ -15,6 +15,15 @@
 > **2026-10-30:** the login's "arc split" layout and a four-stage motion sequence (start-up, sign-in, return to Home).
 > §12 records it. **Bundle +22.1 KB of Hermes (+0.42 %), no JavaScript per frame, but the start-up intro adds up to
 > about 1.1 s before the first screen on a cold start** (§12.2): that is the item to weigh.
+>
+> **2026-11-03:** the polish pass: the people row, a greeting mark, window captions, swipe actions, haptics, the SLA
+> deadline, press feedback, a count cross-fade and a drawn paperclip. §13 records it. **Bundle +32.3 KB of Hermes
+> (+0.59 %). Every new animation is native, one-shot and transform/opacity only; no list row loops. The count roll is a
+> cross-fade, not a count-up (a count-up needs per-frame JavaScript).**
+>
+> **2026-11-05:** raised and due dates on ticket cards, the email form's "Sign in" fix, and the audit filters. §14
+> records the cost. **A card with a due line is 24 dp taller; the list skeleton grew to match. No animation, no timer,
+> no polling; the card's clock is read on render, kept to the minute.** Bundle not measured (no build this round).
 
 **Target.** `minSdkVersion` 24: Android 7.0 and later, including 2016-era phones with 1–2 GB of RAM, a slow CPU and slow storage. Ronit's standing requirement is the best possible experience on those phones, treated as a constant priority.
 
@@ -1405,3 +1414,337 @@ Use the same phone and method as §6 and §10.9 (Developer options → Profile H
   string, is still found.
 - No EAS build. No call to the backend. The web repo was not opened, and no database was touched.
 - Branch `dev`, nothing committed.
+
+---
+
+## 13. Polish pass (2026-11-03)
+
+Ronit's brief, UAT only: the people row on ticket cards, a greeting mark, window captions on Home's counts, and five
+refinements. What each looks like is `docs/brand/UI-STANDARDS.md` §14; this section is the motion and the cost.
+
+**Second round, the same day.** Ronit decided the open questions from the first pass (committed as `e85c602`):
+- the SLA countdown bar became the deadline ("Due Mon 11:00"), with backend ask A31 filed for a real countdown;
+- the count roll became a cross-fade (§13.6);
+- the paperclip emoji became a drawn icon;
+- VIBRATE is kept.
+
+The figures below are for both rounds together, against `8b522e3`.
+
+**The governing constraint is unchanged.** Every animation:
+- runs on the native driver;
+- animates transform and opacity only;
+- never blocks an interaction;
+- is skipped under "Remove animations";
+- is stopped on unmount;
+- takes its values from `src/theme/motion.ts`.
+
+And no looping animation may be added to a list row.
+
+| Item | Motion | Result |
+|---|---|---|
+| People row | none: the arrow is static | Built |
+| Greeting mark | one rise and fade when Home mounts | Built |
+| Window captions | none | Built |
+| Swipe actions | the row follows the finger, then snaps (gesture handler, native) | Built |
+| Haptics | none (no animation) | Built; `expo-haptics` added |
+| SLA deadline | none: static text and a dot | Built (the countdown bar was replaced, Ronit's option C) |
+| Press feedback | one dip per press-in, one return per press-out | Built |
+| Count roll on Home | one cross-fade per tile when the period changes | **A cross-fade**, not a count-up (§13.6) |
+| Paperclip for an e-mail's inline image | none | Built: a drawn icon, no emoji |
+
+**Rules kept:**
+- One library added, `expo-haptics` (`~57.0.3`, with `npx expo install`), listed before it was installed.
+- No other library, and no Reanimated in `src/` (Ronit kept that rule for the count roll).
+- No navigation change, and no permission change: the swipe reuses the existing rules. The VIBRATE permission expo-haptics declares is kept (Ronit, 2026-11-03).
+- No count, query or API call changed.
+- `auth.config.ts`, the 15-day re-authentication and the production profile untouched.
+- No EAS build. The second round is not committed.
+
+**Not run on a device:** there was no build. Frame times are not measured; §13.8 says what to check.
+
+### 13.1 The rules, and how each was verified
+
+| Animation | File | Driver | What is animated | JS per frame | Stops |
+|---|---|---|---|---|---|
+| Press feedback | `components/PressFeedback.tsx` | native: one timing per press-in, one per press-out (90 / 160 ms) | the card's `scale` (1 → 0.97) and `opacity` (1 → 0.85) | none | when the next press starts, and on unmount |
+| Greeting mark | `components/GreetingMark.tsx` | native: one timing, once per Home mount (420 ms) | the mark's `opacity` and `translateY` (6 dp → 0) | none | on unmount |
+| Count fade | `components/CountFade.tsx` | native: one timing per tile per period change (300 ms) | the new number's `opacity` and `translateY` (4 dp → 0); the old number's `opacity` | none | at its end, on blur (end state at once) and on unmount |
+| Swipe | `components/TicketCard.tsx`, react-native-gesture-handler's `Swipeable` | native: `Animated.event` for the drag, `Animated.spring` (bounciness 0) for the snap | the row's `translateX` | none | the gesture ends; the spring settles |
+
+**Native driver, verified three ways.**
+- **Source:** `src/` now has ten `Animated.timing` calls, each with `useNativeDriver: true`: the seven of §12.1, plus `PressFeedback.tsx`, `GreetingMark.tsx` and `CountFade.tsx`.
+- **Release bundle:** every `useNativeDriver` in the release JS was traced to its source through the source map.
+  - Before (`8b522e3`): seven app literals, all `!0` (true).
+  - After: ten, all `!0`: those seven plus `CountFade.tsx:63`, `GreetingMark.tsx:40` and `PressFeedback.tsx:46`.
+  - The 18 library sites are identical before and after. Swipeable was already in the bundle, through the gesture handler's main export, so this phase added none.
+  - Swipeable's two sites (`Swipeable.tsx:256`, the drag event, and `:437`, the snap) read `useNativeAnimations`. Its default is `true` (`defaultProps`), and the card never passes it; a test fails if it does.
+  - `src/` has no `LayoutAnimation` (tested); the bundle's 119 occurrences of the word are the same before and after.
+- **Tests:** `tests/motion/start-up-and-login.test.mjs` now covers eight animating files. It checks the native driver, transform and opacity only, no layout property, "Remove animations" and cleanup in each. `tests/motion/polish.test.mjs` adds this phase's specifics.
+
+**Transform and opacity only.**
+- **Read file by file:**
+  - PressFeedback binds `scale` and `opacity`;
+  - GreetingMark binds `opacity` and `translateY`;
+  - CountFade binds `opacity` and `translateY`, and the old number's `opacity`.
+- **Their other styles are static** `StyleSheet` values or none: the mark's 8 dp margin, the old number's absolute position, and the tile's width on the press wrapper (set by layout, not animated).
+- **Swipeable** moves its row with `translateX` alone (`Swipeable.tsx` render: `transform: [{ translateX }]`). Its action panel is placed with `translateX` too.
+- **The test** fails if an interpolation lands on anything else, or if a layout property is bound to an animated value.
+
+**The checks were tested by breaking them.** Ten deliberate violations were made one at a time and the relevant tests run. Each file was then restored byte for byte (SHA-256 compared). Every violation failed:
+
+| Violation | Tests failing |
+|---|---|
+| native driver off in the press feedback | 2 |
+| a looping animation added to the ticket card | 4 |
+| the greeting mark ignoring "Remove animations" | 2 |
+| a swipe "Resolve" for a role the status chip refuses | 5 |
+| Open captioned with the period | 6 |
+| a Vibrator-driven haptic | 1 |
+| native driver off in the count fade | 2 |
+| the count fading on a refresh, not only a period change | 1 |
+| the emoji placeholder put back in `html.ts` | 5 |
+| a wall-clock countdown put back on the SLA line | 4 |
+
+**Never blocks an interaction.**
+- **Press feedback:** the Pressable's own `onPressIn` / `onPressOut` run straight after the timing starts, and `onPress` is untouched. Nothing awaits the animation.
+- **Greeting mark and count fade:** decoration. The tile stays pressable during the fade, and the fading old number is hidden from screen readers.
+- **Swipe:** the row can be tapped as soon as it settles. A tap on an open row closes it, which is Swipeable's own tap handler.
+
+**"Remove animations".**
+- **Press:** no scale; the tint is set at once (`setValue`), as `active:opacity-80` did.
+- **Greeting mark:** decided at mount; it shows in place with no animated value at all.
+- **Count fade:** the new number at once, with no animated layer.
+- **Swipe:** the drag still follows the finger, because it is the person's own movement, not an animation. The snap's spring runs at `speed: 100`, so it settles in a frame or two.
+
+**Cleanup.** PressFeedback, GreetingMark and CountFade stop their running timing in an effect cleanup; the test pins all three lines. Swipeable's spring ends with its gesture.
+
+### 13.2 No looping animation on any list row
+
+**Verified in source and pinned by a test:**
+- `Animated.loop` exists in exactly two files: `Shimmer.tsx`, the skeleton band, and `SignInButton.tsx`, the sign-in arc. Neither is a list row:
+  - the shimmer is drawn only by `LoadingSkeleton`, a placeholder that leaves when the rows arrive;
+  - the sign-in arc is only on Login.
+- The parts of a ticket row (`TicketCard`, `PeopleRow`, `PressFeedback`, `StatusBadge`, `ListEntry`) contain no loop, no `iterations`, no timer and no `requestAnimationFrame`.
+- The count fade is on Home's tiles, not in a list, and is one-shot.
+
+**What a row can do instead, each one-shot:**
+- its first entry (§10.3, rows 0–7 of a first load);
+- a status badge pulse (§10.4, on its own record's change);
+- a press dip (only while a finger is on it);
+- a swipe (only while dragged, plus a spring under 300 ms).
+
+**While scrolling**, none of these starts on its own:
+- a press dip needs a finger held 60 ms without scrolling (`pressDelay`);
+- the swipe cancels on 10 dp of vertical travel (`failOffsetY`).
+
+### 13.3 Press feedback: cost
+
+- **Per card:** one wrapper `Animated.View`, one `Animated.Value` and two interpolations. At rest the value is JS-side and the card renders as before.
+- **Per press:** two native timings (in and out). There are **no re-renders on a press**: NativeWind's `active:opacity-80`, which this replaces, re-rendered the card's Pressable on press-in and press-out. On a slow phone that is a small gain.
+- **`pressDelay` 60 ms:** a touch that becomes a scroll inside 60 ms never shows the press. Otherwise every fling would start two animations on the card under the finger. NativeWind's `active:` flashed it at once.
+- **Subscriptions:** each card subscribes to the reduce-motion store (`useSyncExternalStore`): a set entry, with no native listener of its own.
+
+### 13.4 Swipe: how it stays out of FlashList's and the selection's way
+
+Checked against react-native-gesture-handler 2.32's `Swipeable.tsx`, read in `node_modules`.
+
+**The gesture:**
+- **Leftward only:** `activeOffsetX={-10}`. A single negative offset sets only the start of the range, so a rightward drag never activates it. The drawer's edge swipe (rightward) is untouched.
+- **A vertical move cancels it:** `failOffsetY={[-10, 10]}`, so a scroll never also drags a row.
+
+**FlashList recycling.** FlashList v2 reuses a cell for another ticket without remounting it (§10.3), so a row could otherwise carry its open state to the next ticket. Three things prevent that:
+- the list closes the open row when a scroll begins (`onScrollBeginDrag`);
+- only one row is open at a time;
+- if a cell still gets another ticket while open (a refresh that reorders), it is closed at once, with `reset()` and no animation, in a layout effect before that ticket shows.
+
+**One element type per list.** Whether rows swipe at all is decided per role (`canSwipeTickets`), not per ticket. A row with no actions keeps the wrapper, disabled. A recycled cell therefore never changes element type, and never remounts its card.
+
+**Long-press selection.**
+- Selection is unchanged on a closed row: the pan activates only after 10 dp of leftward travel, so a still finger reaches the card's own 350 ms long-press.
+- When the pan does activate, the gesture handler cancels the card's touch, so a swipe never also opens the ticket.
+- An open row's content does not receive touches (`pointerEvents="box-only"`), so a long-press there cannot select. Tap to close first.
+- Entering selection closes the open row and disables every row's swipe (`enabled={!selectionMode && …}`).
+
+**Cost per row:**
+- one pan and one tap handler (native);
+- the Swipeable shell, which renders twice more on first mount (its row width and action width arrive by `onLayout`). The card inside is the same element, so React skips re-rendering it;
+- until the first drag, the actions are **one empty box** of their width; the two buttons render only once a row is first dragged.
+
+**Deprecated, and why it is still used:** this Swipeable is the gesture handler's legacy one, marked deprecated in favour of the Reanimated version. The app keeps Reanimated out of `src/` (§12, tested), and the legacy component uses React Native's `Animated` on the native driver. If it is removed in a later gesture-handler major, the swipe needs a rewrite.
+
+**Not verified:** how the pan and FlashList's scroll interact on a real phone. The props above follow the gesture handler's own rules, and the device checks in §13.8 cover this.
+
+### 13.5 Greeting mark, haptics, SLA deadline, paperclip
+
+- **Greeting mark:**
+  - three SVG files, 0.4–1.1 KB each, drawn by expo-image as vectors on its background thread, with no bitmap held (§10.6);
+  - the one timing starts on the art's first `onDisplay`, so the rise is seen, not spent on an empty box;
+  - a failed load leaves nothing to fade, as before.
+- **Haptics:**
+  - fire-and-forget calls to `View.performHapticFeedback`, on the main thread inside expo-haptics, with no JavaScript waiting;
+  - a 401 plays nothing;
+  - VIBRATE is kept (not needed by these calls; a normal install-time permission).
+- **SLA deadline:**
+  - two static texts and an 8 dp dot, laid out once per render;
+  - its clock is read on render, focus and return to the app, never on a timer.
+- **Paperclip:**
+  - one 0.6 KB SVG drawn by expo-image, only in bodies that had an inline e-mail image;
+  - a registered custom element, so the renderer does no extra work for any other tag.
+
+### 13.6 Count roll on Home: a cross-fade, not a count-up
+
+**The brief:** each KPI counts up to its new value over about 500 ms when the period changes. If that can't be done without per-frame JavaScript, skip it.
+
+**A count-up cannot be done without per-frame JavaScript.**
+- A count-up shows every number in between, so the text must change on every frame.
+- The native driver can animate only transforms and opacity: it cannot change a `Text`'s content.
+- With React Native's `Animated`, every frame would need a JavaScript listener, a `setState` and a re-render per tile: about 30 renders per tile in 500 ms, at the phone's busiest moment (new counts arriving).
+- Reanimated's UI-thread text is excluded: Ronit kept the no-Reanimated rule.
+
+**Ronit chose option 5, a cross-fade** (`components/CountFade.tsx`, `motion.countFade`):
+- **One native timing of 300 ms per tile:** the new number fades in and rises 4 dp, while the old number, absolutely positioned over it, fades out. No JavaScript per frame.
+- **A period already loaded:** old into new, as described.
+- **A period not loaded yet:** the old number gives way to the loading bar at once and the new number fades in.
+  - The old number cannot stay while loading: placeholder data still supplies no count (G6, `HomeScreen.tsx` `countsCurrent`, tested), so a previous period's number is never shown as the new one.
+- **Only when the period changes.** A refresh within the same period snaps, and so do the first numbers on Home before the person has changed the period.
+- **Only while Home is in view** (`useIsFocused`). Leaving mid-fade ends it at its end state; it is also stopped on unmount.
+- **Cost:**
+  - at rest, the plain number `Text` as before;
+  - during the 300 ms, two wrapper views per tile, for at most five tiles;
+  - the chips do not fade.
+
+### 13.7 Bundle (measured, `8b522e3` → both rounds)
+
+The same method as §10.7 and §12.5:
+- a release `export:embed` (`EXPO_PUBLIC_APP_ENV=UAT`), then `hermesc -O`;
+- bytes attributed through the source map;
+- built into a scratch folder outside the repo.
+
+The "before" is `8b522e3`, which includes G6–G8 since §12.5.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Release JS, minified | 3,718.6 KB | 3,739.4 KB | **+20.8 KB (+0.56 %)** |
+| gzip | 868.9 KB | 874.5 KB | +5.6 KB |
+| Hermes bytecode (what ships) | 5,500.2 KB | 5,532.5 KB | **+32.3 KB (+0.59 %)** (33,056 bytes) |
+| Modules | 2,386 | 2,400 | +14: 7 source files, 4 SVG asset entries, expo-haptics' 3 modules |
+| Bundled assets | 27 files, 415.3 KB | 31 files, 418.3 KB | +3 greeting SVGs and the paperclip (2.9 KB) |
+
+- **The first round alone** (`e85c602`) was 5,528.8 KB Hermes (+28.6 KB). The second round adds 3.7 KB:
+  - `CountFade` 1.5 KB;
+  - `sla-deadline` and `SlaDeadline` together 0.04 KB less than the countdown they replaced;
+  - `HtmlText` +0.5 KB, `HomeScreen` +0.2 KB, `html` +0.1 KB.
+- **App code over both rounds: 16.2 KB** mapped to `src/`:
+  - `TicketCard` +2.1 KB (swipe), `PeopleRow` 1.9, `CountFade` 1.5, `PressFeedback` 1.2, `sla-deadline` 1.0, `GreetingMark` 0.9, `SlaDeadline` 0.9, `home-kpis` +0.7, `TicketListScreen` +0.7, `dashboard-period` +0.6, `haptics` 0.5, `HtmlText` +0.5;
+  - the rest under 0.5 KB each.
+- **expo-haptics and the module wrappers:** about 4.7 KB.
+- **No other library code changed:** Swipeable was already bundled.
+
+**Verdict:** not meaningful weight. The real costs are at run time: one native pan and tap handler per visible ticket row, and the cards being 23 dp taller (UI-STANDARDS §14.1).
+
+### 13.8 What Ronit should watch on a real low-end phone
+
+Use the same phone and method as §6 and §10.9 (Profile HWUI rendering → bars, or `dumpsys gfxinfo`), against a build of `8b522e3`.
+
+1. **Scroll the ticket list hard.** gfxinfo jank % should match the old build.
+   - Each row now has gesture handlers and a press wrapper, and the cards are 23 dp taller.
+   - No card may dip while flinging.
+   - **If it stutters:** raise `motion.press.pressDelay`.
+2. **Swipe on the list:**
+   - a near-vertical fling never drags a row;
+   - a deliberate left swipe opens one, and a second row's swipe closes the first;
+   - scroll after opening one: no row shows open on another ticket;
+   - long-press a closed row: it selects (with the tick);
+   - the drawer still opens from the left edge.
+   - **If the swipe starts too easily:** raise `motion.swipe.dragStart`. **If scrolling drags rows:** lower `verticalFail`.
+3. **Press feedback:** hold a ticket card, an approval card and a Home tile. Each dips and dims, and releasing opens it with no delay.
+4. **Greeting mark:** cold start into Home. The mark rises once, beside the greeting; switch tabs and back, and it does not replay.
+5. **Count fade:**
+   - switch between This month and Last 7 days twice (the second time both are cached): the numbers cross-fade, with no frame drops;
+   - pick a period not loaded yet: the loading bar, then a fade-in;
+   - pull to refresh: no fade.
+6. **Haptics:**
+   - change a status: one confirm;
+   - fail a save (airplane mode, then retry a write that is not paused): one reject;
+   - long-press select: a tick;
+   - turn Touch feedback / "Vibration & haptics" off: nothing plays;
+   - on an Android 10 phone: the fallbacks play.
+7. **"Remove animations" on:** no dip (the tint only), no greeting rise, no count fade, and the swipe snaps at once.
+
+### 13.9 Verification
+
+- `npx tsc --noEmit`: clean. With `--noUnusedLocals --noUnusedParameters`, nothing reported in any file this phase touched.
+- `npm test`: **1,086 / 1,086** passing (978 before the phase; 1,071 after the first round). The new tests are in:
+  - `tests/rbac/swipe-actions.test.mjs`: swipe gating for all five personas, every status, and against the tap paths;
+  - `tests/home/greeting-mark.test.mjs`: the mark per band, drawn and token-coloured, no emoji anywhere in `src/`, one animation;
+  - `tests/home/window-captions.test.mjs`: the window and caption of every tile and chip, for every period, with the counts pinned;
+  - `tests/polish/haptics.test.mjs`: each event's effect, the fallbacks, the OS setting, VIBRATE kept, and where each event fires;
+  - `tests/polish/sla-deadline.test.mjs`: the deadline's words, colours, hold and breach, the Friday example, never "left", A31 filed;
+  - `tests/polish/cid-image.test.mjs`: the paperclip placeholder in the sanitiser, plain text and the renderer;
+  - `tests/polish/people-row.test.mjs`;
+  - `tests/motion/polish.test.mjs`: no loop on a list row; press feedback; swipe; the count fade.
+- **Existing cases updated:**
+  - `tests/motion/start-up-and-login.test.mjs`: the animating files are eight, not five, and three new cleanup lines are pinned;
+  - `tests/home/dashboard.test.mjs`: the Active chip's label is "Active", with "right now" as its caption.
+  - `tests/support/loader.mjs` gained an in-memory `expo-haptics` stub.
+- Ten deliberate violations each failed the suite (§13.1).
+- Release bundle built before and after with the method above; the native-driver trace is in §13.1.
+- `npm run verify:release-bundle`: **PASS** (UAT), after both rounds. "Sign in with Microsoft", its control string, is still found.
+- Rendered in desktop Chrome to check the drawings: the three greeting SVGs (26 px and 120 px) and the paperclip (16 px and 120 px). That is not the phone's renderer: UI-STANDARDS §14.10 items 2 and 9.
+- No EAS build. No call to the backend. The web repo was not opened, and no database was touched.
+- Branch `dev`. The first round is `e85c602`; the second round is not committed.
+
+## 14. Ticket-card dates, the "Sign in" fix and the audit filters (2026-11-05)
+
+UAT only. No library added, no build, no polling, no `staleTime` change. Design: `docs/brand/UI-STANDARDS.md` §15.3 and §16.
+
+### 14.1 The card's height, FlashList and the skeleton
+
+**Height, per card** (rem 16: `text-xs` is a 16 dp line, `mt-2` is 8 dp):
+
+| Change | Height |
+|---|---|
+| Top line: "#19445 · Raised 2 Nov · updated 2d ago" | 0: still one line (`numberOfLines={1}`; only "Raised …" shrinks) |
+| SLA chip removed from the badge row | 0, as a rule: status and priority are the same height. −28 dp where the three chips used to wrap to a second row (a long breach label, "First Response & Resolution SLA Breached", on a 360 dp phone) |
+| Due line added under the people row | **+24 dp** (8 dp gap + the 16 dp line; the 14 dp clock fits inside it) |
+| No due line (Resolved, Closed, Canceled, no SLA) | 0: the row is absent, not an empty 24 dp |
+
+A typical open card with a one-line title goes from about 153 dp to about 177 dp, plus its 12 dp gap. On a 360 × 640 phone the list shows about 2.2 cards instead of 2.6.
+
+**FlashList (v2, `TicketListScreen.tsx`).**
+- v2 measures every item; there is no `estimatedItemSize` or `overrideItemLayout` to update, and none is set. Cards of 153 and 177 dp in one list are what it handles already (titles of one or two lines, chips that wrap).
+- One item type (`TicketCard`): a card with a due line and one without recycle into each other. The line is a conditional child; recycling re-lays the cell, as it does for the title and the "New reply" badge today.
+- No `maintainVisibleContentPosition` change (still `NO_SCROLL_ANCHOR`).
+
+**The skeleton (`LoadingSkeleton` `list`).** It gained the same row (8 dp gap, a 16 dp-tall line with a 14 dp circle and a bar) and lost its third chip, so it is 24 dp taller, like an open card. Most cards in a list are open, so the first load does not jump. It was already 4 dp shorter than a one-line-title card (its title bar is 16 dp, the title's line 24 dp); that is unchanged. My Requests (`ServiceCatalogScreen`) borrows the `list` skeleton for its own, different rows; its placeholder grows by the same 24 dp.
+
+### 14.2 What the due line costs
+
+- **No animation**, and nothing on the row is an `Animated` value. Tested (`tests/polish/sla-deadline.test.mjs`).
+- **No timer.** The card computes its line on render: `slaDueLine(ticket, now)`, a few `Date` operations.
+- **The clock.** `TicketListScreen` reads the time on every render, to the minute, and sets a minute in state on focus and on return to the app. Within the same minute that state does not change, so nothing re-renders. When the minute has moved on, `renderItem` changes and FlashList re-renders the cells on screen (about 3–6), the same work as a selection change.
+- Cards are still `memo`: a refetch that returns unchanged tickets re-renders none of them.
+
+### 14.3 Login: "Sign in" in view
+
+- Measuring the button is one `measureLayout` per event (the form opening, the button moving, the keyboard opening, the scroll view resizing, the content growing). No `onScroll`: the scroll position is read when a drag or fling ends.
+- The scroll uses `scrollTo`, animated unless "Remove animations" is on, as before.
+- `collapsable={false}` keeps one plain view in the native tree, so there is something to measure against.
+
+### 14.4 The audit log
+
+- The path fallback (`01` §10.5) costs at most one extra request per run of the app, for an ADMIN, and only if the server has no `/audit-logs`.
+- A ticket number now goes to the server as `ticketNumber`: one request where G8 made two (TKT-1, then AUD-1).
+- Each filter combination is its own query, as before; the 500-entry cap and the page size of 50 are unchanged.
+
+### 14.5 Verification
+
+- `npx tsc --noEmit`: clean.
+- `npm test`: **1,265 / 1,265** passing (1,205 before this round). New or rewritten:
+  - `tests/login/sign-in-button.test.mjs` (new): the button through NativeWind's own runtime, the src/-wide style-function scan, and the scroll rule on measured layouts;
+  - `tests/support/nativewind.mjs` and `tests/support/stubs/react-native.cjs` (new): run react-native-css-interop in Node;
+  - `tests/polish/sla-deadline.test.mjs`: the card's line (today, tomorrow, this week, later, breached, no SLA, on hold, resolved, closed, canceled, never a countdown, one rule), AA and lightness of its colours, the card and skeleton;
+  - `tests/rbac/audit-log.test.mjs`: every confirmed param, the path fallback, the unknown ticket number, the Dates filter;
+  - `tests/push/push.test.mjs`: the confirmed device-token contract, the notice with and without Firebase, `app.config.js`;
+  - `tests/home/dashboard.test.mjs`: the written contract's ranges and custom example.
+- No EAS build, no bundle build, no call to UAT or PROD. The web clone was read only (`7df97c8`), and no database was touched.

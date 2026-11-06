@@ -119,13 +119,14 @@ It reports, but does not fail on, the Android-only props that iOS ignores (`stat
 
 ## 6. EAS Update rules (from iOS-7)
 
-**Prerequisites, none of them in place yet:**
+**Prerequisites, in place since iOS-7a (`62a927c`):**
 - `expo-updates` added to the project (decision D6, iOS-7);
-- `runtimeVersion` set (compliance C2: the `fingerprint` policy);
+- `runtimeVersion` set (`app.json`: the `appVersion` policy, so runtime `0.1.0` today);
 - the EAS project (§4).
 
-**The command, for TestFlight builds:**
+**The command, for TestFlight builds** (PowerShell; the first line every time, rule 4):
 ```
+$env:EXPO_PUBLIC_APP_ENV="UAT"
 npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <what and why>"
 ```
 
@@ -135,8 +136,10 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
    - **never by update:** a new feature, screen, module or permission, or a change of purpose. Those ship as a new build through §4.
 2. **Always both flags: `--channel ios-preview --platform ios`.** Without `--platform ios`, an update is also built for Android.
 3. **Run §2 in full first,** with the release check on `preview`.
-4. **`eas update` does not run the build guard** and does not read `eas.json`'s `env`. The bundle takes `EXPO_PUBLIC_APP_ENV` from your shell. Make sure it is unset or `UAT`; `env.ts` treats anything but `PROD` as UAT.
-5. **Log every update** in `docs/ios/UPDATES-LOG.md` (created with the first one): date, channel, runtime version, commit, reason.
+4. **`eas update` does not run the build guard** and does not read `eas.json`'s `env`. The bundle takes `EXPO_PUBLIC_APP_ENV` from your shell.
+   - **Set it before every update: `$env:EXPO_PUBLIC_APP_ENV="UAT"`** in the same PowerShell window (Ronit, iOS-5f, 2026-11-06). `env.ts` also treats an unset value as UAT, but a window left with `PROD` from another task would bake PROD into a TestFlight update.
+   - It also decides `EMAIL_SIGN_IN_ENABLED` (UAT only, iOS-5f), so an update built without it set could drop or show the email sign-in by accident.
+5. **Log every update** in `docs/ios/UPDATES-LOG.md` (created in iOS-5f; entry 1 is the iOS-8a + iOS-5e update): date, channel, runtime version, commit, reason.
 6. **Never publish to `production` before iOS-9.** From then on, only through the script that manifest §8 L5 describes: it sets `PROD`, checks the flags and runs `verify-release-bundle` first.
 7. **The phone hotspot** (§4) applies here too.
 8. **The launch screen and the start-up intro ship together, in a build, never by update** (iOS-5c, 2026-10-30; `docs/brand/UI-STANDARDS.md` §iOS-A.12, `docs/PERFORMANCE.md` §12):
@@ -148,8 +151,13 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
    - **On `ios-preview` only, for internal TestFlight testers only** (§4 step 4; compliance K2). While this update is on the channel, no 0.1.0 build goes to an external group: that group's builds need Beta App Review, and the update reaches every 0.1.0 binary (`runtimeVersion` policy `appVersion`).
    - **Never on `production`.** The App Store build ships these features natively, in the binary App Review sees (iOS-9).
    - **Why an update can carry them:** they are JavaScript only. `app.json`, `package.json`, `package-lock.json`, `eas.json` and `assets/` are unchanged since build 1 (`git diff 30cc239 33dc1f6`; build 1 is `30cc239`, compliance E4). There is no new permission, entitlement or native module: G7c (push), which would need all three, is not ported.
-   - **Every other rule still applies:** §2 in full first, both flags, `EXPO_PUBLIC_APP_ENV` unset or `UAT`, and the hotspot. The update's `--message` and its `UPDATES-LOG.md` entry name this exception.
-   - **One time only.** It covers iOS-5e's code, `33dc1f6`; its docs commit changes no code. Later features follow rule 1 again. iOS-5f (Android's `e85c602` and `69a38ab`) needs its own decision.
+   - **Every other rule still applies:** §2 in full first, both flags, `EXPO_PUBLIC_APP_ENV` set to `UAT` (rule 4), and the hotspot. The update's `--message` and its `UPDATES-LOG.md` entry name this exception.
+   - **One time only.** It covers iOS-5e's code, `33dc1f6`; its docs commit changes no code. Later features follow rule 1 again. iOS-5f (Android's `e85c602` to `d8626bc`) had its own decision: rule 10.
+10. **iOS-5f ships in a new build, never by update** (Ronit, 2026-11-06; `ANDROID-DELTA.md` §10, decision 2):
+    - Its features (the polish pass, the SLA deadline, the audit filters and the UAT-only email sign-in) reach testers in **TestFlight build 0.1.0 (2)**, built through §4.
+    - **The runtime is shared.** `runtimeVersion` follows `appVersion`, and build 2 keeps version 0.1.0, so builds 1 and 2 both take updates for runtime 0.1.0 on `ios-preview`.
+      - Build 2 starts on its own code: its embedded bundle is newer than the update already on the channel (`UPDATES-LOG.md` entry 1), and expo-updates launches the newest.
+      - **But any update published after build 2 also reaches build 1.** One built from iOS-5f code would bring iOS-5f's features to build 1 by update, which this rule forbids. Before the next update, either every tester has moved to build 2 (build 1 expired in TestFlight), or the version moves on (a new runtime). **Ronit decides when the next update comes.**
 
 ## 7. Before a `production` build (iOS-9)
 
