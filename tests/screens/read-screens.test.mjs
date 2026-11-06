@@ -194,6 +194,12 @@ describe('animations skip when iOS Reduce Motion is on', () => {
     'src/navigation/SplashIntro.tsx': /reduceMotionSettled\(\)\.then\(\(reduce\) => \{\s*if \(live\) splashSequence\.motionSetting\(reduce\);/,
     // iOS-5c sign-in button: straight to the circle (or back to the pill), and the arc does not turn.
     'src/screens/auth/SignInButton.tsx': /if \(reduceMotionEnabled\(\)\) \{\s*collapse\.setValue\(to\);\s*return;\s*\}[\s\S]*if \(!busy \|\| reduceMotion\) return;/,
+    // iOS-5f press feedback: no dip with Reduce Motion on; the tint is set at once.
+    'src/components/PressFeedback.tsx': /if \(reduceMotionEnabled\(\)\) \{\s*held\.setValue\(toValue\);\s*return;\s*\}[\s\S]*reduceMotion\s*\?\s*\{ opacity: held\.interpolate/,
+    // iOS-5f Home count: the new number at once with Reduce Motion on.
+    'src/components/CountFade.tsx': /active && !reduceMotionEnabled\(\)[\s\S]*active && periodChanged && shown\.value !== value && !reduceMotionEnabled\(\)/,
+    // iOS-5f greeting mark: in place at once with Reduce Motion (or VoiceOver) on, at mount and on first display.
+    'src/components/GreetingMark.tsx': /reduceMotionEnabled\(\) \|\| screenReaderEnabled\(\) \? null : new Animated\.Value\(0\)[\s\S]*if \(reduceMotionEnabled\(\) \|\| screenReaderEnabled\(\)\) \{\s*entry\.setValue\(1\);\s*return;\s*\}/,
   };
   for (const [file, check] of Object.entries(CHECKS)) {
     test(`${path.basename(file)} checks Reduce Motion before it animates`, () => {

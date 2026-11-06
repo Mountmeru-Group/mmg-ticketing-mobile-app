@@ -97,6 +97,15 @@ const TOKEN_SIZED = {
   'src/screens/auth/SignInButton.tsx': { style: 'style={styles.pill}', height: loginLayout.button.height, width: loginLayout.button.height },
 };
 
+/**
+ * iOS-5f: Android's PressableCard (components/PressFeedback.tsx) is a Pressable whose classes and label all come from
+ * its caller (`<Pressable {...props} …>`). So that one tag is not checked itself; instead every `<PressableCard>` in
+ * src/ is checked exactly as a Pressable is, below.
+ */
+const PRESSABLE_TAGS = ['Pressable', 'PressableCard'];
+const PASS_THROUGH = { 'src/components/PressFeedback.tsx': /^<Pressable \{\.\.\.props\} \{\.\.\.feedback\.pressProps\(\{ onPressIn, onPressOut \}\)\}>$/ };
+const isPassThrough = (rel, text) => !!PASS_THROUGH[rel]?.test(text.replace(/\s+/g, ' '));
+
 // ── 1. Targets and labels ────────────────────────────────────
 
 describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
@@ -104,9 +113,14 @@ describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
     const PT = (step) => Number(step) * 4; // spacing.ts: step n = n × 0.25rem = 4n pt
     const short = [];
     let checked = 0;
+    let passThrough = 0;
     for (const rel of TSX) {
       const src = read(rel);
-      for (const { text, line } of openingTags(src, 'Pressable')) {
+      for (const { text, line } of PRESSABLE_TAGS.flatMap((tag) => openingTags(src, tag))) {
+        if (isPassThrough(rel, text)) {
+          passThrough += 1;
+          continue;
+        }
         checked += 1;
         const attrs = expandConstants(src, text);
         const sized = TOKEN_SIZED[rel];
@@ -124,13 +138,14 @@ describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
       }
     }
     assert.ok(checked > 50, `found ${checked} Pressables`);
+    assert.equal(passThrough, Object.keys(PASS_THROUGH).length, 'the one pass-through Pressable is where it is expected');
     assert.deepEqual(short, [], 'HIG Buttons: "a button needs a hit region of at least 44x44 pt"');
   });
 
   test('the hit slop is only for chips in a row: a lone icon button is 44 pt itself', () => {
     for (const rel of TSX) {
       const src = read(rel);
-      for (const { text, line } of openingTags(src, 'Pressable')) {
+      for (const { text, line } of PRESSABLE_TAGS.flatMap((tag) => openingTags(src, tag))) {
         const iconOnly = /(?:^|[\s`'"])w-(\d+)(?=[\s`'"])/.exec(text);
         if (iconOnly && Number(iconOnly[1]) * 4 < 44) assert.fail(`${rel}:${line}: an icon button narrower than 44 pt`);
       }
@@ -141,8 +156,11 @@ describe('every control: at least 44 × 44 pt, and a VoiceOver label', () => {
     const missing = [];
     for (const rel of TSX) {
       const src = read(rel);
-      for (const tag of ['Pressable', 'TextInput', 'Switch']) {
-        for (const { text, line } of openingTags(src, tag)) if (!/\baccessibilityLabel=/.test(text)) missing.push(`${rel}:${line} <${tag}>`);
+      for (const tag of [...PRESSABLE_TAGS, 'TextInput', 'Switch']) {
+        for (const { text, line } of openingTags(src, tag)) {
+          if (isPassThrough(rel, text)) continue;
+          if (!/\baccessibilityLabel=/.test(text)) missing.push(`${rel}:${line} <${tag}>`);
+        }
       }
     }
     assert.deepEqual(missing, [], 'HIG VoiceOver: "Provide alternative labels for all key interface elements"');
@@ -317,7 +335,10 @@ describe('Dynamic Type: the iOS text styles, the caps and the large-text layouts
         // iOS-5c: Login's 42 pt headline (Android's design, a style, not a class) is a title too; it stops at 1.3 ×,
         // sooner than iOS's Large Title, so a line never wraps (UI-STANDARDS §10.1, §iOS-A.12).
         const loginHeadline = /maxFontSizeMultiplier=\{loginType\.headlineMaxScale\}/.test(text) && /style=\{styles\.headline\}/.test(text);
-        const capped = /text-(lg|xl|2xl|3xl)\b/.test(text) || /maxFontSizeMultiplier=\{1\.4\}/.test(text) || loginHeadline;
+        // iOS-5f: the people row's avatar initials (Android's ×1.2, so two letters fit the 25 pt circle; the name
+        // beside them is never capped).
+        const peopleInitials = rel === 'src/components/PeopleRow.tsx' && /maxFontSizeMultiplier=\{INITIALS_MAX_SCALE\}/.test(text);
+        const capped = /text-(lg|xl|2xl|3xl)\b/.test(text) || /maxFontSizeMultiplier=\{1\.4\}/.test(text) || loginHeadline || peopleInitials;
         assert.ok(capped, `${rel}:${line}: a cap on text that isn't a title, an initial or a badge count`);
       }
     }
@@ -361,7 +382,8 @@ describe('Dynamic Type: the iOS text styles, the caps and the large-text layouts
     assert.equal(tableLayoutWidth(4, 1, 300), 480, 'wider: 4 × 120');
     assert.equal(tableLayoutWidth(2, 3.571, 300), 2 * Math.round(120 * 3.571), 'AX5');
     const html = code(read('src/components/HtmlText.tsx'));
-    assert.match(html, /const RENDERERS = \{ img: ImgRenderer, table: TableRenderer \};/);
+    // iOS-5f: + Android's <cid-image> paperclip (tests/polish/cid-image.test.mjs).
+    assert.match(html, /const RENDERERS = \{ img: ImgRenderer, table: TableRenderer, \[CID_IMAGE_TAG\]: CidImageRenderer \};/);
     assert.match(html, /<ScrollView horizontal/);
   });
 });

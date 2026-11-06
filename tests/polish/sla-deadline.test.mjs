@@ -3,8 +3,8 @@
 // and the colour is the hold-adjusted SLA status (getDisplaySlaStatus); the app adds no threshold of its own.
 // Dates are built in local time (the Date constructor with parts), as the phone shows them.
 //
-// iOS (iOS-5f, STEP 4): ported from Android dev d8626bc. The rules and colours are verbatim; the wiring tests (the
-// SlaDeadline component, ticket detail, the card's due line and top line, the skeleton) join in STEPs 5 and 6.
+// iOS (iOS-5f): ported from Android dev d8626bc (STEP 4: the rules and colours; STEP 5: the SlaDeadline component and
+// the list skeleton). The ticket detail and ticket card wiring tests join in STEP 6.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -115,6 +115,13 @@ describe('colours and where it shows', () => {
         assert.ok(gap >= 15, `${tones[i][0]} vs ${tones[j][0]}: ${gap.toFixed(1)}`);
       }
     }
+  });
+
+  test('no bar, no animation, no timer: the clock is read on render, focus and return to the app', () => {
+    const src = read('src/components/SlaDeadline.tsx');
+    assert.doesNotMatch(src, /Animated|setInterval|setTimeout|requestAnimationFrame|flex: elapsed|track/);
+    assert.match(src, /useFocusEffect\(\s*useCallback\(\(\) => \{\s*setNow\(Date\.now\(\)\);/);
+    assert.match(src, /if \(next === 'active'\) setNow\(Date\.now\(\)\);/);
   });
 
   test('the backend ask for a real countdown is filed (A31), with the Friday-evening example', () => {
@@ -241,4 +248,11 @@ describe('the card\'s due line: colour, place and cost', () => {
     assert.ok(amber - red >= 9, `amber ${amber.toFixed(1)} vs red ${red.toFixed(1)}`);
   });
 
+  test('the list skeleton matches the new card: two chips, then the due line under the people row', () => {
+    const skeleton = read('src/components/LoadingSkeleton.tsx');
+    const list = skeleton.slice(skeleton.indexOf('// `list`: TicketCard'));
+    assert.equal((list.match(/rounded-full" \/>/g) ?? []).length >= 2, true);
+    assert.match(list, /<Bar className="mr-1\.5 h-5 w-16 rounded-full" \/>\s*<Bar className="h-5 w-14 rounded-full" \/>\s*<\/View>/);
+    assert.match(list, /<View className="mt-2 h-4 flex-row items-center">\s*<Bar className="h-3\.5 w-3\.5 rounded-full" \/>/);
+  });
 });

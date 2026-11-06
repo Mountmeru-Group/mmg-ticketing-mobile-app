@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <!-- Setu greeting mark, evening (2026-11-03): a crescent moon (a 16-radius disc less a 13-radius disc offset up and to
+       the right). Flat, no gradients or shadows. Every colour is a src/theme/colors.ts token: #ffcc00 secondary
+       (brand yellow). -->
+  <path d="M22.56 8.07 A16 16 0 1 0 39.6 27.54 A13 13 0 0 1 22.56 8.07 Z" fill="#ffcc00"/>
+</svg>

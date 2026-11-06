@@ -274,17 +274,27 @@ function body(variant: NonNullable<LoadingSkeletonProps['variant']>, rows: numbe
         </View>
       );
     default:
-      // `list`: TicketCard — number and time, title, three badges, people line.
+      // `list`: TicketCard — number, raised and updated, title, two badges (status, priority), the people row under its
+      // hairline rule (two 25 dp avatars), then the SLA due line: a 14 dp clock and its words, 8 dp below (2026-11-05;
+      // TicketCard.tsx, PeopleRow.tsx). Most cards in a list are open, so the placeholder has the due line.
       return items.map((i) => (
         <Card key={i}>
-          <Bar className="mb-2 h-3 w-1/4" />
+          <Bar className="mb-2 h-3 w-1/2" />
           <Bar className="mb-1 h-4 w-3/4" />
           <View className="mt-2 flex-row">
             <Bar className="mr-1.5 h-5 w-16 rounded-full" />
-            <Bar className="mr-1.5 h-5 w-14 rounded-full" />
-            <Bar className="h-5 w-20 rounded-full" />
+            <Bar className="h-5 w-14 rounded-full" />
           </View>
-          <Bar className="mt-2 h-3 w-1/2" />
+          <View className="mt-3 flex-row items-center border-t border-border pt-2.5">
+            <Bar className="h-[25px] w-[25px] rounded-full" />
+            <Bar className="ml-1.5 h-3 w-24" />
+            <Bar className="ml-6 h-[25px] w-[25px] rounded-full" />
+            <Bar className="ml-1.5 h-3 w-16" />
+          </View>
+          <View className="mt-2 h-4 flex-row items-center">
+            <Bar className="h-3.5 w-3.5 rounded-full" />
+            <Bar className="ml-1 h-3 w-32" />
+          </View>
         </Card>
       ));
   }

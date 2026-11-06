@@ -2,15 +2,21 @@
 // A rendered body draws it as a paperclip icon (flat SVG) with "Image in attachments"; plain text reads
 // "[image in attachments]". The sanitiser runs for real (src/utils/html.ts); the renderer is read as source.
 //
-// iOS (iOS-5f, STEP 3): ported from Android dev d8626bc. The sanitiser and plain-text tests are verbatim; the renderer's
-// ("the rendered body draws it") join with HtmlText's paperclip in STEP 5.
+// iOS (iOS-5f): ported from Android dev d8626bc (STEP 3: the sanitiser and plain text; STEP 5: the renderer). One iOS
+// difference: iOS-4's table renderer sits in the same map (tests/screens/hig-polish.test.mjs).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
+import { palette } from '../../src/theme/colors.ts';
 import {
   CID_IMAGE_TAG, CID_IMAGE_TEXT, clearPreparedHtml, htmlToDisplayText, prepareHtmlBody, sanitizeForRender, sanitizeHtml,
 } from '../../src/utils/html.ts';
 
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 const PLACEHOLDER = `<${CID_IMAGE_TAG}>${CID_IMAGE_TEXT}</${CID_IMAGE_TAG}>`;
 const EMOJI = /\p{Emoji_Presentation}/u;
 
@@ -51,5 +57,25 @@ describe('plain text', () => {
   test('a body that is only a cid: image is not shown as empty', () => {
     clearPreparedHtml();
     assert.equal(prepareHtmlBody('<div><img src="cid:only@1"></div>').kind, 'html');
+  });
+});
+
+describe('the rendered body draws it', () => {
+  const html = read('src/components/HtmlText.tsx');
+
+  test('the element is registered as a block, and has its own renderer', () => {
+    assert.match(html, /\[CID_IMAGE_TAG\]: HTMLElementModel\.fromCustomModel\(\{ tagName: CID_IMAGE_TAG, contentModel: HTMLContentModel\.block \}\)/);
+    assert.match(html, /customHTMLElementModels=\{CUSTOM_ELEMENT_MODELS\}/);
+    assert.match(html, /const RENDERERS = \{ img: ImgRenderer, table: TableRenderer, \[CID_IMAGE_TAG\]: CidImageRenderer \};/);
+  });
+
+  test('a drawn paperclip (flat SVG through expo-image) and the words, not an emoji', () => {
+    assert.match(html, /const PAPERCLIP = require\('\.\.\/\.\.\/assets\/illustrations\/paperclip\.svg'\) as number;/);
+    assert.match(html, /<Image source=\{PAPERCLIP\} style=\{PAPERCLIP_SIZE\} contentFit="contain" accessible=\{false\} \/>/);
+    assert.match(html, />Image in attachments<\/Text>/);
+    const svg = read('assets/illustrations/paperclip.svg').replace(/<!--[\s\S]*?-->/g, '');
+    assert.doesNotMatch(svg, /Gradient|<filter|<image|<text/i);
+    const colours = [...svg.matchAll(/#[0-9a-f]{6}\b/gi)].map(([c]) => c.toLowerCase());
+    assert.deepEqual([...new Set(colours)], [palette.gray[500]]);
   });
 });
