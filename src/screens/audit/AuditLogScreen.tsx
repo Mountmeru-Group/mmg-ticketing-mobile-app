@@ -5,13 +5,13 @@
 // - Layout: a heading per day ("Today", "Yesterday", "Mon 02 Nov 2026"), then one card per entry: the action pill, the
 //   entity and time, the ticket number (a link, through the deep-link resolver), the person and their email, and the
 //   details in a tinted box (utils/audit-log.ts formatAuditDetails). Never the IP address the row carries.
-// - Filters: every one is a server-side AUD-1 param, and they combine in one request (auditLog.controller.ts:7-13):
+// - Filters: every one is a server-side AUD-1 param (the backend team's written contract, 2026-11-05), and they combine
+//   in one request (auditLog.controller.ts:7-49):
+//     Ticket      → ticketNumber=<n>, typed in the search box; the server finds the ticket. A number with no ticket
+//                   filters nothing server-side, so the app spots that and says "No ticket #n" (05 B.40)
 //     Entity type → entityType=Ticket | Comment | Attachment (exact match)
-//     Ticket      → ticketId=<id>; the search box takes a ticket number, resolved to its id by TKT-1 as the deep-link
-//                   resolver does (there is no ticket-number param)
-//     Person      → actorId=<user id>, picked with USR-3 (active users only)
-//   The endpoint has NO action, date or free-text filter (G8 §2, §6), so the app offers none: filtering a page on the
-//   device would show a partial answer as if it were the whole one.
+//     Person      → actorId=<user id>, picked with USR-3 (active users only); in the source, not the written contract
+//   There is no free-text filter: filtering a page on the device would show a partial answer as if it were the whole one.
 // - Memory: capped at 500 entries (useAuditLog), with the ticket list's "search or filter to narrow" footer.
 // - No polling; pull-to-refresh reloads the first page only.
 //
@@ -24,12 +24,11 @@
 //   "Clear all"; then the error banner, then the list.
 // - The list's foot: the tab bar takes its own space, so 24 pt (listBottomInset), not Android's insets.bottom + 24.
 // - Chips grow with the text size (at least 36 pt, a 4 pt hit slop); the pull-to-refresh spinner is tinted
-//   (RefreshControl `tintColor`, Android's `colors`); VoiceOver hears the ticket lookup's result (Android's live region
-//   is TalkBack's only); the footer's retry has a label.
+//   (RefreshControl `tintColor`, Android's `colors`); VoiceOver hears the line under the search box (Android's live
+//   region is TalkBack's only); the footer's retry has a label.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
-import { useQueryClient } from '@tanstack/react-query';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useIsOffline } from '@/api/network';
@@ -38,7 +37,7 @@ import {
   OfflineBanner, OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, SearchField, listBottomInset, type Person,
   type SheetOption,
 } from '@/components';
-import { findTicketIdByNumber, queryKeys, useAuditLog } from '@/hooks';
+import { useAuditLog } from '@/hooks';
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
 import { useAuthStore } from '@/store/auth.store';
 import { colors, palette, type AuditActionTone } from '@/theme';
@@ -78,12 +77,6 @@ const ACTION_ICONS: Record<AuditAction, keyof typeof Ionicons.glyphMap> = {
   ESCALATED: 'trending-up-outline',
 };
 
-/** The ticket search: idle, or the state of the last ticket-number lookup. */
-type TicketLookup =
-  | { state: 'idle' }
-  | { state: 'busy' | 'none' | 'offline' | 'error'; ticketNumber: number }
-  | { state: 'invalid' };
-
 const rowKey = (row: AuditListRow) => row.key;
 const rowType = (row: AuditListRow) => row.kind;
 
@@ -94,15 +87,13 @@ function countText(n: number): string {
 export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
   const role = navRole(useAuthStore((s) => s.user?.role));
   const offline = useIsOffline();
-  const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<AuditLogFilters>(NO_AUDIT_FILTERS);
   const [searchText, setSearchText] = useState('');
-  const [lookup, setLookup] = useState<TicketLookup>({ state: 'idle' });
+  // The search box holds something that is not a ticket number.
+  const [invalidSearch, setInvalidSearch] = useState(false);
   const [sheet, setSheet] = useState<'entity' | 'person' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // Each ticket search gets a number; an answer that comes back after a newer search, or a clear, is dropped.
-  const attempt = useRef(0);
 
   const list = useAuditLog(filters);
   const { refreshFirstPage, fetchNextPage, hasNextPage, isFetchingNextPage, isFetchNextPageError } = list;
@@ -125,51 +116,26 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
     if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError && !refreshing && !offline) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, refreshing, offline, fetchNextPage]);
 
-  // ── Ticket search: a number → its id (TKT-1) → ticketId ─────
+  // ── Ticket search: the number goes to the server as ticketNumber ─────
   const clearTicket = () => {
-    attempt.current += 1;
     setSearchText('');
-    setLookup({ state: 'idle' });
-    setFilters((f) => (f.ticket ? { ...f, ticket: null } : f));
+    setInvalidSearch(false);
+    setFilters((f) => (f.ticketNumber !== null ? { ...f, ticketNumber: null } : f));
   };
   const onChangeSearch = (text: string) => {
     setSearchText(text);
-    if (lookup.state !== 'idle' && lookup.state !== 'busy') setLookup({ state: 'idle' });
+    if (invalidSearch) setInvalidSearch(false);
   };
-  async function submitSearch() {
+  const submitSearch = () => {
     const text = searchText.trim();
     if (!text) {
       clearTicket();
       return;
     }
     const ticketNumber = parseAuditTicketNumber(text);
-    if (ticketNumber === null) {
-      setLookup({ state: 'invalid' });
-      return;
-    }
-    if (filters.ticket?.ticketNumber === ticketNumber) return;
-    if (offline) {
-      setLookup({ state: 'offline', ticketNumber });
-      return;
-    }
-    const mine = ++attempt.current;
-    setLookup({ state: 'busy', ticketNumber });
-    try {
-      const found = await queryClient.fetchQuery({
-        queryKey: queryKeys.auditLog.ticket(ticketNumber),
-        queryFn: () => findTicketIdByNumber(role, ticketNumber),
-      });
-      if (mine !== attempt.current) return;
-      if (found) {
-        setFilters((f) => ({ ...f, ticket: found }));
-        setLookup({ state: 'idle' });
-      } else {
-        setLookup({ state: 'none', ticketNumber });
-      }
-    } catch {
-      if (mine === attempt.current) setLookup({ state: 'error', ticketNumber });
-    }
-  }
+    setInvalidSearch(ticketNumber === null);
+    if (ticketNumber !== null) setFilters((f) => (f.ticketNumber === ticketNumber ? f : { ...f, ticketNumber }));
+  };
 
   const clearAll = () => {
     clearTicket();
@@ -240,7 +206,15 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
         contentContainerStyle={contentStyle}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={
-          activeCount > 0 ? (
+          list.ticketMissing && filters.ticketNumber !== null ? (
+            <EmptyState
+              illustration="empty"
+              title={`No ticket #${filters.ticketNumber}`}
+              message="The Service Desk has no ticket with that number. Check it and search again."
+              actionLabel="Clear the ticket filter"
+              onAction={clearTicket}
+            />
+          ) : activeCount > 0 ? (
             <EmptyState
               illustration="empty"
               title="No entries match these filters"
@@ -282,12 +256,12 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
           value={searchText}
           onChangeText={onChangeSearch}
           onClear={clearTicket}
-          onSubmitEditing={() => void submitSearch()}
+          onSubmitEditing={submitSearch}
           returnKeyType="search"
           placeholder="Ticket number, e.g. 1234"
           accessibilityLabel="Filter by ticket number"
         />
-        <LookupLine lookup={lookup} />
+        <SearchLine invalid={invalidSearch} missingTicket={list.ticketMissing ? filters.ticketNumber : null} />
 
         <ScrollView
           horizontal
@@ -296,16 +270,16 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
           contentContainerClassName="gap-2 py-1"
           keyboardShouldPersistTaps="handled"
         >
-          {filters.ticket ? (
+          {filters.ticketNumber !== null ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Ticket #${filters.ticket.ticketNumber}. Clear the ticket filter`}
+              accessibilityLabel={`Ticket #${filters.ticketNumber}. Clear the ticket filter`}
               onPress={clearTicket}
               hitSlop={4}
               className="min-h-9 flex-row items-center rounded-full border border-primary bg-primary px-3 py-1 active:opacity-80"
             >
               <Ionicons name="ticket-outline" size={14} color={colors.primaryForeground} />
-              <Text className="ml-1 text-sm font-medium text-primary-foreground">#{filters.ticket.ticketNumber}</Text>
+              <Text className="ml-1 text-sm font-medium text-primary-foreground">#{filters.ticketNumber}</Text>
               <Ionicons name="close" size={14} color={colors.primaryForeground} style={{ marginLeft: 4 }} />
             </Pressable>
           ) : null}
@@ -366,37 +340,20 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
   );
 }
 
-/** What the last ticket-number search found, or why it found nothing, in words; null while idle or looking. */
-function lookupText(lookup: TicketLookup): string | null {
-  if (lookup.state === 'idle' || lookup.state === 'busy') return null;
-  return lookup.state === 'invalid'
+/** Under the search box: why the search text is not used, or that the number names no ticket. */
+function SearchLine({ invalid, missingTicket }: { invalid: boolean; missingTicket: number | null }) {
+  const text = invalid
     ? 'Search takes a ticket number, like 1234. To see one person’s entries, tap Person.'
-    : lookup.state === 'none'
-      ? `No ticket #${lookup.ticketNumber}.`
-      : lookup.state === 'offline'
-        ? `You're offline. Ticket #${lookup.ticketNumber} can be looked up when you reconnect.`
-        : `Couldn't look up ticket #${lookup.ticketNumber}. Try again.`;
-}
-
-/** Under the search box: what the last ticket-number search found, or why it found nothing. */
-function LookupLine({ lookup }: { lookup: TicketLookup }) {
-  // VoiceOver hears the search start and each result (Android: accessibilityLiveRegion, TalkBack only).
-  const text = lookupText(lookup);
-  const spoken = lookup.state === 'busy' ? `Finding ticket #${lookup.ticketNumber}` : text;
+    : missingTicket !== null
+      ? `No ticket #${missingTicket}.`
+      : null;
+  // VoiceOver hears the line when it appears (Android: accessibilityLiveRegion, TalkBack only).
   useEffect(() => {
-    if (spoken) AccessibilityInfo.announceForAccessibility(spoken);
-  }, [spoken]);
+    if (text) AccessibilityInfo.announceForAccessibility(text);
+  }, [text]);
 
-  if (lookup.state === 'idle') return null;
-  if (lookup.state === 'busy') {
-    return (
-      <View className="mt-2 flex-row items-center">
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text className="ml-2 text-xs text-gray-500">Finding ticket #{lookup.ticketNumber}…</Text>
-      </View>
-    );
-  }
-  const error = lookup.state === 'error' || lookup.state === 'none';
+  if (text === null) return null;
+  const error = !invalid;
   return (
     <View accessibilityRole={error ? 'alert' : undefined} className="mt-2 flex-row items-start">
       <Ionicons

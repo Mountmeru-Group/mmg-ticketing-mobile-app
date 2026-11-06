@@ -65,6 +65,15 @@ export function formatRelative(value: ISODateString | Date | null | undefined, n
   return future ? `in ${text}` : `${text} ago`;
 }
 
+/** "2 Nov" on the phone's calendar; "2 Nov 2025" outside the current year. No leading zero. */
+export function formatShortDate(value: ISODateString | Date | null | undefined, now: number = Date.now()): string {
+  if (!value) return '—';
+  const d = toDate(value);
+  if (!d) return '—';
+  const year = d.getFullYear() === new Date(now).getFullYear() ? '' : ` ${d.getFullYear()}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${year}`;
+}
+
 // ── SLA (05 §A.9, decision D6: one function for list AND detail) ──
 
 export type SlaFields = Pick<

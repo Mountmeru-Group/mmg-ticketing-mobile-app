@@ -15,8 +15,16 @@ export interface AuditLogEntry {
   actor: { id: UUID; displayName: string; email: string } | null;   // null: a job, or the user was deleted
   ticket: { id: UUID; ticketNumber: number; title: string } | null; // null: no ticket, or the ticket was deleted
 }
-/** AUD-1 query. Only these five keys are read by the server (auditLog.controller.ts:6-7); each filter is exact. */
+/**
+ * AUD-1 query: the backend team's written contract (2026-11-05), plus `actorId`, which the source also reads
+ * (auditLog.controller.ts:7 at 7df97c8) but the written list leaves out. Each filter is exact; they combine with AND.
+ */
 export interface AuditLogQuery {
   page?: number; limit?: number;                // limit 1–100, default 25 (utils/pagination.ts:16-20)
-  entityType?: string; actorId?: UUID; ticketId?: UUID;
+  action?: AuditAction;                         // exact enum match
+  entityType?: string;                          // exact, case-sensitive
+  dateFrom?: ISODateString; dateTo?: ISODateString; // createdAt ≥ dateFrom, ≤ dateTo, each read with `new Date()`
+  ticketId?: UUID;
+  ticketNumber?: number;                        // the server looks the ticket up; an unknown number filters NOTHING (05 B.40)
+  actorId?: UUID;                               // in the source, not in the written contract
 }

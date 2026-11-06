@@ -78,8 +78,12 @@ function handleUnauthorized(serverMessage: string): void {
 
 // ── Response checks ──────────────────────────────────────────
 
+function contentTypeOf(response: AxiosResponse): string {
+  return String(response.headers['content-type'] ?? '').toLowerCase();
+}
+
 function isJsonResponse(response: AxiosResponse): boolean {
-  const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
+  const contentType = contentTypeOf(response);
   return contentType.includes('application/json') || contentType.includes('+json');
 }
 
@@ -108,7 +112,7 @@ function normaliseError(error: unknown): ApiClientError {
         return new ApiClientError('http', status, body);
       }
       // Plain-text 429 from express-rate-limit, Express HTML 404 on unknown writes, IIS error pages (01 §0.2, §0.5).
-      return new ApiClientError('not-json', status, { error: fallbackMessage(status) });
+      return new ApiClientError('not-json', status, { error: fallbackMessage(status) }, contentTypeOf(response));
     }
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
       return new ApiClientError('timeout', null, { error: 'Request timed out' });
@@ -144,13 +148,13 @@ apiClient.interceptors.response.use(
     // CRITICAL (00 §2, 01 §0.5, 05 B.8): in production an unknown GET under /api returns
     // 200 text/html (the SPA's index.html). Anything that is not JSON is an error, even on a 200.
     if (!isJsonResponse(response)) {
-      throw new ApiClientError('not-json', response.status, { error: 'Unexpected non-JSON response from the server' });
+      throw new ApiClientError('not-json', response.status, { error: 'Unexpected non-JSON response from the server' }, contentTypeOf(response));
     }
     // A JSON content-type is not enough: axios silently hands back the raw text when the body does not
     // parse (silentJSONParsing), so an HTML page labelled application/json would arrive as a string.
     // Every documented /api/v1 success body is an object or an array (01), never a bare string or null.
     if (typeof response.data !== 'object' || response.data === null) {
-      throw new ApiClientError('not-json', response.status, { error: 'Response body is not a JSON object or array' });
+      throw new ApiClientError('not-json', response.status, { error: 'Response body is not a JSON object or array' }, contentTypeOf(response));
     }
     return response;
   },

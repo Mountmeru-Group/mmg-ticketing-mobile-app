@@ -4,8 +4,20 @@
 //   script execution. Only inline base64 raster images survive; remote images are never fetched (05 §A.6).
 // - htmlToDisplayText(): plain-text fallback, used when the renderer fails.
 // - prepareHtmlBody(): both of the above for one body, from one sanitiser pass, with recent results cached.
+// An e-mail's inline (cid:) image becomes CID_IMAGE_PLACEHOLDER. The web writes a paperclip emoji and "image in
+// attachments" there; the app writes no emoji (Ronit, 2026-11-03): HtmlText draws a paperclip for the element, and plain
+// text reads its words.
 
-/** Web sanitiser, verbatim minimum from FE:TicketDetailPage.tsx:2685-2718 (05 §A.6). */
+/** The custom element standing in for a cid: image. HtmlText registers it and draws it; the sanitiser never strips it. */
+export const CID_IMAGE_TAG = 'cid-image';
+/** Its text is what the plain-text paths show (htmlToDisplayText, and the renderer's fallback). */
+export const CID_IMAGE_TEXT = '[image in attachments]';
+const CID_IMAGE_PLACEHOLDER = `<${CID_IMAGE_TAG}>${CID_IMAGE_TEXT}</${CID_IMAGE_TAG}>`;
+
+/**
+ * Web sanitiser, verbatim minimum from FE:TicketDetailPage.tsx:2685-2718 (05 §A.6), except the cid: placeholder
+ * (above).
+ */
 export function sanitizeHtml(html: string): string {
   let clean = html.replace(/<script[\s\S]*?<\/script>/gi, '');
   clean = clean.replace(/\s+on\w+="[^"]*"/gi, '');
@@ -20,9 +32,9 @@ export function sanitizeHtml(html: string): string {
   clean = clean.replace(/<!DOCTYPE[^>]*>/gi, '');
   clean = clean.replace(/<style[\s\S]*?<\/style>/gi, '');
   clean = clean.replace(/<!--[\s\S]*?-->/g, '');
-  clean = clean.replace(/<img[^>]*src=["']cid:[^"']*["'][^>]*\/?>/gi, '<span>📎 image in attachments</span>');
+  clean = clean.replace(/<img[^>]*src=["']cid:[^"']*["'][^>]*\/?>/gi, CID_IMAGE_PLACEHOLDER);
   clean = clean.replace(/(<img[^>]*)(src=["'][^"']*["'])([^>]*>)/gi, (match, _pre, src: string) => {
-    if (src.toLowerCase().includes('cid:')) return '<span>📎 image in attachments</span>';
+    if (src.toLowerCase().includes('cid:')) return CID_IMAGE_PLACEHOLDER;
     return match;
   });
   return clean.trim();
