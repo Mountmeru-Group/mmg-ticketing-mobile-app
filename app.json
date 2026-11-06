@@ -16,7 +16,7 @@
     ],
     "android": {
       "package": "com.mountmeru.servicedesk",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
