@@ -6,18 +6,21 @@ Updated 2026-10-29 for the first production build (Google Play internal testing)
 PROD URL set, version 1.0.0, release-bundle check fixed.
 Updated 2026-11-03 for the second production build, after UAT testing passed: versionCode 3, the production target,
 bundle, permissions and readiness re-verified (§5a). Not built.
+Updated 2026-11-06 for the third production build, after UAT testing of G9 completed: versionCode 4, the release-bundle
+check made to pass again (it had failed since G9 on an example email address, §6), and what a production build does
+differently from the UAT build that was tested (§5b). Not built.
 
 **Where things stand**
 
 | Item | State |
 |---|---|
-| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`3`** (`app.json`, set 2026-11-03). versionCode `2` (set 2026-10-29) is the AAB uploaded to Google Play; every build before it was `0.1.0` / `1` |
-| Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29 and 2026-11-03). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
+| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`4`** (`app.json`, set 2026-11-06). versionCode `3` (set 2026-11-03) is the latest AAB uploaded to Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
+| Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29, 2026-11-03 and 2026-11-06). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
 | `preview` APK | Ready to build with your Expo account (§2). It points at **UAT** |
-| Signing in | **Microsoft sign-in only, in every build.** The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5), with its route, its Login button and the helpers that existed only for it. AUTH-P2 is live on UAT (02-AUTH §7) |
-| `production` AAB | **versionCode 3: ready to build, not built** (§2a). UAT testing passed; re-verified 2026-11-03 (§5a). versionCode 2 is on Google Play. It points at **PRODUCTION**. Open items outside this repo are in §5 |
+| Signing in | **Production: Microsoft sign-in only.** UAT (`preview`) builds also offer email and password since G9 (2026-11-05, ⚠ ASSUMED contract, 02-AUTH §8); on a production build that option does not render (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`), so **Google's reviewer cannot use it** until A32 ships on PROD (§5b). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5), with its route, its Login button and the helpers that existed only for it. AUTH-P2 is live on UAT (02-AUTH §7) |
+| `production` AAB | **versionCode 4: ready to build, not built** (§2a). Verified 2026-11-06 (§5b). versionCode 3 is the latest on Google Play. It points at **PRODUCTION**, with **no push** (no Firebase in the `production` EAS environment, §2b). Open items outside this repo are in §5 |
 
 ---
 
@@ -87,6 +90,11 @@ Later builds: bump `android.versionCode`, commit, then repeat step 5.
 
 Prepared on 2026-10-29 and **not built**: Ronit runs it after review. Use PowerShell or Git Bash, in `mmg-ticketing-mobile-app`.
 
+**versionCode 4 (prepared 2026-11-06, not built).** Same steps as versionCode 3 below. In step 1, commit the 2026-11-06
+changes (§5b): `app.json`, `scripts/verify-release-bundle.js`, `tests/release/production-readiness.test.mjs` and this
+file. versionCode 3 is the latest on Play. Read §5b first: this build differs from the UAT build that was tested (no
+email sign-in, no push, no environment chip).
+
 **versionCode 3 (prepared 2026-11-03, not built).** Same steps. In step 1, commit the 2026-11-03 changes (§5a). The
 differences:
 - versionCode 2 is already on Play, so Play App Signing already has its key. That makes §3.4 possible now, if it isn't done.
@@ -135,6 +143,14 @@ Ronit has `google-services.json` from the Firebase project **`mmg-setu`**, Andro
    - Without the variable, `googleServicesFile` is not set at all, so prebuild never looks for a file that is not there (it would stop with "Cannot copy google-services.json").
    - A local native build uses the file only when asked: `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`.
 4. **Production is unchanged.** The `production` environment has no `GOOGLE_SERVICES_JSON`, so a production build is exactly as before: no Firebase, push `unavailable`. When push should reach production, run step 2 again with `--environment production` (and check §5).
+   - The exact command (not run; re-checked 2026-11-06, §5b), from the repo root, **before** the production build:
+     ```
+     eas env:set --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --environment production
+     ```
+   - Check it with `eas env:list --environment production`. The variable only takes effect on the next full build.
+   - On a Play install, Google's **app signing key** signs the app, not the EAS key (§3.4). If the Firebase Android API
+     key is restricted to Android apps, its allow-list needs that key's SHA-1 too, or Firebase gives a Play install no token.
+   - NTF-5/NTF-6 must also be deployed on production. Without them the app stays silent (`not-deployed`, a 404).
 
 **Why a secret file variable, not a commit** (the repo is private either way):
 - The repo already keeps this file out of git on purpose (`.gitignore`), and **EAS uploads only what git tracks**: a file placed at the root but ignored never reaches an EAS build by itself. Committing it means reversing that rule.
@@ -265,7 +281,17 @@ The fingerprint is not secret: it comes from the public certificate. Still, send
 
 ## 5. Pre-release checklist (before any `production` build)
 
-State on **2026-11-03** (versionCode 3, after UAT testing passed). Items marked **BLOCKS** stop a useful production build; the rest are on the person releasing. The build guard enforces the PROD URL item.
+State on **2026-11-06** (versionCode 4, after UAT testing completed). Items marked **BLOCKS** stop a useful production build; the rest are on the person releasing. The build guard enforces the PROD URL item.
+
+**Done in this repo (2026-11-06)**: details and evidence in §5b
+- [x] **versionCode** `3` → **`4`** (`app.json`). versionCode 3 is the latest AAB on Google Play (Ronit, 2026-11-06). `version` stays `1.0.0`. Package, slug, schemes and EAS projectId are unchanged.
+- [x] `tests/release/production-readiness.test.mjs` now requires versionCode **> 3**. Before, it required > 2.
+- [x] **Release-bundle check passing again.** It had **failed in both modes since G9** (2026-11-05): the email form's example address `name@mountmerugroup.com` read as an unapproved host. On Ronit's decision (2026-11-06) the check sets aside that one address, by exact value and as a whole token; the bare domain and every other host still fail, which a canary run proved (§6). `npm run verify:release-bundle` **PASS** in both modes.
+- [x] Production target re-verified: the PROD URL, the `production` profile (store, `app-bundle`), `preview` still on UAT, and the build guard's verdicts.
+- [x] Wider secret scan of the PROD bundle repeated, because G9 added password handling: no credential or token value (§5b).
+- [x] Permissions: no dependency or plugin changed since §5a, and the generated manifest is the same. The list in §5a stands.
+- [x] `npx tsc --noEmit` clean. `npm test`: 1265 pass, 0 fail.
+- Not done: no EAS build, no `eas env:set`, no commit. UAT configuration, `auth.config.ts` and the Entra redirect URI are untouched. Email sign-in stays UAT-only.
 
 **Done in this repo (2026-11-03)**: details and evidence in §5a
 - [x] **versionCode** `2` → **`3`** (`app.json`). versionCode 2 is on Google Play, and Play rejects an upload that isn't above it. `version` stays `1.0.0`. Package, slug, schemes and EAS projectId are unchanged.
@@ -297,7 +323,9 @@ State on **2026-11-03** (versionCode 3, after UAT testing passed). Items marked 
 - [x] `npx tsc --noEmit` passes. `npm test` passes. `npm run verify:release-bundle` passes in both modes (UAT and `--prod`), with the production host in its allow-list (§6).
 - [x] `eas.json` `production`: `distribution: "store"`, `android.buildType: "app-bundle"`, `EXPO_PUBLIC_APP_ENV=PROD`. targetSdk **36** (top table).
 
-**Open: outside this repo** (state on 2026-11-03. "No record" means this repo's docs don't show it done. It may be done; Ronit to confirm)
+**Open: outside this repo** (state on 2026-11-06. "No record" means this repo's docs don't show it done. It may be done; Ronit to confirm)
+- [ ] **BLOCKS Play review — a way in for Google's reviewer (A32, 06-BACKEND-ASKS).** A production build offers Microsoft sign-in only (§5b). Either the reviewer gets a Microsoft account that signs in without an MFA prompt, entered under Play Console → App content → **App access**, or A32 ships on PROD and Ronit opens the email option to production (`EMAIL_SIGN_IN_ENABLED`, a code change and a new build). No record of either.
+- [ ] **Push on production** (not blocking): `eas env:set … --environment production` (§2b step 4, not run), the Play app signing key's SHA-1 on the Firebase API key if it is restricted, and NTF-5/NTF-6 on production. Until all are done, push stays off on production, silently. (The Firebase project and `google-services.json` exist since 2026-11-05, for `preview`.)
 - [ ] **BLOCKS — AUTH-P2 on production.** `POST /api/v1/auth/microsoft/mobile` is confirmed on UAT only (02-AUTH §7.6 item 1; no record since). Until the backend team deploys and confirms it on production, a Play build shows **"App sign-in isn't available yet"** (`endpoint-missing`) after Microsoft sign-in, and nobody can get in.
 - [ ] **BLOCKS — security asks fixed and confirmed on production by the backend team** (06-BACKEND-ASKS, all "BLOCKING — launch"; still no record they shipped on 2026-11-03):
   - [ ] **A7**: authorization gaps, the AI-summary private-note leak first;
@@ -308,12 +336,12 @@ State on **2026-11-03** (versionCode 3, after UAT testing passed). Items marked 
 - [x] **SSO end to end on an installed UAT build**: UAT testing passed (Ronit, 2026-11-03).
 - [ ] **Google Play:**
   - [x] first AAB uploaded: versionCode 2 (Ronit, 2026-11-03). Confirm that Play App Signing is on, with a Google-generated key (§2a step 5);
+  - [x] versionCode 3 uploaded (Ronit, 2026-11-06);
   - [ ] **BLOCKS sign-in on Play builds:** Play app signing key SHA-1 → a second Entra redirect URI (§3.4), then sign-in tested on a Play install. No record yet;
   - [ ] Play Console data-safety form and privacy policy. §5a lists every permission. For Play's advertising-ID question, the answer is **No**: there is no ads or analytics SDK and no `AD_ID` permission;
   - [ ] store listing: icon, the app name "Setu" and the splash approved by brand, rebuilt from a high-resolution master (§7 Resolution).
-- [ ] **Push** (not blocking): the Firebase project and `google-services.json` (§2b), and NTF-5/NTF-6 deployed on production. Until both are done, push stays off, silently.
 - [x] **Decided:** ShortcutBadger's 16 launcher-badge permissions are blocked (Ronit, 2026-11-03). The three inherited normal permissions (§5a flag 2) stay.
-- [ ] `eas build --platform android --profile production`. Ronit runs it; it was not run on 2026-10-29 or 2026-11-03.
+- [ ] `eas build --platform android --profile production`. Ronit runs it; it was not run on 2026-10-29, 2026-11-03 or 2026-11-06.
 
 **Notes for Ronit (not blockers, nothing changed)**
 - The UAT URL string is in the production **JS** bundle once, as the unused UAT entry of the URL table in `src/config/env.ts`. A PROD build never selects it: `npm test` loads `env.ts` as a production release build and gets the PROD URL. Removing the string would mean restructuring `env.ts`, which this release did not do.
@@ -459,6 +487,124 @@ App bundle explorer → the bundle → Permissions.
   - no `READ_MEDIA_IMAGES` or `READ_MEDIA_VIDEO`, so Play's photo-and-video permissions declaration doesn't apply;
   - no location, contacts, microphone, `AD_ID`, `QUERY_ALL_PACKAGES` or `MANAGE_EXTERNAL_STORAGE`.
 
+## 5b. Verification for the versionCode 4 build (2026-11-06)
+
+Prepared on Ronit's written instruction after UAT testing completed (R4 and R5 relaxed for this repo only; R1, R2, R3
+and R6 not). Branch `dev` at `d8626bc` (equal to `origin/dev`, tree clean at the start), plus the changes in §5.
+**No EAS build and no `eas env:set` were run, and nothing was committed.** §5a still holds wherever this section does
+not repeat it.
+
+### Version
+
+- `android.versionCode`: `3` → **`4`**. versionCode 3 is the latest AAB on Play (Ronit, 2026-11-06), and Play rejects
+  an upload that isn't above the last one.
+- `version` stays **`1.0.0`**. No reason was found to change it: Play needs only a higher versionCode, and the test
+  pins `1.0.0`. Whether users should see a new name is still Ronit's call (§5a).
+- Unchanged, and pinned by `npm test`: package `com.mountmeru.servicedesk`, slug `meru-servicedesk`, the three
+  schemes, and EAS projectId `86788b11-…325e`.
+- `npx expo config --type introspect` with `EXPO_PUBLIC_APP_ENV=PROD`: versionCode 4, version 1.0.0, no
+  `googleServicesFile`.
+
+### Build profiles
+
+| Profile | EAS environment | App environment | API base URL | Distribution | Build type | Push (Firebase) | Email sign-in | Environment chip |
+|---|---|---|---|---|---|---|---|---|
+| `preview` | `preview` | UAT | `https://uat-servicedesk.mountmerugroup.com/api/v1` | `internal` | `apk` | Yes (`GOOGLE_SERVICES_JSON`) | Shown | Shown |
+| `production` | `production` | PROD | `https://servicedesk.mountmerugroup.com/api/v1` | `store` | `app-bundle` | **No** | **Not rendered** | **Not rendered** |
+
+- `eas.json` is unchanged and sets only `EXPO_PUBLIC_APP_ENV`. `src/config/env.ts` maps it to the URL.
+- Build guard verdicts, run locally:
+  - permitted: `production` + `PROD`, and `preview` + `UAT`;
+  - refused (exit 1): `preview` + `PROD`, `development` + `PROD`, no profile + `PROD`, `production` + `UAT`, and
+    `production` with nothing set.
+
+### What a production build does differently from the UAT build that was tested
+
+1. **Email sign-in: not on production. A production build shows Microsoft sign-in only.**
+   - `EMAIL_SIGN_IN_ENABLED` is `APP_ENV === 'UAT'`, and Login renders the email form only inside that branch. On PROD
+     the option is not drawn at all. Tests: `tests/motion/start-up-and-login.test.mjs` (PROD → `false`) and
+     `tests/auth/password-sign-in.test.mjs`.
+   - ⚠ **Google's reviewer reviews the production build, so the reviewer cannot use email sign-in.** Before Play
+     review, either give the reviewer a Microsoft account that signs in without an MFA prompt (Play Console → App
+     content → App access), or ship A32 on PROD and then open the email option to production. That second route is
+     a code change to `EMAIL_SIGN_IN_ENABLED` and a new build, and needs Ronit's say-so. Neither was done here.
+   - The form's code is still inside the PROD bundle, because the gate is decided at run time. Nothing can reach it:
+     Login is the only place that renders it.
+2. **Push: off on production, silently.** The `production` EAS environment has no `GOOGLE_SERVICES_JSON`, so the
+   build has no Firebase. Firebase gives no token, the app records `unavailable`, and Alerts says "This version of
+   Setu can't receive notifications". Nothing else changes. To turn it on (not run), see §2b step 4:
+   `eas env:set --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --environment production`.
+   This needs a new build afterwards, NTF-5/NTF-6 on production, and the Play signing key's SHA-1 on the Firebase API
+   key if that key is restricted.
+3. **The environment chip: not rendered.** `SHOW_ENVIRONMENT_CHIP` is `APP_ENV !== 'PROD'`, and Login renders the
+   chip only inside that branch (`tests/motion/start-up-and-login.test.mjs`). Profile (M10) still shows
+   **PROD · servicedesk.mountmerugroup.com** (§5 notes).
+
+### What ships in the release bundle
+
+`npm run verify:release-bundle -- --prod`: **PASS (PROD)**. The UAT mode also passes. Both had failed since G9 until
+the 2026-11-06 fix (§6).
+
+These values are in the bundle **by design**. None is a secret; the reasons are in §5a:
+- the PROD API base URL `https://servicedesk.mountmerugroup.com/api/v1`;
+- the Entra **client ID** `76c6edf5-…678b`, the **tenant ID** `24067079-…f4d8`, and the `login.microsoftonline.com`
+  authority;
+- the Entra redirect URI `msauth://com.mountmeru.servicedesk/<URL-encoded Base64 SHA-1>`. That hash comes from the EAS
+  key's public certificate (§3.2);
+- the EAS **project ID** `86788b11-…325e`;
+- the email form's example address `name@mountmerugroup.com` (§6), which is UI text.
+
+The UAT URL appears once in the JS, as the unused entry of the URL table. It is absent from the Hermes bytecode
+(re-checked 2026-11-06).
+
+**Not in the bundle.** A wider scan of the PROD JS and Hermes bundle was repeated on 2026-11-06, because G9 added
+password handling. The script is not in the repo; it printed counts and source file names only. It found:
+- 0 JWTs, PEM private keys, AWS keys, Google API keys, and Slack, GitHub or OpenAI-style keys;
+- 0 `Basic` credentials, `Bearer <value>` literals, Azure connection strings or service-account keys;
+- 0 `sd_session`, `test-login` or test secrets, and 0 Firebase config values (`mobilesdk_app_id`, sender ID);
+- 0 passwords, credentials or tokens with a value.
+
+What the scan did find, all expected. Each hit was traced through the source map and read in the source:
+- 4 "password = literal" hits. They are React Native's `TextInput` autofill map, the validation text "Enter your
+  password." (`signInAttempt.ts:163`) and the "Show password" / "Hide password" labels (`EmailSignInForm.tsx:214`).
+- 2 "token = literal" hits. They are the SecureStore **key name** `'mmg.session.token'` (`auth.store.ts:19`) and the
+  failure code `'no-token'` (`auth.api.ts:787`).
+- 1 `*_KEY =` hit, react-native-worklets' marker `MAGIC_KEY = 'REANIMATED_MAGIC_KEY'`.
+- 28 `client_secret` / `clientSecret` names, all inside `expo-auth-session`, none with a value (§6).
+
+No `.env` file exists in the repo (only `.env.example`, which holds names only), and EAS uploads none.
+
+**Sign-in, logging and token storage**
+- **Microsoft SSO is the only way in on a production build.**
+  - The auth stack has one screen, Login.
+  - Two flows create a session, both in `src/screens/auth/signInAttempt.ts`: Microsoft and email. Email cannot be
+    reached on PROD (above).
+  - The bundle has 0 of the 12 developer-token strings. `tests/release/production-readiness.test.mjs` checks all of this.
+- **Nothing logs a token, an ID token, an authorization code or a password.** `src/` has 9 `console` calls.
+  - 7 run only in `__DEV__`.
+  - 2 run in release:
+    - `pushLog()` (`src/push/registration.ts`) logs fixed text and HTTP statuses;
+    - G9's `logAuth()` (`src/api/auth.api.ts`) logs paths, HTTP statuses, failure codes and the *names* of response
+      keys. It never logs the email, the password, a token or the server's message, and only the email form reaches it,
+      so it never runs on PROD.
+  - Microsoft sign-in errors carry only the OAuth error code and the AADSTS number.
+- **Storage** is as in §5a: tokens are in `expo-secure-store` only, and `allowBackup` is `false`. The password is never
+  written to storage: it goes from the form's state into the request body only.
+
+### Release readiness
+
+| Check | Result | Evidence |
+|---|---|---|
+| targetSdkVersion ≥ 36 | **PASS**: 36 | React Native 0.86.3's catalog: `targetSdk = "36"`, `compileSdk = "36"` (`node_modules/react-native/gradle/libs.versions.toml`). Expo 57.0.31's `ExpoRootProjectPlugin.kt` reads it, and falls back to 35 only if it is missing. No `expo-build-properties` override |
+| minSdkVersion unchanged at 24 | **PASS**: 24 | The same catalog: `minSdk = "24"` |
+| No UAT reference reachable from a production build | **PASS** | `env.ts` picks UAT only when `EXPO_PUBLIC_APP_ENV` isn't `PROD`, and `production` inlines `PROD`. The UAT-only email form and the chip are not rendered on PROD. Deep links and both audit-log paths are built from `API_BASE_URL`. `npm test` loads `env.ts` as a PROD release build and gets the PROD URL and health URL. The UAT string sits once in the JS as the unused table entry, and is absent from the Hermes bytecode |
+| Every declared permission, and why | **PASS** | Unchanged since §5a, whose table gives each one's reason. No dependency or config plugin changed since then (`package.json` unchanged since `0c0bbac`). Re-checked 2026-11-06: the generated app manifest declares `INTERNET`, `VIBRATE`, `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` (both max SDK 32), and removes 18: `SYSTEM_ALERT_WINDOW`, the 16 badge permissions and `RECORD_AUDIO`. Library manifests add `CAMERA` (image picker), `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE` (NetInfo, expo-image), and `POST_NOTIFICATIONS` and `RECEIVE_BOOT_COMPLETED` (expo-notifications). Firebase adds `WAKE_LOCK` and c2dm `RECEIVE`, and androidx.core its signature permission: 12 in all. Firebase's permissions are declared even with push off, because `firebase-messaging` comes in with expo-notifications. Confirm the list on the built AAB (Play Console → App bundle explorer) |
+| 15-day re-authentication active | **PASS** | `REAUTH_INTERVAL_MS` = 15 days (`src/store/auth.store.ts`), checked on cold start and on every return to the foreground, with `prompt=login` when due. An email sign-in starts a new 15 days (`fullAuthAt: Date.now()`). `tests/auth/reauth.test.mjs`: 47 pass |
+| Audit log path fallback works | **PASS** (in tests) | `src/api/auditLog.api.ts` tries the written `/audit-logs` first, and the source's `/audit-log` only when the server has no such route (an HTML answer: the 200 SPA fallback or Express's 404). The answering path is kept for the rest of the run. A 403, 500 or 429 never switches path. `tests/rbac/audit-log.test.mjs`: 6 path tests and 67 in the file, all pass. Which path PROD mounts is not known here; either works, at a cost of one extra request per run, for an ADMIN only |
+| Push silent without Firebase or the endpoint | **PASS** | As §5a: no token → `unavailable`; a 404 → `not-deployed`, one `[push]` log line, no banner, dialog or toast |
+| Release-bundle check | **PASS** both modes | After the 2026-11-06 fix (§6); a canary proved it still fails on a real leak |
+| `npx tsc --noEmit` / `npm test` | **PASS** | Clean / 1265 pass, 0 fail |
+
 ## 6. Release bundle check (`npm run verify:release-bundle`)
 
 Until 2026-10-29 this section was "Proof the developer-token screen is not in a release bundle".
@@ -491,6 +637,7 @@ Until 2026-10-29 this section was "Proof the developer-token screen is not in a 
 | EAS project ID | `86788b11-…325e`, exact value | `app.json` `extra.eas.projectId`, bundled because `src/config/env.ts` imports `app.json`. It names the Expo project and grants nothing without an Expo login | Any other UUID-v4 |
 | `servicedesk.mountmerugroup.com` | Host | The PROD API host, set 2026-10-29. `env.ts` bundles its URL table whole, so every bundle names both hosts | Any other `mountmerugroup.com` host, e.g. QA |
 | Metro's `//# debugId=<uuid>` | The trailer at the very end of the bundle, only when its id equals the `debugId` in the source map Metro just wrote | Appears because the check now builds a source map. Metro generates a fresh id per build to pair a bundle with its map | A UUID anywhere else |
+| `name@mountmerugroup.com` (added 2026-11-06, Ronit's decision) | `EXAMPLE_EMAILS`: this exact address, case-sensitive, as a whole token: no email, host or URL character (`\w . % + @ : / -`) right before it, and no domain label after it. It is set aside before the host search, and the run prints how many times (2 today) | Example text, not a host: the email sign-in form's placeholder (`EmailSignInForm.tsx`) and its "Enter a valid email address, like …" message (`signInAttempt.ts`), G9. The form renders on UAT only, but its code ships in every bundle | The bare `mountmerugroup.com` anywhere else, any other address at the domain (`other@…`, `xname@…`), `https://name@mountmerugroup.com/…`, `name@mountmerugroup.com.<more>`, a different case, and every other host |
 
 - In the Hermes bytecode, the two client-secret names are not searched. Bytecode keeps no source positions to trace them by. It is compiled from the release JS checked above, and every other marker is still searched in it.
 - The old dev placeholder user ID is **no longer allowed**: its source (`src/utils/session.ts`) was deleted.
@@ -502,6 +649,27 @@ Until 2026-10-29 this section was "Proof the developer-token screen is not in a 
   - its literal value;
   - the QA host;
   - the unknown UUID.
+
+**Result on 2026-11-06 (versionCode 4): PASS in both modes, after a fix.**
+- **The check had failed in both modes since G9** (`999943e`, 2026-11-05) on one problem: "release JS names hosts
+  that are not allowed: `mountmerugroup.com`".
+  - The cause was the email form's example address `name@mountmerugroup.com`, in its placeholder and its validation
+    message: 2 occurrences, and the only ones in the bundle. The host pattern stops at `@`, so it read the domain as a host.
+  - It is not a host and not a secret. The G9 commits record no run of this check, so the failure went unnoticed.
+- **Fix (Ronit's decision, 2026-11-06):** the check sets aside that one address, by exact value and as a whole token
+  (`EXAMPLE_EMAILS` in the script, row in the table above). Nothing else was loosened.
+- **Canary (2026-11-06).** For one `--prod` run, a line was appended to `src/utils/greeting.ts`, then the file was
+  restored from a copy (`git diff` empty after). The line held the bare domain, `other@mountmerugroup.com`,
+  `https://name@mountmerugroup.com/x` and the QA host.
+  - Result: **FAIL**, naming `mountmerugroup.com` and `qa-servicedesk.mountmerugroup.com`.
+  - The set-aside count stayed at 2, so none of the canary strings was set aside.
+- Every other figure is unchanged from 2026-11-03:
+  - dev-token strings 0 / 0 / 0;
+  - forbidden markers 0;
+  - 28 client-secret names, all from `expo-auth-session`, none with a value;
+  - the 3 public UUIDs and 0 others;
+  - the two hosts;
+  - the `__DEV__`-only string 1 in the control and 0 in release.
 
 **Result on 2026-11-03 (versionCode 3): PASS in both modes.** The `--prod` run was repeated after the versionCode
 change, because `app.json` is bundled. Every figure equals the 2026-10-29 table below: dev-token strings 0 / 0 / 0;
@@ -531,6 +699,8 @@ History:
 - 2026-10-19 to 2026-10-29: FAIL, on the false positives listed above.
 - 2026-10-29: PASS, both modes (versionCode 2).
 - 2026-11-03: PASS, both modes (versionCode 3).
+- 2026-11-05 to 2026-11-06: FAIL, both modes, on the G9 example email address (above).
+- 2026-11-06: PASS, both modes (versionCode 4), with that one address set aside.
 
 ## 7. App identity assets (`assets/`)
 

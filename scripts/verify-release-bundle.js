@@ -9,6 +9,7 @@
 //   - `client_secret` / `clientSecret` (any case, `_`, `-` or nothing between) ONLY where the source map traces the
 //     occurrence to expo-auth-session's own files, and ONLY as a name: given a literal value anywhere, it fails;
 //   - three public UUIDs, by exact value: the Entra client ID, the Entra tenant ID and the EAS project ID;
+//   - one example email address, by exact value and as a whole token: the email sign-in form's (2026-11-06);
 //   - Metro's own `//# debugId=` trailer, only at the end of the file and only if it matches the source map.
 // A development bundle is also built as a CONTROL: a __DEV__-only string must be found there and not in release,
 // proving both that the search works and that __DEV__ code is stripped from the release bundle.
@@ -33,6 +34,18 @@ const PUBLIC_UUIDS = {
   '24067079-ff6a-4c4e-a5de-7c5ac7ddf4d8': 'Entra tenant ID (src/config/auth.config.ts)',
   '86788b11-328a-4ad7-a3dc-275b6f31325e': 'EAS projectId (app.json, bundled through src/config/env.ts)',
 };
+/**
+ * Example text, not a host (RELEASE.md §6, Ronit 2026-11-06). Set aside before the host search ONLY as this exact,
+ * whole address: the bare domain anywhere else, any other address at it, and any other host still fail.
+ */
+const EXAMPLE_EMAILS = {
+  'name@mountmerugroup.com': 'the email sign-in form\'s example address (src/screens/auth/EmailSignInForm.tsx placeholder, signInAttempt.ts message)',
+};
+/**
+ * `address` standing alone: no email, host or URL character directly before it (so never the user part of
+ * `https://name@host`), and no domain label continuing after it.
+ */
+const wholeAddress = (address) => new RegExp(`(?<![\\w.%+@:/-])${address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.[\\w-])`, 'g');
 
 const DEV_TOKEN_NEEDLES = [
   'DevTokenScreen', 'DevTokenForm', 'Developer session token', 'Developer: use a UAT session token',
@@ -210,7 +223,9 @@ if (strangers.length) {
 const valued = SECRET_VALUE.reduce((n, re) => n + (js.match(re) ?? []).length, 0);
 if (valued) problems.push(`release JS gives a client-secret name a literal value ${valued}× (values not printed)`);
 
-const hosts = [...new Set((js.match(/[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
+const examples = Object.keys(EXAMPLE_EMAILS).map((address) => [address, (js.match(wholeAddress(address)) ?? []).length]);
+const hostJs = Object.keys(EXAMPLE_EMAILS).reduce((t, address) => t.replace(wholeAddress(address), ' '), js);
+const hosts = [...new Set((hostJs.match(/[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
 const badHosts = hosts.filter((h) => !ALLOWED_HOSTS.includes(h));
 if (badHosts.length) problems.push(`release JS names hosts that are not allowed: ${badHosts.join(', ')}`);
 const v4 = js.match(/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi) ?? [];
@@ -222,6 +237,7 @@ if (/Bearer [0-9a-f]{8}-/i.test(js)) problems.push('release JS contains a litera
 console.log(`\nClient-secret names in release JS: ${origins.length}, from expo-auth-session: ${origins.length - strangers.length}, given a literal value: ${valued}`);
 console.log(`Public UUIDs in release JS: ${[...new Set(knownV4.map((u) => PUBLIC_UUIDS[u.toLowerCase()]))].join('; ') || 'none'}; other UUID-v4 literals: ${unknownV4}${js.length < targets['release JS'].length ? ' (Metro debugId trailer set aside)' : ''}`);
 console.log(`mountmerugroup.com hosts in release JS: ${hosts.join(', ') || 'none'}`);
+console.log(`Example email addresses set aside before the host search: ${examples.map(([a, n]) => `${EXAMPLE_EMAILS[a]} ${n}×`).join('; ')}`);
 console.log(`Control (development bundle): __DEV__-only string found ${count(control, DEV_ONLY_NEEDLE)}×; dev-token strings ${DEV_TOKEN_NEEDLES.filter((n) => count(control, n) > 0).length}/${DEV_TOKEN_NEEDLES.length} (0 expected: the screen is deleted)`);
 console.log(`Bundles kept for inspection in: ${out}\n`);
 
