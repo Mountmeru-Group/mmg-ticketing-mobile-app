@@ -278,11 +278,17 @@ describe('who writes the date', () => {
   // (docs/ios/ANDROID-DELTA.md §5, item 5), so iOS checks them here, with the developer-token screen it still has.
   test('signInAttempt only after a challenged sign-in; never the profile save; the __DEV__ developer-token screen always', () => {
     const callers = sourceFiles().filter((rel) => /setSession\(\{/.test(read(rel)));
+    // iOS-5g: + the email sign-in, which starts the 15 days as Android's does (999943e): a password is a full check.
     assert.deepEqual(callers.sort(), [
       'src/hooks/useProfile.ts',
       'src/screens/auth/DevTokenScreen.tsx',
+      'src/screens/auth/passwordSignInAttempt.ts',
       'src/screens/auth/signInAttempt.ts',
     ]);
+    assert.match(
+      read('src/screens/auth/passwordSignInAttempt.ts'),
+      /setSession\(\{ token: session\.token, user: session\.user, fullAuthAt: Date\.now\(\) \}\)/,
+    );
     const attempt = read('src/screens/auth/signInAttempt.ts');
     assert.match(attempt, /const fullAuthAt = challenge \? Date\.now\(\) : undefined;/);
     assert.match(attempt, /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);

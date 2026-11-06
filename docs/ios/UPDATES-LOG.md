@@ -19,4 +19,5 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
 - **iOS-5f is not an update.** Ronit's decision 2 (2026-11-06; `ANDROID-DELTA.md` §10) sends iOS-5f to testers in **TestFlight build 0.2.0 (2)**: `app.json` `version` 0.1.0 → 0.2.0 (Ronit, 2026-11-06), so its runtime is **0.2.0**.
   - An update for build 2 is published for runtime 0.2.0 and cannot reach build 1; entry 1 cannot reach build 2.
   - **Build 1 is retired once 0.2.0 is on TestFlight** (expired in App Store Connect). Nothing more is published for runtime 0.1.0. `RELEASE-IOS.md` §6, rule 10.
+- **iOS-5g is not an update either.** G9, the email sign-in (UAT builds only), is in the same build **0.2.0 (2)** as iOS-5f (Ronit, iOS-5g; `ANDROID-DELTA.md` §10.8). That build waits for the backend team to confirm the endpoint sends no `Set-Cookie` (`RELEASE-IOS.md` §6, rule 10). A later G9 change goes by update only if it is a fix (rule 1).
 - **The next entry** names its runtime (0.2.0) and follows rule 1 (fixes only).

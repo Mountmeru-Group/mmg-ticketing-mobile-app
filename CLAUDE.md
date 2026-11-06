@@ -10,7 +10,8 @@
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
 - **Port source:** `origin/dev` @ `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (since iOS-5f, 2026-11-06; before it `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
   - To bring later Android changes across, diff `d8626bc..origin/dev` (empty on 2026-11-06).
-  - **Not yet on iOS from `d8626bc`:** G9, the email and password sign-in (`999943e`, `d8626bc`), is its own phase, **iOS-5g**, once the backend team confirms the contract (`docs/ios/ANDROID-DELTA.md` §10.7).
+  - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on **UAT builds only**. It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
+    - **Open, and it blocks shipping G9 to testers:** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`.
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
 - Stack (`package.json` is the source of truth):
@@ -33,9 +34,15 @@
   - iOS-8 testing-team rounds
   - iOS-9 App Store readiness + submit
 - **Auth on iOS:**
-  - Microsoft SSO (AUTH-P2) is live on UAT. On iOS it is wired in iOS-6, once IT has registered the iOS redirect `msauth.com.mountmeru.servicedesk://auth`.
-  - Until then the only way in is the `__DEV__` developer-token screen, which arrives in iOS-2.
-  - The TestFlight test login (manifest §8) is a proposal and is **not approved**.
+  - **Microsoft SSO** (AUTH-P2) is the sign-in in every build.
+    - Built in iOS-6 (2026-10-28) with the redirect `msauth.com.mountmeru.servicedesk://auth` (`02-AUTH.md` §7.7), and in TestFlight since build 0.1.0 (1).
+    - Android's 15-day forced re-authentication applies (iOS-5d, `02-AUTH.md` §iOS-A).
+  - **Email and password sign-in** (G9, iOS-5g) is on **UAT builds only**.
+    - A build-time gate and a run-time gate keep it out: a `production` bundle holds none of it.
+    - It makes one call, `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`02-AUTH.md` §iOS-B).
+    - It does not reach testers until the backend team confirms that endpoint sends no `Set-Cookie`.
+  - **The developer-token screen** is `__DEV__` only. It is compiled out of every release build, `preview` and `production`; `verify-release-bundle` proves it is absent.
+  - The TestFlight test login (manifest §8) is a proposal and is **not approved**; nothing is built.
 
 ## iOS branch rules — NON-NEGOTIABLE
 

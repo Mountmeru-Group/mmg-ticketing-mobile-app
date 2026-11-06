@@ -198,6 +198,8 @@ describe('animations skip when iOS Reduce Motion is on', () => {
     'src/components/PressFeedback.tsx': /if \(reduceMotionEnabled\(\)\) \{\s*held\.setValue\(toValue\);\s*return;\s*\}[\s\S]*reduceMotion\s*\?\s*\{ opacity: held\.interpolate/,
     // iOS-5f Home count: the new number at once with Reduce Motion on.
     'src/components/CountFade.tsx': /active && !reduceMotionEnabled\(\)[\s\S]*active && periodChanged && shown\.value !== value && !reduceMotionEnabled\(\)/,
+    // iOS-5g email form: opens in place at once with Reduce Motion on.
+    'src/screens/auth/EmailSignInForm.tsx': /if \(reduceMotionEnabled\(\)\) \{\s*reveal\.setValue\(1\);\s*return;\s*\}/,
     // iOS-5f greeting mark: in place at once with Reduce Motion (or VoiceOver) on, at mount and on first display.
     'src/components/GreetingMark.tsx': /reduceMotionEnabled\(\) \|\| screenReaderEnabled\(\) \? null : new Animated\.Value\(0\)[\s\S]*if \(reduceMotionEnabled\(\) \|\| screenReaderEnabled\(\)\) \{\s*entry\.setValue\(1\);\s*return;\s*\}/,
   };

@@ -65,6 +65,17 @@ describe('Login environment chip: never on a production build', () => {
     }
   });
 
+  // 2026-11-05: the email sign-in follows the same rule. Its endpoint is only on UAT.
+  // iOS (iOS-5g): a production release build refuses to start (above), so its EMAIL_SIGN_IN_ENABLED is read from the
+  // source; the build-time gate that keeps the code out of that bundle is tests/auth/ios-password-sign-in.test.mjs.
+  test('email sign-in: off on a production release build, on for every UAT build', async () => {
+    await assert.rejects(loadEnv(false, 'PROD'), /no PROD API URL is configured/);
+    assert.match(read('src/config/env.ts'), /^export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';$/m);
+    for (const [dev, appEnv] of [[false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
+      assert.equal((await loadEnv(dev, appEnv)).EMAIL_SIGN_IN_ENABLED, true, `dev=${dev} env=${appEnv}`);
+    }
+  });
+
   test('Login renders the chip, and its label, only inside the SHOW_ENVIRONMENT_CHIP branch', () => {
     const login = read('src/screens/auth/LoginScreen.tsx');
     const open = '{SHOW_ENVIRONMENT_CHIP ? (';
@@ -77,7 +88,8 @@ describe('Login environment chip: never on a production build', () => {
     assert.match(branch, /\{ENVIRONMENT_LABEL\}/);
     // Outside the branch the label is only imported, never rendered.
     assert.deepEqual(rest.match(/ENVIRONMENT_LABEL/g), ['ENVIRONMENT_LABEL']);
-    assert.match(rest, /^import \{ ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
+    // 2026-11-05: the same import also brings EMAIL_SIGN_IN_ENABLED (Login's email sign-in, UAT only).
+    assert.match(rest, /^import \{ EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
   });
 });
 
@@ -342,7 +354,7 @@ describe('Login, "arc split"', () => {
   });
 
   test('no colour is written into the login or motion code: every one comes from src/theme/colors.ts', () => {
-    for (const rel of ['src/screens/auth/LoginScreen.tsx', 'src/screens/auth/SignInButton.tsx', 'src/navigation/SplashIntro.tsx', 'src/components/Shimmer.tsx']) {
+    for (const rel of ['src/screens/auth/LoginScreen.tsx', 'src/screens/auth/SignInButton.tsx', 'src/screens/auth/EmailSignInForm.tsx', 'src/navigation/SplashIntro.tsx', 'src/components/Shimmer.tsx']) {
       assert.doesNotMatch(read(rel), /#[0-9a-f]{3,8}\b|rgba?\(/i, rel);
     }
   });
@@ -356,9 +368,9 @@ describe('motion rules hold in every animation in src/', () => {
   const ALLOWED = new Set(['opacity', 'translateX', 'translateY', 'scale', 'scaleX', 'scaleY', 'rotate']);
 
   // iOS: with the success notice that stands in for Android's toast (iOS-3b).
-  test('the animating files are exactly these nine', () => {
+  test('the animating files are exactly these ten', () => {
     // 2026-11-03 (iOS-5f): + the greeting mark, the press feedback and the Home count fade (docs/PERFORMANCE.md §13;
-    // tests/motion/polish.test.mjs). Android's email form joins with the iOS sign-in in STEP 7.
+    // tests/motion/polish.test.mjs). iOS-5g: + Login's email form opening in place (UI-STANDARDS.md §15.2).
     assert.deepEqual(animated.sort(), [
       'src/components/CountFade.tsx',
       'src/components/GreetingMark.tsx',
@@ -368,6 +380,7 @@ describe('motion rules hold in every animation in src/', () => {
       'src/components/StatusBadge.tsx',
       'src/components/SuccessNotice.tsx',
       'src/navigation/SplashIntro.tsx',
+      'src/screens/auth/EmailSignInForm.tsx',
       'src/screens/auth/SignInButton.tsx',
     ]);
   });
@@ -445,6 +458,7 @@ describe('motion rules hold in every animation in src/', () => {
       'src/components/StatusBadge.tsx': [/return \(\) => pulse\.stop\(\);/],
       'src/components/SuccessNotice.tsx': [/return \(\) => \{\s*clearTimeout\(timer\);\s*animation\?\.stop\(\);\s*\};/],
       'src/navigation/SplashIntro.tsx': [/return \(\) => play\.stop\(\);/, /return \(\) => fade\.stop\(\);/],
+      'src/screens/auth/EmailSignInForm.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/],
       'src/screens/auth/SignInButton.tsx': [/useEffect\(\(\) => \(\) => running\.current\?\.stop\(\), \[\]\);/, /return \(\) => loop\.stop\(\);/],
     };
     assert.deepEqual(Object.keys(cleanups).sort(), animated.sort());

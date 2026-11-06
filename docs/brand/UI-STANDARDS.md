@@ -1385,7 +1385,7 @@ Android's §11–§13 (G6–G8), on iOS. What is shown, counted and sent is Andr
 
 ### iOS-A.15 Android's polish, the SLA deadline and the audit filters on iPhone (iOS-5f, 2026-11-06)
 
-Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/colors.ts` and `motion.ts`), with these iOS differences. §15.2–§15.3 (the email sign-in) are not on iOS yet: G9 is its own phase, iOS-5g.
+Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/colors.ts` and `motion.ts`), with these iOS differences. §15.2–§15.3 (the email sign-in) came across in iOS-5g: §iOS-A.16.
 
 **VoiceOver (§14.1, §14.4):**
 - The ticket card is one element, as since iOS-4. Its label reads the people row and the dates: "Ticket 19445: <title>. Requested by <name>, technician <name>. Raised 2 Nov, updated 2 days ago. Due Fri 7 Nov, 17:00".
@@ -1403,3 +1403,27 @@ Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/color
 **Haptics (§14.5):** not Android's `performAndroidHapticsAsync`. iOS-4's four (§iOS-A.6) already cover Android's three events; iOS-5f added the error haptic to the five forms that show a failed save inline. A ticket created with failed attachments keeps iOS-4's warning.
 
 **Pinned by:** `tests/rbac/swipe-actions.test.mjs` (VoiceOver = swipe, per persona), `tests/polish/haptics-parity.test.mjs`, `tests/home/greeting-mark.test.mjs`, `tests/polish/people-row.test.mjs`, `tests/motion/polish.test.mjs`, `tests/rbac/audit-log.test.mjs` and the scans in `tests/screens/hig-polish.test.mjs`.
+
+### iOS-A.16 The email sign-in on iPhone (iOS-5g, 2026-11-06, UAT builds only)
+
+Android's §15.2 and §15.3 apply on iOS as written: the same tokens (`emailForm`, `loginType`, `emailReveal`), the OR divider, the form opened in place, the failure box, "Sign in" at 52 pt with the face drawn through the children function (never a function `style`), the keyboard rule (`revealScrollY`) and the motion. The sign-in calls only `POST /auth/mobile/login` (`docs/web-system/02-AUTH.md` §iOS-B). The iOS differences:
+
+**Only on UAT builds, twice over.** `EMAIL_SIGN_IN_ENABLED` hides it at run time, as on Android. A build-time gate also keeps the form out of a `production` bundle altogether, so App Review's Login shows only "Sign in with Microsoft" (§iOS-A.12).
+
+**Keyboard and AutoFill (§15.2):**
+- Email: the email keyboard (`keyboardType`, `inputMode`), no capitals, corrections or spell check, focused when the form opens. `textContentType="username"` with `autoComplete="email"`, so iOS Password AutoFill pairs it with the password. Return key **next**.
+- Password: `textContentType="password"`, `autoComplete="current-password"`, masked. Return key **go** signs in. AutoFill offers the person's saved passwords above the keyboard; the app stores none.
+- `KeyboardAvoidingView` with `padding`, as on Android and as the app's other forms (iOS's keyboard does not resize the window).
+
+**VoiceOver (§15.2):** iOS has no live region.
+- A field error, or the failure box's title and message, is **announced** when it appears (`AccessibilityInfo.announceForAccessibility`). The failure box is also an `alert`.
+- The text action is a button, "Sign in with email instead", hint "Shows email and password fields". The toggle is a button, "Show password" / "Hide password" (`accessibilityLabel`, which VoiceOver reads; Android: `aria-label`).
+- While an email sign-in runs, the Microsoft pill is hidden from VoiceOver (`accessibilityElementsHidden`; Android hides it from TalkBack).
+
+**Dynamic Type (§16):** the fields, the text action and "Sign in" take `minHeight` (48 pt, 48 pt and 52 pt) in place of a fixed height, and grow with the text. The eye toggle stays 48 × 48 pt. `tests/screens/hig-polish.test.mjs` counts the action, the toggle and "Sign in" among the token-sized targets; `tests/login/sign-in-button.test.mjs` checks the button stays in view and at least 48 pt tall at 200 % text.
+
+**The password** is cleared on success, on failure, on unmount and in the submit's `finally`. It is never stored, logged or put in an error (`02-AUTH.md` §8.5, §iOS-B).
+
+**Light only** (§iOS-A.10), as Login.
+
+**Pinned by:** `tests/auth/password-sign-in.test.mjs` (Android's, one path), `tests/auth/ios-password-sign-in.test.mjs` (iOS: gates, Keychain, password, keyboard, VoiceOver, Dynamic Type), `tests/login/sign-in-button.test.mjs`, and the scans in `tests/motion/start-up-and-login.test.mjs`, `tests/screens/read-screens.test.mjs` and `tests/screens/hig-polish.test.mjs`. Device checks: `docs/ios/UAT-TEST-PLAN-IOS.md` G20.
