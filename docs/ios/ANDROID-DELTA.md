@@ -1,9 +1,9 @@
 # Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5e: `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c`** (§9). To sync later Android work, diff `8b522e3..origin/dev`: in this clone on 2026-11-03 that is `e85c602`, `69a38ab` and `0c0bbac` (§9.5).
-> iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
-> The builds are in `00-PORT-MANIFEST.md` §4.15–§4.18. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
+> **Port source since iOS-5f: `origin/dev` @ `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7`** (§10). To sync later Android work, diff `d8626bc..origin/dev`: empty in this clone on 2026-11-06. G9 (email sign-in) from `d8626bc` is not on iOS yet: iOS-5g (§10.7).
+> iOS-5e's port source was `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (§9). iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
+> The builds are in `00-PORT-MANIFEST.md` §4.15–§4.19. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
 
 ## 1. The rule (Ronit, 2026-10-30)
 
@@ -294,7 +294,7 @@ Three commits reached `dev` while iOS-5e was being built. None of them is in iOS
 
 No clash. Android's new UI-STANDARDS §11–§13 and ROLE-MATRIX §17–§19 were free on iOS; they sit before §iOS-A. The iOS notes are in lettered sections: UI-STANDARDS §iOS-A.14, ROLE-MATRIX §iOS-A.7 (and its §7, the mutation check), WEB-VS-MOBILE-ROLES §iOS-A.6, and 01-API-CONTRACT's first lettered section, §iOS-A.
 
-## 10. iOS-5f: the sync to `d8626bc` (2026-11-06, in progress)
+## 10. iOS-5f: the sync to `d8626bc` (built 2026-11-06)
 
 ### 10.1 What came across
 
@@ -333,21 +333,21 @@ At planning (`git fetch`, 2026-11-06), `origin/dev` was `d8626bc`, the brief's p
 | C1 | `versionCode` 3, `RELEASE.md` §5a | `0c0bbac` | — | **Not ported** (Android only) | — |
 | C2 | ShortcutBadger permissions blocked | `5b3c73a` | — | **Not ported** (Android only; iOS has no `expo-notifications`) | — |
 | D1 | Footer copyright year from the device clock | `be33e7e` | The footer's year stays current | **Port** | 4, 6 |
-| D2 | G9 email and password sign-in, UAT builds only | `999943e` | A second way in, on UAT | **Port, changed:** one call to the confirmed path only (decision 1) | 7 |
+| D2 | G9 email and password sign-in, UAT builds only | `999943e` | A second way in, on UAT | **Port, changed:** one call to the confirmed path only (decision 1). **Moved to iOS-5g** (§10.7) | iOS-5g |
 | D3 | G9 findings, A32, the re-read (docs) | `be33e7e`, `0f75e51` | Docs only | **Docs** (STEP 1: G9-PASSWORD-LOGIN, 06) | 1 |
-| E1 | The email Sign in button visible (no function `style`), kept above the keyboard | `d8626bc` | The button could not be seen on UAT | **Port** with D2 | 7 |
+| E1 | The email Sign in button visible (no function `style`), kept above the keyboard | `d8626bc` | The button could not be seen on UAT | **Port** with D2 (iOS-5g) | iOS-5g |
 | E2 | Push: `google-services.json` through `app.config.js`; NTF-6 sends `{ token, platform }` | `d8626bc` | Android push on UAT builds | **Not ported** (push stays out, decision 4) | — |
 | E3 | Audit log: `/audit-logs` then `/audit-log`; `action`, `dateFrom`, `dateTo`, `ticketNumber`; "No ticket #n" | `d8626bc` | ADMIN filters the log by action and date; gap 12 closed | **Port** | 1, 3, 6 |
 | E4 | Ticket cards: "#n · Raised 2 Nov · updated 2d ago", and the due line (`slaDueLine`) in place of the SLA chip | `d8626bc` | Raised and due dates on each card | **Port** | 4, 5, 6 |
 | E5 | Dashboard: stays on `/dashboard/all`; its params match the written contract | `d8626bc` | None | **Docs only** (01 §8) | 1 |
 
-**Portable: 13** (A1, A2, A3, A4, A7, B1, B2, B3, D1, D3, E3, E4, E5), **plus G9** (D2 with E1). **Not ported: 7** (A5, A6, B4, C1, C2, E2, and G7c's push client, as in iOS-5e).
+**Portable: 13** (A1, A2, A3, A4, A7, B1, B2, B3, D1, D3, E3, E4, E5), **all 13 built in iOS-5f**, **plus G9** (D2 with E1), moved to iOS-5g (§10.7). **Not ported: 7** (A5, A6, B4, C1, C2, E2, and G7c's push client, as in iOS-5e).
 
 ### 10.3 Ronit's decisions (iOS-5f brief, 2026-11-06)
 
-1. **G9 email and password sign-in is in this phase** (STEP 7), using **only the path the backend team confirmed**. Android's fallback chain (`/auth/mobile/login` → `/auth/login/mobile` → `/auth/mobile` → `/auth/login`) is **not ported**. **iOS must never call `POST /auth/login`.**
-   - **⏳ The confirmed contract is still a placeholder** in the brief (`<CONFIRMED_PATH>`, `<CONFIRMED_BODY>`, `<CONFIRMED_RESPONSE>`). STEP 7 stops for it. Recorded as pending in `01-API-CONTRACT.md` §iOS-A and `docs/G9-PASSWORD-LOGIN.md` §iOS-A.
-2. **iOS-5f ships in a new TestFlight build, 0.1.0 (2), not by EAS Update** (`RELEASE-IOS.md` §6, rule 10; `UPDATES-LOG.md`).
+1. **G9 email and password sign-in was planned for this phase** (STEP 7), using **only the path the backend team confirmed**. **Moved to its own phase, iOS-5g** (§10.7). Android's fallback chain (`/auth/mobile/login` → `/auth/login/mobile` → `/auth/mobile` → `/auth/login`) is **not ported**. **iOS must never call `POST /auth/login`.**
+   - **⏳ The confirmed contract was still a placeholder** in the brief (`<CONFIRMED_PATH>`, `<CONFIRMED_BODY>`, `<CONFIRMED_RESPONSE>`). STEP 7 stopped for it. Recorded as pending in `01-API-CONTRACT.md` §iOS-A and `docs/G9-PASSWORD-LOGIN.md` §iOS-A.
+2. **iOS-5f ships in a new TestFlight build, not by EAS Update**: **0.2.0 (2)** since STEP 8 (Ronit: a new version, so a new runtime) (`RELEASE-IOS.md` §6, rule 10; `UPDATES-LOG.md`).
 3. **Swipe (A4):** VoiceOver custom actions "Assign" and "Resolve", under exactly the swipe's rules. An iOS-only accessibility addition.
 4. **Push (E2, G7c) stays out.**
 - **Not ported** (Android native only): A5 (with a check that every Android haptic event has an iOS-4 haptic), A6, B4, C1, C2, E2. **E5 is docs only.**
@@ -357,7 +357,7 @@ At planning (`git fetch`, 2026-11-06), `origin/dev` was `d8626bc`, the brief's p
 
 - **Verbatim from `d8626bc`:** `03-DATA-MODEL.md`, `05-RULES-AND-GAPS.md`, `06-BACKEND-ASKS.md`, `PERFORMANCE.md` (§13, §14), `docs/G9-PASSWORD-LOGIN.md` (new). 05, 06 and G9-PASSWORD-LOGIN each gain an **§iOS-A** at the end: push is not on iOS, and iOS uses only the confirmed G9 path.
 - **Merged** (three-way; every line Android added is present, checked by script): `01-API-CONTRACT.md` (its §iOS-A rewritten for iOS-5f), `UI-STANDARDS.md` (§14–§16 before §iOS-A), `WEB-VS-MOBILE-ROLES.md` (gap 12 closed; the audit-filter row's iOS cell says "being built" until STEP 8).
-- **Left for STEP 7:** `02-AUTH.md`. All of Android's changes to it are G9 (§8, Android's assumed contract); they land with the iOS sign-in and its own §iOS-A note.
+- **Left for G9 (iOS-5g):** `02-AUTH.md`. All of Android's changes to it are G9 (§8, Android's assumed contract); they land with the iOS sign-in and its own §iOS-A note.
 - **Not on iOS:** `docs/RELEASE.md` (Android's release guide, manifest §4.7).
 - **New:** `docs/ios/UPDATES-LOG.md`. `RELEASE-IOS.md` §6: `$env:EXPO_PUBLIC_APP_ENV="UAT"` before every update (rule 4), and rule 10 (iOS-5f by build only; builds 1 and 2 share runtime 0.1.0).
 
@@ -365,6 +365,33 @@ At planning (`git fetch`, 2026-11-06), `origin/dev` was `d8626bc`, the brief's p
 
 No clash. Android's new UI-STANDARDS §14–§16 and PERFORMANCE §13–§14 were free on iOS; they sit before §iOS-A. 05, 06 and G9-PASSWORD-LOGIN get their first lettered section, §iOS-A. 01's §iOS-A keeps its letter.
 
-### 10.6 Results
+### 10.6 Results (STEP 8, 2026-11-06)
 
-Filled in at STEP 8.
+**Built:** all 13 portable changes (§10.2), in six commits: `0d2b623` docs, `8d87945` permissions, `9d2e820` audit data and the cid placeholder, `2467174` functions and theme, `82c6c12` components, `18a795e` screens. G9 (D2, E1) moved to iOS-5g (§10.7). Details by file: `00-PORT-MANIFEST.md` §3.20 and §4.19.
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 errors |
+| `npm test` | **1,391 → 1,589**, all passing (190 → 228 suites) |
+| Mutation check, the new rules (swipe and audit) | **30 of 30 caught**, each applied alone against the full suite and restored; `src/` and `tests/` byte-identical afterwards (SHA-1). Swipe 15: the rule (8), the VoiceOver actions (3), the row and the list (4). Audit 15: the path and its fallback, the params, `isNoSuchGetRoute`, `contentType`, the dates, the unknown ticket number, the calendar. The G9 gate: iOS-5g. Earlier in the phase: 11 of 11 (components), 3 of 3 (press feedback); two equivalent mutations dropped |
+| `npm ci --dry-run` | up to date |
+| `npx expo-doctor` | 19/21. The known `react-native-render-html` notice, and **new: five Expo SDK 57 patch releases** since the lock file (`expo` 57.0.31 → 57.0.32, `expo-image-picker`, `expo-sharing`, `expo-splash-screen`, `expo-updates`). Not changed: no package change in this phase, and Android `dev` is on the same versions. Recorded for the next build phase |
+| `npx expo export --platform ios` | one Hermes bundle, **5,588,572 bytes** (iOS-5e: 5,548,120; +40,452, +0.73 %), written to the session scratch folder and deleted |
+| `npm run verify:release-bundle` | **PASS (preview)** and **PASS (`--profile production`)**: 2,317 modules, 207 of them app code (iOS-5e: 2,305 and 195). Developer-token strings 0 of 12, control 12 of 12. No Android-only API reached. No email sign-in in either (G9 not built) |
+| `package.json`, `package-lock.json` | unchanged since `6897b70` |
+| `app.json` | one change: `version` 0.1.0 → **0.2.0** (Ronit, STEP 8), so build 2's runtime is 0.2.0 (`RELEASE-IOS.md` §6, rule 10) |
+| `git log d8626bc..origin/dev` | empty (fetched 2026-11-06) |
+| Verbatim | 19 files byte-identical to `d8626bc` (4 SVGs, 2 docs, 13 source files) |
+
+**Not run:** a device check. UAT G19.1–G19.17 (`UAT-TEST-PLAN-IOS.md`).
+
+### 10.7 G9: pending, its own phase (iOS-5g)
+
+**Ronit, 2026-11-06:** STEP 7 was skipped. G9 (D2 with E1, Android `999943e` and `d8626bc`) becomes its own phase, **iOS-5g**, once the backend team confirms the contract. Nothing of it is in iOS-5f or in build 0.2.0 (2). Decision 1 stands for iOS-5g: one call to the confirmed path, never `POST /auth/login`, UAT builds only.
+- **Waiting on:** the contract in writing: path and method, request body, the 200 field by field (`user.countryId`; `name` or `displayName`), every error with its body and message, **whether it sets a cookie**, its rate limit, which accounts may use it (06 A32, §iOS-A).
+- **Docs already in place (STEP 1):** `docs/G9-PASSWORD-LOGIN.md` §iOS-A, 01 §iOS-A, 06 §iOS-A. `02-AUTH.md`'s G9 changes land with iOS-5g.
+
+**The cookie proof (the brief's item c): half proven.**
+- **Proven from source** (React Native 0.86.3, axios): `src/api/client.ts:37` `withCredentials: false` → `node_modules/axios/lib/adapters/xhr.js:212-213` → `node_modules/react-native/Libraries/Network/XMLHttpRequest.js:642` and `RCTNetworking.ios.js:54` → `RCTNetworking.mm:319` `request.HTTPShouldHandleCookies = NO`. With NO, React Native never adds the shared jar's cookies (`RCTNetworking.mm:321-325`). Auth is Bearer only.
+- **Not provable from React Native's source:** that a `Set-Cookie` on the answer is never **stored**. React Native's session accepts and stores cookies (`RCTHTTPRequestHandler.mm:98-100`); skipping them for a request with the flag off is iOS's behaviour (Apple: "whether cookies will be sent with and set for this request"). It is settled only if the confirmed endpoint sends **no `Set-Cookie`**, which 06 A32 asks for.
+- **A React Native finding, existing, recorded and not changed:** on any HTTP redirect, `RCTHTTPRequestHandler.mm:149-159` (`willPerformHTTPRedirection`) sets the redirected request's headers to the shared jar's cookies, whatever `withCredentials` says, which also **drops `Authorization`**. It applies to every API call today. No `/api/v1` call is expected to redirect; UAT G19.16 checks it on the device. Recorded in `APP-STORE-COMPLIANCE.md` (G9 section).

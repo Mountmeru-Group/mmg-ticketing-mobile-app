@@ -6,7 +6,7 @@
   - G: iOS-only checks;
   - H: write safety, on one agreed UAT test ticket;
   - I: the account-deletion request and the privacy link.
-- **246 checks:** A–E 140, G 82 (23 screens at two text sizes among them), H 17, I 7. iOS-5e (2026-11-03) added twenty-one for Android's `8b522e3` (G6, G7a, G7b, G8): C5a–C5c, D1.3c, D1.6a, D1.6b, G10.23 and G16–G18. It rewrote C1, C5, C6, D1.2, D1.6, E12.2 and E12.6, and widened G10.2 and G10.3. Android's C5d (the notification permission) has no iOS check: push (G7c) is not ported. iOS-5d (2026-11-01) added six for Android's `f4fad10` 15-day re-authentication, G15.1–G15.6, and extended G1.3. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
+- **263 checks:** A–E 140, G 99 (23 screens at two text sizes among them), H 17, I 7. iOS-5f (2026-11-06) added seventeen for Android's `e85c602`–`d8626bc` (the polish pass, the SLA deadline, the audit filters, the copyright year), G19.1–G19.17, for build 0.2.0 (2); G18 still holds. G9's email sign-in checks come with iOS-5g. iOS-5e (2026-11-03) added twenty-one for Android's `8b522e3` (G6, G7a, G7b, G8): C5a–C5c, D1.3c, D1.6a, D1.6b, G10.23 and G16–G18. It rewrote C1, C5, C6, D1.2, D1.6, E12.2 and E12.6, and widened G10.2 and G10.3. Android's C5d (the notification permission) has no iOS check: push (G7c) is not ported. iOS-5d (2026-11-01) added six for Android's `f4fad10` 15-day re-authentication, G15.1–G15.6, and extended G1.3. iOS-5b (2026-10-30) added six, from Android's `4063df3` plan: D1.3a, D1.3b, E14.3, E17.3, E18.1 and E18.2. iOS-5c (2026-10-30) added two for Android's `c5c63ac` start-up animation, A5a and G14.3, and rewrote A5, A6, B1.1, B1.5, B1.8, C1 and C8 for the new Login.
 - **F, the defect log, is at the end**, so that it follows every section.
 
 **How to use it**
@@ -545,6 +545,30 @@ Android's plan has no audit-log check, so these are iOS's own. Run them after Se
 | G18.4 | Admin | Tap the ticket in an entry | The ticket opens **inside More**; the back chevron returns to the audit log | |
 | G18.5 | Admin | Scroll to the end of the list | More entries load as you go, up to 500. No entry shows an IP address | |
 | G18.6 | User, Technician, Technician-CA, L2 Manager | Open the **More** tab | **No** Audit log row, and nothing in the app opens the audit log (D1.3c) | |
+
+### G19. Android's polish, the SLA deadline and the audit filters (iOS-5f, build 0.2.0 (2); Android `e85c602`–`d8626bc`)
+
+Android's plan has no checks for these, so they are iOS's own. Use **build 0.2.0 (2)**. G9's email sign-in is not in this build (iOS-5g).
+
+| ID | Role | Steps | Expected | ✓/✗ |
+|---|---|---|---|---|
+| G19.1 | Technician | TestFlight › Setu. Then Profile, or Settings › Apps › Setu | Build **0.2.0 (2)** installs and opens on UAT. Once it is out, build 0.1.0 (1) is expired in TestFlight | |
+| G19.2 | Technician | Tickets. Look at a card for an open ticket with an SLA, and one for a Resolved ticket | Top line: **"#<n> · Raised <day> · updated <2d ago>"**, the New reply badge (if any) on the right. Under the two chips, a hairline, then the people row: the requester's pale-red avatar and name → the technician's dark avatar and "First L.", or a dashed ring with + and *Unassigned*. At the foot, a clock and **"Due Fri 13 Nov, 17:00"** in green (amber when due soon, red **"Breached …"** when missed). The Resolved card has no due line. No SLA chip | |
+| G19.3 | User | Tickets. Look at a card, then try to swipe it left | The people row shows the technician only (or *Unassigned*). The card does not swipe | |
+| G19.4 | Technician | On an **In progress** card, swipe left. Tap **Assign**; come back; swipe again and tap **Resolve**. Then swipe a **Closed** card | **Assign** (dark) and **Resolve** (green) appear. Assign opens the Assign screen; Resolve opens the closure sheet, as the status chip's Resolve does. A Closed card shows only what a tap offers there: nothing for a technician | |
+| G19.5 | Technician | Scroll the list with a card swiped open. Swipe one card open, then another. Long-press a card, then try to swipe | Scrolling closes the open card, and a vertical scroll never drags a card. Only one card is open at a time. While tickets are selected, no card swipes | |
+| G19.6 | L2 Manager, then Admin | Swipe an In progress card; then (Admin) a Closed one | L2 Manager: **Resolve** only. Admin: Assign and Resolve; on Closed, **Assign** | |
+| G19.7 | Technician | Turn on VoiceOver. Focus a card and listen; then swipe up or down for its actions | It reads "Ticket <n>: <title>. Requested by <name>, technician <name>. Raised <day>, updated <time ago>. Due …". The actions are **Change status**, **Select**, **Assign** and **Resolve**, but only where the swipe offers them (G19.4–G19.6). While selecting, Assign and Resolve are gone. A User's card has neither | |
+| G19.8 | Any | Press and hold a ticket card, then a task, an approval, a catalogue item, an Alerts row, an attachment and a Home tile. Then turn on Reduce Motion and repeat once | Each dips slightly and dims while held, and comes back on release; a scroll that starts on a card shows nothing. Under Reduce Motion it only dims | |
+| G19.9 | Technician | Open Home in the morning (05:00–11:59), afternoon (12:00–16:59) or evening. Then turn on VoiceOver, swipe Setu away and open it | Beside "Good morning, <name>" a small drawn **sun** (afternoon: sun behind a cloud; evening: a moon), which rises once into place. With VoiceOver on, or Reduce Motion on, it is simply there. VoiceOver never reads it | |
+| G19.10 | Technician | Home. Read under each count. Then Period › **Last 7 days** | Under each count its window: "this month" (Open: **"right now"**). The Active chip reads **Active** with "right now". After the change the numbers cross-fade into the new ones, and the captions read "last 7 days". At AX5 a caption wraps instead of being cut | |
+| G19.11 | Any | Open an open ticket with an SLA. Then one on hold, then a Resolved one | Under the badges: **Resolution ● Due Mon 11:00** (green, amber, or red "Breached"). On hold: no time. Resolved: no row. VoiceOver reads "Resolution: Due …" as one item | |
+| G19.12 | Admin | Audit log. Type a ticket number that does not exist and search | **"No ticket #<n>"** with "Clear the ticket filter", the same line under the search box, and no entries. VoiceOver says "No ticket #<n>." | |
+| G19.13 | Admin | Audit log › **All actions** › Status changed. Then the dates chip › **Last 7 days**. Then dates › **From a day…** | Each narrows the list (and Clear all resets them). "From a day…" closes the Dates sheet, then the iOS calendar opens; no day after today can be picked. A From day after the Until day moves Until with it | |
+| G19.14 | Any | Open a ticket whose email had a pasted screenshot (an inline image) | A grey **paperclip** and *Image in attachments* where the image was. No emoji | |
+| G19.15 | Any | Signed out: read Login's footer, with VoiceOver on | **"Copyright © <this year> Mount Meru Group"**; VoiceOver reads "Copyright <year> Mount Meru Group" | |
+| G19.16 | Developer | A debug build on UAT with the network log open. Use every screen once | No `/api/v1` response is a **redirect (3xx)**. If one is, log it in F: React Native re-attaches the shared cookie jar and drops `Authorization` on a redirect (an existing behaviour, `docs/ios/APP-STORE-COMPLIANCE.md`, G9 section) | |
+| G19.17 | Technician | System Haptics on. In Airplane Mode, send a reply (then turn it off) | The error **buzz** when the reply's error shows under the form (iOS-5f; also Create ticket, closure, service request and Submit for approval). G9.1–G9.3 still hold | |
 
 ---
 

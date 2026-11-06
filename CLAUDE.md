@@ -8,8 +8,9 @@
 
 - This is the **iPhone app** for the Mount Meru Group Service Desk. Users see it as **Setu**. In-app text that says "the Service Desk" means the backend or the IT team, not the app.
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
-- **Port source:** `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (since iOS-5e, 2026-11-03; before it `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
-  - To bring later Android changes across, diff `8b522e3..origin/dev` (on 2026-11-03 that is `e85c602` and `69a38ab`, not yet ported).
+- **Port source:** `origin/dev` @ `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (since iOS-5f, 2026-11-06; before it `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
+  - To bring later Android changes across, diff `d8626bc..origin/dev` (empty on 2026-11-06).
+  - **Not yet on iOS from `d8626bc`:** G9, the email and password sign-in (`999943e`, `d8626bc`), is its own phase, **iOS-5g**, once the backend team confirms the contract (`docs/ios/ANDROID-DELTA.md` §10.7).
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
 - Stack (`package.json` is the source of truth):

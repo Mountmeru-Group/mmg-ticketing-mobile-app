@@ -468,12 +468,12 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc`. It describes the Android build, its ⚠ ASSUMED contract and the Google Play reviewer.
 
-**What iOS does differently (Ronit's iOS-5f decisions, 2026-11-06; ANDROID-DELTA §10)**
+**What iOS does differently (Ronit's iOS-5f decisions, 2026-11-06; ANDROID-DELTA §10).** Built in its own phase, **iOS-5g**, once the backend team confirms the contract (Ronit, 2026-11-06). Nothing of it is in iOS-5f or in TestFlight build 0.2.0 (2).
 - **One call, to the confirmed path only.** iOS ports the email sign-in only against the contract the backend team confirmed in writing. Android's tolerance (the four paths, `{ username, email, password }`, alternative key names for the token, name and expiry) is **not ported**.
 - **iOS never calls `POST /api/v1/auth/login`.** On iOS it stays a do-not-call route with no exception (`01-API-CONTRACT.md` §iOS-A).
 - **UAT builds only**, gated by `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'` exactly as on Android. A `production` build never renders the form; `verify-release-bundle` checks both profiles.
 - **The same session as Microsoft sign-in:** the same resilient reader of the 200, the token in the Keychain with `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, the 15-day re-authentication, the reinstall wipe, sign-out and the AUTH-2 `countryId` rule, all as for SSO on iOS and as on Android.
-- **Ships in a new TestFlight build, 0.1.0 (2),** not by EAS Update (`docs/ios/UPDATES-LOG.md`; compliance C2).
+- **Ships in a TestFlight build,** not by EAS Update (`docs/ios/UPDATES-LOG.md`; compliance C2): the build after 0.2.0 (2), as iOS-5g decides.
 - **The reviewer.** Google Play's reviewer (§7) has an App Store twin: App Review's demo account (compliance A4). Whether this sign-in, once on PROD with a reviewer account, replaces A4's Entra account is an **open decision for iOS-9**. Sign in with Apple is not required: Setu signs in only with existing company accounts, Microsoft or company credentials (Guideline 4.8, compliance G1).
 
 **The confirmed contract (recorded for iOS)**
@@ -485,4 +485,6 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 | 200 | ⏳ **PENDING** — the brief's working text: `{ token, user, expiresAt }`, "correct if different" |
 | Errors | ⏳ **PENDING** — the brief's working text: 400 / 401 / 403 / 429 / 500 as `{ error }`, "correct if different" |
 
-iOS-5f STEP 7 stops until Ronit fills these in. No iOS code calls AUTH-P1 before then, and nothing here is guessed.
+iOS-5g starts when Ronit fills these in. No iOS code calls AUTH-P1 before then, and nothing here is guessed.
+
+**The cookie proof (half proven, iOS-5f).** `withCredentials: false` sets `HTTPShouldHandleCookies = NO` (`node_modules/react-native/Libraries/Network/RCTNetworking.mm:319`), so React Native sends no jar cookie. That a `Set-Cookie` on the answer is never stored is iOS's behaviour, not React Native's code, and is settled only if the confirmed endpoint sends none. React Native re-attaches jar cookies and drops `Authorization` on a redirect (`RCTHTTPRequestHandler.mm:149-159`). `docs/ios/APP-STORE-COMPLIANCE.md`, G9 section.

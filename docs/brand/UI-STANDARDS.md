@@ -1382,3 +1382,24 @@ Android's §11–§13 (G6–G8), on iOS. What is shown, counted and sent is Andr
 **Push notice (§12, G7c):** not on iOS. Alerts keeps its notice that the Service Desk has no push yet, which stays true on iOS.
 
 **Pinned by:** `tests/home/ios-period.test.mjs`, `tests/rbac/audit-log.test.mjs` §6, and the all-of-`src/` scans in `tests/screens/hig-polish.test.mjs` (44 pt, labels) and `read-screens.test.mjs` (no Android-only API, no colour outside the theme).
+
+### iOS-A.15 Android's polish, the SLA deadline and the audit filters on iPhone (iOS-5f, 2026-11-06)
+
+Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/colors.ts` and `motion.ts`), with these iOS differences. §15.2–§15.3 (the email sign-in) are not on iOS yet: G9 is its own phase, iOS-5g.
+
+**VoiceOver (§14.1, §14.4):**
+- The ticket card is one element, as since iOS-4. Its label reads the people row and the dates: "Ticket 19445: <title>. Requested by <name>, technician <name>. Raised 2 Nov, updated 2 days ago. Due Fri 7 Nov, 17:00".
+- **The swipe's Assign and Resolve are custom actions** (the rotor's Actions), beside Change status and Select, under exactly the swipe's rules: the same `ticketSwipeActions()`, none while selecting, none for END_USER. They run the revealed buttons' handler (Ronit's decision 3).
+- Hidden from VoiceOver: the people row (`accessibilityElementsHidden`), the greeting mark, the fading old count. The SLA deadline is one element ("Resolution: Due Mon 11:00").
+
+**Reduce Motion (§14.2, §14.7, §14.8):** Android's "Remove animations". Press feedback only dims; the count shows at once; the swipe's snap settles at once. **The greeting mark also skips its rise while VoiceOver runs** (`hooks/useScreenReader.ts`), checked at mount and when the art first shows.
+
+**Dynamic Type (§16, §14.1, §14.3):** at the accessibility sizes the card's dates line stacks (the number, then "Raised … · updated …") and its due line wraps; a Home tile's caption wraps (the tile has the row to itself). The people row's names grow on one line and truncate; only the initials stop, at ×1.2 (25 pt circle). The count keeps Title 1's cap (§iOS-A.1).
+
+**44 pt (§14.4, §14.7):** the revealed swipe buttons are `min-h-11` and 80 pt wide. `PressableCard` adds no size of its own; every `<PressableCard>` is checked like a Pressable.
+
+**The audit log's Dates (§13):** "From a day…" and "Until a day…" open `DatePickerSheet` (the iOS calendar, Cancel and Done) once the Dates sheet has gone, instead of Android's date dialog: Android's limits (from `DUE_DATE_MIN` to today), and From never after Until (`withAuditDay`).
+
+**Haptics (§14.5):** not Android's `performAndroidHapticsAsync`. iOS-4's four (§iOS-A.6) already cover Android's three events; iOS-5f added the error haptic to the five forms that show a failed save inline. A ticket created with failed attachments keeps iOS-4's warning.
+
+**Pinned by:** `tests/rbac/swipe-actions.test.mjs` (VoiceOver = swipe, per persona), `tests/polish/haptics-parity.test.mjs`, `tests/home/greeting-mark.test.mjs`, `tests/polish/people-row.test.mjs`, `tests/motion/polish.test.mjs`, `tests/rbac/audit-log.test.mjs` and the scans in `tests/screens/hig-polish.test.mjs`.
