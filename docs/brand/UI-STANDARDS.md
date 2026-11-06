@@ -1070,9 +1070,9 @@ A real countdown needs the server's own figure: backend ask **A31** in `docs/web
   - `tests/login/copyright-year.test.mjs` parses every source file and fails on a four-digit year in a string, template text, JSX text, or a number placed straight into text.
   - In `src/`, years appear only in comments, and in the due-date picker's numeric bounds 2000–2100 (`src/utils/tasks.ts:60, 92-93`), which are not text.
 
-### 15.2 Email and password sign-in: built 2026-11-05, UAT builds only
+### 15.2 Email and password sign-in: built 2026-11-05; on every build (UAT and PROD) since 2026-11-06
 
-Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11-05 against an ASSUMED contract, after the backend team confirmed the endpoint is on UAT (`docs/web-system/02-AUTH.md` §8). It shows only where `EMAIL_SIGN_IN_ENABLED` (`src/config/env.ts`) is true: UAT builds. A production build has none of it. Code: `src/screens/auth/EmailSignInForm.tsx`. Tokens: `loginLayout.emailForm`, `loginType.orLabel` / `link` / `fieldLabel` / `field`, `motion.emailReveal`. **Not run on a device:** no build.
+Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11-05 against an ASSUMED contract, after the backend team confirmed the endpoint is on UAT (`docs/web-system/02-AUTH.md` §8). It shows on every build, UAT and PROD (the `EMAIL_SIGN_IN_ENABLED` flag was deleted 2026-11-06). Code: `src/screens/auth/EmailSignInForm.tsx`. Tokens: `loginLayout.emailForm`, `loginType.orLabel` / `link` / `fieldLabel` / `field`, `motion.emailReveal`. **Not run on a device:** no build.
 
 **Above the fold: unchanged.** The arc split, the message slot, "Setu", the prompt, and the outlined Microsoft pill as the primary action, with "Opening Microsoft…" under it. Then, centred in the white area:
 - **OR divider**, 20 dp below the caption: hairline (`StyleSheet.hairlineWidth`, `colors.border`), "OR" (12 dp, weight 600, letter spacing 1), hairline.

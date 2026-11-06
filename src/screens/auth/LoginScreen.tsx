@@ -8,8 +8,8 @@
 //   are ./SignInButton.tsx; this file only lays out.
 // - The environment chip shows on every build except production (SHOW_ENVIRONMENT_CHIP, src/config/env.ts).
 // - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
-// - Below the pill, on UAT builds only (EMAIL_SIGN_IN_ENABLED): email and password sign-in, ./EmailSignInForm.tsx
-//   (2026-11-05, ASSUMED contract, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
+// - Below the pill, on every build, UAT and PROD alike: email and password sign-in, ./EmailSignInForm.tsx
+//   (2026-11-05; opened to PROD 2026-11-06, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
 //   single flight, and the pill is locked while an email sign-in runs.
 // - With the form open, Login measures the form's "Sign in" and scrolls just enough to show all of it, 16 dp clear of
 //   the keyboard or the screen's foot (./emailFormLayout.ts revealScrollY). It does so when the button is laid out or
@@ -28,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, OfflineBanner, OutlineButton } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
-import { EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
+import { ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
 import { reduceMotionEnabled, useSingleFlight } from '@/hooks';
 import { REAUTH_NOTICE, useAuthStore } from '@/store/auth.store';
 import { colors, loginLayout, loginType, palette } from '@/theme';
@@ -249,19 +249,17 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
                 >
                   <SignInButton busy={signingIn} onPress={startSignIn} />
                 </View>
-                {EMAIL_SIGN_IN_ENABLED ? (
-                  <EmailSignInForm
-                    ssoBusy={signingIn}
-                    run={once}
-                    onBusyChange={emailBusyChanged}
-                    onMicrosoft={startSignIn}
-                    onOpen={() => {
-                      emailOpen.current = true;
-                    }}
-                    submitRef={submit}
-                    onSubmitLayout={revealSubmit}
-                  />
-                ) : null}
+                <EmailSignInForm
+                  ssoBusy={signingIn}
+                  run={once}
+                  onBusyChange={emailBusyChanged}
+                  onMicrosoft={startSignIn}
+                  onOpen={() => {
+                    emailOpen.current = true;
+                  }}
+                  submitRef={submit}
+                  onSubmitLayout={revealSubmit}
+                />
                 {/* Which backend this build talks to, for testers (04 M1). Never on a production build. */}
                 {SHOW_ENVIRONMENT_CHIP ? (
                   <View accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">

@@ -9,6 +9,8 @@ bundle, permissions and readiness re-verified (§5a). Not built.
 Updated 2026-11-06 for the third production build, after UAT testing of G9 completed: versionCode 4, the release-bundle
 check made to pass again (it had failed since G9 on an example email address, §6), and what a production build does
 differently from the UAT build that was tested (§5b). Not built.
+Updated 2026-11-06 (later) for the fourth production build: versionCode 5, email sign-in opened to PRODUCTION, push
+enabled for production, and the table of every remaining UAT/PROD difference (§5c). Not built.
 
 **Where things stand**
 
@@ -19,8 +21,8 @@ differently from the UAT build that was tested (§5b). Not built.
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
 | `preview` APK | Ready to build with your Expo account (§2). It points at **UAT** |
-| Signing in | **Production: Microsoft sign-in only.** UAT (`preview`) builds also offer email and password since G9 (2026-11-05, ⚠ ASSUMED contract, 02-AUTH §8); on a production build that option does not render (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`), so **Google's reviewer cannot use it** until A32 ships on PROD (§5b). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5), with its route, its Login button and the helpers that existed only for it. AUTH-P2 is live on UAT (02-AUTH §7) |
-| `production` AAB | **versionCode 4: ready to build, not built** (§2a). Verified 2026-11-06 (§5b). versionCode 3 is the latest on Google Play. It points at **PRODUCTION**, with **no push** (no Firebase in the `production` EAS environment, §2b). Open items outside this repo are in §5 |
+| Signing in | **Microsoft sign-in and email and password sign-in, on every build (UAT and PROD)** since 2026-11-06: the backend confirmed the email endpoint on PRODUCTION (⚠ contract still assumed, 02-AUTH §8). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5). AUTH-P2 is live on UAT (02-AUTH §7); production is still unconfirmed (§5) |
+| `production` AAB | **versionCode 5: ready to build, not built** (§2a, §5c). versionCode 4 is already on Google Play. It points at **PRODUCTION**, with email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
 
 ---
 
@@ -90,7 +92,9 @@ Later builds: bump `android.versionCode`, commit, then repeat step 5.
 
 Prepared on 2026-10-29 and **not built**: Ronit runs it after review. Use PowerShell or Git Bash, in `mmg-ticketing-mobile-app`.
 
-**versionCode 4 (prepared 2026-11-06, not built).** Same steps as versionCode 3 below. In step 1, commit the 2026-11-06
+**versionCode 5 (prepared 2026-11-06, not built).** Same steps. versionCode 4 is already on Play. Commit the changes of §5c, then run the build command in §5c. Read §5c first: it lists every remaining difference from the UAT build.
+
+**versionCode 4 (prepared 2026-11-06, uploaded to Play).** Same steps as versionCode 3 below. In step 1, commit the 2026-11-06
 changes (§5b): `app.json`, `scripts/verify-release-bundle.js`, `tests/release/production-readiness.test.mjs` and this
 file. versionCode 3 is the latest on Play. Read §5b first: this build differs from the UAT build that was tested (no
 email sign-in, no push, no environment chip).
@@ -520,6 +524,8 @@ not repeat it.
 
 ### What a production build does differently from the UAT build that was tested
 
+> **Superseded 2026-11-06 (later) by §5c.** Points 1 (email sign-in) and 2 (push) below describe the versionCode 4 build and are no longer true: email sign-in is on production, and push follows `GOOGLE_SERVICES_JSON` in the production EAS environment. Point 3 (the chip) still holds.
+
 1. **Email sign-in: not on production. A production build shows Microsoft sign-in only.**
    - `EMAIL_SIGN_IN_ENABLED` is `APP_ENV === 'UAT'`, and Login renders the email form only inside that branch. On PROD
      the option is not drawn at all. Tests: `tests/motion/start-up-and-login.test.mjs` (PROD → `false`) and
@@ -604,6 +610,40 @@ No `.env` file exists in the repo (only `.env.example`, which holds names only),
 | Push silent without Firebase or the endpoint | **PASS** | As §5a: no token → `unavailable`; a 404 → `not-deployed`, one `[push]` log line, no banner, dialog or toast |
 | Release-bundle check | **PASS** both modes | After the 2026-11-06 fix (§6); a canary proved it still fails on a real leak |
 | `npx tsc --noEmit` / `npm test` | **PASS** | Clean / 1265 pass, 0 fail |
+
+## 5c. Fourth production build, versionCode 5 (2026-11-06): production made a replica of UAT
+
+Not built. Ronit's instruction: production should match UAT except where a difference is genuinely required.
+
+**Done in this repo**
+- [x] **Email sign-in opened to PRODUCTION.** The backend team confirmed the endpoint on PROD and that the environments are in sync. `EMAIL_SIGN_IN_ENABLED` (`src/config/env.ts`) is deleted; `LoginScreen.tsx` renders `EmailSignInForm` unconditionally. Nothing else about it changed: validation, path discovery, response reading, messages, session storage, the 15-day clock, and the password never being logged or stored are the same code in both. ⚠ The contract is still the tolerant, ASSUMED one: the backend confirmed the endpoint is DEPLOYED on both, but its source and exact shape have not been sent (A32).
+- [x] **Path-discovery order not changed.** `/auth/mobile/login`, `/auth/login/mobile`, `/auth/mobile`, `/auth/login`. The endpoint is known to exist on both, but nobody has told us which path, and the order costs one 404 at most. Reorder when A32's contract names the path.
+- [x] **Push is no longer gated off for production.** `app.config.js` reads `GOOGLE_SERVICES_JSON` and never looks at the profile or `EXPO_PUBLIC_APP_ENV`, so a production build gets Firebase as soon as the variable exists in the production EAS environment. Ronit reports it is set there; this session could not check (`eas env:list --environment production` needs the Expo login). Still outside this repo: NTF-5/NTF-6 on production (else Alerts says `not-deployed`) and the Play signing key's SHA-1 on the Firebase API key if restricted.
+- [x] **Tests changed, none deleted:** `tests/auth/password-sign-in.test.mjs` ("on for UAT builds only" became "available in both environments": no flag, form rendered unconditionally, the attempt code never reads the environment); `tests/motion/start-up-and-login.test.mjs` ("off on a production release build" became "no environment flag, available on PROD and UAT alike", plus the import-line assertion without the flag); `tests/release/production-readiness.test.mjs` (the sign-in `describe` title, and versionCode must be > 4).
+- [x] **versionCode** `4` to **`5`** (`app.json`). `version` stays `1.0.0`. Package, slug, schemes and EAS projectId unchanged.
+- [x] `npx tsc --noEmit` clean. `npm test`: 1265 pass, 0 fail. `npm run verify:release-bundle -- --prod`: **PASS (PROD)**. No secret, token, password or credential in the release bundle (no client-secret literal; only the three public UUIDs; only the two approved hosts).
+- [x] **Logging checked.** Nothing logs a token, ID token, authorization code or password. The email path's only log is `[auth] email sign-in: ...` (paths, statuses, reason names). Push logs `[push] ...` without tokens. Drift warnings are `__DEV__` only.
+- Not done: no EAS build, no commit, no `eas env:set`.
+
+**Every remaining UAT/PROD difference**
+
+| Difference | UAT (`preview`) | PROD (`production`) | Why it stays |
+|---|---|---|---|
+| API base URL | `uat-servicedesk.../api/v1` | `servicedesk.../api/v1` | The environment itself |
+| EAS profile, artifact | APK, internal distribution | AAB, store distribution | Play takes an AAB; testers need an installable APK |
+| `EXPO_PUBLIC_APP_ENV` | `UAT` | `PROD` | Selects the URL; `eas-build-guard.js` refuses PROD on any other profile and UAT on `production` |
+| Development builds | Allowed, UAT only | Refused (`__DEV__` + PROD throws) | CLAUDE.md rule 4 |
+| Login environment chip | Shown (`SHOW_ENVIRONMENT_CHIP`) | Not rendered | Labels the environment for testers; users don't need it. Kept on purpose |
+| Environment label on Profile and in the drawer | `UAT . host` | `PROD . host` | Not a gate: same code, different value |
+| Web origin for ticket deep links | UAT origin | PROD origin | Derived from the base URL; links to the other environment are refused |
+
+No other code path reads the environment. Gone as of this build: the email sign-in gate, and the push gap (a configuration difference, equal once the EAS variable is set in both). `__DEV__`-only code (error detail, drift warnings, redirect-URI box, `[MOBILE TEST]` prefix) differs between development and release builds, not between UAT and PROD, because `preview` is a release build.
+
+**Build command (Ronit runs it, from the repo root, after review and commit):**
+```
+npm run verify:release-bundle -- --prod
+eas build --platform android --profile production
+```
 
 ## 6. Release bundle check (`npm run verify:release-bundle`)
 

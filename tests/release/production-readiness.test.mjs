@@ -22,9 +22,9 @@ function sourceFiles(dir) {
   });
 }
 
-// 2026-11-05: email and password became the second way in (UAT builds only, ASSUMED contract; 02-AUTH.md §8). Both run
+// 2026-11-05: email and password became the second way in; 2026-11-06 it was opened to PROD (02-AUTH.md §8). Both run
 // from signInAttempt.ts; tests/auth/password-sign-in.test.mjs covers the email path itself.
-describe('sign-in: Microsoft, and email on UAT, are the only ways into the app', () => {
+describe('sign-in: Microsoft, and email on UAT and PROD, are the only ways into the app', () => {
   test('the auth stack registers one screen, Login, and its param list has nothing else', () => {
     const stack = read('src/navigation/AuthStack.tsx');
     assert.equal(stack.split('<Stack.Screen').length - 1, 1);
@@ -161,11 +161,11 @@ describe('build profiles and store identity', () => {
     assert.match(source, /^\s*PROD: 'https:\/\/servicedesk\.mountmerugroup\.com\/api\/v1',$/m);
   });
 
-  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (3)', () => {
-    // versionCode 2 was the first AAB uploaded to Play, versionCode 3 the latest (2026-11-06); Play rejects any upload
+  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (4)', () => {
+    // versionCode 2 was the first AAB uploaded to Play, versionCode 4 the latest (2026-11-06); Play rejects any upload
     // not above the last one it received.
     assert.equal(app.version, '1.0.0');
-    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 3, String(app.android.versionCode));
+    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 4, String(app.android.versionCode));
   });
 
   test("ShortcutBadger's 16 launcher-badge permissions are blocked, and nothing the app needs is", () => {

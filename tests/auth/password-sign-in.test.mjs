@@ -24,7 +24,6 @@ import {
   neutralCredentialMessage,
 } from '../../src/api/auth.api.ts';
 import { apiClient } from '../../src/api/client.ts';
-import { EMAIL_SIGN_IN_ENABLED } from '../../src/config/env.ts';
 import { SESSION_TTL_MS, isReauthDue, isSessionExpired, useAuthStore } from '../../src/store/auth.store.ts';
 import {
   PASSWORD_FAILURE_COPY,
@@ -188,10 +187,15 @@ describe('what the app sends', () => {
     assert.equal(JSON.parse(sent[0].data).password, ' spaced pass ');
   });
 
-  test('email sign-in is on for UAT builds only (the tests run as a development build, which is UAT)', () => {
-    assert.equal(EMAIL_SIGN_IN_ENABLED, true);
-    assert.match(read('src/config/env.ts'), /export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';/);
-    assert.match(read('src/screens/auth/LoginScreen.tsx'), /\{EMAIL_SIGN_IN_ENABLED \? \(\s*<EmailSignInForm/);
+  // 2026-11-06: was "on for UAT builds only". The backend confirmed the endpoint on PRODUCTION too, so there is no gate.
+  test('email sign-in is available in both environments: no flag, and Login renders the form unconditionally', () => {
+    assert.doesNotMatch(read('src/config/env.ts'), /EMAIL_SIGN_IN_ENABLED/);
+    const login = read('src/screens/auth/LoginScreen.tsx');
+    assert.doesNotMatch(login, /EMAIL_SIGN_IN_ENABLED|APP_ENV/);
+    assert.equal(login.split('<EmailSignInForm').length - 1, 1);
+    assert.match(login, /<\/View>\s*<EmailSignInForm\s/, 'rendered straight after the Microsoft button, not inside a conditional');
+    // The attempt never reads the environment: UAT and PROD run the same code.
+    assert.doesNotMatch(read('src/screens/auth/signInAttempt.ts'), /APP_ENV|EMAIL_SIGN_IN/);
   });
 });
 

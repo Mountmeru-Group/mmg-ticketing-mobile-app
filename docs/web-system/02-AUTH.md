@@ -9,7 +9,7 @@
 > - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into a production build.
 > - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
-> - **Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, on UAT builds only.** The backend team says the endpoint is deployed on UAT, but its source is not pushed, so the app tolerates several request and response shapes instead of one. Nothing about it is verified against source. See §8.
+> - **Email and password sign-in (G9): built 2026-11-05; opened to PRODUCTION 2026-11-06.** The backend team confirmed the endpoint is deployed on PRODUCTION as well as UAT, and that the two are in sync. **Both sign-in paths (Microsoft and email) now work in both environments.** ⚠ The contract is still the tolerant, ASSUMED one: the backend confirmed the endpoint is DEPLOYED on both, but its source and exact shape have not been sent (A32). See §8.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
 
@@ -584,7 +584,7 @@ Accept: application/json
 
 ---
 
-## 8. Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, UAT builds only
+## 8. Email and password sign-in (G9): built 2026-11-05, on every build since 2026-11-06 (UAT and PROD); contract still ⚠ ASSUMED
 
 **The goal:** a Google Play reviewer, who has no Microsoft account in the MMG tenant, can sign in.
 
@@ -594,7 +594,7 @@ Accept: application/json
 
 | | Microsoft (AUTH-P2, §7) | Email and password (AUTH-P1, this section) |
 |---|---|---|
-| Builds | Every build | **UAT builds only** (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`): development and `preview`. A production build does not render the option at all |
+| Builds | Every build | **Every build, UAT and PROD** (since 2026-11-06). There is no environment flag: `EMAIL_SIGN_IN_ENABLED` was deleted, and Login renders the form unconditionally. Validation, path discovery, response reading, messages, session storage and the 15-day clock are the same code in both |
 | Contract | **Confirmed** by the backend team, 2026-10-19 | **Assumed**: endpoint reported deployed on UAT, source not pushed |
 | Where on Login | The outlined pill, the primary action, unchanged | Under the pill: OR divider, then "Sign in with email instead". The fields open in place (`docs/brand/UI-STANDARDS.md` §15.2) |
 | Request | `POST /auth/microsoft/mobile` `{ idToken }` | Up to four paths (§8.2), `{ username, email, password }` |
@@ -693,7 +693,7 @@ Shown in a failure box above "Sign in": title, message, the server's own words w
 4. **No `Set-Cookie`** on the new route. `__DEV__` builds warn if one is visible to JavaScript. React Native keeps it out of the jar either way (§5.2).
 5. **The rate limit** on the new route, and its **error statuses** and messages: whether it says which field was wrong, and whether unknown emails get 401 or 404.
 6. **Which accounts may use it:** everyone with a local password, or an allow-list (A32's proposal).
-7. **PROD.** The option is off on production builds until the endpoint is on PROD and Ronit says so. A Play reviewer installs the production build (§8 goal; `docs/G9-PASSWORD-LOGIN.md` §7).
+7. **PROD.** ✅ Opened 2026-11-06: the backend team confirmed the endpoint is on PRODUCTION and in sync with UAT. The gate was removed. A Play reviewer installs the production build, so the reviewer can now use the email option (`docs/G9-PASSWORD-LOGIN.md` §7).
 8. **The 15-day clock** (§8.5).
 
 When the contract arrives: cut `src/types/mobile-password-contract.ts` and `AUTH_P1_READER` (`src/api/auth.api.ts`) down to it. Keep the tests for the real shape and drop the guesses. Then record it in `01-API-CONTRACT.md` as confirmed.
