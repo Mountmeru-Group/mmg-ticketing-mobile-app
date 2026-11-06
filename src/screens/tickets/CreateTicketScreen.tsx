@@ -163,7 +163,10 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
       const ticketDetail = { screen: 'TicketDetail', params: { ticketId: result.ticket.id }, initial: false } as const;
       leave(() => navigation.popTo('App', { screen: tab, params: ticketDetail }));
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e) || 'Failed to create ticket');
+      if (!isSessionEndedError(e)) {
+        hapticOutcome('error'); // iOS-5f (A5): Android plays its error haptic here too
+        setError(describeWriteError(e) || 'Failed to create ticket');
+      }
     }
   }
 

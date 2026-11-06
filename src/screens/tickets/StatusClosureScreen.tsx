@@ -33,6 +33,7 @@ import type { SheetScreenProps, TicketStatus } from '@/types';
 import { chooseFromActionSheet, type SheetChoice } from '@/utils/actionSheet';
 import { notify, confirmAction, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { bulkActions, navRole, ticketDetailPermissions } from '@/utils/permissions';
 import {
   BULK_ACTION_LIMIT, CLOSURE_CODE_OPTIONS, EMPTY_CLOSURE_FORM, buildClosureBody, canCloseInBulk, canSubmitClosure,
@@ -189,7 +190,10 @@ function SingleStatus({ navigation, route }: Props) {
       notify('Status updated');
       leave(() => navigation.goBack());
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e));
+      if (!isSessionEndedError(e)) {
+        hapticOutcome('error'); // iOS-5f (A5): Android plays its error haptic here too
+        setError(describeWriteError(e));
+      }
     }
   }
 

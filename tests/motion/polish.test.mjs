@@ -3,8 +3,8 @@
 // The general checks over every animating file live in tests/motion/start-up-and-login.test.mjs (now seven files);
 // this file holds what is specific to this phase, above all: NO LOOPING ANIMATION IN A LIST ROW.
 //
-// iOS (iOS-5f, STEP 5): ported from Android dev d8626bc; "Remove animations" is iOS's Reduce Motion. The card and screen
-// wiring (every card on PressableCard, the swipe, Home's count fade) joins in STEP 6. iOS additions at the end.
+// iOS (iOS-5f): ported from Android dev d8626bc, all of it; "Remove animations" is iOS's Reduce Motion. iOS additions
+// at the end. The haptics are not ported (A5); tests/polish/haptics-parity.test.mjs checks iOS's instead.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -68,6 +68,54 @@ describe('press feedback (components/PressFeedback.tsx)', () => {
     assert.ok(motion.press.pressDelay > 0 && motion.press.pressDelay <= 100);
   });
 
+  test('every tappable card and list row uses it, and the old active: tints are gone from them', () => {
+    const USERS = {
+      'src/components/TicketCard.tsx': /\{\.\.\.feedback\.pressProps\(\)\}/,
+      'src/components/RecentTicketRow.tsx': /<PressableCard\b/,
+      'src/components/TaskRow.tsx': /<PressableCard\b/,
+      'src/screens/approvals/ApprovalsInboxScreen.tsx': /<PressableCard\b/,
+      'src/screens/catalog/ServiceCatalogScreen.tsx': /<PressableCard\b[\s\S]*<PressableCard\b/,
+      'src/screens/knowledge/KnowledgeBaseScreen.tsx': /<PressableCard\b[\s\S]*<PressableCard\b/,
+      'src/screens/notifications/NotificationsScreen.tsx': /\{\.\.\.feedback\.pressProps\(\)\}/,
+      'src/screens/tickets/TicketDetailScreen.tsx': /<PressableCard\b/,
+      'src/screens/dashboard/HomeScreen.tsx': /<PressableCard\b/,
+    };
+    for (const [rel, pattern] of Object.entries(USERS)) assert.match(read(rel), pattern, rel);
+    // No card (a Pressable with the card's rounded-xl border) keeps a NativeWind active: tint.
+    for (const rel of files) {
+      for (const line of read(rel).split('\n')) {
+        if (/rounded-xl border/.test(line)) assert.doesNotMatch(line, /active:(opacity|bg)-/, `${rel}: ${line.trim()}`);
+      }
+    }
+  });
+});
+
+describe('swipe (components/TicketCard.tsx)', () => {
+  const card = read('src/components/TicketCard.tsx');
+
+  test('react-native-gesture-handler\'s Swipeable, on its default native animations: translateX only, never turned off', () => {
+    assert.match(card, /import \{ Swipeable \} from 'react-native-gesture-handler';/);
+    assert.doesNotMatch(card, /useNativeAnimations/);
+  });
+
+  test('its numbers are motion.swipe; leftward only, and a vertical move cancels it (no fight with the list\'s scroll)', () => {
+    assert.match(card, /const \{ actionWidth, dragStart, verticalFail, openThreshold, friction, reducedSpringSpeed \} = motion\.swipe;/);
+    assert.match(card, /activeOffsetX=\{-dragStart\}/);
+    assert.match(card, /failOffsetY=\{\[-verticalFail, verticalFail\]\}/);
+    assert.match(card, /animationOptions=\{reduceMotionEnabled\(\) \? REDUCED_SPRING : undefined\}/);
+  });
+
+  test('recycling: an open row closes when its cell gets another ticket, and when the list starts to scroll', () => {
+    assert.match(card, /if \(shownId\.current === ticket\.id\) return;\s*shownId\.current = ticket\.id;\s*if \(open\.current\) \{\s*open\.current = false;\s*ref\.current\?\.reset\(\);/);
+    assert.match(read('src/screens/tickets/TicketListScreen.tsx'), /onScrollBeginDrag=\{closeOpenRow\}/);
+  });
+
+  test('a selection closes the open row and disables swiping; a resting row renders one empty box, not the buttons', () => {
+    assert.match(read('src/screens/tickets/TicketListScreen.tsx'), /useEffect\(\(\) => \{\s*if \(selectionMode\) closeOpenRow\(\);/);
+    assert.match(card, /revealed \? \(/);
+    assert.match(card, /<View style=\{\{ width: actions\.length \* actionWidth \}\} \/>/);
+    assert.match(card, /onSwipeableOpenStartDrag=\{\(\) => setRevealed\(true\)\}/);
+  });
 });
 
 describe('count roll on Home: a cross-fade, not a count-up (components/CountFade.tsx, Ronit\'s option 5)', () => {
@@ -97,6 +145,16 @@ describe('count roll on Home: a cross-fade, not a count-up (components/CountFade
     assert.match(fade, /return \(\) => run\.stop\(\);/);
   });
 
+  test('Home: only while it is the screen in view, and only after the period has been changed', () => {
+    assert.match(home, /const focused = useIsFocused\(\);/);
+    assert.match(home, /const countsFade = focused && periodTouched;/);
+    assert.match(home, /const pickPeriod = \(next: DashboardPeriod\) => \{\s*setPeriodTouched\(true\);/);
+    assert.match(home, /<CountFade value=\{t\.value\} periodKey=\{periodKey\} active=\{countsFade\} \/>/);
+  });
+
+  test('a previous period\'s count is never shown as the new one: placeholder data still supplies no count', () => {
+    assert.match(home, /const countsCurrent = showTileCounts && periodReady && !dashboard\.isPlaceholderData;/);
+  });
 });
 
 // ── iOS (iOS-5f) ─────────────────────────────────────────────

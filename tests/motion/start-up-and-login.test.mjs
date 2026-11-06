@@ -326,7 +326,8 @@ describe('Login, "arc split"', () => {
     assert.match(login, />Raise, track and resolve issues across the whole of Mount Meru Group\.</);
     assert.match(login, />Setu</);
     assert.match(login, />Sign in with your work account</);
-    assert.match(login, />Mount Meru Group IT</);
+    // The footer: "Copyright © <device year> Mount Meru Group" since 2026-11-04 (tests/login/copyright-year.test.mjs).
+    assert.match(login, /<Text style=\{styles\.footer\} accessibilityLabel=\{copyrightLabel\(year\)\}>\s*\{copyrightLine\(year\)\}\s*<\/Text>/);
   });
 
   test('the button is an outlined pill as wide as its content and exactly 52 dp tall; it never scales', () => {

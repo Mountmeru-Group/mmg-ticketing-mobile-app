@@ -9,6 +9,8 @@
 //   in one request (auditLog.controller.ts:7-49):
 //     Ticket      → ticketNumber=<n>, typed in the search box; the server finds the ticket. A number with no ticket
 //                   filters nothing server-side, so the app spots that and says "No ticket #n" (05 B.40)
+//     Action      → action=<AuditAction> (exact)
+//     Dates       → dateFrom / dateTo: whole days on the phone's calendar, sent as their first and last instants
 //     Entity type → entityType=Ticket | Comment | Attachment (exact match)
 //     Person      → actorId=<user id>, picked with USR-3 (active users only); in the source, not the written contract
 //   There is no free-text filter: filtering a page on the device would show a partial answer as if it were the whole one.
@@ -26,16 +28,20 @@
 // - Chips grow with the text size (at least 36 pt, a 4 pt hit slop); the pull-to-refresh spinner is tinted
 //   (RefreshControl `tintColor`, Android's `colors`); VoiceOver hears the line under the search box (Android's live
 //   region is TalkBack's only); the footer's retry has a label.
+// - iOS-5f (Android's d8626bc filters): Action and Dates are chips beside Entity type and Person, each opening an
+//   OptionSheet (a native page sheet), as the others do. "From a day…" and "Until a day…" open DatePickerSheet (the iOS
+//   calendar, Cancel and Done) once the Dates sheet has gone, instead of Android's system date dialog; Android's limits
+//   (from DUE_DATE_MIN to today) and its rule that From never comes after To (withAuditDay) are unchanged.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
-import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
-  OfflineBanner, OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, SearchField, listBottomInset, type Person,
-  type SheetOption,
+  DatePickerSheet, EmptyState, ErrorState, FilterChip, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton,
+  NO_SCROLL_ANCHOR, OfflineBanner, OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, SearchField,
+  listBottomInset, type Person, type SheetOption,
 } from '@/components';
 import { useAuditLog } from '@/hooks';
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
@@ -43,14 +49,17 @@ import { useAuthStore } from '@/store/auth.store';
 import { colors, palette, type AuditActionTone } from '@/theme';
 import type { AuditAction, AuditLogEntry, MoreStackScreenProps, UserRole } from '@/types';
 import {
-  AUDIT_ENTITY_TYPES, NO_AUDIT_FILTERS, activeAuditFilterCount, auditActionLabel, auditListRows, auditTicketLink, auditTime,
-  formatAuditDetails, isKnownAuditAction, parseAuditTicketNumber, type AuditEntityType, type AuditListRow,
-  type AuditLogFilters,
+  AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_DATE_PRESETS, AUDIT_ENTITY_TYPES, NO_AUDIT_FILTERS, activeAuditFilterCount,
+  auditActionLabel, auditDatesLabel, auditListRows, auditPresetDays, auditPresetOf, auditTicketLink, auditTime,
+  formatAuditDetails, isKnownAuditAction, parseAuditTicketNumber, withAuditDay, type AuditDatePreset, type AuditEntityType,
+  type AuditListRow, type AuditLogFilters,
 } from '@/utils/audit-log';
 import { formatDisplayName } from '@/utils/format';
 import { canViewAuditLog, navRole } from '@/utils/permissions';
+import { DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 
 const ALL_TYPES = '__ALL__';
+const ALL_ACTIONS = '__ALL__';
 /** USR-3 for every role: anyone can appear in the log, requesters included. */
 const EVERY_ROLE: readonly UserRole[] = [];
 
@@ -63,6 +72,20 @@ const ENTITY_OPTIONS: readonly SheetOption<string>[] = [
   { value: ALL_TYPES, label: 'All types' },
   ...AUDIT_ENTITY_TYPES.map((t) => ({ value: t, label: t, description: ENTITY_DESCRIPTIONS[t] })),
 ];
+
+/** Written by no server code today (docs/G8-WEB-AUDIT.md §8): offered, because the enum has them, but said so. */
+const UNWRITTEN_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>(['DELETED', 'SLA_BREACHED', 'ESCALATED']);
+const ACTION_OPTIONS: readonly SheetOption<string>[] = [
+  { value: ALL_ACTIONS, label: 'All actions' },
+  ...AUDIT_ACTIONS.map((a) => ({
+    value: a,
+    label: AUDIT_ACTION_LABELS[a],
+    description: UNWRITTEN_ACTIONS.has(a) ? 'Not written by the Service Desk today' : undefined,
+  })),
+];
+
+/** Dates: the quick spans, then a day picked by hand for either end. */
+type DatesChoice = AuditDatePreset | 'pick-from' | 'pick-to';
 
 /** One icon per action, so a pill never relies on its colour (docs/brand/UI-STANDARDS.md §13). */
 const ACTION_ICONS: Record<AuditAction, keyof typeof Ionicons.glyphMap> = {
@@ -92,7 +115,10 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
   const [searchText, setSearchText] = useState('');
   // The search box holds something that is not a ticket number.
   const [invalidSearch, setInvalidSearch] = useState(false);
-  const [sheet, setSheet] = useState<'entity' | 'person' | null>(null);
+  const [sheet, setSheet] = useState<'action' | 'dates' | 'entity' | 'person' | null>(null);
+  // iOS: the day calendar for one end of the Dates span (DatePickerSheet), or null.
+  // Its latest day is today, read when it opens (Android: `maximumDate: new Date()` when its dialog opens).
+  const [dayPicker, setDayPicker] = useState<{ end: 'from' | 'to'; value: Date; today: Date } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const list = useAuditLog(filters);
@@ -136,6 +162,32 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
     setInvalidSearch(ticketNumber === null);
     if (ticketNumber !== null) setFilters((f) => (f.ticketNumber === ticketNumber ? f : { ...f, ticketNumber }));
   };
+
+  // ── Dates: a quick span, or either end picked in the iOS calendar (Android: its system date dialog) ─────
+  // iOS presents one sheet at a time: a hand-picked end opens its calendar once the Dates sheet has gone.
+  const pickNext = useRef<'from' | 'to' | null>(null);
+  const pickDay = (end: 'from' | 'to') => {
+    const current = filters.dates[end];
+    const today = new Date();
+    setDayPicker({ end, value: (current ? dateFromDay(current) : null) ?? today, today });
+  };
+  const pickDates = (choice: DatesChoice) => {
+    if (choice === 'pick-from' || choice === 'pick-to') {
+      pickNext.current = choice === 'pick-from' ? 'from' : 'to';
+      return;
+    }
+    setFilters((f) => ({ ...f, dates: auditPresetDays(choice) }));
+  };
+  const onDatesSheetGone = () => {
+    const end = pickNext.current;
+    pickNext.current = null;
+    if (end) pickDay(end);
+  };
+  const dateOptions: readonly SheetOption<DatesChoice>[] = [
+    ...AUDIT_DATE_PRESETS,
+    { value: 'pick-from', label: 'From a day…', description: filters.dates.from ? auditDatesLabel({ from: filters.dates.from, to: null }) : undefined },
+    { value: 'pick-to', label: 'Until a day…', description: filters.dates.to ? auditDatesLabel({ from: null, to: filters.dates.to }) : undefined },
+  ];
 
   const clearAll = () => {
     clearTicket();
@@ -285,6 +337,20 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
           ) : null}
           <FilterChip
             role="button"
+            icon="flash-outline"
+            label={filters.action ? AUDIT_ACTION_LABELS[filters.action] : 'All actions'}
+            active={!!filters.action}
+            onPress={() => setSheet('action')}
+          />
+          <FilterChip
+            role="button"
+            icon="calendar-outline"
+            label={auditDatesLabel(filters.dates)}
+            active={!!(filters.dates.from || filters.dates.to)}
+            onPress={() => setSheet('dates')}
+          />
+          <FilterChip
+            role="button"
             icon="pricetag-outline"
             label={filters.entityType ?? 'All types'}
             active={!!filters.entityType}
@@ -318,6 +384,35 @@ export function AuditLogScreen(_props: MoreStackScreenProps<'AuditLog'>) {
 
       <ListEntryScope>{content}</ListEntryScope>
 
+      <OptionSheet
+        visible={sheet === 'action'}
+        title="Action"
+        options={ACTION_OPTIONS}
+        selected={filters.action ?? ALL_ACTIONS}
+        onSelect={(value) => setFilters((f) => ({ ...f, action: value === ALL_ACTIONS ? null : (value as AuditAction) }))}
+        onClose={() => setSheet(null)}
+      />
+      <OptionSheet
+        visible={sheet === 'dates'}
+        title="Dates"
+        options={dateOptions}
+        selected={auditPresetOf(filters.dates)}
+        onSelect={pickDates}
+        onClose={() => setSheet(null)}
+        onDismiss={onDatesSheetGone}
+      />
+      {/* iOS: a hand-picked end in the iOS calendar. Android's limits: from DUE_DATE_MIN; nothing is logged in the future. */}
+      <DatePickerSheet
+        visible={dayPicker !== null}
+        title={dayPicker?.end === 'to' ? 'Until' : 'From'}
+        value={dayPicker?.value ?? DUE_DATE_MIN}
+        minimumDate={DUE_DATE_MIN}
+        maximumDate={dayPicker?.today}
+        onDone={(date) => {
+          if (dayPicker) setFilters((f) => ({ ...f, dates: withAuditDay(f.dates, dayPicker.end, dayFromDate(date)) }));
+        }}
+        onClose={() => setDayPicker(null)}
+      />
       <OptionSheet
         visible={sheet === 'entity'}
         title="Entity type"

@@ -28,6 +28,7 @@ import type { SheetScreenProps, TicketDetail, UserRole } from '@/types';
 import { submitApprovalMessage, submitApprovalOutcome } from '@/utils/approvals';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { formatDisplayName, statusLabel } from '@/utils/format';
+import { hapticOutcome } from '@/utils/haptics';
 import { canSubmitForApproval, navRole } from '@/utils/permissions';
 
 /** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
@@ -99,7 +100,10 @@ function SubmitApprovalForm({ navigation, route }: Props) {
       await submit.mutateAsync({ ticketId, approverIds: chosenIds, comments });
     } catch (e) {
       // The form keeps everything as it was, so the person can correct it and try again.
-      if (!isSessionEndedError(e)) setError(describeActionWriteError('submit tickets for approval', e));
+      if (!isSessionEndedError(e)) {
+        hapticOutcome('error'); // iOS-5f (A5): Android plays its error haptic here too
+        setError(describeActionWriteError('submit tickets for approval', e));
+      }
       return;
     }
     notify('Approval request submitted');

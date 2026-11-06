@@ -18,7 +18,7 @@ import { ActivityIndicator, Pressable, RefreshControl, Text, View } from 'react-
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, OutlineButton, QueryBanner, SearchField, StatusBadge,
+  OfflineState, OutlineButton, PressableCard, QueryBanner, SearchField, StatusBadge,
 } from '@/components';
 import { useMyServiceRequests, useServiceCategories, useServiceItems } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
@@ -328,11 +328,11 @@ function CatalogRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={description ? `${title || 'Untitled'}. ${description}` : title || 'Untitled'}
       onPress={onPress}
-      className="mx-4 mb-3 min-h-11 flex-row items-center rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 min-h-11 flex-row items-center rounded-xl border border-border bg-white p-4"
     >
       {/* The web's icon square: `bg-blue-100 text-blue-600` (ServiceCatalogPage.tsx:429, :463). */}
       <View className="h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
@@ -350,7 +350,7 @@ function CatalogRow({
         {trailing ? <View className="mt-1.5 flex-row">{trailing}</View> : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.text.muted} style={{ marginLeft: 8 }} />
-    </Pressable>
+    </PressableCard>
   );
 }
 
@@ -476,14 +476,14 @@ const RequestRow = memo(function RequestRow({ request, own, onPress }: { request
   );
   const className = 'mx-4 mb-3 rounded-xl border border-border bg-white p-4';
   return onPress ? (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={`${requestRef(request.requestNumber)}, ${request.serviceItem?.name || 'Service request'}, ${statusLabel(request.status)}`}
       onPress={onPress}
-      className={`${className} min-h-11 active:opacity-80`}
+      className={`${className} min-h-11`}
     >
       {body}
-    </Pressable>
+    </PressableCard>
   ) : (
     <View className={className}>{body}</View>
   );

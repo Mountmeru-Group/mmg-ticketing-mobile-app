@@ -31,7 +31,7 @@ import { colors } from '@/theme';
 import type { CannedResponse, SheetScreenProps } from '@/types';
 import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { confirmAction, notify } from '@/utils/dialogs';
-import { hapticSelection } from '@/utils/haptics';
+import { hapticOutcome, hapticSelection } from '@/utils/haptics';
 import { composerPermissions, navRole, type ComposerMode } from '@/utils/permissions';
 import { isPlaceholderUser } from '@/utils/session';
 import { insertTemplate, templateHasImages } from '@/utils/templates';
@@ -136,7 +136,10 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
       notify(isPublic ? 'Reply sent' : 'Note saved');
       leave(() => navigation.goBack());
     } catch (e) {
-      if (!isSessionEndedError(e)) setError(describeWriteError(e));
+      if (!isSessionEndedError(e)) {
+        hapticOutcome('error'); // iOS-5f (A5): Android plays its error haptic here too
+        setError(describeWriteError(e));
+      }
     }
   }
 

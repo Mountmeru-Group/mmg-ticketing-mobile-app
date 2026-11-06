@@ -20,12 +20,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import { memo, useCallback, useMemo, useState, type ReactElement, type ReactNode } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlProps } from 'react-native';
+import { RefreshControl, ScrollView, Text, View, type RefreshControlProps } from 'react-native';
 
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, LIST_TOP_GAP, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
-  OfflineBanner, OfflineState, QueryBanner, listBottomInset,
+  OfflineBanner, OfflineState, PressableCard, QueryBanner, listBottomInset,
 } from '@/components';
 import { MAX_CARD_TICKET_LOOKUPS, useApprovalTickets, usePendingApprovals } from '@/hooks';
 import { colors } from '@/theme';
@@ -176,11 +176,11 @@ const ApprovalCard = memo(function ApprovalCard({
   const subject = approvalSubject(approval, ticket);
   const genericTicket = approval.entityType === 'ticket' && !ticket;
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={`${entityLabel(approval.entityType)} approval: ${subject}`}
       onPress={() => onPress(approval.id)}
-      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4"
     >
       <View className="mb-2 flex-row items-center">
         <View className="rounded-full bg-yellow-100 px-2.5 py-0.5">
@@ -201,6 +201,6 @@ const ApprovalCard = memo(function ApprovalCard({
           Requested {formatRelative(approval.createdAt)} · {formatDateTime(approval.createdAt)}
         </Text>
       </View>
-    </Pressable>
+    </PressableCard>
   );
 });

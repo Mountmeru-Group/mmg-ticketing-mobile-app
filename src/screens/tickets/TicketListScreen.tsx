@@ -29,9 +29,9 @@
 //   Who gets which: ticketListFilters() (utils/permissions.ts). All of the above combine in ONE request
 //   (ticketListQuery); "Clear all" is the web's Clear: named filter, search, the five and the sort (not the country).
 // CLIENT-SIDE — display only, never used to hide or reorder rows:
-//   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the hold-adjusted SLA badge (05 §A.9), which can
-//   disagree with the server slaStatus behind Overdue / Due soon. Results are never filtered on the device to
-//   "fix" the search-scope bug (05 C.7).
+//   the "New reply" highlight (lastRequesterReplyAt, 05 §A.9) and the card's hold-adjusted SLA due line (05 §A.9,
+//   slaDueLine), which can disagree with the server slaStatus behind Overdue / Due soon. Results are never filtered on
+//   the device to "fix" the search-scope bug (05 C.7).
 //
 // WRITES (Phase 3b) — every one is an explicit action with a confirmation naming who is emailed:
 //   Inline status chip (08 §4.1): staff only, transitions from ticket-rules.ts for that ticket only; RESOLVED /
@@ -39,6 +39,11 @@
 //   Tap-and-hold multi-select (08 §4.2): staff only, hard cap BULK_ACTION_LIMIT (20). Pick up (ADMIN/AGENT) runs
 //     here; Assign → M7 and Close → M6 in bulk mode. Sequential, Stop button, per-ticket results, one list refresh.
 //   No bulk delete or merge: those endpoints don't exist (08 §4.2).
+//   Swipe left on a row (2026-11-03): Assign and Resolve, only where a tap already offers them (ticketSwipeActions,
+//     utils/permissions.ts). Assign opens M7 as More options does; Resolve runs the status chip's own handler (→ M6).
+//     One row open at a time; a scroll or a selection closes it. Not for END_USER (canSwipeTickets).
+// HAPTICS (2026-11-03, utils/haptics.ts): a tick on the long-press that selects; the confirm on a status change.
+//   iOS: iOS-4's haptics play both already: the selection haptic in toggle(), the success haptic in notify().
 //
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #2): the Tickets tab's root. There is no hardware back: while tickets are
 // selected, the navigation bar shows the count and Cancel. The status chip opens an iOS action sheet listing exactly
@@ -53,12 +58,17 @@
 // - at the accessibility text sizes only the search row stays fixed; the rows under it ride at the top of the list, so
 //   the tickets keep room (iOS-4's large-text rule, UI-STANDARDS §iOS-A.3);
 // - the list clears the "+" button, or the selection bar at its measured height (listBottomInset).
+// iOS-5f: the swipe also reaches VoiceOver, as the card's Assign and Resolve actions (TicketCard.tsx). The cards'
+// clock and the swipe row keep iOS-8a's toolbar and listBottomInset unchanged.
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlProps, type ViewStyle,
+  ActivityIndicator, Alert, AppState, Pressable, RefreshControl, ScrollView, Text, View, type RefreshControlProps,
+  type ViewStyle,
 } from 'react-native';
+import type { Swipeable } from 'react-native-gesture-handler';
 
 import { useIsOffline } from '@/api/network';
 import { assignTicket } from '@/api/tickets.api';
@@ -81,7 +91,8 @@ import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
 import { statusLabel } from '@/utils/format';
 import { hapticSelection } from '@/utils/haptics';
 import {
-  bulkActions, inlineStatusTransitions, navRole, ticketListFilters, ticketsTitle, type BulkAction,
+  bulkActions, canSwipeTickets, inlineStatusTransitions, navRole, ticketListFilters, ticketsTitle, type BulkAction,
+  type SwipeAction,
 } from '@/utils/permissions';
 import { isStaff } from '@/utils/roles';
 import {
@@ -100,6 +111,8 @@ const SORT_OPTIONS: readonly SheetOption<TicketSortOption>[] = [
 
 const ALL_COUNTRIES = '__ALL__';
 const ticketKey = (t: Ticket) => t.id;
+/** The phone's clock to the minute: the cards' dates never need finer, and an unchanged minute re-renders nothing. */
+const currentMinute = () => Math.floor(Date.now() / 60_000) * 60_000;
 
 export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<'TicketList'>) {
   const user = useAuthStore((s) => s.user);
@@ -228,6 +241,8 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     }
   });
   const onCardPress = useCallback((ticketId: string) => (selectionMode ? toggle(ticketId) : openTicket(ticketId)), [selectionMode, toggle, openTicket]);
+  // Android (2026-11-03) gives the long-press that selects a light tick; iOS-4's toggle() plays the selection haptic
+  // already, so the card's long-press stays toggle (A5, ANDROID-DELTA.md §10).
   // Rows can vanish when the query changes; start over rather than act on tickets no longer shown.
   useEffect(() => clearSelection(), [activeFilter, ticketSort, search, countryId, ticketAdvanced, clearSelection]);
   // iOS has no back button to clear the selection (Android's did): while tickets are selected, the navigation bar shows
@@ -254,6 +269,21 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
   const largeText = useAccessibilityTextSize();
   // iOS-8a: the selection bar's height as drawn (taller when its buttons stack), so the last rows clear it.
   const [selectionBarHeight, setSelectionBarHeight] = useState(0);
+
+  // The cards' clock ("Raised", "updated", the due line), as the Home greeting reads its time (UI-STANDARDS.md §9):
+  // every render reads it, and focus or a return to the app makes a render happen if the minute has moved on, so a
+  // "Due today 16:30" seen at 16:31 reads "Breached". No timer.
+  const [shownAt, setShownAt] = useState(currentMinute);
+  useFocusEffect(
+    useCallback(() => {
+      setShownAt(currentMinute());
+      const sub = AppState.addEventListener('change', (next) => {
+        if (next === 'active') setShownAt(currentMinute());
+      });
+      return () => sub.remove();
+    }, []),
+  );
+  const now = Math.max(shownAt, currentMinute());
 
   // ── Inline status chip (08 §4.1) ───────────────────────────
   const changeStatus = useChangeStatus();
@@ -288,7 +318,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     if (!ok) return;
     try {
       await changeStatus.mutateAsync({ ticketId: t.id, from: t.status, body: { status: target } });
-      notify('Status updated');
+      notify('Status updated'); // iOS: notify() plays the success haptic (Android: haptic('success'))
     } catch (e) {
       reportWriteError('Failed to update status', e);
     }
@@ -338,6 +368,31 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
     else navigation.navigate('StatusClosure', { ticketIds, target: 'CLOSED' });
     clearSelection();
   }
+  // ── Swipe actions (2026-11-03) ─────────────────────────────
+  // Which rows swipe is decided per role (canSwipeTickets), and which actions a row reveals per ticket inside the card
+  // (ticketSwipeActions): the same rules as the tap paths they shortcut.
+  const swipeable = canSwipeTickets(role);
+  const openRow = useRef<Swipeable | null>(null);
+  const onSwipeOpen = useCallback((row: Swipeable) => {
+    if (openRow.current && openRow.current !== row) openRow.current.close();
+    openRow.current = row;
+  }, []);
+  const onSwipeClose = useCallback((row: Swipeable) => {
+    if (openRow.current === row) openRow.current = null;
+  }, []);
+  const closeOpenRow = useCallback(() => {
+    openRow.current?.close();
+    openRow.current = null;
+  }, []);
+  // A selection disables swiping; an open row closes first.
+  useEffect(() => {
+    if (selectionMode) closeOpenRow();
+  }, [selectionMode, closeOpenRow]);
+  const onSwipeAction = useStableCallback((action: SwipeAction, t: Ticket) => {
+    if (action === 'assign') navigation.navigate('AssignPicker', { ticketIds: [t.id] }); // as More options' Assign…
+    else void once(() => applyTransition(t, 'RESOLVED')); // the status chip's own path: checks the transition, opens M6
+  });
+
   const onBulk: Record<BulkAction, () => void> = {
     pickup: () => void once(bulkPickUp),
     assign: () => openBulk('AssignPicker'),
@@ -358,11 +413,19 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
             selected={selected.has(item.id)}
             onStatusPress={interactive ? onStatusPress : undefined}
             statusBusy={statusBusyId === item.id}
+            swipeViewer={swipeable ? user : undefined}
+            onSwipeAction={onSwipeAction}
+            onSwipeOpen={onSwipeOpen}
+            onSwipeClose={onSwipeClose}
+            now={now}
           />
         </ListEntry>
       );
     },
-    [role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId],
+    [
+      role, onCardPress, canSelect, toggle, selectionMode, selected, onStatusPress, statusBusyId, swipeable, user,
+      onSwipeAction, onSwipeOpen, onSwipeClose, now,
+    ],
   );
 
   // iOS-8a: below the toolbar, clear of the "+" button or the selection bar. At the accessibility sizes the filter rows
@@ -538,6 +601,7 @@ export function TicketListScreen({ navigation, route }: TicketsStackScreenProps<
         renderItem={renderItem}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
+        onScrollBeginDrag={closeOpenRow}
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={listHeader}

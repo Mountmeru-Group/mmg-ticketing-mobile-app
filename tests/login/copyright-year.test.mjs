@@ -3,8 +3,7 @@
 // as Home reads the greeting: events only, never a timer. And a guard: no user-facing string anywhere in src/ may hold
 // a written four-digit year, because a written year is wrong from 1 January.
 //
-// iOS (iOS-5f, STEP 4): ported from Android dev d8626bc. The year rule and the no-written-year guard are verbatim;
-// "copyright year: Login" joins with the iOS Login footer in STEP 6. On iOS VoiceOver, like TalkBack, reads "©" as
+// iOS (iOS-5f): ported from Android dev d8626bc, all of it, unchanged. On iOS VoiceOver, like TalkBack, reads "©" as
 // "copyright".
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -41,6 +40,27 @@ describe('copyright year: the device clock', () => {
       // "©" alone is read as "copyright", so the label drops it rather than saying the word twice.
       assert.equal(copyrightLabel(year), `Copyright ${year} Mount Meru Group`);
     }
+  });
+});
+
+describe('copyright year: Login', () => {
+  const login = read('src/screens/auth/LoginScreen.tsx');
+
+  test('the footer renders the computed line, with the spoken label', () => {
+    assert.match(login, /<Text style=\{styles\.footer\} accessibilityLabel=\{copyrightLabel\(year\)\}>\s*\{copyrightLine\(year\)\}\s*<\/Text>/);
+    assert.doesNotMatch(login, /Mount Meru Group IT/);
+  });
+
+  test('read on first render, on focus and when the app returns to the foreground', () => {
+    assert.match(login, /const \[year, setYear\] = useState\(\(\) => copyrightYear\(\)\);/);
+    assert.match(login, /useFocusEffect\(\s*useCallback\(\(\) => \{\s*setYear\(copyrightYear\(\)\);/);
+    assert.match(login, /AppState\.addEventListener\('change', \(next\) => \{\s*if \(next === 'active'\) setYear\(copyrightYear\(\)\);/);
+    assert.match(login, /return \(\) => subscription\.remove\(\);/);
+  });
+
+  test('no timer and no polling; the device clock only', () => {
+    assert.doesNotMatch(login, /setInterval|setTimeout|refetchInterval|requestAnimationFrame/);
+    assert.doesNotMatch(read('src/utils/copyright.ts'), /setInterval|setTimeout|\bfetch\(|apiClient|@\/api|useAuthStore/);
   });
 });
 

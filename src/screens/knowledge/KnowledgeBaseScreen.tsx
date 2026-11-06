@@ -17,7 +17,7 @@ import { describeError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import {
   EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, OutlineButton, QueryBanner, SearchField,
+  OfflineState, OutlineButton, PressableCard, QueryBanner, SearchField,
 } from '@/components';
 import { useDebouncedValue, useKbArticles, useKbCategories, useKbSearch } from '@/hooks';
 import { colors, palette } from '@/theme';
@@ -234,11 +234,11 @@ const rowKey = (row: { id: string }) => row.id;
 
 const ArticleRow = memo(function ArticleRow({ article, onPress }: { article: KBArticleListItem; onPress: (slug: string) => void }) {
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={`${article.title || 'Untitled article'}${article.category?.name ? `, ${article.category.name}` : ''}`}
       onPress={() => onPress(article.slug)}
-      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4"
     >
       {article.category?.name ? <Text className="mb-0.5 text-xs font-medium text-blue-700">{article.category.name}</Text> : null}
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
@@ -254,17 +254,17 @@ const ArticleRow = memo(function ArticleRow({ article, onPress }: { article: KBA
         {article.publishedAt ? `Published ${formatDate(article.publishedAt)}` : 'Published'}
         {typeof article.helpfulCount === 'number' && article.helpfulCount > 0 ? ` · ${article.helpfulCount} found it helpful` : ''}
       </Text>
-    </Pressable>
+    </PressableCard>
   );
 });
 
 const SearchRow = memo(function SearchRow({ result, onPress }: { result: KBSearchResult; onPress: (slug: string) => void }) {
   return (
-    <Pressable
+    <PressableCard
       accessibilityRole="button"
       accessibilityLabel={result.title || 'Untitled article'}
       onPress={() => onPress(result.slug)}
-      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4 active:opacity-80"
+      className="mx-4 mb-3 min-h-11 rounded-xl border border-border bg-white p-4"
     >
       <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
         {result.title || 'Untitled article'}
@@ -275,6 +275,6 @@ const SearchRow = memo(function SearchRow({ result, onPress }: { result: KBSearc
         </Text>
       ) : null}
       <Tags tags={result.tags} />
-    </Pressable>
+    </PressableCard>
   );
 });

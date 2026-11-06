@@ -3,8 +3,7 @@
 // and the colour is the hold-adjusted SLA status (getDisplaySlaStatus); the app adds no threshold of its own.
 // Dates are built in local time (the Date constructor with parts), as the phone shows them.
 //
-// iOS (iOS-5f): ported from Android dev d8626bc (STEP 4: the rules and colours; STEP 5: the SlaDeadline component and
-// the list skeleton). The ticket detail and ticket card wiring tests join in STEP 6.
+// iOS (iOS-5f): ported from Android dev d8626bc, all of it, unchanged.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -115,6 +114,12 @@ describe('colours and where it shows', () => {
         assert.ok(gap >= 15, `${tones[i][0]} vs ${tones[j][0]}: ${gap.toFixed(1)}`);
       }
     }
+  });
+
+  test('detail: the dot row in the header card. The list card: its own due line from the same rule (below). Home: neither', () => {
+    assert.match(read('src/screens/tickets/TicketDetailScreen.tsx'), /<SlaBadge ticket=\{ticket\} \/>\s*<\/View>\s*\{\/\*[^*]*\*\/\}\s*<SlaDeadline ticket=\{ticket\} \/>/);
+    assert.doesNotMatch(read('src/components/TicketCard.tsx'), /<SlaDeadline|\bslaDeadline\(/, 'the card words it with slaDueLine');
+    assert.doesNotMatch(read('src/components/RecentTicketRow.tsx'), /SlaDeadline|slaDeadline|slaDueLine/);
   });
 
   test('no bar, no animation, no timer: the clock is read on render, focus and return to the app', () => {
@@ -246,6 +251,37 @@ describe('the card\'s due line: colour, place and cost', () => {
     const [green, amber, red] = ['WITHIN_SLA', 'DUE_SOON', 'BREACHED'].map((s) => lightness(colors.slaDue[s]));
     assert.ok(green - amber >= 9, `green ${green.toFixed(1)} vs amber ${amber.toFixed(1)}`);
     assert.ok(amber - red >= 9, `amber ${amber.toFixed(1)} vs red ${red.toFixed(1)}`);
+  });
+
+  test('TicketCard: the due line after the people row, in the SLA colour, from slaDueLine; no SLA chip; absent when null', () => {
+    const card = read('src/components/TicketCard.tsx');
+    assert.doesNotMatch(card, /SlaBadge/);
+    assert.match(card, /const due = slaDueLine\(ticket, now\);/);
+    const people = card.indexOf('<PeopleRow');
+    const line = card.indexOf('{due ? (');
+    assert.ok(people > 0 && line > people, 'below the people row');
+    assert.match(card, /<Ionicons name="time-outline" size=\{14\} color=\{dueColor\} \/>/);
+    assert.match(card, /style=\{\{ color: dueColor \}\}/);
+    assert.match(card, /\) : null\}\s*<\/Pressable>/, 'nothing rendered when there is no line');
+  });
+
+  test('no animation, no timer on the row: computed on render from the list\'s clock', () => {
+    const card = read('src/components/TicketCard.tsx');
+    const row = card.slice(card.indexOf('{due ? ('), card.indexOf(') : null}', card.indexOf('{due ? (')));
+    assert.doesNotMatch(row, /Animated|useEffect|setInterval|setTimeout/);
+    const list = read('src/screens/tickets/TicketListScreen.tsx');
+    assert.match(list, /const now = Math\.max\(shownAt, currentMinute\(\)\);/);
+    assert.match(list, /now=\{now\}/);
+    assert.doesNotMatch(list, /setInterval|refetchInterval/);
+  });
+
+  test('the top line: "#19445 · Raised 2 Nov · updated 2d ago", the New reply badge still at the right', () => {
+    const card = read('src/components/TicketCard.tsx');
+    assert.match(card, /#\{ticket\.ticketNumber \?\? '—'\}<\/Text>\s*<Text className=\{`shrink text-xs \$\{meta\}`\} numberOfLines=\{1\}>\s*\{` · Raised \$\{raised\}`\}/);
+    assert.match(card, /\{` · updated \$\{formatRelativeShort\(ticket\.updatedAt, now\)\}`\}/);
+    assert.ok(card.indexOf('· updated') < card.indexOf('New reply</Text>'));
+    assert.equal(formatShortDate(new Date(2026, 10, 2, 8, 0), new Date(2026, 10, 5).getTime()), '2 Nov');
+    assert.equal(formatRelativeShort(new Date(2026, 10, 3, 10), new Date(2026, 10, 5, 10).getTime()), '2d ago');
   });
 
   test('the list skeleton matches the new card: two chips, then the due line under the people row', () => {

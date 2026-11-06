@@ -7,6 +7,8 @@
 // - The attempt itself, the messages and the stale-banner rule are in ./signInAttempt.ts; the button and its motion
 //   are ./SignInButton.tsx; this file only lays out.
 // - The environment chip shows on every build except production (SHOW_ENVIRONMENT_CHIP, src/config/env.ts).
+// - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
+//   iOS (iOS-5f): VoiceOver hears "Copyright <year> Mount Meru Group" (copyrightLabel), as TalkBack does.
 // - iOS (iOS-5c): Android's 2026-10-30 file with one difference: __DEV__ builds keep the developer-token button, because
 //   deleting that screen is on the iOS-9 list (docs/ios/ANDROID-DELTA.md §5, item 1). Release builds never contain it.
 // TODO(later phase):
@@ -14,7 +16,8 @@
 // - SYS-1 health check on start / after a network error.
 // - Never: password form (production is SSO only), /auth/test-login, WebView cookie lifting (02 §6).
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +28,7 @@ import { useSingleFlight } from '@/hooks';
 import { REAUTH_NOTICE, useAuthStore } from '@/store/auth.store';
 import { colors, loginLayout, loginType, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
+import { copyrightLabel, copyrightLine, copyrightYear } from '@/utils/copyright';
 import { SignInButton } from './SignInButton';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
@@ -49,6 +53,20 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
   const once = useSingleFlight();
   // Read by the AppState listener, which must not re-subscribe on every render.
   const inFlight = useRef(false);
+
+  // The footer's year: from the device clock on first render, again each time Login is focused, and again when the app
+  // comes back to the foreground on Login (left open over New Year). Events only: no timer, no polling, as the Home
+  // greeting. The state is the year itself, so a check that finds the same year does not re-render.
+  const [year, setYear] = useState(() => copyrightYear());
+  useFocusEffect(
+    useCallback(() => {
+      setYear(copyrightYear());
+      const subscription = AppState.addEventListener('change', (next) => {
+        if (next === 'active') setYear(copyrightYear());
+      });
+      return () => subscription.remove();
+    }, []),
+  );
 
   // An old failure banner must not greet someone reopening the app as if it had just failed (signInAttempt.ts).
   useEffect(() => {
@@ -186,7 +204,9 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
             ) : null}
           </View>
 
-          <Text style={styles.footer}>Mount Meru Group IT</Text>
+          <Text style={styles.footer} accessibilityLabel={copyrightLabel(year)}>
+            {copyrightLine(year)}
+          </Text>
         </View>
       </ScrollView>
     </View>

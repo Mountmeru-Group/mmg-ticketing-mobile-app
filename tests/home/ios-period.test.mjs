@@ -136,7 +136,8 @@ describe('iOS: Custom validation is Android\'s, messages and picker limits', () 
 
   test('Done writes the device\'s calendar day (YYYY-MM-DD) into the store; Cancel or a swipe down writes nothing', () => {
     const src = read(HOME);
-    assert.match(src, /onDone=\{\(date\) => \{\s*if \(dayPicker\) setCustomRange\(\{ \[dayPicker\.which\]: dayFromDate\(date\) \}\);\s*\}\}/);
+    // iOS-5f: a picked day also counts as changing the period, for the count fade (Android: its date dialog's handler).
+    assert.match(src, /onDone=\{\(date\) => \{\s*if \(dayPicker\) \{\s*setPeriodTouched\(true\);\s*setCustomRange\(\{ \[dayPicker\.which\]: dayFromDate\(date\) \}\);\s*\}\s*\}\}/);
     assert.match(src, /onClose=\{\(\) => setDayPicker\(null\)\}/);
   });
 });
@@ -249,7 +250,8 @@ describe('iOS: the period toolbar, the period sheet and the Custom calendars', (
   test('every new control is labelled for VoiceOver and at least 44 pt (the chips: 36 pt + a 4 pt hit slop)', () => {
     assert.match(src, /accessibilityLabel=\{`Period: \$\{label\}\. Changes the period`\}[\s\S]{0,80}className="min-h-11 /);
     assert.match(src, /accessibilityLabel=\{`\$\{label\}: \$\{value \?\? 'not picked'\}\. Opens the date picker`\}[\s\S]{0,80}className=\{`min-h-11 /);
-    assert.match(src, /accessibilityLabel=\{`\$\{label\}\$\{value !== undefined \? `: \$\{value\}` : ''\}\. Opens the list`\}\s+onPress=\{onPress\}\s+hitSlop=\{4\}\s+className="min-h-9 /);
+    // iOS-5f: + the chip's window caption (Active's "right now", homeChipCaption), as on Android.
+    assert.match(src, /accessibilityLabel=\{`\$\{label\}\$\{value !== undefined \? `: \$\{value\}` : ''\}\$\{caption \? `, \$\{caption\}` : ''\}\. Opens the list`\}\s+onPress=\{onPress\}\s+hitSlop=\{4\}\s+className="min-h-9 /);
   });
 
   test('VoiceOver hears the Custom message change (Android\'s live region is TalkBack\'s only)', () => {
