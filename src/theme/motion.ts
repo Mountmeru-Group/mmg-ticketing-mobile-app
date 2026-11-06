@@ -123,6 +123,67 @@ export const motion = {
     curve: curve.standard,
   },
 
+  /** Press feedback on every tappable card and list row (components/PressFeedback.tsx, 2026-11-03). */
+  press: {
+    /** Scale while held. */
+    scale: 0.97,
+    /** Opacity while held: the slight tint, the card dimming towards the grey canvas, as `active:opacity-80` did. */
+    opacity: 0.85,
+    /** Into the held look, ms. */
+    pressIn: 90,
+    /** Back to rest when the finger lifts or the press is cancelled, ms. */
+    pressOut: 160,
+    curve: curve.standard,
+    /**
+     * How long after touch-down the press shows (Pressable's `unstable_pressDelay`), ms. A touch that becomes a scroll
+     * within this time shows nothing, so a fling does not flicker every card the finger lands on. A quicker tap still
+     * shows the press and still fires.
+     */
+    pressDelay: 60,
+  },
+
+  /**
+   * A Home KPI tile's number when the period changes (components/CountFade.tsx, 2026-11-03, Ronit's option 5 for the
+   * count roll): the old number fades out as the new one fades in and rises into place. Not a count-up: that needs
+   * JavaScript every frame (docs/PERFORMANCE.md §13.6).
+   */
+  countFade: {
+    duration: 300,
+    /** How far below its place the new number starts, dp. */
+    rise: 4,
+    curve: curve.standard,
+  },
+
+  /** The greeting mark beside "Good morning, Ronit" (components/GreetingMark.tsx, 2026-11-03): one rise and fade. */
+  greetingMark: {
+    duration: 420,
+    /** How far below its place it starts, dp. */
+    rise: 6,
+    curve: curve.enter,
+  },
+
+  /**
+   * Swipe actions on ticket-list rows (components/TicketCard.tsx, 2026-11-03): react-native-gesture-handler's
+   * Swipeable, whose drag and snap run on the native driver and move the row with `translateX` only.
+   */
+  swipe: {
+    /** Width of each revealed action, dp. */
+    actionWidth: 80,
+    /** How far the finger must travel left before the row moves (the pan's `activeOffsetX`), dp. */
+    dragStart: 10,
+    /** Vertical travel that cancels a swipe, so a scroll never also drags a row (`failOffsetY`), dp. */
+    verticalFail: 10,
+    /** Released further than this, the row snaps open; otherwise it closes, dp. */
+    openThreshold: 40,
+    /** 1 = the row follows the finger exactly. */
+    friction: 1,
+    /**
+     * "Remove animations" (iOS: Reduce Motion): the snap's spring speed (bounciness 0), so it settles in a frame or two
+     * instead of easing.
+     */
+    reducedSpringSpeed: 100,
+  },
+
   /** iOS: the success notice after a write (components/SuccessNotice.tsx), in place of Android's toast. */
   successNotice: {
     /** Fade in, and fade out, ms. */

@@ -65,6 +65,27 @@ export function formatRelative(value: ISODateString | Date | null | undefined, n
   return future ? `in ${text}` : `${text} ago`;
 }
 
+/**
+ * formatRelative's steps, in one-line units, past only: "just now", "5m ago", "3h ago", "2d ago", "4mo ago", "1y ago".
+ * For one-line meta such as a ticket card's "updated 2d ago". A time ahead of the phone's clock reads "just now".
+ */
+export function formatRelativeShort(value: ISODateString | Date | null | undefined, now: number = Date.now()): string {
+  if (!value) return '—';
+  const d = toDate(value);
+  if (!d) return '—';
+  const seconds = Math.max(0, now - d.getTime()) / 1000;
+  const minutes = Math.round(seconds / 60);
+  const hours = Math.round(seconds / 3600);
+  const days = Math.round(seconds / 86_400);
+  const months = Math.round(seconds / (86_400 * 30));
+  if (seconds < 45) return 'just now';
+  if (minutes < 45) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 30) return `${days}d ago`;
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.round(seconds / (86_400 * 365))}y ago`;
+}
+
 /** "2 Nov" on the phone's calendar; "2 Nov 2025" outside the current year. No leading zero. */
 export function formatShortDate(value: ISODateString | Date | null | undefined, now: number = Date.now()): string {
   if (!value) return '—';
@@ -228,6 +249,34 @@ export function formatDisplayName(name: string | null | undefined): string {
     .replace(/[._-]+/g, ' ')
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * First name and last initial, for the technician on a ticket card (2026-11-03): "Sarthak Darekar" → "Sarthak D.",
+ * "Ana Maria Lopez" → "Ana L.". One word stays as it is. Formatted as formatDisplayName() first, so an e-mail-style name
+ * gives the same words the drawer shows.
+ */
+export function shortName(name: string | null | undefined): string {
+  const parts = formatDisplayName(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0] as string;
+  const last = parts[parts.length - 1] as string;
+  return `${parts[0]} ${last[0]?.toUpperCase() ?? ''}.`;
+}
+
+/**
+ * What a ticket card's people row says, for the card's screen-reader label (the row itself is hidden from TalkBack;
+ * on iOS, from VoiceOver): "Requested by Rohit Jadhav, technician Sarthak Darekar"; END_USER's row has the technician
+ * only ("Unassigned").
+ */
+export function peopleRowLabel(
+  requesterName: string | null | undefined,
+  technicianName: string | null | undefined,
+  showRequester: boolean,
+): string {
+  const technician = formatDisplayName(technicianName);
+  if (!showRequester) return technician ? `Technician ${technician}` : 'Unassigned';
+  return `Requested by ${formatDisplayName(requesterName) || 'unknown requester'}, ${technician ? `technician ${technician}` : 'unassigned'}`;
 }
 
 /** Two-letter initials for the drawer avatar. */
