@@ -15,6 +15,7 @@ export { useDiscardGuard } from './useDiscardGuard';
 export { useSingleFlight } from './useSingleFlight';
 export { useStableCallback } from './useStableCallback';
 export { reduceMotionEnabled, reduceMotionSettled, useReduceMotion } from './useReduceMotion';
+export { screenReaderEnabled } from './useScreenReader';
 export { ACCESSIBILITY_TEXT_SCALE, isAccessibilityTextScale, useAccessibilityTextSize, useScaledIconSize } from './useTextSize';
 export { findCachedTicket } from './cache';
 

@@ -10,6 +10,9 @@
 // a module that needs more of React Native is not a pure module and is checked by reading its source instead.
 const listeners = new Set();
 let reduceMotion = false;
+// iOS-5f: VoiceOver (hooks/useScreenReader.ts): isScreenReaderEnabled() and 'screenReaderChanged'.
+const screenReaderListeners = new Set();
+let screenReader = false;
 
 export const Platform = { OS: 'ios' };
 
@@ -35,9 +38,11 @@ const announcements = [];
 
 export const AccessibilityInfo = {
   isReduceMotionEnabled: () => Promise.resolve(reduceMotion),
+  isScreenReaderEnabled: () => Promise.resolve(screenReader),
   addEventListener(event, handler) {
-    if (event === 'reduceMotionChanged') listeners.add(handler);
-    return { remove: () => listeners.delete(handler) };
+    const set = event === 'reduceMotionChanged' ? listeners : event === 'screenReaderChanged' ? screenReaderListeners : null;
+    set?.add(handler);
+    return { remove: () => set?.delete(handler) };
   },
   announceForAccessibility(announcement) {
     announcements.push({ announcement, options: undefined });
@@ -56,6 +61,12 @@ export function __setReduceMotion(value) {
 export function __changeReduceMotion(value) {
   reduceMotion = value;
   for (const listener of listeners) listener(value);
+}
+
+/** VoiceOver turned on or off while the app runs (iOS-5f). */
+export function __changeScreenReader(value) {
+  screenReader = value;
+  for (const listener of screenReaderListeners) listener(value);
 }
 
 /** Everything VoiceOver was asked to say, oldest first, with its options. */
