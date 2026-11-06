@@ -110,6 +110,5 @@ export const queryKeys = {
   auditLog: {
     all: () => ['audit-log'] as const,
     list: (params: AuditLogKeyParams) => ['audit-log', 'list', params] as const,
-    ticket: (ticketNumber: number) => ['audit-log', 'ticket', ticketNumber] as const,
   },
 } as const;

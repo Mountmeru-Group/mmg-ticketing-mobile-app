@@ -15,7 +15,9 @@
 // number) is shown raw. It never throws: anything unexpected ends in the raw block.
 import type { AuditAction, AuditLogEntry, AuditLogQuery } from '@/types';
 import { APP_ORIGIN, parseTicketLink } from './deep-links';
-import { IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, formatDate, formatDisplayName, statusLabel } from './format';
+import {
+  IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, formatDate, formatDisplayName, formatShortDate, statusLabel,
+} from './format';
 
 // ── Actions ──────────────────────────────────────────────────
 
@@ -64,30 +66,135 @@ export function isKnownAuditAction(action: string): action is AuditAction {
 export const AUDIT_ENTITY_TYPES = ['Ticket', 'Comment', 'Attachment'] as const;
 export type AuditEntityType = typeof AUDIT_ENTITY_TYPES[number];
 
-/** What the screen filters by. Each maps to one exact-match AUD-1 param. */
+/** A span of days on the phone's calendar, `YYYY-MM-DD`. Either end may be open; `from` is never after `to`. */
+export interface AuditDayRange {
+  from: string | null;
+  to: string | null;
+}
+
+export const ANY_DAY: AuditDayRange = { from: null, to: null };
+
+/** What the screen filters by. Each maps to one AUD-1 param (the backend team's written contract, 2026-11-05). */
 export interface AuditLogFilters {
+  /** `action`, an exact AuditAction. */
+  action: AuditAction | null;
+  /** `entityType`, exact and case-sensitive. */
   entityType: AuditEntityType | null;
-  /** The ticket picked by number. AUD-1 filters by its id; there is no ticket-number param. */
-  ticket: { id: string; ticketNumber: number } | null;
-  /** The person picked in the USR-3 picker (active users only). */
+  /** `dateFrom` / `dateTo`: the first day from its first moment, the last day to its last, in the phone's time zone. */
+  dates: AuditDayRange;
+  /** `ticketNumber`, as typed: the server finds the ticket. */
+  ticketNumber: number | null;
+  /** `actorId`: the person picked in the USR-3 picker (active users only). In the source, not the written contract. */
   person: { id: string; displayName: string } | null;
 }
 
-export const NO_AUDIT_FILTERS: AuditLogFilters = { entityType: null, ticket: null, person: null };
+export const NO_AUDIT_FILTERS: AuditLogFilters = { action: null, entityType: null, dates: ANY_DAY, ticketNumber: null, person: null };
 
 export type AuditLogKeyParams = Omit<AuditLogQuery, 'page' | 'limit'>;
 
-/** AUD-1 params for these filters, without page and limit. Only the three the server reads (auditLog.controller.ts:7). */
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** A day's first (`start`) or last (`end`) millisecond on the phone's clock, as the instant the server compares with. */
+function dayBound(day: string, edge: 'start' | 'end'): string | undefined {
+  const m = DAY_RE.exec(day);
+  if (!m) return undefined;
+  const date = edge === 'start'
+    ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+    : new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/**
+ * AUD-1 params for these filters, without page and limit. The days go as full instants: the server reads each with
+ * `new Date()` and compares `createdAt` ≥ dateFrom and ≤ dateTo (auditLog.controller.ts:45-49), so a bare `2026-11-05`
+ * would be UTC midnight and drop all of that day but its first moment from `dateTo` (05 B.40).
+ */
 export function auditLogQuery(filters: AuditLogFilters): AuditLogKeyParams {
   const query: AuditLogKeyParams = {};
+  if (filters.action) query.action = filters.action;
   if (filters.entityType) query.entityType = filters.entityType;
-  if (filters.ticket) query.ticketId = filters.ticket.id;
+  if (filters.dates.from) query.dateFrom = dayBound(filters.dates.from, 'start');
+  if (filters.dates.to) query.dateTo = dayBound(filters.dates.to, 'end');
+  if (filters.ticketNumber !== null) query.ticketNumber = filters.ticketNumber;
   if (filters.person) query.actorId = filters.person.id;
   return query;
 }
 
 export function activeAuditFilterCount(filters: AuditLogFilters): number {
-  return (filters.entityType ? 1 : 0) + (filters.ticket ? 1 : 0) + (filters.person ? 1 : 0);
+  const dates = filters.dates.from || filters.dates.to ? 1 : 0;
+  return (filters.action ? 1 : 0) + (filters.entityType ? 1 : 0) + dates + (filters.ticketNumber !== null ? 1 : 0) + (filters.person ? 1 : 0);
+}
+
+/**
+ * True when AUD-1 ignored a `ticketNumber`: the server looks the number up, and a number with no ticket filters
+ * NOTHING (auditLog.controller.ts:11-18, 05 B.40), so the whole log comes back. With the filter applied, every entry
+ * belongs to that ticket; one entry from any other ticket (or none) means there is no such ticket.
+ */
+export function auditTicketFilterIgnored(entries: readonly AuditLogEntry[], ticketNumber: number): boolean {
+  return entries.some((entry) => entry?.ticket?.ticketNumber !== ticketNumber);
+}
+
+// ── Dates ────────────────────────────────────────────────────
+
+export type AuditDatePreset = 'any' | 'today' | 'yesterday' | 'last7' | 'last30';
+
+/** The quick choices in the Dates sheet. Each is a span of whole days, ending today. */
+export const AUDIT_DATE_PRESETS: readonly { value: AuditDatePreset; label: string }[] = [
+  { value: 'any', label: 'Any date' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last7', label: 'Last 7 days' },
+  { value: 'last30', label: 'Last 30 days' },
+];
+
+function localDay(now: Date, offsetDays: number): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** The days a preset stands for, today: "Last 7 days" is today and the 6 before it. */
+export function auditPresetDays(preset: AuditDatePreset, now: Date = new Date()): AuditDayRange {
+  switch (preset) {
+    case 'any':
+      return ANY_DAY;
+    case 'today':
+      return { from: localDay(now, 0), to: localDay(now, 0) };
+    case 'yesterday':
+      return { from: localDay(now, -1), to: localDay(now, -1) };
+    case 'last7':
+      return { from: localDay(now, -6), to: localDay(now, 0) };
+    case 'last30':
+      return { from: localDay(now, -29), to: localDay(now, 0) };
+  }
+}
+
+/** The preset these days are, today, for the sheet's tick; null for any other span. */
+export function auditPresetOf(dates: AuditDayRange, now: Date = new Date()): AuditDatePreset | null {
+  const match = AUDIT_DATE_PRESETS.find(({ value }) => {
+    const days = auditPresetDays(value, now);
+    return days.from === dates.from && days.to === dates.to;
+  });
+  return match?.value ?? null;
+}
+
+/** One end picked by hand. The other end moves with it if it would otherwise come first, so `from` ≤ `to` always. */
+export function withAuditDay(dates: AuditDayRange, end: 'from' | 'to', day: string): AuditDayRange {
+  if (end === 'from') return { from: day, to: dates.to !== null && dates.to < day ? day : dates.to };
+  return { from: dates.from !== null && dates.from > day ? day : dates.from, to: day };
+}
+
+/** The Dates chip: "Any date", "Today", "Last 7 days", "5 Nov", "1 Nov – 5 Nov", "From 1 Nov", "Until 5 Nov". */
+export function auditDatesLabel(dates: AuditDayRange, now: Date = new Date()): string {
+  const preset = auditPresetOf(dates, now);
+  if (preset) return AUDIT_DATE_PRESETS.find((p) => p.value === preset)?.label ?? 'Any date';
+  const short = (day: string) => {
+    const m = DAY_RE.exec(day);
+    return m ? formatShortDate(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12), now.getTime()) : day;
+  };
+  if (dates.from && dates.to) return dates.from === dates.to ? short(dates.from) : `${short(dates.from)} – ${short(dates.to)}`;
+  if (dates.from) return `From ${short(dates.from)}`;
+  if (dates.to) return `Until ${short(dates.to)}`;
+  return 'Any date';
 }
 
 /**

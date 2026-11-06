@@ -79,6 +79,15 @@ function report(line: string): void {
 }
 
 /**
+ * Logs (once per session) one drift line that a FieldSpec cannot express, e.g. none of a field's accepted aliases
+ * being present (AUTH-P1, auth.api.ts). `detail` must name fields and types only, never a value.
+ */
+export function reportDrift(endpoint: string, detail: string): void {
+  if (!__DEV__) return;
+  report(`${endpoint} ${detail}`);
+}
+
+/**
  * Logs (once per session) each field of `value` that does not match `specs`. `label` prefixes the path,
  * e.g. `data[0].`. Checks one sample item per array to keep the cost negligible.
  */

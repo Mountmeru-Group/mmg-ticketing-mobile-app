@@ -14,6 +14,20 @@ import type { ApiError } from '@/types';
 export type ApiErrorKind = 'http' | 'not-json' | 'network' | 'timeout' | 'client' | 'shape';
 
 /**
+ * True when a GET found no route at all, so its HTML is not the route's own answer (01 §0.5): Express's HTML 404
+ * ("Cannot GET"), or the web app's index.html with 200, which a server in production mode serves for any unknown GET
+ * under /api/v1. A route's own errors are JSON; a 429 from the limiter is plain text. Neither counts.
+ */
+export function isNoSuchGetRoute(error: unknown): boolean {
+  return (
+    error instanceof ApiClientError &&
+    error.kind === 'not-json' &&
+    (error.status === 404 || error.status === 200) &&
+    (error.contentType ?? '').includes('text/html')
+  );
+}
+
+/**
  * Every rejection from src/api/ is an ApiClientError whose `body` is the documented error envelope
  * (`ApiError`, 03 §C / 01 §0.2), so screens handle one shape only.
  * Deliberately carries no request config: axios errors include headers, i.e. the Bearer token (02 §5.1).
@@ -23,13 +37,21 @@ export class ApiClientError extends Error {
   /** HTTP status, or null when no response was received / the request never left the device. */
   readonly status: number | null;
   readonly body: ApiError;
+  /**
+   * The response's `content-type` for a `not-json` answer ('' when it had none), otherwise undefined.
+   * isNoSuchGetRoute() reads it, so AUD-1's path fallback (auditLog.api.ts) tells a missing route's HTML from any other
+   * non-JSON answer (01 §0.5). iOS: Android's email sign-in also reads it to walk its fallback paths; iOS makes one
+   * call to the confirmed path and has no such walk (01 §iOS-A).
+   */
+  readonly contentType?: string;
 
-  constructor(kind: ApiErrorKind, status: number | null, body: ApiError) {
+  constructor(kind: ApiErrorKind, status: number | null, body: ApiError, contentType?: string) {
     super(body.error);
     this.name = 'ApiClientError';
     this.kind = kind;
     this.status = status;
     this.body = body;
+    if (contentType !== undefined) this.contentType = contentType;
   }
 }
 
