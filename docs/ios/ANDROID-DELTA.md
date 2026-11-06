@@ -1,4 +1,4 @@
-# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e)
+# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
 > **Port source since iOS-5e: `origin/dev` @ `8b522e3bf063b26a808efee9d65776c3c6bbef3c`** (§9). To sync later Android work, diff `8b522e3..origin/dev`: in this clone on 2026-11-03 that is `e85c602`, `69a38ab` and `0c0bbac` (§9.5).
@@ -293,3 +293,78 @@ Three commits reached `dev` while iOS-5e was being built. None of them is in iOS
 ### 9.6 Section numbers
 
 No clash. Android's new UI-STANDARDS §11–§13 and ROLE-MATRIX §17–§19 were free on iOS; they sit before §iOS-A. The iOS notes are in lettered sections: UI-STANDARDS §iOS-A.14, ROLE-MATRIX §iOS-A.7 (and its §7, the mutation check), WEB-VS-MOBILE-ROLES §iOS-A.6, and 01-API-CONTRACT's first lettered section, §iOS-A.
+
+## 10. iOS-5f: the sync to `d8626bc` (2026-11-06, in progress)
+
+### 10.1 What came across
+
+At planning (`git fetch`, 2026-11-06), `origin/dev` was `d8626bc`, the brief's port target, with nothing after it. `8b522e3..d8626bc` is **eight commits**, 102 files (+8,059 / −689):
+
+| Commit | Date (+0530) | What | Files |
+|---|---|---|---|
+| `e85c602` | 2026-11-03 10:42 | The polish pass: people row, greeting mark, window captions, swipe, haptics, SLA bar, press feedback | 53 |
+| `69a38ab` | 2026-11-03 11:28 | The SLA deadline (in place of the SLA bar), count cross-fade, paperclip icon, VIBRATE kept | 26 |
+| `0c0bbac` | 2026-11-03 12:24 | Android's `versionCode` 3 | 3 |
+| `5b3c73a` | 2026-11-03 12:33 | ShortcutBadger's launcher-badge permissions blocked | 3 |
+| `be33e7e` | 2026-11-05 09:01 | G9: the footer's copyright year; password-login findings, ask A32 | 10 |
+| `0f75e51` | 2026-11-05 09:51 | G9 re-read of the web clone, A32 narrowed (docs) | 2 |
+| `999943e` | 2026-11-05 10:34 | G9: email and password sign-in on UAT builds, against an ASSUMED contract | 22 |
+| `d8626bc` | 2026-11-05 14:17 | The visible email Sign in button; push config, audit and dashboard contracts; card dates | 41 |
+
+**Packages and `app.json`.** Android adds `expo-haptics` (`package.json`, the lock file), which iOS has had since iOS-4. Android's `app.json` and `app.config.js` changes are Android only: VIBRATE, ShortcutBadger, `versionCode`, `google-services.json`. On iOS, `package.json`, `package-lock.json` and `app.json` stay unchanged (checked at STEP 8). The four SVGs in `assets/illustrations/` are drawn by `expo-image`, already installed.
+
+### 10.2 The gap table
+
+> The IDs follow the commits: A = `e85c602`, B = `69a38ab`, C = `0c0bbac` and `5b3c73a`, D = the three G9 commits, E = `d8626bc`. They were written up from the commits for this section; the brief's references (A3, A4, A5, A6, B3, B4, C1, C2, D2, E1, E2, E3, E5) map onto them.
+
+| ID | Change | Commit | What it does for the user | iOS | Step |
+|---|---|---|---|---|---|
+| A1 | People row on ticket cards (requester → technician, dashed "Unassigned"), list skeleton to match | `e85c602` | Who raised it and who has it, at a glance | **Port** | 4, 5, 6 |
+| A2 | Greeting mark: a drawn SVG per time-of-day band, one rise and fade | `e85c602` | A small sun, cloud-sun or moon by the Home greeting | **Port**. iOS: plays once, skipped under Reduce Motion and VoiceOver | 4, 5, 6 |
+| A3 | Window captions under every count; "Active now" → "Active" | `e85c602` | "this month" … or "right now" under each Home count (P7, §9.4) | **Port** | 4, 6 |
+| A4 | Swipe left on list rows: Assign, Resolve (`ticketSwipeActions`) | `e85c602` | Quick actions from the list, from the tap rules; none for END_USER | **Port**, plus VoiceOver custom actions "Assign" and "Resolve" under the same rules (decision 3, an iOS-only accessibility addition) | 2, 6 |
+| A5 | Haptics through `performAndroidHapticsAsync`; VIBRATE blocked | `e85c602` | Android's system haptics | **Not ported** (Android native). iOS has its own haptics since iOS-4 (UI-STANDARDS §iOS-A.6). STEP 6 checks that every event Android buzzes on has an iOS-4 haptic | 6 (check) |
+| A6 | SLA countdown bar on ticket detail | `e85c602` | A bar to the resolve deadline | **Not ported**: Android replaced it with B1 within the hour; none of it is left at `d8626bc` | — |
+| A7 | Press feedback (0.97 dip and tint, native driver) on every tappable card or row | `e85c602` | Taps feel answered | **Port**. iOS: honours Reduce Motion | 5, 6 |
+| B1 | SLA deadline on ticket detail ("Due Mon 11:00"), `slaDeadline` | `69a38ab` | The deadline instead of a misleading wall-clock countdown (06 A31) | **Port** | 4, 5, 6 |
+| B2 | Count cross-fade on Home | `69a38ab` | A changed count fades rather than jumps | **Port** | 5, 6 |
+| B3 | Paperclip icon for `cid:` images, no emoji (`<cid-image>`) | `69a38ab` | "Image in attachments" with a flat icon | **Port** | 3, 5 |
+| B4 | VIBRATE kept in `app.json` | `69a38ab` | — | **Not ported** (Android permission) | — |
+| C1 | `versionCode` 3, `RELEASE.md` §5a | `0c0bbac` | — | **Not ported** (Android only) | — |
+| C2 | ShortcutBadger permissions blocked | `5b3c73a` | — | **Not ported** (Android only; iOS has no `expo-notifications`) | — |
+| D1 | Footer copyright year from the device clock | `be33e7e` | The footer's year stays current | **Port** | 4, 6 |
+| D2 | G9 email and password sign-in, UAT builds only | `999943e` | A second way in, on UAT | **Port, changed:** one call to the confirmed path only (decision 1) | 7 |
+| D3 | G9 findings, A32, the re-read (docs) | `be33e7e`, `0f75e51` | Docs only | **Docs** (STEP 1: G9-PASSWORD-LOGIN, 06) | 1 |
+| E1 | The email Sign in button visible (no function `style`), kept above the keyboard | `d8626bc` | The button could not be seen on UAT | **Port** with D2 | 7 |
+| E2 | Push: `google-services.json` through `app.config.js`; NTF-6 sends `{ token, platform }` | `d8626bc` | Android push on UAT builds | **Not ported** (push stays out, decision 4) | — |
+| E3 | Audit log: `/audit-logs` then `/audit-log`; `action`, `dateFrom`, `dateTo`, `ticketNumber`; "No ticket #n" | `d8626bc` | ADMIN filters the log by action and date; gap 12 closed | **Port** | 1, 3, 6 |
+| E4 | Ticket cards: "#n · Raised 2 Nov · updated 2d ago", and the due line (`slaDueLine`) in place of the SLA chip | `d8626bc` | Raised and due dates on each card | **Port** | 4, 5, 6 |
+| E5 | Dashboard: stays on `/dashboard/all`; its params match the written contract | `d8626bc` | None | **Docs only** (01 §8) | 1 |
+
+**Portable: 13** (A1, A2, A3, A4, A7, B1, B2, B3, D1, D3, E3, E4, E5), **plus G9** (D2 with E1). **Not ported: 7** (A5, A6, B4, C1, C2, E2, and G7c's push client, as in iOS-5e).
+
+### 10.3 Ronit's decisions (iOS-5f brief, 2026-11-06)
+
+1. **G9 email and password sign-in is in this phase** (STEP 7), using **only the path the backend team confirmed**. Android's fallback chain (`/auth/mobile/login` → `/auth/login/mobile` → `/auth/mobile` → `/auth/login`) is **not ported**. **iOS must never call `POST /auth/login`.**
+   - **⏳ The confirmed contract is still a placeholder** in the brief (`<CONFIRMED_PATH>`, `<CONFIRMED_BODY>`, `<CONFIRMED_RESPONSE>`). STEP 7 stops for it. Recorded as pending in `01-API-CONTRACT.md` §iOS-A and `docs/G9-PASSWORD-LOGIN.md` §iOS-A.
+2. **iOS-5f ships in a new TestFlight build, 0.1.0 (2), not by EAS Update** (`RELEASE-IOS.md` §6, rule 10; `UPDATES-LOG.md`).
+3. **Swipe (A4):** VoiceOver custom actions "Assign" and "Resolve", under exactly the swipe's rules. An iOS-only accessibility addition.
+4. **Push (E2, G7c) stays out.**
+- **Not ported** (Android native only): A5 (with a check that every Android haptic event has an iOS-4 haptic), A6, B4, C1, C2, E2. **E5 is docs only.**
+- **Kept:** the 17 🔒 SAFER divergences (manifest, WEB-VS-MOBILE-ROLES) and every iOS-only interface difference recorded in §1–§9 above: tabs and More, sheets, iOS-8a's header and toolbar layout and `listBottomInset`, the developer-token screen in `__DEV__` only, iOS-4's haptics.
+
+### 10.4 Docs in STEP 1
+
+- **Verbatim from `d8626bc`:** `03-DATA-MODEL.md`, `05-RULES-AND-GAPS.md`, `06-BACKEND-ASKS.md`, `PERFORMANCE.md` (§13, §14), `docs/G9-PASSWORD-LOGIN.md` (new). 05, 06 and G9-PASSWORD-LOGIN each gain an **§iOS-A** at the end: push is not on iOS, and iOS uses only the confirmed G9 path.
+- **Merged** (three-way; every line Android added is present, checked by script): `01-API-CONTRACT.md` (its §iOS-A rewritten for iOS-5f), `UI-STANDARDS.md` (§14–§16 before §iOS-A), `WEB-VS-MOBILE-ROLES.md` (gap 12 closed; the audit-filter row's iOS cell says "being built" until STEP 8).
+- **Left for STEP 7:** `02-AUTH.md`. All of Android's changes to it are G9 (§8, Android's assumed contract); they land with the iOS sign-in and its own §iOS-A note.
+- **Not on iOS:** `docs/RELEASE.md` (Android's release guide, manifest §4.7).
+- **New:** `docs/ios/UPDATES-LOG.md`. `RELEASE-IOS.md` §6: `$env:EXPO_PUBLIC_APP_ENV="UAT"` before every update (rule 4), and rule 10 (iOS-5f by build only; builds 1 and 2 share runtime 0.1.0).
+
+### 10.5 Section numbers
+
+No clash. Android's new UI-STANDARDS §14–§16 and PERFORMANCE §13–§14 were free on iOS; they sit before §iOS-A. 05, 06 and G9-PASSWORD-LOGIN get their first lettered section, §iOS-A. 01's §iOS-A keeps its letter.
+
+### 10.6 Results
+
+Filled in at STEP 8.
