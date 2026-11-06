@@ -18,7 +18,7 @@ export const palette = {
   },
   slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 500: '#64748b', 700: '#334155' },
   zinc: { 600: '#52525b', 700: '#3f3f46' },
-  red: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' },
+  red: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 900: '#7f1d1d' },
   orange: { 100: '#ffedd5', 500: '#f97316', 700: '#c2410c' },
   amber: { 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
   yellow: { 100: '#fef9c3', 500: '#eab308', 600: '#ca8a04', 700: '#a16207' },
@@ -55,6 +55,9 @@ const BRAND_RED_LIGHT = '#de1223';
 const BRAND_RED_TINT = '#fff3f4';
 /** Brand yellow at about 30 % on white: the sign-in spinner's ring. Decoration only (the label says what happens). */
 const BRAND_YELLOW_PALE = '#fff0b3';
+// App-only shade added with the polish pass (2026-11-03, docs/brand/UI-STANDARDS.md §14).
+/** S3's avatar fill, `bg-primary/10` over white, as hex. Brand red initials on it are 4.6:1. */
+const BRAND_RED_PALE = '#fbe7e9';
 
 /** Ticket status pill. Web: frontend/src/components/ui/StatusBadge.tsx. */
 const status: Record<TicketStatus, BadgeTone> = {
@@ -242,6 +245,55 @@ export const colors = {
     buttonBorder: palette.gray[300],
     buttonPressed: palette.gray[50],
     buttonLabel: palette.gray[900],
+  },
+
+  /**
+   * The people row on a ticket card (2026-11-03, UI-STANDARDS.md §14). Requester and technician are told apart by
+   * LIGHTNESS, not hue alone (tests/polish/people-row.test.mjs): CIELAB L* 93 against 27.
+   *   requester   S3's avatar: bg-primary/10 with brand red initials, 4.6:1
+   *   technician  slate-700 with white initials, 10.4:1
+   *   unassigned  the dashed ring, the plus and the "Unassigned" text: gray-500, 4.8:1 on white
+   */
+  avatar: {
+    requester: tone(BRAND_RED_PALE, BRAND_RED),
+    technician: tone(palette.slate[700], palette.white),
+    unassigned: palette.gray[500],
+  },
+
+  /**
+   * The dot beside the SLA deadline on ticket detail (2026-11-03, UI-STANDARDS.md §14.6), by the hold-adjusted SLA status
+   * (05 §A.9). Told apart by lightness: L* 59, 81 and 40, at least 15 apart (tests/polish/sla-deadline.test.mjs). The
+   * words ("Due Mon 11:00", "Breached") carry the meaning; the dot is decoration (WCAG 1.4.1).
+   */
+  slaDeadline: {
+    WITHIN_SLA: palette.green[600],
+    DUE_SOON: palette.amber[400],
+    BREACHED: palette.red[700],
+  },
+
+  /**
+   * The due line on a ticket card (2026-11-05, UI-STANDARDS.md §16): its clock icon and its words, by the same status as
+   * the dot above. These are TEXT, so each passes WCAG AA for 12 dp text (4.5:1) on the white card AND on the selected
+   * card's red-50, and they are told apart by LIGHTNESS (tests/polish/sla-deadline.test.mjs):
+   *   WITHIN_SLA  green-700  L* 47   5.0:1 on white, 4.6:1 on red-50
+   *   DUE_SOON    amber-800  L* 38   7.1:1, 6.5:1
+   *   BREACHED    red-900    L* 28   10.0:1, 9.2:1
+   * 9 L* apart, not the dots' 15: AA text leaves a green, an amber and a red only L* 28–48 between them. The words
+   * ("Due …", "Breached …") carry the meaning; the colour adds to them (WCAG 1.4.1).
+   */
+  slaDue: {
+    WITHIN_SLA: palette.green[700],
+    DUE_SOON: palette.amber[800],
+    BREACHED: palette.red[900],
+  } satisfies Record<SLAStatus, string>,
+
+  /**
+   * The two swipe actions on a ticket-list row (2026-11-03, UI-STANDARDS.md §14). L* 27 and 47; each has its icon and
+   * its word. White on slate-700 is 10.4:1, on green-700 5.0:1.
+   */
+  swipe: {
+    assign: tone(palette.slate[700], palette.white),
+    resolve: tone(palette.green[700], palette.white),
   },
 
   /** Microsoft's four-square logo, in Microsoft's own colours (the sign-in button only). */

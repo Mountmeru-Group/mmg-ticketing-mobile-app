@@ -18,7 +18,7 @@
 // Every one of these is scoped correctly by the server for ADMIN, AGENT and END_USER, except `unassigned` for an AGENT
 // whose scope is "assigned to me" alone (05 B.20), which is why permissions.ts shows it to ADMIN and triage AGENT only.
 import type { DashboardKpis } from '@/types';
-import type { DashboardPeriod } from './dashboard-period';
+import { periodCaption, type CustomDayRange, type DashboardPeriod } from './dashboard-period';
 import type { HomeChip, HomeTile } from './permissions';
 import type { TicketNamedFilter } from './ticket-filters';
 
@@ -123,7 +123,10 @@ export const HOME_CHIP_CARRIES_PERIOD: Record<HomeChip, boolean> = {
   active: false,
 };
 
-/** The web's words (:382-402); Active is the app's own. */
+/**
+ * The web's words (:382-402); Active is the app's own. "Active" until 2026-11-03 read "Active now"; the "now" is its
+ * window caption since (HOME_CHIP_WINDOW), as Open's is.
+ */
 export const HOME_CHIP_LABELS: Record<HomeChip, string> = {
   closed: 'Closed',
   unassigned: 'Unassigned',
@@ -133,7 +136,7 @@ export const HOME_CHIP_LABELS: Record<HomeChip, string> = {
   pendingUserInfo: 'More info',
   pendingMasterData: 'Master data',
   onHold: 'On hold',
-  active: 'Active now',
+  active: 'Active',
 };
 
 const CHIP_KPI: Record<HomeChip, keyof HomeKpis> = {
@@ -166,4 +169,52 @@ const HIDDEN_AT_ZERO: ReadonlySet<HomeChip> = new Set<HomeChip>([
 export function visibleHomeChips(chips: readonly HomeChip[], kpis: HomeKpis | undefined, counted: boolean): HomeChip[] {
   if (!counted) return [...chips];
   return chips.filter((chip) => !HIDDEN_AT_ZERO.has(chip) || (kpis !== undefined && homeChipValue(chip, kpis) > 0));
+}
+
+// ── Window captions (2026-11-03) ─────────────────────────────
+
+/**
+ * The window a count covers, read from the table at the top of this file (docs/G6-WEB-DASHBOARD.md §5, §7):
+ * - `period`: created within the Home period (`createdAt` in the window, BE:dashboard.controller.ts:332-346).
+ * - `now`: a status count right now, whatever the creation date: Open (`currentlyOpen`, :433) and Active (`totalOpen`,
+ *   :431). "Right now", not "all time": they count what is open at this moment, not everything ever.
+ * This is why Open can be larger than Total (Total 199, Open 342 on Ronit's phone): Total counts the period, Open does
+ * not. The numbers are the web's on purpose (G6); the captions say which window each one is.
+ */
+export type KpiWindow = 'period' | 'now';
+
+export const HOME_TILE_WINDOW: Record<HomeTile, KpiWindow> = {
+  total: 'period',
+  open: 'now',
+  inProgress: 'period',
+  resolved: 'period',
+  slaBreached: 'period',
+};
+
+export const HOME_CHIP_WINDOW: Record<HomeChip, KpiWindow> = {
+  closed: 'period',
+  unassigned: 'period',
+  pendingMgmtReview: 'period',
+  pendingPartner: 'period',
+  pendingUserConfirm: 'period',
+  pendingUserInfo: 'period',
+  pendingMasterData: 'period',
+  onHold: 'period',
+  active: 'now',
+};
+
+/** The caption of a count with no date filter. */
+export const NOW_CAPTION = 'right now';
+
+/** The small caption under a tile's count: the period ("this month", "last 7 days", "01 Oct – 15 Oct") or "right now". */
+export function homeTileCaption(tile: HomeTile, period: DashboardPeriod, custom: CustomDayRange): string {
+  return HOME_TILE_WINDOW[tile] === 'now' ? NOW_CAPTION : periodCaption(period, custom);
+}
+
+/**
+ * A chip's caption, only where the chip is counted differently from its neighbours. Every chip but Active counts the
+ * period, so only Active carries one ("right now"); the others would all repeat the same words.
+ */
+export function homeChipCaption(chip: HomeChip): string | null {
+  return HOME_CHIP_WINDOW[chip] === 'now' ? NOW_CAPTION : null;
 }
