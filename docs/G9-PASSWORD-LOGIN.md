@@ -3,7 +3,8 @@
 **What this is.** Can the app sign in with an email and a password? Each brief asked for the answer to come from the web repo (read-only) before anything was built, and every statement here has a source.
 - **The source still has no such endpoint** (the sections from "What changed since the last read" on).
 - **Later on 2026-11-05,** Ronit confirmed with the backend team that one **is deployed on UAT**, with its source not pushed.
-- So the form was **built defensively, on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
+- **2026-11-06: the backend team confirmed the endpoint is deployed on PRODUCTION as well as UAT, in sync, and the app's UAT-only gate was removed.** The form is on every build. The contract is still the ⚠ ASSUMED, tolerant one (source not pushed).
+- So the form was **built defensively, first on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
 - Ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`) stays open, narrowed to "send us the contract, and push the source".
 - The Login footer's year (first G9 brief, Part 1) is in §8.
 
@@ -28,7 +29,7 @@
 | `countryId` | A string or `null` is kept as sent. **Missing:** AUTH-2 `GET /auth/me` with the new token supplies it, or the sign-in is **refused** and the session ended (AUTH-3). A missing one never makes an AGENT a triage agent | `confirmFromAuthMe()` |
 | Session | `setSession()`, exactly as after Microsoft: same store, same 8-hour rule. `fullAuthAt = now` on every password sign-in, because a password is a full credential check; without it, the next cold start would sign the person out. **Ronit to confirm** | `src/screens/auth/signInAttempt.ts` `attemptPasswordSignIn()` |
 | Screen | Below the unchanged pill: OR divider, "Sign in with email instead" with a chevron. The fields open in place (opacity and translateY on the native driver, at once under "Remove animations"). Email keyboard; masked password with a show/hide toggle (`aria-label`); 52 dp brand-red "Sign in". The keyboard never covers "Sign in" (`KeyboardAvoidingView`, plus a scroll to the end when the keyboard opens or the content grows) | `src/screens/auth/EmailSignInForm.tsx`; `LoginScreen.tsx`; tokens in `src/theme/` |
-| Builds | **UAT only:** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`. A production build does not render it. The code is still in the production bundle, behind that flag | `src/config/env.ts` |
+| Builds | **Every build, UAT and PROD** (since 2026-11-06). Was `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`; the flag is deleted | `src/screens/auth/LoginScreen.tsx` |
 | Errors | 400, 401, 403, other 4xx, 429, 5xx, none of the paths exists, no token, bad body, `countryId` unconfirmed, network, storage: each has its own message. **Never which field was wrong:** a server message naming one field is replaced | `PASSWORD_FAILURE_COPY`, `neutralCredentialMessage()` |
 | Password | Component state only. Sent in the sign-in request and nowhere else. Cleared on success, on failure and on unmount. Never logged, stored or put into an error | `EmailSignInForm.tsx` |
 | Tests | `tests/auth/password-sign-in.test.mjs`, 108 new tests. Existing guards updated for the new premise: two ways in (`tests/release/production-readiness.test.mjs`); nine animating files, plus the env import and the UAT-only flag (`tests/motion/start-up-and-login.test.mjs`). `npm test`: 1205 pass, 0 fail | |
@@ -464,9 +465,11 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 - That is a tenant security decision, for IT and Ronit.
 - Once AUTH-P2 is on PROD, this is likely the fastest route.
 
-## iOS-A. The iOS app (iOS-5f, 2026-11-06; built in iOS-5g, 2026-11-06)
+## iOS-A. The iOS app (iOS-5f, 2026-11-06; built in iOS-5g, 2026-11-06; iOS-5h, 2026-11-08)
 
-> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc`. It describes the Android build, its ⚠ ASSUMED contract and the Google Play reviewer.
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`). It describes the Android build, its ⚠ ASSUMED contract and the Google Play reviewer.
+
+**iOS-5h (Ronit, 2026-11-08): Android opened the email sign-in to PRODUCTION; iOS does not, yet.** The opening paragraph's 2026-11-06 line and the "Builds" row above are Android's `6b5e46c`: the backend team confirmed the endpoint on PRODUCTION, and Android deleted `EMAIL_SIGN_IN_ENABLED`. On iOS nothing changes: UAT builds only, with both gates (below). **Matching Android `6b5e46c` is on the iOS-9 list,** after the backend team confirms no `Set-Cookie` and PROD is approved, together with the App Review demo-login route (compliance A4; `docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer `Set-Cookie`, which still blocks shipping the email sign-in to testers.
 
 **Built in iOS-5g, UAT builds only** (`docs/ios/ANDROID-DELTA.md` §10.8; `02-AUTH.md` §iOS-B). It ships in the same TestFlight build as iOS-5f, **0.2.0 (2)**, and only once the backend team confirms the endpoint sends no `Set-Cookie` (Ronit, iOS-5g). Not by EAS Update (`docs/ios/UPDATES-LOG.md`; compliance C2).
 - **One call, to the confirmed path only:** `POST /api/v1/auth/mobile/login`. Android's other three paths, its fallback after an HTML 404 and its remembered path are **not ported**.
@@ -480,7 +483,7 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 
 | Part | iOS |
 |---|---|
-| Method and path | ✅ **CONFIRMED:** `POST /api/v1/auth/mobile/login`, live on UAT (the backend team, through Ronit, 2026-11-06). Not on PROD |
+| Method and path | ✅ **CONFIRMED:** `POST /api/v1/auth/mobile/login`, live on UAT (the backend team, through Ronit, 2026-11-06). Not called on PROD by iOS: the backend team reports it deployed there too (2026-11-06, Android `6b5e46c`), but iOS has no PROD build (CLAUDE.md I3) and its PROD opening is on the iOS-9 list (iOS-5h) |
 | Request body | `{ "username": <email>, "email": <email>, "password": <password> }`: what Android sends to this path (`d8626bc`). The brief said `{ email, password }` "as Android sends to this path"; Android sends both names, and Ronit chose Android's body (1a) |
 | 200 | Android's tolerant reader (`02-AUTH.md` §8.3). The brief listed `user.email` and `expiresAt` as required; Ronit chose Android's reader (2a), where they are optional (the typed email stands in; the app's own 8-hour clock applies) |
 | Errors | Android's reasons and words (`02-AUTH.md` §8.6): 400, 401, 403, 429, 5xx, offline, and the rest |

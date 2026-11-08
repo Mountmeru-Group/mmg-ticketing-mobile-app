@@ -643,11 +643,11 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - It needs AUTH-P2 on PROD (item 3), plus a Conditional Access exclusion from MFA for that one account. That is IT's decision.
 - See `docs/G9-PASSWORD-LOGIN.md` §10.
 
-**Mobile: built 2026-11-05, UAT builds only** (`02-AUTH.md` §8)
+**Mobile: built 2026-11-05; on every build (UAT and PROD) since 2026-11-06** (`02-AUTH.md` §8)
 - The approved design is in, under "Sign in with Microsoft", on the same Login screen. An OR divider, then "Sign in with email instead", then email and password fields that open in place.
 - The session is stored exactly as AUTH-P2's is: same store, same 8-hour rule, same 15-day re-authentication clock.
 - The password is held in component state only, and is never logged or stored.
-- **For PROD:** set `EMAIL_SIGN_IN_ENABLED` in `src/config/env.ts` to include PROD, once this ask ships there and Ronit says so.
+- **PROD:** done 2026-11-06. The backend team confirmed the endpoint on PRODUCTION, and the mobile gate was removed. Still open: send the contract and push the source, so the tolerant reader can be cut down.
 
 ---
 
@@ -672,14 +672,15 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - Confirm whether PROD, UAT and QA share one Redis/Memurai database. If they do, a session token minted in one environment may be accepted by the others through the Redis fast path.
 - The deployment guide's smoke test `GET /api/health` hits no route. The health route is `GET /health`.
 
-## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06)
+## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06; iOS-5h, 2026-11-08)
 
-> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc`.
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`).
 
 - **A32 on iOS.** The Google Play reviewer has an App Store twin: App Review needs a demo account (Guideline 2.1, `docs/ios/APP-STORE-COMPLIANCE.md` A4).
   - iOS builds the email sign-in for **UAT builds only**, in its own phase, **iOS-5g** (built 2026-11-06). **The path is confirmed:** `POST /api/v1/auth/mobile/login`, live on UAT (`01` §iOS-A).
   - **⏳ Still to answer, and it blocks shipping the email sign-in to testers: does this endpoint send a `Set-Cookie`?** The iOS cookie proof rests on it sending none (`docs/ios/APP-STORE-COMPLIANCE.md`, G9 section). Ronit is asking. Also open: its rate limit, and which accounts may use it.
   - Android's other paths are **not on iOS**. iOS makes one call to the confirmed path, with Android's body and reader for it (Ronit: 1a, 2a), and never calls `POST /auth/login`.
   - **Open decision (iOS-9):** whether the email sign-in, once the endpoint is on PROD with a reviewer account, becomes App Review's demo login in place of A4's Entra account. Recorded in compliance A4.
+  - **iOS-5h (Ronit, 2026-11-08):** A32's "Mobile" block above is Android's since `6b5e46c`: the backend team confirmed the endpoint on PRODUCTION (2026-11-06) and Android removed its gate. **On iOS the gate stays:** UAT builds only, at run time and at build time. Matching Android `6b5e46c` is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the demo-login decision above (`docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer the `Set-Cookie` question, which stays open.
 - **A5 and NTF-5/NTF-6 (confirmed 2026-11-05):** Android only. iOS has no push client (G7c not ported; decision 4). iOS push would also need APNs, the `aps-environment` entitlement and compliance C4; that is its own future decision.
 - **A31 (business time left on the SLA):** applies to iOS unchanged. Until it ships, iOS shows the deadline, as Android does (UI-STANDARDS §14.6, built in iOS-5f).

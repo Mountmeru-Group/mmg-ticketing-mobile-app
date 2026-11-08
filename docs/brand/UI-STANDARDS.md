@@ -1075,9 +1075,9 @@ A real countdown needs the server's own figure: backend ask **A31** in `docs/web
   - `tests/login/copyright-year.test.mjs` parses every source file and fails on a four-digit year in a string, template text, JSX text, or a number placed straight into text.
   - In `src/`, years appear only in comments, and in the due-date picker's numeric bounds 2000–2100 (`src/utils/tasks.ts:60, 92-93`), which are not text.
 
-### 15.2 Email and password sign-in: built 2026-11-05, UAT builds only
+### 15.2 Email and password sign-in: built 2026-11-05; on every build (UAT and PROD) since 2026-11-06
 
-Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11-05 against an ASSUMED contract, after the backend team confirmed the endpoint is on UAT (`docs/web-system/02-AUTH.md` §8). It shows only where `EMAIL_SIGN_IN_ENABLED` (`src/config/env.ts`) is true: UAT builds. A production build has none of it. Code: `src/screens/auth/EmailSignInForm.tsx`. Tokens: `loginLayout.emailForm`, `loginType.orLabel` / `link` / `fieldLabel` / `field`, `motion.emailReveal`. **Not run on a device:** no build.
+Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11-05 against an ASSUMED contract, after the backend team confirmed the endpoint is on UAT (`docs/web-system/02-AUTH.md` §8). It shows on every build, UAT and PROD (the `EMAIL_SIGN_IN_ENABLED` flag was deleted 2026-11-06). Code: `src/screens/auth/EmailSignInForm.tsx`. Tokens: `loginLayout.emailForm`, `loginType.orLabel` / `link` / `fieldLabel` / `field`, `motion.emailReveal`. **Not run on a device:** no build.
 
 **Above the fold: unchanged.** The arc split, the message slot, "Setu", the prompt, and the outlined Microsoft pill as the primary action, with "Opening Microsoft…" under it. Then, centred in the white area:
 - **OR divider**, 20 dp below the caption: hairline (`StyleSheet.hairlineWidth`, `colors.border`), "OR" (12 dp, weight 600, letter spacing 1), hairline.
@@ -1408,7 +1408,8 @@ Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/color
 
 Android's §15.2 and §15.3 apply on iOS as written: the same tokens (`emailForm`, `loginType`, `emailReveal`), the OR divider, the form opened in place, the failure box, "Sign in" at 52 pt with the face drawn through the children function (never a function `style`), the keyboard rule (`revealScrollY`) and the motion. The sign-in calls only `POST /auth/mobile/login` (`docs/web-system/02-AUTH.md` §iOS-B). The iOS differences:
 
-**Only on UAT builds, twice over.** `EMAIL_SIGN_IN_ENABLED` hides it at run time, as on Android. A build-time gate also keeps the form out of a `production` bundle altogether, so App Review's Login shows only "Sign in with Microsoft" (§iOS-A.12).
+**Only on UAT builds, twice over.** `EMAIL_SIGN_IN_ENABLED` hides it at run time, as Android did until `6b5e46c`. A build-time gate also keeps the form out of a `production` bundle altogether, so App Review's Login shows only "Sign in with Microsoft" (§iOS-A.12).
+- **iOS-5h (Ronit, 2026-11-08):** §15.2's heading and "every build, UAT and PROD" are Android's since `6b5e46c`. On iPhone the form stays on UAT builds only. Matching Android is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved (`docs/ios/ANDROID-DELTA.md` §5, item 7). The form itself, its tokens and its motion do not change.
 
 **Keyboard and AutoFill (§15.2):**
 - Email: the email keyboard (`keyboardType`, `inputMode`), no capitals, corrections or spell check, focused when the form opens. `textContentType="username"` with `autoComplete="email"`, so iOS Password AutoFill pairs it with the password. Return key **next**.
