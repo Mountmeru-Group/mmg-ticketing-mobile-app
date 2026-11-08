@@ -1,11 +1,10 @@
-// Login's email and password sign-in (M1, G9, 2026-11-05; docs/brand/UI-STANDARDS.md §15.2, 02-AUTH.md §8). UAT builds only
-// (EMAIL_SIGN_IN_ENABLED, src/config/env.ts).
+// Login's email and password sign-in (M1, G9, 2026-11-05; docs/brand/UI-STANDARDS.md §15.2, 02-AUTH.md §8). on every build, UAT and PROD.
 // - Under the Microsoft pill, which stays the primary action: an OR divider (hairline, "OR", hairline), then a quiet
 //   "Sign in with email instead" with a chevron: text only, no border, no fill.
 // - Tapped, the fields open IN PLACE on the same screen (no route): email, password with a show/hide toggle, and a
 //   52 dp brand-red "Sign in". Opening fades and lifts the form on the native driver; with "Remove animations" it shows
 //   at once. Nothing's layout is animated: the fields take their place in the first frame.
-// - The attempt itself is attemptPasswordSignIn() (./signInAttempt.ts), against an ASSUMED contract (src/api/auth.api.ts).
+// - The attempt itself is attemptPasswordSignIn() (./signInAttempt.ts), (src/api/auth.api.ts; the endpoint is deployed on UAT and PROD, but its contract is still the tolerant one).
 // - The password lives in this component's state ONLY. It is never logged or stored, and it goes nowhere but that one
 //   call. It is cleared on success, on failure and on unmount.
 // - "Sign in" takes static styles only (./emailFormLayout.ts says why: a function `style` made it invisible on UAT).

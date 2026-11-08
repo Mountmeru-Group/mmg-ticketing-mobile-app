@@ -61,11 +61,11 @@ describe('Login environment chip: never on a production build', () => {
     }
   });
 
-  // 2026-11-05: the email sign-in follows the same rule. Its endpoint is only on UAT, and its contract is ASSUMED.
-  test('email sign-in: off on a production release build, on for every UAT build', async () => {
-    assert.equal((await loadEnv(false, 'PROD')).EMAIL_SIGN_IN_ENABLED, false);
-    for (const [dev, appEnv] of [[false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
-      assert.equal((await loadEnv(dev, appEnv)).EMAIL_SIGN_IN_ENABLED, true, `dev=${dev} env=${appEnv}`);
+  // 2026-11-06: was "off on a production release build, on for every UAT build". Email sign-in is deployed on PROD as
+  // well, so the environment no longer decides it: no flag is exported, in any build.
+  test('email sign-in: no environment flag, so it is available on PROD and UAT alike', async () => {
+    for (const [dev, appEnv] of [[false, 'PROD'], [false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
+      assert.equal('EMAIL_SIGN_IN_ENABLED' in (await loadEnv(dev, appEnv)), false, `dev=${dev} env=${appEnv}`);
     }
   });
 
@@ -81,8 +81,8 @@ describe('Login environment chip: never on a production build', () => {
     assert.match(branch, /\{ENVIRONMENT_LABEL\}/);
     // Outside the branch the label is only imported, never rendered.
     assert.deepEqual(rest.match(/ENVIRONMENT_LABEL/g), ['ENVIRONMENT_LABEL']);
-    // 2026-11-05: the same import also brings EMAIL_SIGN_IN_ENABLED (Login's email sign-in, UAT only).
-    assert.match(rest, /^import \{ EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
+    // 2026-11-06: the import brought EMAIL_SIGN_IN_ENABLED too until email sign-in was opened to PROD.
+    assert.match(rest, /^import \{ ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
   });
 });
 

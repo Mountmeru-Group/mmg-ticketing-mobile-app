@@ -643,11 +643,11 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - It needs AUTH-P2 on PROD (item 3), plus a Conditional Access exclusion from MFA for that one account. That is IT's decision.
 - See `docs/G9-PASSWORD-LOGIN.md` §10.
 
-**Mobile: built 2026-11-05, UAT builds only** (`02-AUTH.md` §8)
+**Mobile: built 2026-11-05; on every build (UAT and PROD) since 2026-11-06** (`02-AUTH.md` §8)
 - The approved design is in, under "Sign in with Microsoft", on the same Login screen. An OR divider, then "Sign in with email instead", then email and password fields that open in place.
 - The session is stored exactly as AUTH-P2's is: same store, same 8-hour rule, same 15-day re-authentication clock.
 - The password is held in component state only, and is never logged or stored.
-- **For PROD:** set `EMAIL_SIGN_IN_ENABLED` in `src/config/env.ts` to include PROD, once this ask ships there and Ronit says so.
+- **PROD:** done 2026-11-06. The backend team confirmed the endpoint on PRODUCTION, and the mobile gate was removed. Still open: send the contract and push the source, so the tolerant reader can be cut down.
 
 ---
 

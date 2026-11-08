@@ -3,7 +3,8 @@
 **What this is.** Can the app sign in with an email and a password? Each brief asked for the answer to come from the web repo (read-only) before anything was built, and every statement here has a source.
 - **The source still has no such endpoint** (the sections from "What changed since the last read" on).
 - **Later on 2026-11-05,** Ronit confirmed with the backend team that one **is deployed on UAT**, with its source not pushed.
-- So the form was **built defensively, on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
+- **2026-11-06: the backend team confirmed the endpoint is deployed on PRODUCTION as well as UAT, in sync, and the app's UAT-only gate was removed.** The form is on every build. The contract is still the ⚠ ASSUMED, tolerant one (source not pushed).
+- So the form was **built defensively, first on UAT builds only, against an ⚠ ASSUMED contract.** The next section has what was built and what still needs confirming.
 - Ask **A32** (`docs/web-system/06-BACKEND-ASKS.md`) stays open, narrowed to "send us the contract, and push the source".
 - The Login footer's year (first G9 brief, Part 1) is in §8.
 
@@ -28,7 +29,7 @@
 | `countryId` | A string or `null` is kept as sent. **Missing:** AUTH-2 `GET /auth/me` with the new token supplies it, or the sign-in is **refused** and the session ended (AUTH-3). A missing one never makes an AGENT a triage agent | `confirmFromAuthMe()` |
 | Session | `setSession()`, exactly as after Microsoft: same store, same 8-hour rule. `fullAuthAt = now` on every password sign-in, because a password is a full credential check; without it, the next cold start would sign the person out. **Ronit to confirm** | `src/screens/auth/signInAttempt.ts` `attemptPasswordSignIn()` |
 | Screen | Below the unchanged pill: OR divider, "Sign in with email instead" with a chevron. The fields open in place (opacity and translateY on the native driver, at once under "Remove animations"). Email keyboard; masked password with a show/hide toggle (`aria-label`); 52 dp brand-red "Sign in". The keyboard never covers "Sign in" (`KeyboardAvoidingView`, plus a scroll to the end when the keyboard opens or the content grows) | `src/screens/auth/EmailSignInForm.tsx`; `LoginScreen.tsx`; tokens in `src/theme/` |
-| Builds | **UAT only:** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`. A production build does not render it. The code is still in the production bundle, behind that flag | `src/config/env.ts` |
+| Builds | **Every build, UAT and PROD** (since 2026-11-06). Was `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'`; the flag is deleted | `src/screens/auth/LoginScreen.tsx` |
 | Errors | 400, 401, 403, other 4xx, 429, 5xx, none of the paths exists, no token, bad body, `countryId` unconfirmed, network, storage: each has its own message. **Never which field was wrong:** a server message naming one field is replaced | `PASSWORD_FAILURE_COPY`, `neutralCredentialMessage()` |
 | Password | Component state only. Sent in the sign-in request and nowhere else. Cleared on success, on failure and on unmount. Never logged, stored or put into an error | `EmailSignInForm.tsx` |
 | Tests | `tests/auth/password-sign-in.test.mjs`, 108 new tests. Existing guards updated for the new premise: two ways in (`tests/release/production-readiness.test.mjs`); nine animating files, plus the env import and the UAT-only flag (`tests/motion/start-up-and-login.test.mjs`). `npm test`: 1205 pass, 0 fail | |

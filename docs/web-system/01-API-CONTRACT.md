@@ -147,7 +147,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 ### 1.4 PENDING — not in the API yet (do not call until shipped; shape to be agreed)
 | ID | Endpoint | Ask | Proposed response |
 |---|---|---|---|
-| AUTH-P1 | Email and password sign-in. **⚠ ASSUMED, called by the app on UAT builds since 2026-11-05:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
+| AUTH-P1 | Email and password sign-in. **⚠ ASSUMED contract; deployed on UAT AND PRODUCTION (backend team, 2026-11-06); called by the app on every build:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
 | AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }`. **Deployed on UAT, contract confirmed** (`02-AUTH.md` §7.5) | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
 | ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, confirmed in writing 2026-11-05), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
@@ -157,7 +157,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 > **Why assumed.** On 2026-11-05 the backend team told Ronit that a mobile password-login endpoint is deployed on UAT, with local auth on there. Its source has not been pushed: no branch of the web clone has it, neither the clone fetched 2026-11-04 16:36 nor the fresh one of 2026-11-05 09:56 (`master` `7df97c8`) (`docs/G9-PASSWORD-LOGIN.md`). Ronit authorised the four assumed paths in writing (G9 brief, 2026-11-05), under CLAUDE.md rule 1. **Nothing below is from source.** It is what the app sends, and what it accepts. Confirm it with the backend team (ask A32), then replace this entry with the real contract.
 
 - **Code:** every wire name is in `src/types/mobile-password-contract.ts`. The call is `signInWithPassword()` in `src/api/auth.api.ts`.
-- **Builds:** UAT only (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`). Production builds never call it.
+- **Builds:** every build, UAT and PROD (since 2026-11-06). The backend team confirmed the endpoint is deployed on both and that the environments are in sync. There is no environment flag. The shape is still the tolerant, assumed one until the contract arrives (A32).
 - **Auth:** none. Sent without `Authorization` and without cookies.
 - **Paths, tried in this order;** the next only after a **404 with an HTML body** (Express's "Cannot POST", §0.5):
   1. `POST /api/v1/auth/mobile/login`
