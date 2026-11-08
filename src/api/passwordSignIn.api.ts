@@ -8,7 +8,8 @@
 // - Only a UAT build bundles this module: LoginScreen.tsx loads the form behind a build-time gate, so a production
 //   bundle has no email sign-in code or string (scripts/verify-release-bundle.js).
 // - Cookies: `withCredentials: false` (client.ts) sends no jar cookie (React Native's RCTNetworking.mm:319). Whether the
-//   answer sets one is not yet confirmed: an open item that blocks shipping to testers (APP-STORE-COMPLIANCE.md, G9).
+//   answer sets one is not yet confirmed (ask A32). Since R1 it no longer blocks testers: whatever the answer, iOS's
+//   cookie store is emptied right after it, before AUTH-2 and before the session is stored (./cookieShield.ts).
 // - The password is never logged, stored or put into an error: it exists only in the request body.
 import { API_HOST } from '@/config/env';
 import type { AuthUser } from '@/types';
@@ -23,6 +24,7 @@ import {
   errorName, isRecord, own, readSession, readUser, type SessionReader, type SessionReadout, type UserReader,
 } from './auth.api';
 import { apiClient } from './client';
+import { clearCookieStore } from './cookieShield';
 import { checkFields, type FieldSpec } from './drift';
 import { ApiClientError } from './errors';
 
@@ -184,7 +186,8 @@ export async function signInWithPassword(email: string, password: string): Promi
     // skipAuth: there is no session yet, and a stale token must not ride along.
     const res = await apiClient.post<unknown>(path, body, { skipAuth: true });
     if (res.headers['set-cookie'] !== undefined) {
-      // The value is never logged. The open item (no Set-Cookie) is unanswered: say so, in every UAT build.
+      // The value is never logged. The open item (no Set-Cookie, A32) is unanswered: say so, in every UAT build.
+      // The cookie itself does not outlive this answer: the shield below deletes it (R1).
       logAuth(`POST /api/v1${path} sent Set-Cookie; the app expects no cookie (02 §2 #5)`);
       if (__DEV__) console.warn(`[API drift] AUTH-P1 POST /api/v1${path} sent Set-Cookie; the app expects no cookie (02 §2 #5)`);
     }
@@ -201,6 +204,10 @@ export async function signInWithPassword(email: string, password: string): Promi
     const failure = classifyPasswordFailure(e, path);
     logAuth(`POST /api/v1${path} answered ${failure.status === null ? 'nothing' : `HTTP ${failure.status}`} (${failure.reason})`);
     throw failure;
+  } finally {
+    // R1: whatever the answer, success or error, a cookie it may have set is gone before AUTH-2 and before the
+    // caller's setSession() (./cookieShield.ts). Never throws, never blocks.
+    await clearCookieStore('email-sign-in');
   }
   return completeSession(answer, email);
 }

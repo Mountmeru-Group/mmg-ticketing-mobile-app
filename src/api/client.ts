@@ -12,6 +12,7 @@ import {
 } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import type { ApiError } from '@/types';
+import { clearCookieStore } from './cookieShield';
 import { ApiClientError } from './errors';
 import { queryClient } from './queryClient';
 
@@ -34,6 +35,7 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: DEFAULT_TIMEOUT_MS,
   // Never send or accept cookies: an `sd_session` cookie overrides the Bearer header server-side (02 §2 #5).
+  // iOS also empties its cookie store at sign-in, launch and sign-out (R1, ./cookieShield.ts).
   withCredentials: false,
   headers: { Accept: 'application/json' },
 });
@@ -46,8 +48,8 @@ const UNAUTHORIZED_MESSAGES: Record<string, string> = {
 };
 
 /**
- * Wipe everything tied to the session (02 §5.3 step 2, §5.5): token, cached server data, UI state.
- * Flipping the auth store to logged out makes RootNavigator switch to the Login stack.
+ * Wipe everything tied to the session (02 §5.3 step 2, §5.5): token, cached server data, UI state, and iOS's cookie
+ * store (R1). Flipping the auth store to logged out makes RootNavigator switch to the Login stack.
  * There is no refresh token, so there is nothing to retry.
  * `forgetFullAuth` also deletes the 15-day date, so the next sign-in is challenged (02 §5.8).
  */
@@ -55,6 +57,9 @@ export async function endSession(message: string | null, options?: ClearSessionO
   queryClient.clear();
   useUiStore.getState().reset();
   await useAuthStore.getState().clearSession(message, options);
+  // R1: no server cookie outlives the session (./cookieShield.ts). After the state flip above, so a burst of 401s still
+  // ends the session once; on a sign-out, after AUTH-3 (signOutAndWipe). Never throws, never blocks.
+  await clearCookieStore('sign-out');
 }
 
 /**

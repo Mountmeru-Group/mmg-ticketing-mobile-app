@@ -12,6 +12,7 @@ import { useEffect, type ComponentType } from 'react';
 import { AppState, Pressable, View } from 'react-native';
 
 import { endSession, endSessionIfReauthDue } from '@/api/client';
+import { clearCookieStore } from '@/api/cookieShield';
 import { SuccessNoticeHost } from '@/components';
 import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { AssignPickerScreen } from '@/screens/tickets/AssignPickerScreen';
@@ -92,6 +93,8 @@ export function RootNavigator() {
   useEffect(() => {
     // iOS keeps Keychain items after the app is deleted: a reinstall must not start in the old session (installMarker.ts).
     void (async () => {
+      // R1: no cookie from an earlier run reaches this one. First, before any API call (cookieShield.ts).
+      await clearCookieStore('launch');
       await wipeSessionLeftByPreviousInstall();
       await useAuthStore.getState().restoreSession();
     })();

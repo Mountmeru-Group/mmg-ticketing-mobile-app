@@ -8,7 +8,8 @@
 // 2. The code is redeemed at Microsoft's token endpoint with the PKCE verifier. Only the ID token is kept, in memory,
 //    for one request. Microsoft's access and refresh tokens are dropped unused: there is no refresh in this app (02 §1.1).
 // 3. exchangeMicrosoftIdToken() posts the ID token to AUTH-P2 and reads the MMG session `{ token, expiresAt, user }`
-//    from the JSON body (no cookie). The caller stores it with the auth store's setSession().
+//    from the JSON body (no cookie). The caller stores it with the auth store's setSession(). R1: iOS's cookie store is
+//    emptied right after AUTH-P2's answer, whatever it is, before the session is read and stored (./cookieShield.ts).
 // AUTH-P2's request and response shapes were CONFIRMED by the backend team on 2026-10-19. They live in one file:
 // src/types/mobile-sso-contract.ts. Only five response fields can fail sign-in (readSession()).
 // Every failure is a MicrosoftSignInError with its own `reason`, so the Login screen can tell them apart.
@@ -46,6 +47,7 @@ import {
 } from '@/types';
 import type { MobilePasswordUser } from '@/types/mobile-password-contract';
 import { apiClient, endSession, type MessageResponse } from './client';
+import { clearCookieStore } from './cookieShield';
 import { checkFields, reportDrift, type FieldSpec } from './drift';
 import { ApiClientError } from './errors';
 import { MOBILE_SSO_OPTIONAL_SPEC } from './responseSpecs';
@@ -295,6 +297,10 @@ export async function exchangeMicrosoftIdToken(idToken: string): Promise<MobileL
     data = res.data;
   } catch (e) {
     throw classifyExchangeFailure(e);
+  } finally {
+    // R1: whatever the answer, success or error, a cookie it may have set is gone before the caller's setSession()
+    // (./cookieShield.ts). Never throws, never blocks.
+    await clearCookieStore('microsoft-sign-in');
   }
   return readSsoSession(data);
 }
