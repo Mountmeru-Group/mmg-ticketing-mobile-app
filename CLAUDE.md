@@ -8,10 +8,11 @@
 
 - This is the **iPhone app** for the Mount Meru Group Service Desk. Users see it as **Setu**. In-app text that says "the Service Desk" means the backend or the IT team, not the app.
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
-- **Port source:** `origin/dev` @ `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (since iOS-5f, 2026-11-06; before it `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
-  - To bring later Android changes across, diff `d8626bc..origin/dev` (empty on 2026-11-06).
+- **Port source:** `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed` (since iOS-5h, 2026-11-08; before it `d8626bc` in iOS-5f and iOS-5g, `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
+  - To bring later Android changes across, diff `6b5e46c..origin/dev` (empty on 2026-11-08).
   - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on **UAT builds only**. It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
     - **Open, and it blocks shipping G9 to testers:** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`.
+    - **Android `6b5e46c` opened G9 to production builds; iOS does not** (Ronit, iOS-5h). Matching it is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the App Review demo-login route (`docs/ios/ANDROID-DELTA.md` §5, item 7).
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
 - Stack (`package.json` is the source of truth):

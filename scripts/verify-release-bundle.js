@@ -18,7 +18,9 @@
 //     node_modules/expo-auth-session, and secret VALUES are searched instead (manifest §4.10, approved 2026-10-28);
 //   - the Entra client and tenant IDs (public, src/config/auth.config.ts) and the EAS projectId (app.json, once set) are
 //     UUIDs, not tokens. They are read from those files and allowed, along with UUIDs that only library code defines
-//     and the build's own source-map debug id (the bundle's last line, equal to the map's `debugId`).
+//     and the build's own source-map debug id (the bundle's last line, equal to the map's `debugId`);
+//   - (iOS-5h, Android f67265c) one example email address, by exact value and as a whole token: the email sign-in form's
+//     (EXAMPLE_EMAILS). Any other address at the domain, the bare domain and any other host still fail.
 // Prints counts only — never a matched value.
 //
 // Usage: npm run verify:release-bundle                          (the preview profile: EXPO_PUBLIC_APP_ENV=UAT)
@@ -61,6 +63,18 @@ const PUBLIC_UUIDS = new Set(
     .filter(Boolean)
     .map((u) => u.toLowerCase()),
 );
+/**
+ * Example text, not a host (Android f67265c, RELEASE.md §6, Ronit 2026-11-06; iOS-5h). Set aside before the host search
+ * ONLY as this exact, whole address: the bare domain anywhere else, any other address at it, and any other host still fail.
+ */
+const EXAMPLE_EMAILS = {
+  'name@mountmerugroup.com': 'the email sign-in form\'s example address (src/screens/auth/EmailSignInForm.tsx placeholder, passwordSignInAttempt.ts message)',
+};
+/**
+ * `address` standing alone: no email, host or URL character directly before it (so never the user part of
+ * `https://name@host`), and no domain label continuing after it.
+ */
+const wholeAddress = (address) => new RegExp(`(?<![\\w.%+@:/-])${address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.[\\w-])`, 'g');
 
 const DEV_TOKEN_NEEDLES = [
   'DevTokenScreen', 'DevTokenForm', 'Developer session token', 'Developer: use a UAT session token',
@@ -218,9 +232,12 @@ if (!IOS_REDIRECT || count(js, IOS_REDIRECT) === 0) problems.push('release JS la
 for (const [k, t] of Object.entries(targets)) if (count(t, 'msauth://') > 0) problems.push(`${k} contains the Android redirect form "msauth://"`);
 
 // Hosts, and the UAT API URL in a preview build.
-// iOS-5g: a domain right after "@" is an e-mail address (the email form's example, "name@mountmerugroup.com"), not a
-// host the app connects to: a host match starts at the start of its name and is not preceded by "@".
-const hosts = [...new Set((js.match(/(?<![@a-z0-9.-])[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
+// iOS-5h (Android f67265c): the example address is set aside first, ONLY as that exact, whole address (EXAMPLE_EMAILS);
+// then every mountmerugroup.com name is a host. iOS-5g skipped any domain right after "@", which also hid a host written
+// as `https://user@host` and any other address at the domain.
+const examples = Object.keys(EXAMPLE_EMAILS).map((address) => [address, (js.match(wholeAddress(address)) ?? []).length]);
+const hostJs = Object.keys(EXAMPLE_EMAILS).reduce((t, address) => t.replace(wholeAddress(address), ' '), js);
+const hosts = [...new Set((hostJs.match(/[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
 const badHosts = hosts.filter((h) => !ALLOWED_HOSTS.includes(h));
 if (badHosts.length) problems.push(`release JS names hosts that are not allowed: ${badHosts.join(', ')}`);
 if (profile === 'preview' && (!UAT_API_URL || count(js, UAT_API_URL) === 0)) problems.push('release JS (preview) lacks the UAT API URL from src/config/env.ts');
@@ -254,6 +271,7 @@ console.log(`Client-secret option names: ${nameCount} in release JS, defined by 
 console.log(`Email sign-in (G9, UAT only): ${emailModules.length}/${EMAIL_SIGN_IN_MODULES.length} modules · strings ${Object.entries(emailStrings).map(([k, c]) => `${k}: ${c}/${EMAIL_SIGN_IN_NEEDLES.length}`).join('  ')} (${profile === 'production' ? 'must be none' : 'must be all'}) · "/auth/login": ${count(js, '/auth/login')}`);
 console.log(`iOS redirect: ${IOS_REDIRECT && count(js, IOS_REDIRECT) > 0 ? 'present' : 'MISSING'} · Android "msauth://": ${count(js, 'msauth://')}`);
 console.log(`mountmerugroup.com hosts: ${hosts.join(', ') || 'none'} · UAT API URL: ${UAT_API_URL && count(js, UAT_API_URL) > 0 ? 'present' : 'absent'}${profile === 'preview' ? ' (required)' : ''}`);
+console.log(`Example email addresses set aside before the host search: ${examples.map(([a, n]) => `${EXAMPLE_EMAILS[a]} ${n}×`).join('; ')}`);
 console.log(`UUID-v4 literals: ${v4.length} (${v4.filter((u) => PUBLIC_UUIDS.has(u)).length} public IDs, ${v4.filter((u) => !PUBLIC_UUIDS.has(u) && libraryUuid(u)).length} library constants, ${v4.filter((u) => debugIds.has(u)).length} build debug id, ${unexplained.length} unexplained)`);
 console.log(`Android-only APIs reached from app code: ${androidApis.length} · drawer modules: ${drawer.length}`);
 console.log(`Android-only props in app code (ignored on iOS, not a failure): ${androidProps.length ? androidProps.join('; ') : 'none'}`);

@@ -147,7 +147,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 ### 1.4 PENDING — not in the API yet (do not call until shipped; shape to be agreed)
 | ID | Endpoint | Ask | Proposed response |
 |---|---|---|---|
-| AUTH-P1 | Email and password sign-in. **⚠ ASSUMED, called by the app on UAT builds since 2026-11-05:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
+| AUTH-P1 | Email and password sign-in. **⚠ ASSUMED contract; deployed on UAT AND PRODUCTION (backend team, 2026-11-06); called by the app on every build:** see "AUTH-P1" below | A1, A32 | Several shapes tolerated (below) |
 | AUTH-P2 | `POST /api/v1/auth/microsoft/mobile` `{ idToken }`. **Deployed on UAT, contract confirmed** (`02-AUTH.md` §7.5) | A2 | `{ token, expiresAt, user }`, no cookie |
 | AUTH-P3 | `POST /api/v1/auth/refresh` | A3 | `{ token, expiresAt }` |
 | ~~AUTH-P4~~ | ~~`POST /api/v1/devices`, `DELETE /api/v1/devices/:token`~~ **Superseded in G7 (2026-11-02)** by NTF-5 / NTF-6 (`/notifications/device-token`, §9, confirmed in writing 2026-11-05), as specified in Ronit's MOBILE-BACKEND-REQUIREMENTS.md §1.5 | A5 | see §9 |
@@ -157,7 +157,7 @@ Each web `api/*.api.ts` function was checked against the backend routers. File p
 > **Why assumed.** On 2026-11-05 the backend team told Ronit that a mobile password-login endpoint is deployed on UAT, with local auth on there. Its source has not been pushed: no branch of the web clone has it, neither the clone fetched 2026-11-04 16:36 nor the fresh one of 2026-11-05 09:56 (`master` `7df97c8`) (`docs/G9-PASSWORD-LOGIN.md`). Ronit authorised the four assumed paths in writing (G9 brief, 2026-11-05), under CLAUDE.md rule 1. **Nothing below is from source.** It is what the app sends, and what it accepts. Confirm it with the backend team (ask A32), then replace this entry with the real contract.
 
 - **Code:** every wire name is in `src/types/mobile-password-contract.ts`. The call is `signInWithPassword()` in `src/api/auth.api.ts`.
-- **Builds:** UAT only (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`). Production builds never call it.
+- **Builds:** every build, UAT and PROD (since 2026-11-06). The backend team confirmed the endpoint is deployed on both and that the environments are in sync. There is no environment flag. The shape is still the tolerant, assumed one until the contract arrives (A32).
 - **Auth:** none. Sent without `Authorization` and without cookies.
 - **Paths, tried in this order;** the next only after a **404 with an HTML body** (Express's "Cannot POST", §0.5):
   1. `POST /api/v1/auth/mobile/login`
@@ -1344,9 +1344,9 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |
 | AUD-1 | GET | `/audit-logs`, else `/audit-log` (§10.5) | ADMIN | P2 (G8; confirmed 2026-11-05) |
 
-## iOS-A. The iOS app and this contract (iOS-5e, 2026-11-03; iOS-5f, 2026-11-06)
+## iOS-A. The iOS app and this contract (iOS-5e, 2026-11-03; iOS-5f, 2026-11-06; iOS-5h, 2026-11-08)
 
-> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `d8626bc` (iOS-5f; before it `8b522e3`).
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`, iOS-5f; `8b522e3`).
 
 - **NTF-5 and NTF-6 (§9) describe the Android app only.** G7's push client (G7c) is **not ported** to iOS: `ios-dev` has no `expo-notifications`, no `src/push/`, and calls neither endpoint. The lines that say "Mobile (G7): … called from `src/push/registration.ts`" or "from `useSignOut` … NTF-6" are Android's; on iOS sign-out sends AUTH-3 only, as before. Pinned by `tests/rbac/approvals-visibility.test.mjs` ("G7c (push) is not in the iOS app").
   - **iOS-5f:** the 2026-11-05 confirmation of NTF-5/NTF-6, NTF-6's new `{ token, platform }` body and the `google-services.json` lines (NTF-2, NTF-5) change nothing on iOS. Push stays out (ANDROID-DELTA §10, decision 4, E2).
@@ -1359,6 +1359,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
   - **For that one path, Android's request and reader** (Ronit, iOS-5g: 1a, 2a): the body `{ username, email, password }`, and `AUTH_P1_READER` (above): the token, `user`, `user.id` and `user.role` required; `name` or `displayName`; extras ignored. Errors as above.
   - **iOS never calls `POST /api/v1/auth/login`.** §1.5's "Exception since 2026-11-05" is Android's. On iOS, `/auth/login` stays do-not-call with no exception; `verify-release-bundle` fails a bundle that names it.
   - UAT builds only, gated by `EMAIL_SIGN_IN_ENABLED` exactly as on Android, and at build time as well: a `production` bundle holds none of the G9 code (`02-AUTH.md` §iOS-B).
+  - **iOS-5h (Ronit, 2026-11-08):** the AUTH-P1 row and the "Builds" line above are Android's since `6b5e46c`: Android calls it on every build, UAT and PROD. **iOS does not:** it stays on UAT builds only, with both gates. Matching Android `6b5e46c` is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved (`docs/ios/ANDROID-DELTA.md` §5, item 7). The backend team's 2026-11-06 word that the endpoint is also on PROD is recorded; iOS has no PROD build to call it from (CLAUDE.md I3).
   - **`Set-Cookie`: ⏳ NOT CONFIRMED** (06 A32). It blocks shipping the email sign-in to testers. Recorded in `02-AUTH.md` §iOS-B and `docs/G9-PASSWORD-LOGIN.md` §iOS-A.
   - §1.5's cookie line names Android's mechanism (`CookieJar.NO_COOKIES`). The iOS counterpart is **half proven** (iOS-5f): `withCredentials: false` sets `HTTPShouldHandleCookies = NO` (`node_modules/react-native/Libraries/Network/RCTNetworking.mm:319`), so no jar cookie is sent; that a response `Set-Cookie` is never stored rests on iOS and on the endpoint sending none. A React Native redirect re-attaches jar cookies and drops `Authorization` (`RCTHTTPRequestHandler.mm:149-159`). Both are in `docs/ios/APP-STORE-COMPLIANCE.md` (G9 section) and `ANDROID-DELTA.md` §10.7.
-- **No other endpoint, param or write** was added on iOS in iOS-5e or iOS-5f.
+- **No other endpoint, param or write** was added on iOS in iOS-5e, iOS-5f or iOS-5h.

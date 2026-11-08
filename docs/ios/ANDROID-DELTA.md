@@ -1,9 +1,10 @@
-# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g)
+# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g, iOS-5h)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5f: `origin/dev` @ `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7`** (§10). To sync later Android work, diff `d8626bc..origin/dev`: empty in this clone on 2026-11-06. G9 (email sign-in) from `d8626bc` came across in iOS-5g, UAT builds only, to the one confirmed path (§10.8).
+> **Port source since iOS-5h: `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed`** (§11). To sync later Android work, diff `6b5e46c..origin/dev`. Android's opening of the email sign-in to PROD (`6b5e46c`) is on the iOS-9 list (§5, item 7), not ported.
+> iOS-5f's and iOS-5g's port source was `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (§10); G9 (email sign-in) from `d8626bc` came across in iOS-5g, UAT builds only, to the one confirmed path (§10.8).
 > iOS-5e's port source was `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (§9). iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
-> The builds are in `00-PORT-MANIFEST.md` §4.15–§4.20. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
+> The builds are in `00-PORT-MANIFEST.md` §4.15–§4.21. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
 
 ## 1. The rule (Ronit, 2026-10-30)
 
@@ -155,6 +156,8 @@ Details are in manifest §4.15. In short:
 | 4 | The release check's PROD host (D8) | `4063df3` | Allow `servicedesk.mountmerugroup.com` in the `production` run only | Item 2 |
 | 5 | Production-readiness tests (D9) | `4063df3`, `c5c63ac`, `f4fad10` | Port the part items 1–3 make true; leave out APK/AAB and `versionCode`. `c5c63ac` changed its "Login navigates nowhere" case for the new sign-in button; it becomes true on iOS with item 1. `f4fad10` changed its sign-in case (`setSession` with `fullAuthAt`; the profile save never passes it). iOS-5d checks the same in `ios-reauth.test.mjs`, with the developer-token screen as a third caller until item 1 | Items 1–3 |
 | 6 | 02-AUTH §6 and the release guide | `4063df3` | Android's text about the deleted screen and the PROD build, in `RELEASE-IOS.md` | Items 1, 2 |
+| 7 | **Match Android `6b5e46c` at iOS-9: the email sign-in on production builds** (H4, §11). Android deleted `EMAIL_SIGN_IN_ENABLED` and renders the form unconditionally; the backend team reports the endpoint on PROD, in sync with UAT (2026-11-06). **Also the App Review demo-login route** (compliance A4): whether the email sign-in, with a reviewer account on PROD, becomes App Review's demo login | `6b5e46c` | Remove the run-time gate (`src/config/env.ts`) and the build-time gate (`LoginScreen.tsx`); flip the release check's production rule (G9 modules and strings required, not forbidden); port Android's three test changes (`password-sign-in`, `start-up-and-login`, `production-readiness`); update compliance K1, K2, A4, A5 and the G9 section. Keep the one path and never `/auth/login` | **The backend team confirms the endpoint sends no `Set-Cookie`, and PROD is approved** (Ronit's written sign-off, CLAUDE.md I3; item 2). Ronit, iOS-5h (2026-11-08) |
+| 8 | Android's release guide: what a production build does differently from the tested UAT build, and "production = UAT except where a difference is required", with its table of every remaining difference (H3, H8, §11) | `f67265c`, `6b5e46c` (`docs/RELEASE.md` §5b, §5c) | Write the iOS table in `RELEASE-IOS.md` when the `production` profile becomes runnable: API URL, profile and artifact, `EXPO_PUBLIC_APP_ENV`, the Login chip, the environment label, deep-link origins, and (until item 7) the email sign-in | Items 2, 7 |
 
 ## 6. Not ported: not in Android `dev`
 
@@ -445,3 +448,58 @@ No clash. Android's new UI-STANDARDS §14–§16 and PERFORMANCE §13–§14 wer
 | `git log d8626bc..origin/dev` | empty |
 
 **Not run:** a device check: UAT G20 (`UAT-TEST-PLAN-IOS.md`). No call to UAT was made; the tests mock the network.
+
+## 11. iOS-5h: the sync to `6b5e46c` (2026-11-08)
+
+### 11.1 What came across
+
+At planning (`git fetch origin --prune` in this clone, 2026-11-08), `d8626bc..origin/dev` was **two commits**, both 2026-11-06:
+- `f67265c` "chore: prepare versionCode 4 production build" (4 files);
+- `6b5e46c` "feat: open email sign-in to production; versionCode 5; production matches UAT except required differences" (14 files).
+
+Together they changed 15 files and added or deleted none (293 files, as at `d8626bc`). `origin/main` took both through PRs #70 and #71 (2026-11-08 07:02 +0530); it has merge commits only, and its tree equals `dev`'s. No new branch. The four unmerged branches (2026-10-22) are unchanged, with no commit after 2026-11-05: not ported (§6).
+
+**The Android folder** was opened read-only for the diagnosis only, on Ronit's brief, every git command with `--no-optional-locks`. It is on `dev` @ `6b5e46c`, equal to its own `origin/dev`, with nothing uncommitted, untracked, stashed or unpushed and no lock file. Its branch, HEAD, status, stash list, every ref, and the size and time of `.git/index`, `FETCH_HEAD` and `logs/HEAD` were identical before and after (32 lines compared). In iOS-5h itself it was not opened; Android was read only through git in this clone.
+
+### 11.2 The items
+
+| ID | Change | Commit | What it does for the user | iOS | **Outcome** |
+|---|---|---|---|---|---|
+| H1 | `versionCode` 3 → 4 | `f67265c` | — | Android only | **Not ported** |
+| H2 | Release check: the email form's example address set aside **only** as that exact, whole address before the host search (`EXAMPLE_EMAILS`, `wholeAddress()`) | `f67265c` | Tooling only | Partial: iOS-5g skipped any domain after "@", which also hid `https://user@host` and any other address at the domain | **Ported** (Android's code, with the iOS file names in the description). Proven by a plant (§11.5) |
+| H3 | `RELEASE.md` §5b: what the production build does differently from the tested UAT build | `f67265c` | Docs | Not on iOS (manifest §4.7) | **iOS-9 list** (§5, item 8) |
+| H4 | **The email sign-in on production builds:** `EMAIL_SIGN_IN_ENABLED` deleted, the form rendered unconditionally | `6b5e46c` | On Android PROD, anyone with a local password can sign in with email, and the Play reviewer can get in. The same for every role (sign-in comes before the role) | Partial: UAT builds only, two gates | **iOS-9 list** (§5, item 7; Ronit, §11.3). No code change |
+| H5 | Push on production: the Firebase file in the production EAS environment (`app.config.js`, a comment only) | `6b5e46c` | Android PROD gets push | No: push is out (§10.3, decision 4) | **Not ported** (Android native; iOS would need `expo-notifications` and APNs, a native build) |
+| H6 | `versionCode` 4 → 5 | `6b5e46c` | — | Android only | **Not ported** |
+| H7 | Shared docs: **the backend team reports the email endpoint deployed on PROD as well as UAT, in sync** (2026-11-06); 01 AUTH-P1, 02-AUTH §8, 06 A32, `G9-PASSWORD-LOGIN.md`, UI-STANDARDS §15.2 | `6b5e46c` | Docs | No | **Merged** verbatim, with iOS notes (§11.4) |
+| H8 | `RELEASE.md` §5c: "production = UAT except where a difference is required", with the table of every remaining difference | `6b5e46c` | Docs | No | **iOS-9 list** (§5, item 8) |
+
+**Flags.** H4 and H7 touch G9. Android's docs at `6b5e46c` still list "no `Set-Cookie`" as unconfirmed (02-AUTH §8 item 4) and A32 is still open: the PROD confirmation does not answer iOS's open item. Android's production builds now also carry its fourth path, `POST /auth/login`, tried after an HTML 404 on the first three; iOS never calls it (§10.3). Reported, not for iOS to change.
+
+### 11.3 Ronit's decision (2026-11-08)
+
+1. **H4: option (a), defer.** Recorded on the iOS-9 list as "match Android `6b5e46c` at iOS-9, after the backend confirms no `Set-Cookie` and PROD is approved; also the App Review demo-login route (A4)" (§5, item 7). iOS keeps both gates. Every runnable iOS build is UAT (the PROD URL is empty, CLAUDE.md I3), so no iOS user sees a difference either way.
+2. **The rest as proposed:** H2 ported, H7 merged, H3 and H8 on the iOS-9 list; H1, H5, H6 not ported.
+
+### 11.4 Docs
+
+- **Merged three-way** (base `d8626bc`, ours `ios-dev`, theirs `6b5e46c`): `01-API-CONTRACT.md`, `02-AUTH.md`, `06-BACKEND-ASKS.md`, `docs/G9-PASSWORD-LOGIN.md`, `docs/brand/UI-STANDARDS.md`. All 13 lines Android added are present verbatim, and the 12 it replaced are gone (checked by script).
+- **One conflict:** 02-AUTH's header bullet on G9. Android's line verbatim, with the iOS sub-bullet kept under it and updated (UAT only; Android's PROD opening on the iOS-9 list).
+- **iOS notes** in the lettered sections: 01 §iOS-A, 02 §8's iOS line and §iOS-B (the gate row's Android column, "Not on production"), 06 §iOS-A, `G9-PASSWORD-LOGIN.md` §iOS-A (and its contract row), UI-STANDARDS §iOS-A.16.
+- **Section numbers:** no clash; no new lettered section.
+- **Not on iOS:** `docs/RELEASE.md` (H3, H8: §5, item 8).
+- **Compliance:** A4 (the demo-login line), K1 (the host rule, with the proof below) and the G9 section (`APP-STORE-COMPLIANCE.md`).
+
+### 11.5 Results (2026-11-08)
+
+| Check | Result |
+|---|---|
+| H2, proven to fail | With `https://x@servicedesk.mountmerugroup.com/api/v1` and `it@mountmerugroup.com` planted in `src/config/env.ts`: the iOS-5g check **PASS** (the gap: hosts reported, only `uat-servicedesk`); the iOS-5h check **FAIL**, "release JS names hosts that are not allowed: servicedesk.mountmerugroup.com, mountmerugroup.com". Plant removed; `src/` identical to `c3e9eee` |
+| `npm run verify:release-bundle` | **PASS (preview):** 2,322 modules, 212 app code; hosts only `uat-servicedesk.mountmerugroup.com`; the example set aside 2×; G9 4 of 4 modules, 7 of 7 strings; `/auth/login` 0. **PASS (`--profile production`):** 2,318 modules, 208 app code; G9 0 of 4 modules, 0 of 7 strings; the example 0×; `/auth/login` 0. Developer-token strings 0 of 12 in both, control 12 of 12 |
+| `npx tsc --noEmit` | 0 errors |
+| `npm test` | **1,735**, all passing (247 suites), as in iOS-5g: no test changed |
+| `app.json`, `package.json`, `package-lock.json` | unchanged (`version` 0.2.0) |
+| `src/`, `tests/` | unchanged |
+| `git log 6b5e46c..origin/dev` | empty (fetched 2026-11-08) |
+
+**Build 0.2.0 (2):** iOS-5h changes no app code, so it joins that build as it is. The build still waits for the backend team's `Set-Cookie` answer (`RELEASE-IOS.md` §6, rule 10).

@@ -11,8 +11,8 @@
 > - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 >   - **iOS (`ios-dev`, iOS-5d, 2026-11-01):** ported from Android `f4fad10`, with the same behaviour. The iOS differences (Keychain class, reinstall, the private sheet) are in §iOS-A.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
-> - **Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, on UAT builds only.** The backend team says the endpoint is deployed on UAT, but its source is not pushed, so the app tolerates several request and response shapes instead of one. Nothing about it is verified against source. See §8.
->   - **iOS (`ios-dev`, iOS-5g, 2026-11-06):** one path only, `POST /api/v1/auth/mobile/login`, **confirmed** live on UAT by the backend team. No fallback, and iOS never calls `POST /auth/login`. Android's body and tolerant reader (Ronit: 1a, 2a). UAT builds only, gated at build time as well as at run time. **`Set-Cookie` is not yet confirmed: that blocks shipping it to testers.** See §iOS-B.
+> - **Email and password sign-in (G9): built 2026-11-05; opened to PRODUCTION 2026-11-06.** The backend team confirmed the endpoint is deployed on PRODUCTION as well as UAT, and that the two are in sync. **Both sign-in paths (Microsoft and email) now work in both environments.** ⚠ The contract is still the tolerant, ASSUMED one: the backend confirmed the endpoint is DEPLOYED on both, but its source and exact shape have not been sent (A32). See §8.
+>   - **iOS (`ios-dev`, iOS-5g, 2026-11-06; iOS-5h, 2026-11-08):** one path only, `POST /api/v1/auth/mobile/login`, **confirmed** live on UAT by the backend team. No fallback, and iOS never calls `POST /auth/login`. Android's body and tolerant reader (Ronit: 1a, 2a). **UAT builds only**, gated at build time as well as at run time: Android's opening to PRODUCTION (`6b5e46c`) is on the iOS-9 list (Ronit, iOS-5h). **`Set-Cookie` is not yet confirmed: that blocks shipping it to testers.** See §iOS-B.
 
 All paths are relative to `backend/src/` unless prefixed with `frontend/src/`. Line numbers are as of 2026-10-09.
 
@@ -699,11 +699,11 @@ Ported from Android `dev` @ `f4fad10`. iOS keeps **the same behaviour** as §5.8
 - Swiping the app away and reopening it at +16 days shows the notice too (the cold-start path).
 ---
 
-## 8. Email and password sign-in (G9): built 2026-11-05 against an ⚠ ASSUMED contract, UAT builds only
+## 8. Email and password sign-in (G9): built 2026-11-05, on every build since 2026-11-06 (UAT and PROD); contract still ⚠ ASSUMED
 
 **The goal:** a Google Play reviewer, who has no Microsoft account in the MMG tenant, can sign in.
 
-> **iOS:** this section is Android's text, verbatim at `d8626bc`. iOS calls one confirmed path, with no fallback: §iOS-B.
+> **iOS:** this section is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`). iOS calls one confirmed path, with no fallback, and **on UAT builds only**: Android's opening to PROD is on the iOS-9 list. §iOS-B.
 
 > **⚠ ASSUMED, NOT VERIFIED AGAINST SOURCE.** On 2026-11-05 Ronit confirmed with the backend team that a mobile password-login endpoint is **deployed on UAT**, with local auth on there. Its source has **not been pushed**: no branch of the web clone has it (`docs/G9-PASSWORD-LOGIN.md`). That holds for the clone fetched 2026-11-04 16:36, and for the fresh one of 2026-11-05 09:56 (`master` `7df97c8`, 15 refs), whose auth module and middleware are unchanged since `d7f3887`. That is the same position AUTH-P2 was in before its contract arrived. So the app was built to work against **several plausible shapes, not one guessed shape**. The last guess cost a rebuild: the app required `displayName`, and the server sent `name`. Every wire name is in one file, `src/types/mobile-password-contract.ts`. Cut it down to the real contract when it arrives (ask A32).
 
@@ -711,7 +711,7 @@ Ported from Android `dev` @ `f4fad10`. iOS keeps **the same behaviour** as §5.8
 
 | | Microsoft (AUTH-P2, §7) | Email and password (AUTH-P1, this section) |
 |---|---|---|
-| Builds | Every build | **UAT builds only** (`EMAIL_SIGN_IN_ENABLED`, `src/config/env.ts`): development and `preview`. A production build does not render the option at all |
+| Builds | Every build | **Every build, UAT and PROD** (since 2026-11-06). There is no environment flag: `EMAIL_SIGN_IN_ENABLED` was deleted, and Login renders the form unconditionally. Validation, path discovery, response reading, messages, session storage and the 15-day clock are the same code in both |
 | Contract | **Confirmed** by the backend team, 2026-10-19 | **Assumed**: endpoint reported deployed on UAT, source not pushed |
 | Where on Login | The outlined pill, the primary action, unchanged | Under the pill: OR divider, then "Sign in with email instead". The fields open in place (`docs/brand/UI-STANDARDS.md` §15.2) |
 | Request | `POST /auth/microsoft/mobile` `{ idToken }` | Up to four paths (§8.2), `{ username, email, password }` |
@@ -810,7 +810,7 @@ Shown in a failure box above "Sign in": title, message, the server's own words w
 4. **No `Set-Cookie`** on the new route. `__DEV__` builds warn if one is visible to JavaScript. React Native keeps it out of the jar either way (§5.2).
 5. **The rate limit** on the new route, and its **error statuses** and messages: whether it says which field was wrong, and whether unknown emails get 401 or 404.
 6. **Which accounts may use it:** everyone with a local password, or an allow-list (A32's proposal).
-7. **PROD.** The option is off on production builds until the endpoint is on PROD and Ronit says so. A Play reviewer installs the production build (§8 goal; `docs/G9-PASSWORD-LOGIN.md` §7).
+7. **PROD.** ✅ Opened 2026-11-06: the backend team confirmed the endpoint is on PRODUCTION and in sync with UAT. The gate was removed. A Play reviewer installs the production build, so the reviewer can now use the email option (`docs/G9-PASSWORD-LOGIN.md` §7).
 8. **The 15-day clock** (§8.5).
 
 When the contract arrives: cut `src/types/mobile-password-contract.ts` and `AUTH_P1_READER` (`src/api/auth.api.ts`) down to it. Keep the tests for the real shape and drop the guesses. Then record it in `01-API-CONTRACT.md` as confirmed.
@@ -832,9 +832,9 @@ The email path needs no Microsoft redirect, so it also works in a development bu
 
 ---
 
-## iOS-B. iOS: email and password sign-in (`ios-dev`, iOS-5g, 2026-11-06)
+## iOS-B. iOS: email and password sign-in (`ios-dev`, iOS-5g, 2026-11-06; iOS-5h, 2026-11-08)
 
-Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/ios/ANDROID-DELTA.md` §10.8). §8 is Android's text, verbatim. It describes Android's build: an ⚠ ASSUMED contract and four paths. This section lists only what differs on iOS, and why. The brief called this note "02-AUTH §iOS-A"; that letter is the 15-day section, so it is §iOS-B.
+Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/ios/ANDROID-DELTA.md` §10.8). §8 is Android's text, verbatim (at `6b5e46c` since iOS-5h). It describes Android's build: an ⚠ ASSUMED contract and four paths, and since `6b5e46c` every build, UAT and PROD. This section lists only what differs on iOS, and why. The brief called this note "02-AUTH §iOS-A"; that letter is the 15-day section, so it is §iOS-B.
 
 **The contract iOS is built against** (the backend team, through Ronit, 2026-11-06)
 
@@ -852,7 +852,7 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 |---|---|---|
 | Paths | Up to four, in order, moving on after a 404 with an HTML body; the path that answered is remembered for the run (§8.2) | **One**, `POST /auth/mobile/login`, once per tap. A 404 with an HTML body is `unavailable` ("Email sign-in isn't available … Sign in with Microsoft instead", `Ref: unavailable · HTTP 404`), and no other path is tried. Nothing is remembered |
 | `POST /auth/login` | Android's fourth path | **Never called.** `verify-release-bundle` fails any bundle that names `/auth/login`, and `tests/auth/ios-password-sign-in.test.mjs` lists every auth path in `src/` |
-| The gate | `EMAIL_SIGN_IN_ENABLED`, at run time (§8.1) | **Two gates, both UAT only.** The same run-time gate (`src/config/env.ts`, `APP_ENV === 'UAT'`). **And a build-time gate:** `LoginScreen.tsx` loads the form with a `require()` behind `process.env.EXPO_PUBLIC_APP_ENV !== 'PROD'`. Expo writes that value into the bundle, and Metro folds the branch away before it collects the modules. So a `production` bundle holds **none** of the four G9 modules and **none** of their strings: checked on every release check, for both profiles |
+| The gate | **None since `6b5e46c` (2026-11-06):** every build, UAT and PROD (§8.1). Until then `EMAIL_SIGN_IN_ENABLED`, at run time | **Two gates, both UAT only** (kept in iOS-5h; matching Android is on the iOS-9 list, below). The same run-time gate (`src/config/env.ts`, `APP_ENV === 'UAT'`). **And a build-time gate:** `LoginScreen.tsx` loads the form with a `require()` behind `process.env.EXPO_PUBLIC_APP_ENV !== 'PROD'`. Expo writes that value into the bundle, and Metro folds the branch away before it collects the modules. So a `production` bundle holds **none** of the four G9 modules and **none** of their strings: checked on every release check, for both profiles |
 | Where the code is | `src/api/auth.api.ts`, `src/screens/auth/signInAttempt.ts` | iOS's own modules, so the build-time gate can leave them out: `src/api/passwordSignIn.api.ts` and `src/screens/auth/passwordSignInAttempt.ts`. The contract file is not re-exported from `src/types/index.ts`. The reader (`readSession()`, `readUser()`) stays shared in `auth.api.ts`; AUTH-P2's reader is unchanged |
 | A `Set-Cookie` on the answer | A `__DEV__` warning | The same warning, plus one `[auth] email sign-in: … sent Set-Cookie` line in every UAT build. The cookie's value is never logged |
 | The session | `setSession({ token, user, fullAuthAt: Date.now() })` in SecureStore | The same call. On iOS: the Keychain with `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, as for Microsoft (§7.7); the reinstall wipe and the 15-day rule (§iOS-A); sign-out through `signOutAndWipe()` (AUTH-3). `fullAuthAt = now` on every password sign-in, as §8.5 (the iOS-5g brief, item e) |
@@ -868,5 +868,6 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 - **React Native's redirect behaviour (existing):** on any HTTP redirect, `RCTHTTPRequestHandler.mm:149-159` puts the jar's cookies on the redirected request and drops `Authorization`. No `/api/v1` call is expected to redirect. `UAT-TEST-PLAN-IOS.md` G19.16 and G20 check it on a device.
 
 **Not on production.** The option is off in production builds until the endpoint is on PROD and Ronit says so. Whether it then serves App Review's demo account (compliance A4) is an open decision for iOS-9.
+- **iOS-5h (Ronit, 2026-11-08):** Android opened the email sign-in to PRODUCTION in `6b5e46c` (2026-11-06), after the backend team confirmed the endpoint on PROD (§8 item 7, Android's). **iOS keeps both gates.** Matching Android `6b5e46c` is on the iOS-9 list, **after the backend team confirms no `Set-Cookie` and PROD is approved** (CLAUDE.md I3), together with the App Review demo-login route (compliance A4; `docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer `Set-Cookie` (§8 item 4 is still open on Android too).
 
 **Tests:** `tests/auth/password-sign-in.test.mjs` (Android's, with "one path" in place of "path discovery"), `tests/auth/ios-password-sign-in.test.mjs` (the iOS-only checks: one path, the gates, the Keychain, the password), `tests/login/sign-in-button.test.mjs` (E1). Device checks: `UAT-TEST-PLAN-IOS.md` G20.
