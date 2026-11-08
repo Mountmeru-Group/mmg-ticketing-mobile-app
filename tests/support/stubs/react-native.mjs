@@ -6,6 +6,9 @@
 // - iOS-3b: AccessibilityInfo's announcements (VoiceOver reading out a success notice, utils/successNotice.ts),
 //   ActionSheetIOS (utils/actionSheet.ts) and Alert (utils/dialogs.ts). Each records what the app asked for, and the
 //   test answers as the person would: __pickActionSheet(index), __pressAlertButton(text).
+// - R1: TurboModuleRegistry, for the one native module the app reaches by name: React Native's Networking, whose
+//   clearCookies(callback) empties iOS's cookie store (src/api/cookieShield.ts). The stand-in counts each call and
+//   answers as the device would; a test can swap in a missing, throwing or silent module (__setNetworking).
 // The test sets what the device says with the __ functions. Any other React Native import fails at load, on purpose:
 // a module that needs more of React Native is not a pure module and is checked by reading its source instead.
 const listeners = new Set();
@@ -126,4 +129,56 @@ export function __pressAlertButton(text) {
 /** Forget every Alert (between tests). */
 export function __clearAlerts() {
   alerts = [];
+}
+
+// ── TurboModuleRegistry: React Native's Networking module (R1) ──
+
+let cookieClears = 0;
+let jarHoldsCookies = false;
+let onCookieClear = null;
+
+/** As on the phone (RCTNetworking.mm clearCookies): empties the store, answers true when it held cookies. */
+const deviceNetworking = {
+  clearCookies(callback) {
+    cookieClears += 1;
+    onCookieClear?.();
+    const held = jarHoldsCookies;
+    jarHoldsCookies = false;
+    callback(held);
+  },
+};
+let networking = deviceNetworking;
+
+export const TurboModuleRegistry = {
+  get(name) {
+    return name === 'Networking' ? networking : null;
+  },
+};
+
+/** How many times clearCookies was called since the last __resetNetworking(). */
+export function __cookieClears() {
+  return cookieClears;
+}
+
+/** Puts a cookie in the store, as a Set-Cookie on an answer would: the next clearCookies answers true. */
+export function __putCookieInStore() {
+  jarHoldsCookies = true;
+}
+
+/** Runs `fn` inside each clearCookies call, at the moment the app calls it (to see what has happened so far). */
+export function __onCookieClear(fn) {
+  onCookieClear = fn;
+}
+
+/** Replaces the Networking module: null (missing), or an object with its own clearCookies (throwing, silent…). */
+export function __setNetworking(module) {
+  networking = module;
+}
+
+/** Back to the device's module, an empty store, no hook and a count of 0. */
+export function __resetNetworking() {
+  networking = deviceNetworking;
+  cookieClears = 0;
+  jarHoldsCookies = false;
+  onCookieClear = null;
 }

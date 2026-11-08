@@ -832,7 +832,7 @@ The email path needs no Microsoft redirect, so it also works in a development bu
 
 ---
 
-## iOS-B. iOS: email and password sign-in (`ios-dev`, iOS-5g, 2026-11-06; iOS-5h, 2026-11-08)
+## iOS-B. iOS: email and password sign-in (`ios-dev`, iOS-5g, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08)
 
 Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/ios/ANDROID-DELTA.md` §10.8). §8 is Android's text, verbatim (at `6b5e46c` since iOS-5h). It describes Android's build: an ⚠ ASSUMED contract and four paths, and since `6b5e46c` every build, UAT and PROD. This section lists only what differs on iOS, and why. The brief called this note "02-AUTH §iOS-A"; that letter is the 15-day section, so it is §iOS-B.
 
@@ -844,7 +844,7 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 | Request body | Android's: `{ "username": <email>, "email": <email>, "password": <password> }`, which is what Android sends to this path (§8.2). Ronit, 1a |
 | The 200 | Android's tolerant reader, `AUTH_P1_READER` (§8.3). Ronit, 2a. Required: a token (`token`, `accessToken` or `sessionToken`), `user`, `user.id`, and `user.role`. `name` and `displayName` (and `fullName`) are both accepted; any other field is optional; extra fields never fail sign-in |
 | Errors | Android's reasons and words (§8.6), unchanged |
-| `Set-Cookie` | ⏳ **NOT CONFIRMED.** Ronit is asking the backend team. **Until it is answered, the email sign-in does not go to testers** (below) |
+| `Set-Cookie` | ⏳ **NOT CONFIRMED** (ask A32): **open, not blocking since R1** (2026-11-08). Whatever the answer, iOS's cookie store is emptied right after it, before the session is stored (Cookies, below), so it no longer holds the email sign-in back from testers. The answer is still recorded when it comes |
 
 **Android → iOS**
 
@@ -854,7 +854,7 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 | `POST /auth/login` | Android's fourth path | **Never called.** `verify-release-bundle` fails any bundle that names `/auth/login`, and `tests/auth/ios-password-sign-in.test.mjs` lists every auth path in `src/` |
 | The gate | **None since `6b5e46c` (2026-11-06):** every build, UAT and PROD (§8.1). Until then `EMAIL_SIGN_IN_ENABLED`, at run time | **Two gates, both UAT only** (kept in iOS-5h; matching Android is on the iOS-9 list, below). The same run-time gate (`src/config/env.ts`, `APP_ENV === 'UAT'`). **And a build-time gate:** `LoginScreen.tsx` loads the form with a `require()` behind `process.env.EXPO_PUBLIC_APP_ENV !== 'PROD'`. Expo writes that value into the bundle, and Metro folds the branch away before it collects the modules. So a `production` bundle holds **none** of the four G9 modules and **none** of their strings: checked on every release check, for both profiles |
 | Where the code is | `src/api/auth.api.ts`, `src/screens/auth/signInAttempt.ts` | iOS's own modules, so the build-time gate can leave them out: `src/api/passwordSignIn.api.ts` and `src/screens/auth/passwordSignInAttempt.ts`. The contract file is not re-exported from `src/types/index.ts`. The reader (`readSession()`, `readUser()`) stays shared in `auth.api.ts`; AUTH-P2's reader is unchanged |
-| A `Set-Cookie` on the answer | A `__DEV__` warning | The same warning, plus one `[auth] email sign-in: … sent Set-Cookie` line in every UAT build. The cookie's value is never logged |
+| A `Set-Cookie` on the answer | A `__DEV__` warning | The same warning, plus one `[auth] email sign-in: … sent Set-Cookie` line in every UAT build. The cookie's value is never logged. **Since R1 the cookie is gone from iOS's store right after the answer** (Cookies, below) |
 | The session | `setSession({ token, user, fullAuthAt: Date.now() })` in SecureStore | The same call. On iOS: the Keychain with `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, as for Microsoft (§7.7); the reinstall wipe and the 15-day rule (§iOS-A); sign-out through `signOutAndWipe()` (AUTH-3). `fullAuthAt = now` on every password sign-in, as §8.5 (the iOS-5g brief, item e) |
 | `countryId` | AUTH-2 asked when it is missing (§8.4) | The same |
 | The keyboard | Android's | The email keyboard. `textContentType` `"username"` and `"password"`, so iOS Password AutoFill offers saved company credentials. Return goes to the password, then signs in. The form stays above the keyboard (E1) |
@@ -862,12 +862,29 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 | The password | Cleared on success, failure and unmount (§8.5) | The same, in the submit's `finally` |
 | Reading the `[auth]` lines | `adb logcat -s ReactNativeJS:V` (§8.8) | A development build: Metro. A `preview` build: Console.app on a Mac with the iPhone connected, subsystem `com.facebook.react.log`, category `javascript`, with **Include Debug Messages** on (React Native logs `console.debug` at the debug level). A failure box's Ref line needs no tool |
 
-**Cookies.** Recorded here and in `docs/ios/APP-STORE-COMPLIANCE.md` (G9 section). Not changed.
+**Cookies.** Recorded here and in `docs/ios/APP-STORE-COMPLIANCE.md` (G9 section). Mitigated on the device by R1 (2026-11-08), below.
 - **Proven from source:** `withCredentials: false` sets `HTTPShouldHandleCookies = NO` on the request (`RCTNetworking.mm:319`), so React Native sends no cookie from the jar. Auth is Bearer only.
-- **Not provable from source:** that a `Set-Cookie` on the answer is never **stored**. That is iOS's behaviour, not React Native's code. It is settled only if the endpoint sends no `Set-Cookie`, which the backend team has not yet confirmed. **That open item blocks shipping the email sign-in to testers.**
-- **React Native's redirect behaviour (existing):** on any HTTP redirect, `RCTHTTPRequestHandler.mm:149-159` puts the jar's cookies on the redirected request and drops `Authorization`. No `/api/v1` call is expected to redirect. `UAT-TEST-PLAN-IOS.md` G19.16 and G20 check it on a device.
+- **Not provable from source:** that a `Set-Cookie` on the answer is never **stored**. That is iOS's behaviour, not React Native's code. The backend team has not yet said whether the endpoint sends one (ask A32). Until R1 this open item blocked shipping the email sign-in to testers. **Since R1 it does not** (Ronit, 2026-11-08); the answer is still recorded when it comes.
+- **React Native's redirect behaviour (existing):** on any HTTP redirect, `RCTHTTPRequestHandler.mm:149-159` puts the jar's cookies on the redirected request and drops `Authorization`. No `/api/v1` call is expected to redirect. `UAT-TEST-PLAN-IOS.md` G19.16 and G20 check it on a device. Since R1 the jar is empty at every session boundary, so there is no server cookie to put on it; `Authorization` is still dropped.
+
+**R1, the cookie shield (2026-11-08).** `src/api/cookieShield.ts` empties iOS's cookie store (`NSHTTPCookieStorage.sharedHTTPCookieStorage`), so no server cookie, `sd_session` or any other, outlives the answer it came on or crosses from one session into the next. Whatever the endpoint sends.
+- **How:** React Native's own Networking module, `clearCookies` (`node_modules/react-native/Libraries/Network/RCTNetworking.mm:850-863`): it deletes every cookie in the shared store and calls back `true`, or `false` when the store was already empty. It never names a cookie. The app reaches it as `TurboModuleRegistry.get('Networking')`, as `NativeNetworkingIOS.js:38` does, because the `Networking` export is missing from the TypeScript types the project compiles against. No new package.
+- **When:**
+
+| When | Where |
+|---|---|
+| Right after the `POST /auth/mobile/login` answer, success or error, before AUTH-2 and before `setSession()` | `signInWithPassword()` (`src/api/passwordSignIn.api.ts`), in a `finally` |
+| Right after the AUTH-P2 answer (Microsoft), success or error, before `setSession()` | `exchangeMicrosoftIdToken()` (`src/api/auth.api.ts`), in a `finally` |
+| Once at every cold start, before the first API call | RootNavigator's start-up: the shield, then the reinstall check, then `restoreSession()`. The navigator shows a blank view until `restoreSession()` ends, so nothing calls the API before it |
+| At every sign-out: by the person (after AUTH-3), the 15-day re-authentication, the 8-hour expiry, a 401 | `endSession()` (`src/api/client.ts`), after the session is wiped, so a burst of 401s still ends it once |
+
+- **Never blocks.** It never throws. An error is one `[auth] cookie shield (<point>): …` warning; a native answer that never comes is given up after 2 s (`CLEAR_COOKIES_WAIT_MS`). When it deleted something, one debug line says so: `[auth] cookie shield (<point>): the cookie store held cookies; all deleted`. No cookie, token or personal data is logged.
+- **iOS only:** its first statement returns on any other platform, which never touches the module.
+- **Why it matters beyond axios (found in R1).** `withCredentials: false` protects only the axios client. Attachment downloads (ATT-4, expo-file-system: `URLSession(configuration: .default)` and `URLSession.shared`, `node_modules/expo-file-system/ios/FileSystemDownload.swift:51`, `:133`) read the shared store with Apple's default, cookies on. Attachment views (ATT-3, expo-image → SDWebImage, a CocoaPod not in `node_modules`, so not provable here) may too. A server cookie left in the store would ride on them, and after a sign-out into the next person's session, while the server reads `sd_session` before the Bearer header (§2 #5). The shield keeps the store empty at each of those boundaries.
+- **Microsoft is not in this store.** The sign-in sheet is ephemeral (`src/config/auth.config.ts:54` → `expo-web-browser/ios/WebAuthSession.swift:59`, `prefersEphemeralWebBrowserSession`) and keeps its own. The code-for-token exchange (`exchangeCodeAsync`, a `fetch` whose cookies are on by React Native's default, `XMLHttpRequest.js:157`) can leave `login.microsoftonline.com` cookies in the store. PKCE needs none of them, and the shield clears them too.
+- **Tests:** `tests/auth/ios-cookie-shield.test.mjs` (40), with a mocked native module (`tests/support/stubs/react-native.mjs`). **Device check:** `UAT-TEST-PLAN-IOS.md` G20.12.
 
 **Not on production.** The option is off in production builds until the endpoint is on PROD and Ronit says so. Whether it then serves App Review's demo account (compliance A4) is an open decision for iOS-9.
 - **iOS-5h (Ronit, 2026-11-08):** Android opened the email sign-in to PRODUCTION in `6b5e46c` (2026-11-06), after the backend team confirmed the endpoint on PROD (§8 item 7, Android's). **iOS keeps both gates.** Matching Android `6b5e46c` is on the iOS-9 list, **after the backend team confirms no `Set-Cookie` and PROD is approved** (CLAUDE.md I3), together with the App Review demo-login route (compliance A4; `docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer `Set-Cookie` (§8 item 4 is still open on Android too).
 
-**Tests:** `tests/auth/password-sign-in.test.mjs` (Android's, with "one path" in place of "path discovery"), `tests/auth/ios-password-sign-in.test.mjs` (the iOS-only checks: one path, the gates, the Keychain, the password), `tests/login/sign-in-button.test.mjs` (E1). Device checks: `UAT-TEST-PLAN-IOS.md` G20.
+**Tests:** `tests/auth/password-sign-in.test.mjs` (Android's, with "one path" in place of "path discovery"), `tests/auth/ios-password-sign-in.test.mjs` (the iOS-only checks: one path, the gates, the Keychain, the password), `tests/login/sign-in-button.test.mjs` (E1), `tests/auth/ios-cookie-shield.test.mjs` (R1). Device checks: `UAT-TEST-PLAN-IOS.md` G20.

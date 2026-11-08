@@ -11,7 +11,7 @@
 - **Port source:** `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed` (since iOS-5h, 2026-11-08; before it `d8626bc` in iOS-5f and iOS-5g, `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
   - To bring later Android changes across, diff `6b5e46c..origin/dev` (empty on 2026-11-08).
   - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on **UAT builds only**. It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
-    - **Open, and it blocks shipping G9 to testers:** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`.
+    - **Open, not blocking (R1, 2026-11-08):** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`. The R1 cookie shield (`src/api/cookieShield.ts`) mitigates it on the device: iOS's cookie store is emptied right after every sign-in answer (email and Microsoft, success or error, before the session is stored), at every cold start and at every sign-out. So it no longer blocks shipping G9 to testers in build 0.2.0 (2); the answer is still recorded when it comes (06 A32).
     - **Android `6b5e46c` opened G9 to production builds; iOS does not** (Ronit, iOS-5h). Matching it is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the App Review demo-login route (`docs/ios/ANDROID-DELTA.md` §5, item 7).
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
@@ -41,7 +41,7 @@
   - **Email and password sign-in** (G9, iOS-5g) is on **UAT builds only**.
     - A build-time gate and a run-time gate keep it out: a `production` bundle holds none of it.
     - It makes one call, `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`02-AUTH.md` §iOS-B).
-    - It does not reach testers until the backend team confirms that endpoint sends no `Set-Cookie`.
+    - Whether that endpoint sends a `Set-Cookie` is still unconfirmed, but since R1 it no longer holds G9 back from testers: the cookie shield empties iOS's cookie store after each sign-in answer, at launch and at sign-out (`02-AUTH.md` §iOS-B).
   - **The developer-token screen** is `__DEV__` only. It is compiled out of every release build, `preview` and `production`; `verify-release-bundle` proves it is absent.
   - The TestFlight test login (manifest §8) is a proposal and is **not approved**; nothing is built.
 

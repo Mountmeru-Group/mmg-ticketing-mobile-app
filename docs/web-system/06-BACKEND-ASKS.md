@@ -672,13 +672,13 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - Confirm whether PROD, UAT and QA share one Redis/Memurai database. If they do, a session token minted in one environment may be accepted by the others through the Redis fast path.
 - The deployment guide's smoke test `GET /api/health` hits no route. The health route is `GET /health`.
 
-## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06; iOS-5h, 2026-11-08)
+## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08)
 
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`).
 
 - **A32 on iOS.** The Google Play reviewer has an App Store twin: App Review needs a demo account (Guideline 2.1, `docs/ios/APP-STORE-COMPLIANCE.md` A4).
   - iOS builds the email sign-in for **UAT builds only**, in its own phase, **iOS-5g** (built 2026-11-06). **The path is confirmed:** `POST /api/v1/auth/mobile/login`, live on UAT (`01` §iOS-A).
-  - **⏳ Still to answer, and it blocks shipping the email sign-in to testers: does this endpoint send a `Set-Cookie`?** The iOS cookie proof rests on it sending none (`docs/ios/APP-STORE-COMPLIANCE.md`, G9 section). Ronit is asking. Also open: its rate limit, and which accounts may use it.
+  - **⏳ Open, not blocking (R1 shield, 2026-11-08): does this endpoint send a `Set-Cookie`?** Until R1 this blocked shipping the email sign-in to testers, because the iOS cookie proof rested on it sending none. Since R1, iOS empties its cookie store right after every sign-in answer (success or error, before the session is stored), at every cold start and at every sign-out (`02-AUTH.md` §iOS-B). Whatever the answer, no cookie outlives it, so it no longer holds up build 0.2.0 (2). Ronit is still asking; the answer is recorded when it comes (`docs/ios/APP-STORE-COMPLIANCE.md`, G9 section; UAT G20.12). Also open: its rate limit, and which accounts may use it.
   - Android's other paths are **not on iOS**. iOS makes one call to the confirmed path, with Android's body and reader for it (Ronit: 1a, 2a), and never calls `POST /auth/login`.
   - **Open decision (iOS-9):** whether the email sign-in, once the endpoint is on PROD with a reviewer account, becomes App Review's demo login in place of A4's Entra account. Recorded in compliance A4.
   - **iOS-5h (Ronit, 2026-11-08):** A32's "Mobile" block above is Android's since `6b5e46c`: the backend team confirmed the endpoint on PRODUCTION (2026-11-06) and Android removed its gate. **On iOS the gate stays:** UAT builds only, at run time and at build time. Matching Android `6b5e46c` is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the demo-login decision above (`docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer the `Set-Cookie` question, which stays open.

@@ -483,10 +483,11 @@ describe('expiry reached while the app is open: the return to the foreground', (
 
   test('RootNavigator: restoreSession() on start, and on each return to the foreground the 15 days before the 8 hours', () => {
     const nav = read('src/navigation/RootNavigator.tsx');
-    // iOS: the reinstall check (installMarker.ts) runs first, then restoreSession().
+    // iOS: R1's cookie shield first (tests/auth/ios-cookie-shield.test.mjs), then the reinstall check (installMarker.ts),
+    // then restoreSession().
     assert.match(
       nav,
-      /useEffect\(\(\) => \{\s*\/\/[^\n]*\n\s*void \(async \(\) => \{\s*await wipeSessionLeftByPreviousInstall\(\);\s*await useAuthStore\.getState\(\)\.restoreSession\(\);\s*\}\)\(\);\s*\}, \[\]\);/,
+      /useEffect\(\(\) => \{\s*\/\/[^\n]*\n\s*void \(async \(\) => \{\s*\/\/[^\n]*\n\s*await clearCookieStore\('launch'\);\s*await wipeSessionLeftByPreviousInstall\(\);\s*await useAuthStore\.getState\(\)\.restoreSession\(\);\s*\}\)\(\);\s*\}, \[\]\);/,
     );
     assert.match(
       nav,
