@@ -1,5 +1,5 @@
-// Login's email and password sign-in (M1, G9, 2026-11-05; docs/brand/UI-STANDARDS.md §15.2, 02-AUTH.md §8). UAT builds only
-// (EMAIL_SIGN_IN_ENABLED, src/config/env.ts).
+// Login's email and password sign-in (M1, G9, 2026-11-05; docs/brand/UI-STANDARDS.md §15.2, 02-AUTH.md §8). On every
+// build, UAT and PROD (Android 6b5e46c; iOS-9b).
 // - Under the Microsoft pill, which stays the primary action: an OR divider (hairline, "OR", hairline), then a quiet
 //   "Sign in with email instead" with a chevron: text only, no border, no fill.
 // - Tapped, the fields open IN PLACE on the same screen (no route): email, password with a show/hide toggle, and a
@@ -13,7 +13,7 @@
 //   `onSubmitLayout` let it measure the button whenever it moves.
 //
 // iOS (iOS-5g; ANDROID-DELTA.md §10.7): the attempt is ./passwordSignInAttempt.ts, on the ONE confirmed path, POST
-// /auth/mobile/login. Only a UAT build bundles this file (LoginScreen.tsx loads it behind a build-time gate).
+// /auth/mobile/login. Every build bundles this file, UAT and PROD (iOS-9b removed the build-time gate in LoginScreen.tsx).
 // - Keyboard: the email keyboard; `textContentType` "username" on the email and "password" on the password, so iOS
 //   offers the saved password (AutoFill); secure entry; Return moves to the password, then signs in.
 // - VoiceOver: every control has a label; a field error and the failure box are announced when they appear (Android's

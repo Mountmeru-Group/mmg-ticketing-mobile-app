@@ -2,42 +2,42 @@
 
 **Written in Phase iOS-5, 2026-10-29.** Android's guide stays `docs/RELEASE.md` at the port source. Manifest §4.7 planned to rewrite that file in iOS-7; the iOS-5 brief asked for this file in `docs/ios/` instead. The build guard's refusal message still says "docs/RELEASE.md" (`scripts/eas-build-guard.js:63`); it means this file. That message was not changed in iOS-5.
 
-**No `eas` command has been run on this branch.** The commands in §4 and §6 are for iOS-7 and later, when their phase brief allows them (CLAUDE.md I7).
+**Ronit runs every `eas` command** (build, submit, update, channel). A phase never runs one (CLAUDE.md I7). The commands in §4 and §6 are for Ronit to run.
 
 | | |
 |---|---|
 | Bundle ID | `com.mountmeru.servicedesk` (iPhone only, `supportsTablet: false`) |
-| Version | `app.json` `expo.version` and `expo.ios.buildNumber`. `eas.json` has `appVersionSource: "local"`: bump both by hand for each upload |
-| Profiles | `preview` (TestFlight, UAT) · `production` (placeholder, refused by the build guard) |
-| EAS project | Not created yet. `setu-ios`, in iOS-7. Its `projectId` goes in `app.json` `extra.eas`; the release check reads it from there |
-| Apple records | Apple Developer team, App Store Connect app and TestFlight internal group: iOS-7 |
+| Version | `app.json` `expo.version`: **1.0.0** since iOS-9b (2026-11-11), for both profiles. The build number comes from EAS (`appVersionSource: "remote"`, `autoIncrement` on both profiles); `app.json`'s `ios.buildNumber` (`"1"`) only seeded EAS's counter |
+| Profiles | `preview` (TestFlight, UAT) · `production` (App Store, PROD, since iOS-9b) |
+| EAS project | `setu-ios`, `projectId` `f7e5b2ae-0785-414d-b9c9-9e3e59b21be3` (iOS-7), in `app.json` `extra.eas`; the release check reads it from there |
+| Apple records | App Store Connect app `ascAppId` 6827931735, team `ZNPR2MFW76`, in `eas.json` `submit` for both profiles. One app record: TestFlight (UAT) and App Store (PROD) builds share it and its version train |
 | `eas-cli` | Not a dependency. Always `npx eas-cli@24.8.0 …`; `eas.json` requires `>= 24.8.0` |
-| API | UAT only: `https://uat-servicedesk.mountmerugroup.com/api/v1`. PROD stays empty until Ronit signs it off (CLAUDE.md I3) |
+| API | `preview` and development builds: UAT only, `https://uat-servicedesk.mountmerugroup.com/api/v1`. `production` only: PROD, `https://servicedesk.mountmerugroup.com/api/v1`, **approved by Ronit's manager on 2026-11-11 for the `production` profile only** (CLAUDE.md I3). Each bundle holds one of the two URLs, never both (`src/config/env.ts`, iOS-9b) |
 
 ## 1. Build profiles (`eas.json`) and the build guard
 
 | Profile | Distribution | Channel | `EXPO_PUBLIC_APP_ENV` | Use |
 |---|---|---|---|---|
 | `preview` | `store` (TestFlight requires store signing) | `ios-preview` | `UAT` | Every TestFlight build |
-| `production` | `store` | `production` | `PROD` | App Review (iOS-9). **Not runnable today** |
+| `production` | `store` | `production` | `PROD` | The App Store build (iOS-9b): App Review, then release. `ios.autoIncrement` too |
 
-`scripts/eas-build-guard.js` runs on the EAS server first (`eas-build-pre-install`), before `npm install`. It refuses a build in three cases:
+`scripts/eas-build-guard.js` runs on the EAS server first (`eas-build-pre-install`), before `npm install`. It refuses a build in four cases:
 1. a profile other than `production` asks for `PROD` (development and preview builds are UAT only);
-2. `production` while the PROD URL in `src/config/env.ts` is empty;
-3. `production` while a value in `src/config/legal.ts` is empty (§7).
+2. `production` without `PROD` (`EXPO_PUBLIC_APP_ENV` unset or anything else);
+3. `production` while the PROD URL in `src/config/env.ts` is empty or unreadable;
+4. `production` while `PRIVACY_POLICY_URL` or `SUPPORT_URL` in `src/config/legal.ts` is not an `https://` link (§7). iOS-9b dropped the old deletion category and working days (§7).
 
-**The `legal.ts` rule blocks only `production`, never the TestFlight `preview` build.** Checked on 2026-10-29 by calling the guard's own `verdict()` with today's files:
+**The `legal.ts` rule blocks only `production`, never the TestFlight `preview` build.** Checked on 2026-11-11 (iOS-9b), with the real files:
 
 | Build | Result |
 |---|---|
-| `preview`, UAT, `legal.ts` empty (today) | **OK** |
-| `preview`, UAT, `legal.ts` unreadable | **OK** |
-| `production`, PROD, `legal.ts` empty, no PROD URL (today) | Refused: no PROD URL, and the three legal values |
-| `production`, PROD URL set, `legal.ts` empty | Refused: the three legal values |
-| `production`, PROD URL set, `legal.ts` filled | **OK** |
-| `preview` asking for PROD | Refused (CLAUDE.md rule 4) |
+| `production`, PROD | **OK** (PROD URL, privacy and support links set) |
+| `preview`, UAT | **OK** |
+| `production`, UAT or unset | Refused: production must target PROD |
+| `preview`, `development` or any other profile asking for PROD | Refused (CLAUDE.md rule 4) |
+| `production`, PROD URL emptied, or a legal link empty or `http://` | Refused (pinned by `tests/screens/hig-polish.test.mjs`) |
 
-To see the verdict locally: `EAS_BUILD_PROFILE=production EXPO_PUBLIC_APP_ENV=PROD node scripts/eas-build-guard.js`. It is pinned by `tests/screens/hig-polish.test.mjs`.
+To see the verdict locally: `EAS_BUILD_PROFILE=production EXPO_PUBLIC_APP_ENV=PROD node scripts/eas-build-guard.js`. It is pinned by `tests/screens/hig-polish.test.mjs` (the rules) and `tests/release/production-readiness.test.mjs` (spawned on this repo).
 
 ## 2. Pre-build checks: before every build or update, in order
 
@@ -50,8 +50,8 @@ Stop at the first failure.
 | 3 | `npm test` | Every test passes (962 on 2026-10-29). The count never goes down without a reason in the phase notes |
 | 4 | `npx expo-doctor` | Every check passes except `react-native-render-html` "Unmaintained" (known since iOS-1b) |
 | 5 | `npm ci --dry-run` | "up to date": the lockfile installs as it is |
-| 6 | `npm run verify:release-bundle` | **PASS** for `preview` (§3). Before an iOS-9 `production` build, also `npm run verify:release-bundle -- --profile production` |
-| 7 | `app.json` | `version` and `ios.buildNumber` bumped since the last upload |
+| 6 | `npm run verify:release-bundle` **and** `npm run verify:release-bundle -- --profile production` | **PASS** for both (§3), whichever profile is being built: each proves its bundle holds its own API URL and never the other's |
+| 7 | `app.json` `version` | The version this upload should carry (1.0.0 since iOS-9b). The build number is EAS's, never typed by hand |
 
 ## 3. The release-bundle check (`scripts/verify-release-bundle.js`)
 
@@ -68,8 +68,9 @@ Stop at the first failure.
 - contains a **client-secret value**: an Entra secret (`…NQ~…`), a literal assigned to the client-secret option, or `client_secret=<value>` inside a string;
 - names the client-secret option outside `expo-auth-session`'s own modules;
 - lacks the iOS redirect `msauth.com.mountmeru.servicedesk://auth`, or contains the Android form `msauth://`;
-- **(preview)** lacks the UAT API URL from `src/config/env.ts`;
-- names any `mountmerugroup.com` host that `env.ts` doesn't allow;
+- **(iOS-9b) lacks its own profile's API URL** (`preview`: UAT; `production`: PROD, which must be set) **or holds the other profile's**, in the JS or in Hermes: one API URL per bundle;
+- names any `mountmerugroup.com` host but its own API host. Set aside first, each only as its exact, whole value: the email form's example address (iOS-5h) and the two `legal.ts` links (iOS-9b);
+- **(iOS-9b) lacks any email sign-in module or string** (G9: 4 modules, 7 strings), in `preview` **and** `production`; contains the web login path `/auth/login` (iOS never calls it);
 - contains a UUID-v4 literal that is not a known public ID, or a literal "Bearer <uuid>";
 - reaches an Android-only API from app code: `ToastAndroid`, `BackHandler`, `PermissionsAndroid`, `DateTimePickerAndroid`, `DrawerLayoutAndroid`, `TouchableNativeFeedback` or `android_ripple`. App code is read from the bundle's source map, with comments removed; library code doesn't count;
 - contains `@react-navigation/drawer`;
@@ -100,12 +101,24 @@ It reports, but does not fail on, the Android-only props that iOS ignores (`stat
    - EAS creates and keeps the Apple distribution certificate and the provisioning profile. Nothing goes in the repo: no `.p12`, no `.mobileprovision`, no `.p8` (CLAUDE.md rule 8).
    - The build guard runs first, on the server (§1).
    - Check the build log: Xcode 26 or later with the iOS 26 SDK (compliance J1); the deployment target (J2).
-3. Submit the latest build to App Store Connect, for TestFlight:
+3. Submit **that** build, never "the latest" (iOS-9b): either build and submit in one go, which submits the build it just made with the profile's own `submit` entry,
    ```
-   npx eas-cli@24.8.0 submit --platform ios --latest
+   npx eas-cli@24.8.0 build --platform ios --profile preview --auto-submit
    ```
+   or submit a finished build by its ID: `npx eas-cli@24.8.0 submit --platform ios --profile preview --id <build id>`.
+   - **Never `submit --latest`** from iOS-9b on: it takes the newest iOS build of **either** profile, so it can send a PROD build to TestFlight testers or a UAT build to App Review. Both profiles upload to the same App Store Connect app (6827931735) and the same version train (1.0.0).
 4. In App Store Connect › TestFlight, give the build to the **internal** group only (compliance K2). An external group would trigger Beta App Review and widen access.
 5. Testers follow `docs/ios/UAT-TEST-PLAN-IOS.md`. TestFlight builds expire after 90 days.
+
+**The App Store build (`production`, from iOS-9b).** After §2 in full (both release checks PASS) and the external items in `APP-STORE-COMPLIANCE.md`:
+```
+npx eas-cli@24.8.0 build --platform ios --profile production --auto-submit
+```
+- The guard (§1) refuses it unless it is PROD with the PROD URL and both `legal.ts` links.
+- `--auto-submit` uploads that build with `submit.production` (same `ascAppId` and `appleTeamId` as preview). Or submit it later by ID: `npx eas-cli@24.8.0 submit --platform ios --profile production --id <build id>`.
+- The upload also appears in TestFlight, as every upload does. **Before the first production upload, turn off automatic distribution** to the UAT internal group (App Store Connect › TestFlight › the group), or testers get a PROD build (compliance K2). Who may install a production build before release, to check it on PROD (compliance A1), is Ronit's decision.
+- In App Store Connect, choose this build (version 1.0.0, its build number) for the 1.0.0 version, and check it is the `production` build: a UAT build of 1.0.0 has a different build number.
+- Check the build log: Xcode 26 or later with the iOS 26 SDK (J1); record the deployment target (J2). Check the IPA's `Info.plist`: `NSAllowsArbitraryLoads` false, no exception domains (compliance I-row ATS check).
 
 **First build only (iOS-7):**
 - `npx eas-cli@24.8.0 init` creates `setu-ios` and writes its `projectId` into `app.json`. Re-run `npm run verify:release-bundle`: the check reads the new ID from `app.json` and allows it.
@@ -115,7 +128,7 @@ It reports, but does not fail on, the Android-only props that iOS ignores (`stat
 ## 5. Getting a build to testers
 
 - Internal testers are added in App Store Connect › Users and Access, then to the TestFlight internal group. They install with the TestFlight app (UAT plan A1–A2).
-- **Only UAT `preview` builds go to TestFlight.** Never a build pointed at production (CLAUDE.md rule 4).
+- **Only UAT `preview` builds go to the testers' TestFlight groups.** Never a build pointed at production (CLAUDE.md rule 4). A `production` build appears in TestFlight too (§4): it is never added to a testers' group, and automatic distribution stays off.
 
 ## 6. EAS Update rules (from iOS-7)
 
@@ -127,7 +140,7 @@ It reports, but does not fail on, the Android-only props that iOS ignores (`stat
 **The command, for TestFlight builds** (PowerShell; the first line every time, rule 4):
 ```
 $env:EXPO_PUBLIC_APP_ENV="UAT"
-npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <what and why>"
+npx eas-cli@24.8.0 update --channel ios-preview --platform ios --clear-cache --message "fix: <what and why>"
 ```
 
 **Rules:**
@@ -138,9 +151,14 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
 3. **Run §2 in full first,** with the release check on `preview`.
 4. **`eas update` does not run the build guard** and does not read `eas.json`'s `env`. The bundle takes `EXPO_PUBLIC_APP_ENV` from your shell.
    - **Set it before every update: `$env:EXPO_PUBLIC_APP_ENV="UAT"`** in the same PowerShell window (Ronit, iOS-5f, 2026-11-06). `env.ts` also treats an unset value as UAT, but a window left with `PROD` from another task would bake PROD into a TestFlight update.
-   - It also decides `EMAIL_SIGN_IN_ENABLED` (UAT only, iOS-5f), so an update built without it set could drop or show the email sign-in by accident.
+   - Since iOS-9b it also decides **which single API URL the update's bundle holds** (`src/config/env.ts`). The email sign-in no longer depends on it: it is in every build (iOS-9b).
+   - **Always `--clear-cache` (found in iOS-9b, 2026-11-11).** Metro's transform cache on this laptop is **not** keyed on `EXPO_PUBLIC_APP_ENV`. Seen in iOS-9b: `npx expo export` with `UAT`, run right after one with `PROD`, produced a bundle with **the PROD URL and not the UAT one**; with `--clear` it was right. §2 step 6 runs the release check for `production` last, which leaves PROD in the cache, so an update published next without `--clear-cache` could put the **PROD URL into a TestFlight update** (or, for a production update, the UAT URL). Keying the cache on the environment in `metro.config.js` (`cacheVersion`) was tried and did **not** prevent it. Confirm the flag's name once with `npx eas-cli@24.8.0 update --help`. The same applies to any local `npx expo export`: use `--clear`.
+   - Not affected: `verify-release-bundle` (it bundles with `--reset-cache`) and EAS builds (a clean server; never add the Metro cache to `eas.json` `cache`).
 5. **Log every update** in `docs/ios/UPDATES-LOG.md` (created in iOS-5f; entry 1 is the iOS-8a + iOS-5e update): date, channel, runtime version, commit, reason.
-6. **Never publish to `production` before iOS-9.** From then on, only through the script that manifest §8 L5 describes: it sets `PROD`, checks the flags and runs `verify-release-bundle` first.
+6. **No update to `production` in iOS-9b.** The first one waits for an agreed procedure: the script manifest §8 L5 describes (not built) or a written checklist. Whichever it is, a production update:
+   - is built with **`$env:EXPO_PUBLIC_APP_ENV="PROD"`** in the same window, or the update carries the UAT URL to App Store users;
+   - uses **`--channel production --platform ios --clear-cache`** (rule 4), and `npm run verify:release-bundle -- --profile production` PASSES first;
+   - follows rule 1 (fixes only), and is logged in `UPDATES-LOG.md`.
 7. **The phone hotspot** (§4) applies here too.
 8. **The launch screen and the start-up intro ship together, in a build, never by update** (iOS-5c, 2026-10-30; `docs/brand/UI-STANDARDS.md` §iOS-A.12, `docs/PERFORMANCE.md` §12):
    - The launch screen is native: expo-splash-screen builds it from `assets/splash-icon.png` at build time. Since iOS-5c that image is the yellow drop alone, the first frame of the intro (`src/navigation/SplashIntro.tsx`, mounted in `App.tsx`). The first TestFlight build is the first to have it.
@@ -165,19 +183,38 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --message "fix: <
       - **Build 1 is retired once 0.2.0 is on TestFlight:** expire it in App Store Connect, so every tester moves to build 2. After that, nothing more is published for runtime 0.1.0.
       - The build number still comes from EAS (`appVersionSource: remote`, `autoIncrement`); `app.json`'s `ios.buildNumber` only seeded it.
     - Superseded: the first draft of this rule (iOS-5f STEP 1) kept 0.1.0 for build 2, so builds 1 and 2 would have shared runtime 0.1.0. Ronit chose the version bump instead.
+11. **Version 1.0.0, runtime 1.0.0, two channels** (iOS-9b, 2026-11-11):
+    - `app.json` `version` is **1.0.0** for both profiles, so every build from iOS-9b on, TestFlight and App Store alike, has runtime **1.0.0**. The runtime no longer separates them: **the channel does.**
+    - The channel is written into each binary by EAS from its profile (`preview` → `ios-preview`, `production` → `production`) and sent with every update check. The app cannot change it at run time: nothing in `src/` imports `expo-updates`' JavaScript API (`tests/release/production-readiness.test.mjs`).
+    - **Never link the channels:** no `eas channel:edit production --branch ios-preview`, no `eas channel:rollout` between them, and no `eas update --branch` aimed at the other profile's branch. Any of these would send a UAT update (UAT URL) to App Store users, or the reverse.
+    - **Build 0.2.0 (2)** keeps runtime 0.2.0. A fix for it is published **from a commit before iOS-9b** (`bafbb8c` or earlier), where `app.json` says 0.2.0; published from iOS-9b on, it would be runtime 1.0.0 and never reach build 2.
 
-## 7. Before a `production` build (iOS-9)
+## 7. The `production` values (iOS-9b, 2026-11-11)
 
-The build guard refuses `production` until all of these are set (§1):
+The build guard refuses `production` unless all of these are set (§1). All are set since iOS-9b:
 
-| File | Value | Rule | Owner |
+| File | Value | Set to | Rule | Owner |
+|---|---|---|---|---|
+| `src/config/env.ts` | `PROD` URL | `https://servicedesk.mountmerugroup.com/api/v1` | Approved by Ronit's manager, 2026-11-11, for the `production` profile only (CLAUDE.md I3). Picked at build time: a production bundle holds it and never the UAT URL | Ronit |
+| `src/config/legal.ts` | `PRIVACY_POLICY_URL` | `https://www.mountmerugroup.com/privacy-policy` | An `https://` link to MMG's published privacy policy, in Profile and in App Store Connect (5.1.1(i); compliance H1) | Ronit, legal |
+| `src/config/legal.ts` | `SUPPORT_URL` | `https://www.mountmerugroup.com` | App Store Connect's Support URL (1.5; H7). **Not shown in the app** | Ronit |
+
+**Removed in iOS-9b:** `ACCOUNT_DELETION_CATEGORY` and `ACCOUNT_DELETION_WORKING_DAYS`. MMG has no deletion category and IT has agreed no deletion time, so account deletion is now a **pre-filled Create Ticket**: Profile › Request Account Deletion → a confirmation → Create Ticket opens with the subject "Account deletion request" and "Please delete my Setu / Service Desk account (<email>)". The person picks the category and creates it through the normal flow. No time is promised anywhere (compliance H6; `src/utils/accountDeletion.ts`).
+
+`legal.ts` holds plain literals only, because the guard and the release check read it as text. While a link is empty, its Profile row is hidden in every build (UAT plan I1). The rest of the production checklist is `docs/ios/APP-STORE-COMPLIANCE.md`.
+
+**`production` and `preview` differ only in these** (iOS-9b; Android's RELEASE.md §5c has its own list):
+
+| | `preview` (TestFlight) | `production` (App Store) | Why |
 |---|---|---|---|
-| `src/config/env.ts` | `PROD` URL | Ronit's written sign-off (CLAUDE.md I3); AUTH-P2 deployed on PROD (compliance A3, K3) | Ronit, backend |
-| `src/config/legal.ts` | `PRIVACY_POLICY_URL` | An `https://` link to MMG's published privacy policy (App Review 5.1.1(i); compliance H1) | Ronit, legal |
-| `src/config/legal.ts` | `ACCOUNT_DELETION_CATEGORY` | The exact name of an active Service Desk category, looked up through LKP-1 when the request is sent (5.1.1(v); H6) | Ronit, IT |
-| `src/config/legal.ts` | `ACCOUNT_DELETION_WORKING_DAYS` | A whole number > 0: IT's committed time to delete an account (H6) | IT |
-
-`legal.ts` holds plain literals only, because the guard reads it as text. While a value is empty, its Profile row is hidden in every build (UAT plan I1). The rest of the production checklist is `docs/ios/APP-STORE-COMPLIANCE.md`.
+| `EXPO_PUBLIC_APP_ENV` | `UAT` | `PROD` | `eas.json` |
+| API URL in the bundle | UAT only | PROD only | `env.ts` picks it at build time; the release check proves it both ways |
+| Login's environment chip | Shown | Not rendered | `SHOW_ENVIRONMENT_CHIP` (04 M1) |
+| Profile's Environment row | `UAT · uat-servicedesk.mountmerugroup.com` | `PROD · servicedesk.mountmerugroup.com` | `ENVIRONMENT_LABEL`, from the build's one URL |
+| Ticket links the app accepts (deep-link origin) | `https://uat-servicedesk.mountmerugroup.com/…`; a PROD link is "another environment" | `https://servicedesk.mountmerugroup.com/…`; a UAT link is "another environment" | `APP_ORIGIN` (`src/utils/deep-links.ts`), from the build's one URL |
+| Update channel | `ios-preview` | `production` | §6 rule 11 |
+| Where it goes | TestFlight internal group | App Review, then the App Store | §4, §5 |
+| Same in both | Version 1.0.0 and runtime 1.0.0; Microsoft sign-in; the email sign-in (G9, since iOS-9b); the privacy link and the deletion request; no developer-token screen (`__DEV__` only) | | |
 
 ## 8. Results on 2026-10-29 (Phase iOS-5)
 
@@ -219,3 +256,48 @@ The build guard refuses `production` until all of these are set (§1):
 - `ToastAndroid` reached from app code.
 
 The copy was then restored and verified byte for byte.
+
+## 9. Results on 2026-11-11 (Phase iOS-9b)
+
+**The §2 checks**, on `ios-dev` (`bafbb8c` plus the iOS-9b changes, not yet committed):
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `git status` | The iOS-9b changes, waiting for Ronit's OK. `package.json` and `package-lock.json` unchanged |
+| 2 | `npx tsc --noEmit` | 0 errors |
+| 3 | `npm test` | **1793 / 1793** (257 suites; 1775 before iOS-9b) |
+| 4 | `npx expo-doctor` | 20/21: `react-native-render-html` "Unmaintained" (known). A first run also failed the config-schema check because it could not reach the Expo API (a network error); it passed on the next run |
+| 5 | `npm ci --dry-run` | up to date |
+| 6 | `npm run verify:release-bundle` | **PASS** (`preview`) and **PASS** (`--profile production`) |
+| — | `npx expo export --platform ios` | `EXPO_PUBLIC_APP_ENV=PROD`: the PROD URL once, the UAT URL 0. `EXPO_PUBLIC_APP_ENV=UAT` **with `--clear`**: the UAT URL once, the PROD URL 0. Both: 2,316 modules, the email sign-in present, 0 developer-token strings. Written to a temp folder outside the repo. **Without `--clear`, the UAT export run after the PROD one held the PROD URL** (§6 rule 4) |
+
+**The release check, both profiles** (2,323 modules, 213 of them app code):
+
+| Check | `preview` | `production` |
+|---|---|---|
+| API URL | UAT present; PROD **0** in JS and in Hermes | PROD present; UAT **0** in JS and in Hermes |
+| Hosts | `uat-servicedesk.mountmerugroup.com` only | `servicedesk.mountmerugroup.com` only |
+| Legal links set aside (exact URLs) | privacy 1×, support 1× | privacy 1×, support 1× |
+| Email sign-in (G9) | 4/4 modules; 7/7 strings in JS and Hermes | 4/4 modules; 7/7 strings in JS and Hermes |
+| `/auth/login` | 0 | 0 |
+| Developer-token strings (of 12) | 0 (the control finds 12) | 0 (the control finds 12) |
+| UUID-v4 literals | 5: 4 public IDs, 1 build debug ID, 0 unexplained | the same |
+
+**Mutation checks: each change must make something fail.** Every file was restored and checked byte for byte (SHA-256) after each one.
+- **Bundle level: 10 of 10 caught**, each by `verify-release-bundle` on a real bundle:
+  - both URLs in one record, as Android has them (preview and production);
+  - the build-time condition flipped (preview and production);
+  - the UAT URL planted in app code (production); the PROD URL planted in app code (preview);
+  - the PROD URL emptied (production);
+  - another path on the legal links' host (production);
+  - the email sign-in kept out of production with the old `require` gate (production);
+  - a developer-token string planted in app code (production).
+- **Unit level: 23 of 23 caught** by the tests, once one weak check was tightened (the release check's "other URL" rule, first missed, then caught):
+  - `eas.json`: the preview channel or environment changed, production pointed at `ios-preview`, production's `autoIncrement` or `submit.production` removed;
+  - `app.json`: the version back to 0.2.0, arbitrary loads on;
+  - `legal.ts`: the privacy URL emptied, the support URL made `http`;
+  - `env.ts`: the development-build refusal removed, both URLs in one record, the PROD URL emptied, `EMAIL_SIGN_IN_ENABLED` put back;
+  - Login: the form re-gated, or its import removed;
+  - deletion: Create Ticket opened before the confirmation, the row gated on a role, a category in the pre-fill, a time in the confirmation, the pre-fill ignored by Create Ticket;
+  - the release check: the other URL no longer forbidden, G9 exempt in production; the guard: the support URL no longer required.
+

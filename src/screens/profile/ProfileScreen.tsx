@@ -14,9 +14,10 @@
 // navigation bar. The form scrolls the focused field above the keyboard and the tab bar (automaticallyAdjustKeyboardInsets)
 // and a drag down puts the keyboard away. The country list keeps its scrollable sheet (a server list).
 // iOS-4:
-// - the Account card (docs/ios/APP-STORE-COMPLIANCE.md H1, H6): Privacy Policy opens MMG's policy in Safari, and Request
-//   Account Deletion files a ticket for IT through the existing TKT-2 after a confirmation (utils/accountDeletion.ts).
-//   Each row shows only once its release value is set in config/legal.ts; a production build refuses empty ones.
+// - the Account card (docs/ios/APP-STORE-COMPLIANCE.md H1, H6): Privacy Policy opens MMG's policy in Safari, once its
+//   URL is set in config/legal.ts (a production build refuses an empty one). Request Account Deletion (iOS-9b): after a
+//   confirmation it opens the existing Create Ticket sheet, filled in; the person picks the category and creates it
+//   there (utils/accountDeletion.ts). Profile sends nothing itself.
 // - the fields: Return moves Name → Phone → Department → Timezone; the phone pad, which has no Return key, gets the
 //   keyboard's Done bar; Name and Phone offer AutoFill (textContentType). The email wraps instead of being cut.
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -29,27 +30,24 @@ import {
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
 import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
-import { ACCOUNT_DELETION_CATEGORY, ACCOUNT_DELETION_WORKING_DAYS, PRIVACY_POLICY_URL } from '@/config/legal';
+import { PRIVACY_POLICY_URL } from '@/config/legal';
 import {
   Card, ErrorState, FieldLabel, InlineError, KeyboardDoneBar, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
-  countryName, profileChanges, useCategories, useCountryOptions, useCreateTicket, useProfile, useSignOut, useSingleFlight,
-  useUpdateProfile, validateProfile, type ProfileForm,
+  countryName, profileChanges, useCountryOptions, useProfile, useSignOut, useSingleFlight, useUpdateProfile, validateProfile,
+  type ProfileForm,
 } from '@/hooks';
-import { requireOnline } from '@/hooks/writeGuards';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors, maxTextScale, palette } from '@/theme';
 import type { MoreStackScreenProps, UserProfile } from '@/types';
 import {
-  DELETION_CONFIRM_LABEL, DELETION_CONFIRM_TITLE, accountDeletionTicket, accountRows, deletionConfirmMessage,
-  findDeletionCategory,
+  DELETION_CONFIRM_LABEL, DELETION_CONFIRM_MESSAGE, DELETION_CONFIRM_TITLE, accountDeletionPrefill, accountRows,
 } from '@/utils/accountDeletion';
-import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
+import { confirmAction, notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
-import { hapticOutcome } from '@/utils/haptics';
 import { ROLE_LABELS } from '@/utils/roles';
 import { isPlaceholderUser } from '@/utils/session';
 import { countrySelectorMode } from '@/utils/ticket-filters';
@@ -58,12 +56,8 @@ const ALL_COUNTRIES = '__ALL__';
 const EMPTY_FORM: ProfileForm = { displayName: '', phone: '', department: '', timezone: '' };
 /** The profile form's keyboard Done bar (iOS-4, components/KeyboardDoneBar.tsx). */
 const PROFILE_KEYBOARD = 'profile-keyboard';
-/** Which Account rows this build shows (config/legal.ts, set per release). */
-const ACCOUNT_ROWS = accountRows({
-  privacyPolicyUrl: PRIVACY_POLICY_URL,
-  deletionCategory: ACCOUNT_DELETION_CATEGORY,
-  deletionWorkingDays: ACCOUNT_DELETION_WORKING_DAYS,
-});
+/** Whether this build shows the Privacy Policy row (config/legal.ts, set per release). */
+const ACCOUNT_ROWS = accountRows({ privacyPolicyUrl: PRIVACY_POLICY_URL });
 
 function formFrom(p: UserProfile): ProfileForm {
   return { displayName: p.displayName ?? '', phone: p.phone ?? '', department: p.department ?? '', timezone: p.timezone ?? '' };
@@ -144,11 +138,9 @@ export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
       }
     });
 
-  // ── Account (iOS-4): the privacy policy, and a deletion request for IT through TKT-2 ──
-  const createTicket = useCreateTicket();
-  // LKP-1 only when a request is being sent (refetch runs even while the query is disabled), never on opening Profile.
-  const categories = useCategories({ enabled: false });
-  const canRequestDeletion = ACCOUNT_ROWS.requestDeletion && !!user && !placeholder;
+  // ── Account: the privacy policy (iOS-4), and the deletion request through Create Ticket (iOS-9b) ──
+  // Every signed-in role (each can create tickets); never a placeholder session, which has no real account to delete.
+  const canRequestDeletion = !!user && !placeholder;
   const openPrivacyPolicy = () => {
     Linking.openURL(PRIVACY_POLICY_URL).catch(() => Alert.alert("Couldn't open the privacy policy", 'Try again.'));
   };
@@ -157,32 +149,12 @@ export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
       if (!user) return;
       const ok = await confirmAction({
         title: DELETION_CONFIRM_TITLE,
-        message: deletionConfirmMessage(ACCOUNT_DELETION_WORKING_DAYS),
+        message: DELETION_CONFIRM_MESSAGE,
         confirmLabel: DELETION_CONFIRM_LABEL,
       });
       if (!ok) return;
-      try {
-        // Offline, the lookup below would wait for the network: say so now, as every write does.
-        requireOnline();
-        const lookup = categories.data ? { data: categories.data, error: null } : await categories.refetch();
-        if (!lookup.data) throw lookup.error ?? new Error('No categories');
-        const category = findDeletionCategory(lookup.data, ACCOUNT_DELETION_CATEGORY);
-        if (!category) {
-          hapticOutcome('error');
-          Alert.alert("Couldn't send the request", `The Service Desk has no "${ACCOUNT_DELETION_CATEGORY}" category. Nothing was sent. Contact IT.`);
-          return;
-        }
-        const { ticket } = await createTicket.mutateAsync(
-          accountDeletionTicket(user, { appVersion: APP_VERSION, requestedAt: new Date(), categoryId: category.id }),
-        );
-        hapticOutcome('success');
-        Alert.alert('Request Sent', `Ticket #${ticket.ticketNumber} was created. IT will reply on it; updates appear in Alerts.`, [
-          { text: 'View Ticket', onPress: () => navigation.navigate('TicketDetail', { ticketId: ticket.id }) },
-          { text: 'OK', style: 'cancel' },
-        ]);
-      } catch (e) {
-        reportWriteError("Couldn't send the request", e);
-      }
+      // Only opens the form, filled in: the person picks the category and creates it there (TKT-2's own flow).
+      navigation.navigate('CreateTicket', { prefill: accountDeletionPrefill(user) });
     });
 
   const set = (key: keyof ProfileForm) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
@@ -357,9 +329,8 @@ export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
               <AccountRow
                 icon="person-remove-outline"
                 label="Request Account Deletion"
-                hint="Asks you to confirm, then sends IT a request to delete your Service Desk account"
+                hint="Asks you to confirm, then opens a new request for IT to delete your Service Desk account"
                 onPress={requestDeletion}
-                busy={createTicket.isPending}
                 destructive
                 divider={ACCOUNT_ROWS.privacyPolicy}
               />

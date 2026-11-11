@@ -1,7 +1,7 @@
 // M1 Login, email and password, without the UI (G9; 02-AUTH.md §8): one sign-in attempt, the form's own checks, and what
 // each failure says. Android keeps this in signInAttempt.ts (d8626bc); on iOS (iOS-5g) it is its own module, which only
-// EmailSignInForm.tsx imports, so a production bundle (no email sign-in, LoginScreen.tsx) carries none of it. The code
-// and every message are Android's. Tests run this exact code under Node: tests/auth/password-sign-in.test.mjs.
+// EmailSignInForm.tsx imports (it kept the email sign-in out of production bundles until iOS-9b opened it to PROD). The
+// code and every message are Android's. Tests run this exact code under Node: tests/auth/password-sign-in.test.mjs.
 import {
   PasswordSignInError,
   signInWithPassword,

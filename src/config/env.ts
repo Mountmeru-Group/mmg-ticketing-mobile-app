@@ -6,12 +6,24 @@ import appJson from '../../app.json';
 
 export type AppEnvironment = 'UAT' | 'PROD';
 
-const API_BASE_URLS: Record<AppEnvironment, string> = {
-  UAT: 'https://uat-servicedesk.mountmerugroup.com/api/v1',
-  // ⛔ PROD — INTENTIONALLY EMPTY PLACEHOLDER. Do NOT add the production URL here.
-  // It is filled in only after Ronit signs off and the BLOCKING backend asks ship (00-OVERVIEW §3, 06).
-  PROD: '',
-};
+/**
+ * iOS (iOS-9b): ONE base URL per bundle. Expo writes EXPO_PUBLIC_APP_ENV into the bundle when it builds it, so a
+ * production build reads `'PROD' === 'PROD' ? { PROD } : { UAT }` and the minifier drops the other branch with its URL
+ * (the folding that kept the email sign-in out of production bundles in iOS-5g): a production bundle holds the PROD URL
+ * and never the UAT one, a preview bundle the reverse (scripts/verify-release-bundle.js proves both, on JS and Hermes).
+ * Android keeps both URLs in every bundle (docs/ios/ANDROID-DELTA.md §5).
+ * - PROD: approved by Ronit's manager, 2026-11-11 (iOS-9b), for release builds of the `production` EAS profile ONLY:
+ *   __DEV__ builds refuse it below, and scripts/eas-build-guard.js refuses PROD on every other profile.
+ * - Keep each URL on its own `UAT: '…',` / `PROD: '…',` line: the build guard and the release check read them as text.
+ */
+const API_BASE_URLS: Partial<Record<AppEnvironment, string>> =
+  process.env.EXPO_PUBLIC_APP_ENV === 'PROD'
+    ? {
+        PROD: 'https://servicedesk.mountmerugroup.com/api/v1',
+      }
+    : {
+        UAT: 'https://uat-servicedesk.mountmerugroup.com/api/v1',
+      };
 
 function resolveEnvironment(): AppEnvironment {
   // Inlined at build time by Expo. Must stay a direct `process.env.EXPO_PUBLIC_*` access (no destructuring).
@@ -29,7 +41,7 @@ function resolveEnvironment(): AppEnvironment {
 export const APP_ENV: AppEnvironment = resolveEnvironment();
 
 /** Base for every `/api/v1` endpoint in 01-API-CONTRACT.md. */
-export const API_BASE_URL: string = API_BASE_URLS[APP_ENV];
+export const API_BASE_URL: string = API_BASE_URLS[APP_ENV] ?? '';
 
 /** SYS-1 lives OUTSIDE `/api/v1`: `https://<host>/health` (01 §1; `/api/health` is not a route). */
 export const HEALTH_URL: string = `${API_BASE_URL.replace(/\/api\/v1$/, '')}/health`;
@@ -49,14 +61,5 @@ export const ENVIRONMENT_LABEL: string = `${APP_ENV} · ${API_HOST}${__DEV__ ? '
  * scripts/eas-build-guard.js). Profile (M10) still shows ENVIRONMENT_LABEL on every build.
  */
 export const SHOW_ENVIRONMENT_CHIP: boolean = APP_ENV !== 'PROD';
-
-/**
- * Login's email and password sign-in (02-AUTH.md §8, 2026-11-05): UAT only. Its endpoint is known to be deployed only
- * there, and its contract is ASSUMED (src/types/mobile-password-contract.ts). On a production build the option does not
- * render at all, as the environment chip. Opening it to PROD needs A32 shipped there and Ronit's say-so.
- * iOS (iOS-5g): the run-time gate, as on Android. On iOS the path is confirmed (POST /auth/mobile/login), and a second,
- * build-time gate keeps the email sign-in's code out of a production bundle altogether (LoginScreen.tsx).
- */
-export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';
 
 export const APP_VERSION: string = appJson.expo.version;

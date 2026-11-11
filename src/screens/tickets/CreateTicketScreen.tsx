@@ -8,6 +8,10 @@
 // - Body from the per-role allow-list (createTicket): END_USER sends only title, description, categoryId, source.
 // - Create is explicit and confirmed (a ticket can't be deleted). Files upload AFTER create, to the new id (ATT-2).
 //   On success: open the new ticket.
+// - iOS-9b: a caller may pass `prefill` (route params) to open the form with a title and description already written:
+//   Profile's account-deletion request (utils/accountDeletion.ts). Only that text: the category, the rest of the form,
+//   the validation, the confirmation and TKT-2 are exactly as for any ticket, and nothing is sent until Create is
+//   confirmed. Closing a pre-filled form the person has not changed asks nothing, as an empty one.
 //
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #7): a root sheet with the standard ✕, its title from routes.ts. On success the
 // sheet closes and the new ticket opens in the tab underneath (Android's replace() can't cross a sheet). Impact and
@@ -52,7 +56,7 @@ const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 
 type Sheet = 'top' | 'sub' | 'item' | 'team' | 'assignee' | 'requester' | null;
 
-export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicket'>) {
+export function CreateTicketScreen({ navigation, route }: SheetScreenProps<'CreateTicket'>) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const can = createTicketPermissions(user);
@@ -66,8 +70,12 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
   const create = useCreateTicket();
   const once = useSingleFlight();
 
-  const [title, setTitle] = useState(INITIAL_TITLE);
-  const [description, setDescription] = useState('');
+  // The form's starting text: empty (the dev prefix in a __DEV__ title), or the caller's `prefill` (iOS-9b).
+  const prefill = route.params?.prefill;
+  const [initialTitle] = useState(() => (prefill ? `${INITIAL_TITLE}${prefill.title}` : INITIAL_TITLE));
+  const [initialDescription] = useState(() => prefill?.description ?? '');
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
   const [topId, setTopId] = useState<string | null>(null);
   const [subId, setSubId] = useState<string | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
@@ -115,7 +123,7 @@ export function CreateTicketScreen({ navigation }: SheetScreenProps<'CreateTicke
     setAssignee(member?.user ? { id: member.user.id, displayName: member.user.displayName, email: member.user.email } : null);
   }, [agentOrAdmin, teamTouched, teams, itemId, subId, topId, find]);
 
-  const dirty = title !== INITIAL_TITLE || !!description.trim() || !!categoryId || files.length > 0;
+  const dirty = title !== initialTitle || description.trim() !== initialDescription.trim() || !!categoryId || files.length > 0;
   const { leave } = useDiscardGuard({ dirty, busy: create.isPending, what: 'ticket' });
 
   async function submit() {

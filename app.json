@@ -2,7 +2,7 @@
   "expo": {
     "name": "Setu",
     "slug": "setu-ios",
-    "version": "0.2.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,7 +20,11 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Setu uses the camera only when you choose to take a photo to attach to a ticket, a reply or a request.",
         "NSPhotoLibraryUsageDescription": "Setu opens your photos only when you choose some to attach to a ticket, a reply or a request. Only the photos you pick are uploaded.",
-        "NSPhotoLibraryAddUsageDescription": "Setu saves an attachment image to your photo library only when you choose Save Image."
+        "NSPhotoLibraryAddUsageDescription": "Setu saves an attachment image to your photo library only when you choose Save Image.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "plugins": [

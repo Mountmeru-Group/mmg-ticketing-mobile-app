@@ -1,6 +1,6 @@
 // Login "arc split" and the motion sequence (2026-10-30): docs/brand/UI-STANDARDS.md §10, docs/PERFORMANCE.md §12.
-// iOS (iOS-5c): Android's file with two changes, each marked "iOS": the production-build chip test (the PROD URL is
-// still empty) and a sixth animating file (SuccessNotice.tsx). "Remove animations" is iOS's Reduce Motion.
+// iOS (iOS-5c): Android's file with one change, marked "iOS": a sixth animating file (SuccessNotice.tsx). "Remove
+// animations" is iOS's Reduce Motion. (iOS-9b: the production-build chip test is Android's again, with the PROD URL set.)
 //
 // What runs for real: src/config/env.ts (evaluated as each kind of build would), the start-up sequence's decisions
 // (src/navigation/splashSequence.ts) and the theme. The two start-up images are decoded and measured.
@@ -50,12 +50,11 @@ describe('Login environment chip: never on a production build', () => {
     }
   }
 
-  // iOS (iOS-5c): the PROD URL is still empty (CLAUDE.md I3; the iOS-9 list), so a release build of the production
-  // profile refuses to start before Login exists. Until then this checks that refusal and the chip's rule; Android's
-  // assertion (APP_ENV PROD, no chip) comes back with the PROD URL (docs/ios/ANDROID-DELTA.md §5, item 2).
+  // iOS-9b: Android's assertion again, now that the PROD URL is set (docs/ios/ANDROID-DELTA.md §5, item 2).
   test('a release build of the production profile does not show it', async () => {
-    await assert.rejects(loadEnv(false, 'PROD'), /no PROD API URL is configured/);
-    assert.match(read('src/config/env.ts'), /^export const SHOW_ENVIRONMENT_CHIP: boolean = APP_ENV !== 'PROD';$/m);
+    const env = await loadEnv(false, 'PROD');
+    assert.equal(env.APP_ENV, 'PROD');
+    assert.equal(env.SHOW_ENVIRONMENT_CHIP, false);
   });
 
   test('every other build shows it: preview (UAT), nothing set, and development', async () => {
@@ -65,14 +64,11 @@ describe('Login environment chip: never on a production build', () => {
     }
   });
 
-  // 2026-11-05: the email sign-in follows the same rule. Its endpoint is only on UAT.
-  // iOS (iOS-5g): a production release build refuses to start (above), so its EMAIL_SIGN_IN_ENABLED is read from the
-  // source; the build-time gate that keeps the code out of that bundle is tests/auth/ios-password-sign-in.test.mjs.
-  test('email sign-in: off on a production release build, on for every UAT build', async () => {
-    await assert.rejects(loadEnv(false, 'PROD'), /no PROD API URL is configured/);
-    assert.match(read('src/config/env.ts'), /^export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';$/m);
-    for (const [dev, appEnv] of [[false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
-      assert.equal((await loadEnv(dev, appEnv)).EMAIL_SIGN_IN_ENABLED, true, `dev=${dev} env=${appEnv}`);
+  // 2026-11-06: was "off on a production release build, on for every UAT build". Email sign-in is deployed on PROD as
+  // well, so the environment no longer decides it: no flag is exported, in any build. (iOS-9b, Android's test.)
+  test('email sign-in: no environment flag, so it is available on PROD and UAT alike', async () => {
+    for (const [dev, appEnv] of [[false, 'PROD'], [false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
+      assert.equal('EMAIL_SIGN_IN_ENABLED' in (await loadEnv(dev, appEnv)), false, `dev=${dev} env=${appEnv}`);
     }
   });
 
@@ -88,8 +84,8 @@ describe('Login environment chip: never on a production build', () => {
     assert.match(branch, /\{ENVIRONMENT_LABEL\}/);
     // Outside the branch the label is only imported, never rendered.
     assert.deepEqual(rest.match(/ENVIRONMENT_LABEL/g), ['ENVIRONMENT_LABEL']);
-    // 2026-11-05: the same import also brings EMAIL_SIGN_IN_ENABLED (Login's email sign-in, UAT only).
-    assert.match(rest, /^import \{ EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
+    // 2026-11-06: the import brought EMAIL_SIGN_IN_ENABLED too until email sign-in was opened to PROD (iOS: iOS-9b).
+    assert.match(rest, /^import \{ ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
   });
 });
 

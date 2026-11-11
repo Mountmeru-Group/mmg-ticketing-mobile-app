@@ -95,10 +95,22 @@ export type AppTabParamList = {
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };
 
+/**
+ * iOS-9b: text Create Ticket opens with, instead of empty fields (Profile's account-deletion request,
+ * utils/accountDeletion.ts). Only the title and description: the person still picks the category and creates it.
+ */
+export interface CreateTicketPrefill {
+  title: string;
+  description: string;
+}
+
 // ── Sheets: above the tabs, in the root stack ────────────────
 export type SheetsParamList = {
-  /** M8. A sheet on iOS; on success it closes and the new ticket opens in the tab underneath. */
-  CreateTicket: undefined;
+  /**
+   * M8. A sheet on iOS; on success it closes and the new ticket opens in the tab underneath. No params from the
+   * Tickets "+" and Home; `prefill` from Profile's account-deletion request (iOS-9b).
+   */
+  CreateTicket: { prefill?: CreateTicketPrefill } | undefined;
   /** M5 */
   ReplyComposer: { ticketId: UUID; mode: 'reply' | 'replyAll' | 'note' };
   /** M6. One ticket from M4, or up to 20 from M3 bulk mode (08 §4.2). */

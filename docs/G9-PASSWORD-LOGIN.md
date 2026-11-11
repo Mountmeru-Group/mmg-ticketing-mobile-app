@@ -465,9 +465,11 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 - That is a tenant security decision, for IT and Ronit.
 - Once AUTH-P2 is on PROD, this is likely the fastest route.
 
-## iOS-A. The iOS app (iOS-5f, 2026-11-06; built in iOS-5g, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08)
+## iOS-A. The iOS app (iOS-5f, 2026-11-06; built in iOS-5g, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08; iOS-9b, 2026-11-11)
 
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`). It describes the Android build, its ⚠ ASSUMED contract and the Google Play reviewer.
+
+**iOS-9b (Ronit, 2026-11-11): iOS opens the email sign-in to PRODUCTION too, exactly as Android `6b5e46c`.** `EMAIL_SIGN_IN_ENABLED` is deleted and Login renders the form in every build; iOS's second, build-time gate is gone as well. Kept: the one confirmed path `POST /auth/mobile/login`, never `POST /auth/login`, and the R1 cookie shield. `verify-release-bundle` now requires the email sign-in in both profiles (`02-AUTH.md` §iOS-B). **App Review's demo login is an email-and-password review account** (compliance A4), as Google Play's reviewer is on Android (§7). **Still pending:** the backend team's `Set-Cookie` answer (06 A32), mitigated on the device by R1. The paragraphs below are the history.
 
 **iOS-5h (Ronit, 2026-11-08): Android opened the email sign-in to PRODUCTION; iOS does not, yet.** The opening paragraph's 2026-11-06 line and the "Builds" row above are Android's `6b5e46c`: the backend team confirmed the endpoint on PRODUCTION, and Android deleted `EMAIL_SIGN_IN_ENABLED`. On iOS nothing changes: UAT builds only, with both gates (below). **Matching Android `6b5e46c` is on the iOS-9 list,** after the backend team confirms no `Set-Cookie` and PROD is approved, together with the App Review demo-login route (compliance A4; `docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer `Set-Cookie`, which still blocks shipping the email sign-in to testers.
 
@@ -477,15 +479,15 @@ Comments, and numbers used as numbers, are left alone. Nine positive controls pr
 - **One call, to the confirmed path only:** `POST /api/v1/auth/mobile/login`. Android's other three paths, its fallback after an HTML 404 and its remembered path are **not ported**.
 - **iOS never calls `POST /api/v1/auth/login`.** On iOS it stays a do-not-call route with no exception (`01-API-CONTRACT.md` §iOS-A). `verify-release-bundle` fails a bundle that names it.
 - **Android's request and reading of the 200, for that one path** (Ronit, iOS-5g: 1a, 2a): the body `{ username, email, password }`, and the tolerant reader (`AUTH_P1_READER`). Only the token, `user`, `user.id` and `user.role` are required; `name` and `displayName` are both accepted; extra fields never fail sign-in.
-- **UAT builds only, gated twice:** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'` at run time, exactly as on Android, and a build-time gate, so a `production` bundle holds none of the G9 code or strings. `verify-release-bundle` checks both profiles.
+- **UAT builds only, gated twice (until iOS-9b):** `EMAIL_SIGN_IN_ENABLED = APP_ENV === 'UAT'` at run time, exactly as on Android, and a build-time gate, so a `production` bundle held none of the G9 code or strings. **iOS-9b removed both:** every bundle carries it, and `verify-release-bundle` requires it in both profiles.
 - **The same session as Microsoft sign-in:** the token in the Keychain with `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, the 15-day re-authentication (`fullAuthAt` set on every password sign-in, as on Android), the reinstall wipe, sign-out (AUTH-3) and the AUTH-2 `countryId` rule, all as for SSO on iOS and as on Android.
-- **The reviewer.** Google Play's reviewer (§7) has an App Store twin: App Review's demo account (compliance A4). Whether this sign-in, once on PROD with a reviewer account, replaces A4's Entra account is an **open decision for iOS-9**. Sign in with Apple is not required: Setu signs in only with existing company accounts, Microsoft or company credentials (Guideline 4.8, compliance G1).
+- **The reviewer.** Google Play's reviewer (§7) has an App Store twin: App Review's demo account (compliance A4). Whether this sign-in, once on PROD with a reviewer account, replaces A4's Entra account was an open decision for iOS-9. **Decided in iOS-9b (Ronit): it does**, with an email-and-password review account and no MFA. Sign in with Apple is not required: Setu signs in only with existing company accounts, Microsoft or company credentials (Guideline 4.8, compliance G1).
 
 **The contract (recorded for iOS)**
 
 | Part | iOS |
 |---|---|
-| Method and path | ✅ **CONFIRMED:** `POST /api/v1/auth/mobile/login`, live on UAT (the backend team, through Ronit, 2026-11-06). Not called on PROD by iOS: the backend team reports it deployed there too (2026-11-06, Android `6b5e46c`), but iOS has no PROD build (CLAUDE.md I3) and its PROD opening is on the iOS-9 list (iOS-5h) |
+| Method and path | ✅ **CONFIRMED:** `POST /api/v1/auth/mobile/login`, live on UAT (the backend team, through Ronit, 2026-11-06). The backend team reports it deployed on PROD too (2026-11-06, Android `6b5e46c`). **iOS calls it on PROD from iOS-9b** (2026-11-11), in `production` builds only, with the PROD URL approved for that profile (CLAUDE.md I3) |
 | Request body | `{ "username": <email>, "email": <email>, "password": <password> }`: what Android sends to this path (`d8626bc`). The brief said `{ email, password }` "as Android sends to this path"; Android sends both names, and Ronit chose Android's body (1a) |
 | 200 | Android's tolerant reader (`02-AUTH.md` §8.3). The brief listed `user.email` and `expiresAt` as required; Ronit chose Android's reader (2a), where they are optional (the typed email stands in; the app's own 8-hour clock applies) |
 | Errors | Android's reasons and words (`02-AUTH.md` §8.6): 400, 401, 403, 429, 5xx, offline, and the rest |

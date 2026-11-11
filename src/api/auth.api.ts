@@ -18,10 +18,10 @@
 // shown, or put into an error.
 //
 // ── Email and password sign-in (AUTH-P1, ask A32, 02-AUTH.md §8) ──
-// iOS (iOS-5g): not in this file. signInWithPassword() is src/api/passwordSignIn.api.ts, which only a UAT build bundles
-// (LoginScreen.tsx loads the form behind a build-time gate). It calls ONE path, POST /auth/mobile/login, and reads its
-// answer through the SAME readSession() below, with AUTH-P1's options (Android's, d8626bc). This file holds no
-// email-sign-in code or string, so a production bundle carries none.
+// iOS (iOS-5g): not in this file. signInWithPassword() is src/api/passwordSignIn.api.ts, which every build bundles since
+// iOS-9b opened the email sign-in to PROD (it was UAT only behind a build-time gate). It calls ONE path, POST
+// /auth/mobile/login, and reads its answer through the SAME readSession() below, with AUTH-P1's options (Android's,
+// d8626bc). This file holds no email-sign-in code or string.
 import * as AuthSession from 'expo-auth-session';
 
 import {

@@ -622,20 +622,18 @@ Android's plan has no checks for this, so they are iOS's own. Use **build 0.2.0 
 
 ## Section I — Account-deletion request and privacy link
 
-The two rows appear only once `src/config/legal.ts` has its three values (manifest §4.13; compliance H1, H6).
-- **I1** is for a build with the values empty, as today.
-- **I2–I7** need a UAT build with test values agreed with Ronit and IT: an https privacy URL, a UAT category for deletion requests, and a working-day count.
+**iOS-9b (2026-11-11): both rows show in every build.** The privacy link is set in `src/config/legal.ts`, and the deletion request needs no value: it opens Create Ticket, pre-filled, and the person sends it (compliance H1, H6). No time is promised anywhere.
 - **Tell IT before I5** that the request is a test, and must not be acted on.
 
 | ID | Role | Steps | Expected | ✓/✗ |
 |---|---|---|---|---|
-| I1 | Any | `legal.ts` empty: More › Settings › Account | ❌ no **Privacy Policy** row and no **Request Account Deletion** row. No link to nothing (compliance A2) | |
-| I2 | Any | `legal.ts` set: tap **Privacy Policy** | Safari opens the policy. "◀ Setu" at the top left returns to the app | |
-| I3 | User | Tap **Request Account Deletion** | An alert, **"Request account deletion?"**. It says what happens, how many working days IT takes, what may be kept, that the Microsoft account is not affected, and that signing in again creates a new account. The buttons are **Cancel** and **Send Request** | |
-| I4 | User | **Cancel** | Nothing is sent, and no ticket is created | |
-| I5 | User | Tap again, then **Send Request** | **"Request Sent"**: "Ticket #<n> was created. IT will reply on it; updates appear in Alerts." **View Ticket** opens the ticket. It is in the configured category, with no priority, impact or urgency set by the app | |
-| I6 | User | In Airplane Mode, **Send Request** | Refused; nothing is sent | |
-| I7 | User | VoiceOver and AX5 on the Account rows and the alert | Both rows are read and fit (G10, G11) | |
+| I1 | Any | More › Settings › Account | Two rows: **Privacy Policy** and **Request Account Deletion** (red). No link to nothing (compliance A2) | |
+| I2 | Any | Tap **Privacy Policy** | Safari opens `https://www.mountmerugroup.com/privacy-policy`. "◀ Setu" at the top left returns to the app | |
+| I3 | Each role | Tap **Request Account Deletion** | An alert, **"Request account deletion?"**. It says a Service Desk request will open, filled in, asking IT to delete the Setu / Service Desk account; that the person chooses a category and creates it; that IT updates them on that ticket; what may be kept; that the Microsoft account is not affected. **No number of days or other time.** The buttons are **Cancel** and **Continue** | |
+| I4 | User | **Cancel** | The alert closes. Nothing opens and nothing is sent | |
+| I5 | Each role | Tap again, then **Continue** | **New ticket** opens with the title "Account deletion request" and the description "Please delete my Setu / Service Desk account (<your email>)", no category chosen. Nothing is sent yet. Choose a category, tap **Create**, confirm **"Create this ticket?"**: the ticket is created as any other and opens. Close the sheet instead without changing anything: it closes without asking | |
+| I6 | User | In Airplane Mode, **Continue**, then **Create** | Create Ticket shows its offline state or refuses the send, as for any ticket; nothing is sent | |
+| I7 | User | VoiceOver and AX5 on the Account rows, the alert and the pre-filled form | All are read and fit (G10, G11) | |
 
 ---
 

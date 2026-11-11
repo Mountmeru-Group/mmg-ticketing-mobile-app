@@ -1,7 +1,7 @@
 // iOS-5g: what iOS adds to Android's email and password sign-in (tests/auth/password-sign-in.test.mjs is Android's):
 //   (b) ONE path, the backend team's confirmed POST /auth/mobile/login; never POST /auth/login, never any other;
-//   (c) the gate: UAT only, at run time (EMAIL_SIGN_IN_ENABLED, as Android) and at build time (LoginScreen.tsx), so a
-//       production bundle has no email sign-in code or string (scripts/verify-release-bundle.js proves it on bundles);
+//   (c) every build: iOS-9b removed the UAT-only gates (run time and build time), as Android 6b5e46c, so every bundle,
+//       preview and production, carries the email sign-in (scripts/verify-release-bundle.js proves it on bundles);
 //   (e) the session exactly as after Microsoft sign-in: the Keychain class, the 15-day clock, the reinstall wipe,
 //       sign-out (AUTH-3);
 //   (f) the password: never written anywhere, and dropped by the form on success, failure and unmount; the iOS keyboard.
@@ -138,30 +138,27 @@ describe('(b) one path: POST /auth/mobile/login, and never POST /auth/login', ()
 
 // ── (c) the gate ─────────────────────────────────────────────
 
-describe('(c) UAT only: at run time, and at build time', () => {
+describe('(c) every build, UAT and PROD (iOS-9b, as Android 6b5e46c)', () => {
   const login = code('src/screens/auth/LoginScreen.tsx');
   const GATED = [
     'src/screens/auth/EmailSignInForm.tsx', 'src/screens/auth/passwordSignInAttempt.ts', 'src/api/passwordSignIn.api.ts',
     'src/types/mobile-password-contract.ts',
   ];
 
-  test('run time: EMAIL_SIGN_IN_ENABLED is APP_ENV === UAT (Android\'s line), and Login renders the form only then', () => {
-    assert.match(read('src/config/env.ts'), /^export const EMAIL_SIGN_IN_ENABLED: boolean = APP_ENV === 'UAT';$/m);
-    assert.match(login, /\{EMAIL_SIGN_IN_ENABLED && EmailSignInForm \? \(\s*<EmailSignInForm/);
+  test('no run-time gate: no EMAIL_SIGN_IN_ENABLED anywhere, and Login renders the form unconditionally, in one place', () => {
+    for (const rel of SRC) assert.doesNotMatch(read(rel), /EMAIL_SIGN_IN_ENABLED/, rel);
+    assert.match(login, /<\/View>\s*<EmailSignInForm\s/, 'straight after the Microsoft button, not inside a conditional');
     assert.equal(login.split('<EmailSignInForm').length - 1, 1, 'rendered in one place');
   });
 
-  test('build time: Login loads the form through a require that Expo and Metro remove from a production build', () => {
-    assert.match(
-      login,
-      /const EmailSignInForm: typeof import\('\.\/EmailSignInForm'\)\.EmailSignInForm \| null =\s*process\.env\.EXPO_PUBLIC_APP_ENV !== 'PROD'\s*\? \(require\('\.\/EmailSignInForm'\) as typeof import\('\.\/EmailSignInForm'\)\)\.EmailSignInForm\s*: null;/,
-    );
-    // The same test env.ts uses: anything but PROD is UAT (resolveEnvironment).
+  test('no build-time gate: Login imports the form statically, and reads no environment for it', () => {
+    assert.match(login, /^import \{ EmailSignInForm \} from '\.\/EmailSignInForm';$/m);
+    assert.doesNotMatch(login, /require\('\.\/EmailSignInForm'\)|process\.env\.EXPO_PUBLIC_APP_ENV/);
+    // env.ts still turns anything but PROD into UAT (resolveEnvironment); that now picks only the API URL.
     assert.match(read('src/config/env.ts'), /const requested = process\.env\.EXPO_PUBLIC_APP_ENV;\s*if \(requested !== 'PROD'\) return 'UAT';/);
-    assert.doesNotMatch(login, /^import [^\n]*from '\.\/EmailSignInForm'/m, 'no static import');
   });
 
-  test('nothing outside the gated modules imports them (a static import would carry them into every bundle)', () => {
+  test('the modules are still imported along one chain only: Login → form → attempt → API → contract', () => {
     const importers = {};
     for (const rel of SRC) {
       const text = code(rel);
@@ -173,6 +170,7 @@ describe('(c) UAT only: at run time, and at build time', () => {
       }
     }
     assert.deepEqual(importers, {
+      'src/screens/auth/EmailSignInForm.tsx': ['src/screens/auth/LoginScreen.tsx'],
       'src/screens/auth/passwordSignInAttempt.ts': ['src/screens/auth/EmailSignInForm.tsx'],
       'src/api/passwordSignIn.api.ts': ['src/screens/auth/passwordSignInAttempt.ts'],
       'src/types/mobile-password-contract.ts': ['src/api/passwordSignIn.api.ts'],
@@ -180,12 +178,14 @@ describe('(c) UAT only: at run time, and at build time', () => {
     assert.doesNotMatch(read('src/types/index.ts'), /mobile-password-contract/, 'not re-exported from the types barrel');
   });
 
-  test('the release check: production must hold none of the email sign-in\'s modules or strings, preview all of them', () => {
+  test('the release check: every bundle, preview and production, must hold all of the email sign-in\'s modules and strings', () => {
     const script = read('scripts/verify-release-bundle.js');
     for (const rel of GATED) assert.ok(script.includes(`'${rel}'`), rel);
-    assert.match(script, /if \(profile === 'production'\) \{\s*if \(emailModules\.length\) problems\.push/);
-    assert.match(script, /for \(const \[k, c\] of Object\.entries\(emailStrings\)\) if \(c > 0\) problems\.push/);
-    assert.match(script, /if \(missing\.length\) problems\.push\(`the preview bundle lacks email sign-in module/);
+    assert.match(script, /if \(missingEmailModules\.length\) problems\.push\(`the \$\{profile\} bundle lacks email sign-in module/);
+    assert.match(script, /if \(absentEmailStrings\.length\) problems\.push\(`release JS \(\$\{profile\}\) lacks email sign-in string/);
+    // No profile is exempt: the rule is not inside a profile branch any more.
+    assert.doesNotMatch(script, /if \(profile === 'production'\) \{\s*if \(emailModules\.length\)/);
+    assert.doesNotMatch(script, /contains \$\{c\} email sign-in string/);
   });
 });
 

@@ -1,8 +1,8 @@
 // EAS Build profiles for the iOS app (JSON5: comments are allowed in eas.json). No build is run in iOS-1b; the first
 // one is iOS-7 (docs/ios/00-PORT-MANIFEST.md §2).
 // Every profile sets EXPO_PUBLIC_APP_ENV, which src/config/env.ts turns into the API base URL. No URL lives here.
-// scripts/eas-build-guard.js runs first on the build server and refuses a production build while the PROD URL in
-// src/config/env.ts is empty, and refuses PROD on any other profile.
+// scripts/eas-build-guard.js runs first on the build server: it refuses PROD on any profile but production, and a
+// production build without the PROD URL (src/config/env.ts) or the privacy and support links (src/config/legal.ts).
 {
   "cli": {
     "version": ">= 24.8.0",
@@ -20,18 +20,27 @@
       "env": { "EXPO_PUBLIC_APP_ENV": "UAT" },
       "ios": { "autoIncrement": true }
     },
-    // ⛔ PLACEHOLDER — NOT RUNNABLE. Ronit has not approved a production URL: the PROD entry in src/config/env.ts is
-    // empty, so the build guard stops this profile on the server, and the app itself refuses to start without it.
-    // Do not use until docs/ios/APP-STORE-COMPLIANCE.md is closed for release (iOS-9).
+    // The App Store build (iOS-9b), pointed at PROD: approved by Ronit's manager on 2026-11-11, for this profile only.
+    // Version 1.0.0 (app.json); EAS gives each build the next build number. Its channel is `production` and never
+    // ios-preview, so a TestFlight (UAT) update can't reach it. Build, submit and update rules: docs/ios/RELEASE-IOS.md.
     "production": {
       "node": "24.18.0",
       "distribution": "store",
       "channel": "production",
-      "env": { "EXPO_PUBLIC_APP_ENV": "PROD" }
+      "env": { "EXPO_PUBLIC_APP_ENV": "PROD" },
+      "ios": { "autoIncrement": true }
     }
   },
   "submit": {
     "preview": {
+      "ios": {
+        "ascAppId": "6827931735",
+        "appleTeamId": "ZNPR2MFW76"
+      }
+    },
+    // The same App Store Connect app as preview: submit a production build by its own build (`--auto-submit` or
+    // `--id`), never `--latest`, which takes the newest iOS build of EITHER profile (RELEASE-IOS.md §4).
+    "production": {
       "ios": {
         "ascAppId": "6827931735",
         "appleTeamId": "ZNPR2MFW76"
