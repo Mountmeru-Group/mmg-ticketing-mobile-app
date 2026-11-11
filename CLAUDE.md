@@ -10,9 +10,9 @@
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
 - **Port source:** `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed` (since iOS-5h, 2026-11-08; before it `d8626bc` in iOS-5f and iOS-5g, `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
   - To bring later Android changes across, diff `6b5e46c..origin/dev` (empty on 2026-11-08).
-  - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on **UAT builds only**. It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
+  - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on UAT builds only, and opened to **every build, UAT and PROD, in iOS-9b** (2026-11-11). It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
     - **Open, not blocking (R1, 2026-11-08):** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`. The R1 cookie shield (`src/api/cookieShield.ts`) mitigates it on the device: iOS's cookie store is emptied right after every sign-in answer (email and Microsoft, success or error, before the session is stored), at every cold start and at every sign-out. So it no longer blocks shipping G9 to testers in build 0.2.0 (2); the answer is still recorded when it comes (06 A32).
-    - **Android `6b5e46c` opened G9 to production builds; iOS does not** (Ronit, iOS-5h). Matching it is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the App Review demo-login route (`docs/ios/ANDROID-DELTA.md` §5, item 7).
+    - **Android `6b5e46c` opened G9 to production builds; iOS matched it in iOS-9b** (Ronit, 2026-11-11; `docs/ios/ANDROID-DELTA.md` §5, item 7), before the `Set-Cookie` answer, which stays open and mitigated by R1. App Review signs in with an email-and-password review account (compliance A4).
   - The sync rule (Ronit, 2026-10-30): iOS = Android `dev` exactly. Unmerged Android branches are not ported. Android release items go to the iOS-9 list. In shared docs, Android's section numbers win, and iOS-only sections are lettered §iOS-A, §iOS-B… (`docs/ios/ANDROID-DELTA.md`).
   - Apply each changed file according to its row in the manifest.
 - Stack (`package.json` is the source of truth):
@@ -38,9 +38,8 @@
   - **Microsoft SSO** (AUTH-P2) is the sign-in in every build.
     - Built in iOS-6 (2026-10-28) with the redirect `msauth.com.mountmeru.servicedesk://auth` (`02-AUTH.md` §7.7), and in TestFlight since build 0.1.0 (1).
     - Android's 15-day forced re-authentication applies (iOS-5d, `02-AUTH.md` §iOS-A).
-  - **Email and password sign-in** (G9, iOS-5g) is on **UAT builds only**.
-    - A build-time gate and a run-time gate keep it out: a `production` bundle holds none of it.
-    - It makes one call, `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`02-AUTH.md` §iOS-B).
+  - **Email and password sign-in** (G9, iOS-5g) is on **every build, UAT and PROD, since iOS-9b** (as Android `6b5e46c`; until then UAT only, behind a build-time and a run-time gate).
+    - It makes one call, `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`02-AUTH.md` §iOS-B). `verify-release-bundle` requires it in both profiles and fails any bundle that names `/auth/login`.
     - Whether that endpoint sends a `Set-Cookie` is still unconfirmed, but since R1 it no longer holds G9 back from testers: the cookie shield empties iOS's cookie store after each sign-in answer, at launch and at sign-out (`02-AUTH.md` §iOS-B).
   - **The developer-token screen** is `__DEV__` only. It is compiled out of every release build, `preview` and `production`; `verify-release-bundle` proves it is absent.
   - The TestFlight test login (manifest §8) is a proposal and is **not approved**; nothing is built.
@@ -54,8 +53,10 @@ I2. **Never open or modify** `..\mmg-ticketing-mobile-app` (Android) or `..\MMG-
     - Read Android code only through git, from this repo: `git show <commit>:<path>`, `git ls-tree`, `git grep`.
     - Porting a file is `git checkout <port source> -- <path>` into the working tree; it never switches branch.
 
-I3. **UAT API only:** `https://uat-servicedesk.mountmerugroup.com/api/v1`.
-    - The PROD entry in `src/config/env.ts` stays an empty placeholder until Ronit signs off in writing.
+I3. **UAT API for every build except one:** `https://uat-servicedesk.mountmerugroup.com/api/v1`.
+    - **PROD is approved for the `production` EAS profile ONLY** (the App Store build): `https://servicedesk.mountmerugroup.com/api/v1`, approved by Ronit's manager on 2026-11-11 (iOS-9b).
+    - Development and TestFlight (`preview`) builds stay on UAT: a `__DEV__` build refuses PROD, and `scripts/eas-build-guard.js` refuses PROD on every other profile.
+    - `src/config/env.ts` picks the URL at build time, so each bundle holds exactly one of the two (`verify-release-bundle` proves it both ways). Any other change to which builds may reach PROD needs Ronit's written sign-off.
 
 I4. **The web repo is read-only reference, and it is not opened from this repo.**
     - Use `docs/web-system/`. If a shape must be checked against the web source, ask Ronit.

@@ -5,9 +5,10 @@
 //      (00-OVERVIEW §3: no production target until Ronit signs off and the blocking backend asks ship);
 //   2. any profile other than `production` asks for EXPO_PUBLIC_APP_ENV=PROD (development and preview builds are
 //      UAT-only, CLAUDE.md rule 4);
-//   3. (iOS-4) the profile is `production` while a value App Review needs is still empty in src/config/legal.ts: the
-//      privacy-policy URL (App Review 5.1.1(i)), or the account-deletion category and working days (5.1.1(v);
-//      docs/ios/APP-STORE-COMPLIANCE.md H1, H6).
+//   3. (iOS-4; iOS-9b) the profile is `production` while a link App Review needs is not an https URL in
+//      src/config/legal.ts: the privacy policy (App Review 5.1.1(i), compliance H1) or the support URL (1.5, H7).
+//      iOS-9b dropped the account-deletion category and working days: deletion is now a request the person files
+//      through Create Ticket (utils/accountDeletion.ts), with no fixed category and no time promise.
 // It contains no URL and reads no secret. Fails closed: if a file can't be read or parsed, production is refused.
 // Run locally to preview the verdict: EAS_BUILD_PROFILE=production node scripts/eas-build-guard.js
 // The rules are verdict(), a pure function, so tests/screens/hig-polish.test.mjs checks each one.
@@ -27,13 +28,13 @@ function legalValuesFrom(legalSource) {
     const match = text.match(new RegExp(`^export const ${name} = '([^']*)';`, 'm'));
     return match ? match[1].trim() : null;
   };
-  const days = text.match(/^export const ACCOUNT_DELETION_WORKING_DAYS = (\d+);/m);
   return {
     privacyPolicyUrl: string('PRIVACY_POLICY_URL'),
-    deletionCategory: string('ACCOUNT_DELETION_CATEGORY'),
-    deletionWorkingDays: days ? Number(days[1]) : null,
+    supportUrl: string('SUPPORT_URL'),
   };
 }
+
+const isHttpsUrl = (value) => typeof value === 'string' && /^https:\/\/\S+$/.test(value);
 
 /**
  * The guard's decision for one build: `ok`, or the lines saying why it is refused. Pure: the build's profile and
@@ -66,20 +67,14 @@ function verdict({ profile, appEnv, envSource, legalSource }) {
   if (appEnv !== 'PROD') lines.push('The production profile must set EXPO_PUBLIC_APP_ENV=PROD in eas.json.');
 
   const legal = legalValuesFrom(legalSource);
-  if (!legal.privacyPolicyUrl || !/^https:\/\/\S+$/.test(legal.privacyPolicyUrl)) {
+  if (!isHttpsUrl(legal.privacyPolicyUrl)) {
     lines.push(
       'src/config/legal.ts has no PRIVACY_POLICY_URL (an https link): App Review 5.1.1(i) needs the privacy policy',
       'linked in the app (docs/ios/APP-STORE-COMPLIANCE.md H1).',
     );
   }
-  if (!legal.deletionCategory) {
-    lines.push(
-      'src/config/legal.ts has no ACCOUNT_DELETION_CATEGORY: the in-app deletion request (App Review 5.1.1(v),',
-      'compliance H6) would be hidden.',
-    );
-  }
-  if (!legal.deletionWorkingDays || legal.deletionWorkingDays < 1) {
-    lines.push('src/config/legal.ts has no ACCOUNT_DELETION_WORKING_DAYS: the deletion request must say how long IT takes (H6).');
+  if (!isHttpsUrl(legal.supportUrl)) {
+    lines.push('src/config/legal.ts has no SUPPORT_URL (an https link): App Store Connect needs a Support URL (H7).');
   }
   return lines.length > 0 ? { ok: false, lines } : { ok: true, lines: [] };
 }

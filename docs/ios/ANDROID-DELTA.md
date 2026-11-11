@@ -1,7 +1,7 @@
 # Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g, iOS-5h)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5h: `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed`** (§11). To sync later Android work, diff `6b5e46c..origin/dev`. Android's opening of the email sign-in to PROD (`6b5e46c`) is on the iOS-9 list (§5, item 7), not ported.
+> **Port source since iOS-5h: `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed`** (§11). To sync later Android work, diff `6b5e46c..origin/dev`. Android's opening of the email sign-in to PROD (`6b5e46c`) was on the iOS-9 list (§5, item 7) and is done in iOS-9b (2026-11-11).
 > iOS-5f's and iOS-5g's port source was `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (§10); G9 (email sign-in) from `d8626bc` came across in iOS-5g, UAT builds only, to the one confirmed path (§10.8).
 > iOS-5e's port source was `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (§9). iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
 > The builds are in `00-PORT-MANIFEST.md` §4.15–§4.21. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
@@ -158,6 +158,19 @@ Details are in manifest §4.15. In short:
 | 6 | 02-AUTH §6 and the release guide | `4063df3` | Android's text about the deleted screen and the PROD build, in `RELEASE-IOS.md` | Items 1, 2 |
 | 7 | **Match Android `6b5e46c` at iOS-9: the email sign-in on production builds** (H4, §11). Android deleted `EMAIL_SIGN_IN_ENABLED` and renders the form unconditionally; the backend team reports the endpoint on PROD, in sync with UAT (2026-11-06). **Also the App Review demo-login route** (compliance A4): whether the email sign-in, with a reviewer account on PROD, becomes App Review's demo login | `6b5e46c` | Remove the run-time gate (`src/config/env.ts`) and the build-time gate (`LoginScreen.tsx`); flip the release check's production rule (G9 modules and strings required, not forbidden); port Android's three test changes (`password-sign-in`, `start-up-and-login`, `production-readiness`); update compliance K1, K2, A4, A5 and the G9 section. Keep the one path and never `/auth/login` | **The backend team confirms the endpoint sends no `Set-Cookie`, and PROD is approved** (Ronit's written sign-off, CLAUDE.md I3; item 2). Ronit, iOS-5h (2026-11-08) |
 | 8 | Android's release guide: what a production build does differently from the tested UAT build, and "production = UAT except where a difference is required", with its table of every remaining difference (H3, H8, §11) | `f67265c`, `6b5e46c` (`docs/RELEASE.md` §5b, §5c) | Write the iOS table in `RELEASE-IOS.md` when the `production` profile becomes runnable: API URL, profile and artifact, `EXPO_PUBLIC_APP_ENV`, the Login chip, the environment label, deep-link origins, and (until item 7) the email sign-in | Items 2, 7 |
+
+**Status after iOS-9b (Ronit, 2026-11-11):**
+
+| # | Status |
+|---|---|
+| 1 | **Open.** Not in the iOS-9b brief. The screen is `__DEV__` only and in no release bundle (`verify-release-bundle`: 0 of 12 strings, both profiles) |
+| 2 | **Done.** PROD URL `https://servicedesk.mountmerugroup.com/api/v1`, approved by Ronit's manager on 2026-11-11 for the `production` profile only; the `eas.json` comment rewritten; Android's chip assertion restored (`start-up-and-login.test.mjs`). **iOS difference:** `env.ts` picks the URL at build time, so each bundle holds one URL; Android's holds both |
+| 3 | **Done.** `app.json` `version` 1.0.0 (both profiles; runtime 1.0.0). The build number stays EAS's (`autoIncrement`, now on `production` too) |
+| 4 | **Done, stricter than planned.** Each run allows its own profile's host only: `production` the PROD host, `preview` the UAT host; and each fails on the other profile's URL, in JS and Hermes |
+| 5 | **Done for items 2, 3 and 7:** `tests/release/production-readiness.test.mjs` (environment, guard, profiles, submit, version, runtime, channels, ATS). Android's sign-in cases wait for item 1 |
+| 6 | **Partly.** `RELEASE-IOS.md` has the production build, submit and channel rules (§4, §6 rule 11, §7). Android's text about the deleted screen waits for item 1 |
+| 7 | **Done** (Ronit opened it before the `Set-Cookie` answer, which stays pending, mitigated by R1): no `EMAIL_SIGN_IN_ENABLED`, no build-time gate, the release check requires G9 in `production`; Android's three test changes ported; compliance A4, A5, G1, H5, K1 and the G9 section updated. App Review's demo login is an email-and-password review account |
+| 8 | **Done.** `RELEASE-IOS.md` §7, the `preview` vs `production` table |
 
 ## 6. Not ported: not in Android `dev`
 

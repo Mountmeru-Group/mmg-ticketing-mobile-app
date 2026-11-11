@@ -1,85 +1,48 @@
-// Account deletion, started in the app (iOS-4; docs/ios/APP-STORE-COMPLIANCE.md H6; App Review 5.1.1(v)).
-// The Service Desk has no deletion endpoint, so the request is a ticket for IT, raised through the EXISTING TKT-2
-// (POST /tickets) by useCreateTicket(): the same validation as Create Ticket (validateNewTicket), the same per-role
-// allow-list (tickets.api.ts), and the same online and role guards. No new endpoint, no backend change.
-// - Fields sent: title, description (as <p> HTML, by useCreateTicket), categoryId and source. Never priority, impact or
-//   urgency for any role, so the server stores its default priority (01 TKT-2).
-// - The category: the one named in config/legal.ts ACCOUNT_DELETION_CATEGORY, found by exact name in LKP-1.
-// - Nothing is sent until the person confirms (Profile › Account › Request Account Deletion → confirmation Alert).
-// Pure functions only, so the Node tests check the exact text and payload.
-import type { AuthUser, Category } from '@/types';
-import { formatDateTime, formatDisplayName } from './format';
-import { ROLE_LABELS } from './roles';
+// Account deletion, started in the app (App Review 5.1.1(v); docs/ios/APP-STORE-COMPLIANCE.md H6). iOS-4; redesigned in
+// iOS-9b (Ronit, 2026-11-11), because MMG has no deletion category and IT has agreed no deletion time.
+// The Service Desk has no deletion endpoint, so deletion is a Service Desk request for IT:
+// - Profile › Account › Request Account Deletion → a confirmation Alert (below) → the EXISTING Create Ticket sheet,
+//   filled in with the subject and description below. The person picks the category and creates the ticket through the
+//   normal flow: the same validation, the same "Create this ticket?" confirmation, the same POST /tickets (TKT-2).
+//   Profile sends nothing itself, and nothing is sent without the person's own taps.
+// - No category is hard-coded, and no time is promised anywhere: IT deletes the account and updates the person on that
+//   ticket.
+// - Every role can create tickets (Create Ticket and its "+" are shown to all four), so every role gets the same request.
+// Pure values only, so the Node tests check the exact text.
+import type { AuthUser, CreateTicketPrefill } from '@/types';
 
-/** What Profile's Account card shows: each row only once its release value is set (config/legal.ts). */
-export function accountRows(config: {
-  privacyPolicyUrl: string;
-  deletionCategory: string;
-  deletionWorkingDays: number;
-}): { privacyPolicy: boolean; requestDeletion: boolean } {
-  return {
-    privacyPolicy: /^https:\/\/\S+$/.test(config.privacyPolicyUrl.trim()),
-    requestDeletion: config.deletionCategory.trim() !== '' && Number.isInteger(config.deletionWorkingDays) && config.deletionWorkingDays > 0,
-  };
-}
-
-/** The category to file the request under: the one with exactly this name (case and outer spaces ignored), if active. */
-export function findDeletionCategory(categories: readonly Category[], name: string): Category | null {
-  const wanted = name.trim().toLowerCase();
-  if (!wanted) return null;
-  return categories.find((c) => c.isActive !== false && c.name.trim().toLowerCase() === wanted) ?? null;
+/** What Profile's Account card shows from config/legal.ts: the privacy policy only once it is an https link. */
+export function accountRows(config: { privacyPolicyUrl: string }): { privacyPolicy: boolean } {
+  return { privacyPolicy: /^https:\/\/\S+$/.test(config.privacyPolicyUrl.trim()) };
 }
 
 export const DELETION_CONFIRM_TITLE = 'Request account deletion?';
-export const DELETION_CONFIRM_LABEL = 'Send Request';
-
-/** The confirmation's message: what happens, how long it takes, and what may be kept (App Review 5.1.1(v) guidance). */
-export function deletionConfirmMessage(workingDays: number): string {
-  const days = `${workingDays} working ${workingDays === 1 ? 'day' : 'days'}`;
-  return [
-    'This asks Mount Meru IT to delete your Service Desk account and the personal data linked to it.',
-    `IT completes it by hand within ${days} and replies on the request ticket.`,
-    'Records Mount Meru must keep, such as tickets you raised, may be kept.',
-    'Your Mount Meru work account (Microsoft) is not affected.',
-    'If you sign in to Setu again, a new Service Desk account is created.',
-  ].join(' ');
-}
-
-/** The ticket's title, within TKT-2's 3–255 characters. */
-export function deletionTicketTitle(user: Pick<AuthUser, 'displayName' | 'email'>): string {
-  const who = formatDisplayName(user.displayName) || user.email || 'unknown user';
-  return `Account deletion request: ${who}`.slice(0, 255);
-}
+export const DELETION_CONFIRM_LABEL = 'Continue';
 
 /**
- * The ticket's description, as plain text (useCreateTicket sends it as <p> HTML, 05 §A.16): who is asking, from where
- * and when, and what IT is asked to do.
+ * The confirmation's message: what happens, who does it, where the person hears back and what may be kept (App Review
+ * 5.1.1(v) guidance). It names no time: IT has agreed none.
  */
-export function deletionTicketDescription(
-  user: Pick<AuthUser, 'id' | 'displayName' | 'email' | 'role'>,
-  { appVersion, requestedAt }: { appVersion: string; requestedAt: Date },
-): string {
-  return [
-    'Please delete my Service Desk account and the personal data linked to it.',
-    [
-      `Name: ${formatDisplayName(user.displayName) || '—'}`,
-      `Email: ${user.email || '—'}`,
-      `Role: ${ROLE_LABELS[user.role] ?? user.role}`,
-      `Service Desk user ID: ${user.id}`,
-      `Sent from: Setu for iPhone ${appVersion}, Profile › Request Account Deletion, ${formatDateTime(requestedAt)}`,
-    ].join('\n'),
-    'This request was made in the app after a confirmation. Please reply on this ticket when the account has been deleted, or say what has to be kept and why.',
-  ].join('\n\n');
+export const DELETION_CONFIRM_MESSAGE = [
+  'This opens a new Service Desk request, filled in for you, asking Mount Meru IT to delete your Setu / Service Desk account.',
+  'Choose a category and create it as you would any ticket: nothing is sent until you do.',
+  'IT deletes the account and updates you on that ticket.',
+  'Records Mount Meru must keep, such as tickets you raised, may be kept.',
+  'Your Mount Meru work account (Microsoft) is not affected.',
+].join(' ');
+
+/** The ticket's subject (TKT-2 title, 3–255 characters). */
+export const DELETION_TICKET_TITLE = 'Account deletion request';
+
+/** The ticket's description: who is asking, by the signed-in email. Plain text (useCreateTicket sends it as <p> HTML). */
+export function deletionTicketDescription(email: string | null | undefined): string {
+  const address = (email ?? '').trim();
+  return address
+    ? `Please delete my Setu / Service Desk account (${address})`
+    : 'Please delete my Setu / Service Desk account';
 }
 
-/** The useCreateTicket() variables for the request: title, description and category only. */
-export function accountDeletionTicket(
-  user: Pick<AuthUser, 'id' | 'displayName' | 'email' | 'role'>,
-  { appVersion, requestedAt, categoryId }: { appVersion: string; requestedAt: Date; categoryId: string },
-): { title: string; description: string; categoryId: string } {
-  return {
-    title: deletionTicketTitle(user),
-    description: deletionTicketDescription(user, { appVersion, requestedAt }),
-    categoryId,
-  };
+/** What Create Ticket opens with: the subject and description only. Never a category, priority or anything else. */
+export function accountDeletionPrefill(user: Pick<AuthUser, 'email'>): CreateTicketPrefill {
+  return { title: DELETION_TICKET_TITLE, description: deletionTicketDescription(user.email) };
 }

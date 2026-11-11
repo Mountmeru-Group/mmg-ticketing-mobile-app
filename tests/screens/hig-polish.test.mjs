@@ -6,8 +6,8 @@
 // 5. VoiceOver: no control hidden inside another; the priority preview is announced;
 // 6. appearance: light only, nothing reads the system scheme; brand yellow never text or an icon;
 // 7. the ticket list's search (iOS-8a: Android's field, fixed under the navigation bar) searches exactly as before;
-// 8. account deletion: the exact TKT-2 payload per role, and nothing sent without the confirmation;
-// 9. the privacy policy: the row, and the release guard that refuses a production build without the URL.
+// 8. account deletion (iOS-9b): a confirmation, then Create Ticket filled in; the person picks the category and sends it;
+// 9. the privacy policy and the support URL: the row, and the release guard that refuses a production build without them.
 // Source checks read the files as text, as the other screen tests do; pure modules are run.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -22,13 +22,15 @@ import { __alerts, __clearAlerts, __pressAlertButton } from 'react-native';
 import { ApiClientError } from '../../src/api/errors.ts';
 import { apiClient } from '../../src/api/client.ts';
 import { MOBILE_TICKET_SOURCE, createTicket } from '../../src/api/tickets.api.ts';
-import { ACCOUNT_DELETION_CATEGORY, ACCOUNT_DELETION_WORKING_DAYS, PRIVACY_POLICY_URL } from '../../src/config/legal.ts';
+import { PRIVACY_POLICY_URL, SUPPORT_URL } from '../../src/config/legal.ts';
+import { validateNewTicket } from '../../src/hooks/useCreateTicket.ts';
 import { ACCESSIBILITY_TEXT_SCALE, isAccessibilityTextScale } from '../../src/hooks/useTextSize.ts';
 import { loginLayout } from '../../src/theme/brand.ts';
 import { fontSize, loginType, maxTextScale, textStylePoints } from '../../src/theme/typography.ts';
+import { USER_ROLES } from '../../src/types/enums.ts';
 import {
-  DELETION_CONFIRM_LABEL, DELETION_CONFIRM_TITLE, accountDeletionTicket, accountRows, deletionConfirmMessage,
-  deletionTicketTitle, findDeletionCategory,
+  DELETION_CONFIRM_LABEL, DELETION_CONFIRM_MESSAGE, DELETION_CONFIRM_TITLE, DELETION_TICKET_TITLE, accountDeletionPrefill,
+  accountRows, deletionTicketDescription,
 } from '../../src/utils/accountDeletion.ts';
 import { plainTextToHtml } from '../../src/utils/compose.ts';
 import { confirmAction, notify, notifyWarning, reportWriteError } from '../../src/utils/dialogs.ts';
@@ -456,7 +458,10 @@ describe('the ticket list: Android\'s search field, fixed under the navigation b
 
 // ── 8. Account deletion ──────────────────────────────────────
 
-describe('account deletion: a ticket for IT through the existing TKT-2, only after a confirmation (H6)', () => {
+// iOS-9b (Ronit, 2026-11-11): MMG has no deletion category and IT has agreed no deletion time, so the iOS-4 request (a
+// ticket sent from Profile under a named category, with "within N working days") became: a confirmation, then the
+// EXISTING Create Ticket sheet, filled in. The person picks the category and creates it through the normal flow.
+describe('account deletion: a confirmation, then Create Ticket filled in; the person picks the category and sends it (H6)', () => {
   const sent = [];
   apiClient.defaults.adapter = async (config) => {
     sent.push({ method: config.method, url: config.url, data: typeof config.data === 'string' ? JSON.parse(config.data) : config.data });
@@ -468,151 +473,177 @@ describe('account deletion: a ticket for IT through the existing TKT-2, only aft
   });
 
   const user = { id: 'user-7', displayName: 'Asha Mrema', email: 'asha.mrema@mountmerugroup.com', role: 'END_USER' };
-  const at = new Date(2026, 9, 29, 14, 5);
+  const profile = code(read('src/screens/profile/ProfileScreen.tsx'));
+  const flow = profile.slice(profile.indexOf('const requestDeletion'), profile.indexOf('const set = (key'));
+  const create = code(read('src/screens/tickets/CreateTicketScreen.tsx'));
+  /** Words that would promise a time. None may appear anywhere in the flow. */
+  const TIMELINE = /\b(days?|weeks?|hours?|months?|within|working|business|by hand|soon|immediately|promptly)\b|\d/i;
 
-  test('the exact ticket: title, description and category, nothing else', () => {
-    const v = accountDeletionTicket(user, { appVersion: '0.1.0', requestedAt: at, categoryId: 'cat-access' });
-    assert.deepEqual(Object.keys(v).sort(), ['categoryId', 'description', 'title']);
-    assert.equal(v.title, 'Account deletion request: Asha Mrema');
-    assert.equal(v.categoryId, 'cat-access');
-    assert.equal(
-      v.description,
-      [
-        'Please delete my Service Desk account and the personal data linked to it.',
-        '',
-        'Name: Asha Mrema',
-        'Email: asha.mrema@mountmerugroup.com',
-        'Role: User',
-        'Service Desk user ID: user-7',
-        `Sent from: Setu for iPhone 0.1.0, Profile › Request Account Deletion, ${v.description.match(/Deletion, (.*)$/m)[1]}`,
-        '',
-        'This request was made in the app after a confirmation. Please reply on this ticket when the account has been deleted, or say what has to be kept and why.',
-      ].join('\n'),
-    );
-    assert.match(v.description, /Deletion, \d{2} \w{3} 2026, 14:05$/m, 'the date and time it was sent');
-    assert.ok(v.title.length >= 3 && v.title.length <= 255, "TKT-2's title limits");
-    assert.equal(deletionTicketTitle({ displayName: '', email: 'x@y.z' }), 'Account deletion request: x@y.z');
-    assert.equal(deletionTicketTitle({ displayName: 'A'.repeat(400), email: '' }).length, 255);
-  });
-
-  test('POST /tickets sends title, description, category and source for every role: never priority, impact or urgency', async () => {
-    const v = accountDeletionTicket(user, { appVersion: '0.1.0', requestedAt: at, categoryId: 'cat-access' });
-    for (const role of ['END_USER', 'L2_MANAGER', 'AGENT', 'ADMIN']) {
-      sent.length = 0;
-      // As useCreateTicket() builds it: the description as <p> HTML, source API, and no impact or urgency given.
-      await createTicket({ title: v.title, description: plainTextToHtml(v.description), categoryId: v.categoryId, source: MOBILE_TICKET_SOURCE, impact: undefined, urgency: undefined }, role);
-      assert.equal(sent.length, 1, role);
-      assert.equal(sent[0].method, 'post');
-      assert.equal(sent[0].url, '/tickets');
-      assert.deepEqual(sent[0].data, { title: v.title, description: plainTextToHtml(v.description), categoryId: 'cat-access', source: 'API' }, role);
-    }
-    assert.match(plainTextToHtml(v.description), /^<p>Please delete my Service Desk account and the personal data linked to it\.<\/p><p>Name: Asha Mrema<br>/);
-  });
-
-  test('the request goes through useCreateTicket (its validation and guards), with nothing but the built ticket', () => {
-    const src = code(read('src/screens/profile/ProfileScreen.tsx'));
-    assert.match(src, /const createTicket = useCreateTicket\(\);/);
-    assert.match(src, /createTicket\.mutateAsync\(\s*accountDeletionTicket\(user, \{ appVersion: APP_VERSION, requestedAt: new Date\(\), categoryId: category\.id \}\),\s*\)/);
-    const hook = code(read('src/hooks/useCreateTicket.ts'));
-    assert.match(hook, /const problem = validateNewTicket\(v\);/, 'the same validation as Create Ticket');
-    assert.match(hook, /requireOnline\(\);/);
-  });
-
-  test('nothing is sent without the confirmation: it asks first, and Cancel stops everything', async () => {
-    const src = code(read('src/screens/profile/ProfileScreen.tsx'));
-    const flow = src.slice(src.indexOf('const requestDeletion'), src.indexOf('const set = (key'));
+  test('the confirmation appears first: its title, its buttons, and Cancel opens nothing', async () => {
     const asked = flow.indexOf('await confirmAction(');
-    assert.ok(asked >= 0);
+    assert.ok(asked >= 0, 'it asks');
     assert.ok(asked < flow.indexOf('if (!ok) return;'));
-    assert.ok(flow.indexOf('if (!ok) return;') < flow.indexOf('categories.refetch()'), 'no lookup before the OK');
-    assert.ok(flow.indexOf('if (!ok) return;') < flow.indexOf('createTicket.mutateAsync('), 'no ticket before the OK');
-    assert.match(flow, /title: DELETION_CONFIRM_TITLE,\s*message: deletionConfirmMessage\(ACCOUNT_DELETION_WORKING_DAYS\),\s*confirmLabel: DELETION_CONFIRM_LABEL,/);
+    assert.ok(flow.indexOf('if (!ok) return;') < flow.indexOf("navigation.navigate('CreateTicket'"), 'nothing opens before the OK');
+    assert.match(flow, /title: DELETION_CONFIRM_TITLE,\s*message: DELETION_CONFIRM_MESSAGE,\s*confirmLabel: DELETION_CONFIRM_LABEL,/);
     assert.doesNotMatch(flow, /destructive: true/, 'a deliberate choice: the default style (HIG Alerts)');
 
-    const answer = confirmAction({ title: DELETION_CONFIRM_TITLE, message: deletionConfirmMessage(5), confirmLabel: DELETION_CONFIRM_LABEL });
+    const answer = confirmAction({ title: DELETION_CONFIRM_TITLE, message: DELETION_CONFIRM_MESSAGE, confirmLabel: DELETION_CONFIRM_LABEL });
     const alert = __alerts().at(-1);
     assert.equal(alert.title, 'Request account deletion?');
-    assert.deepEqual(alert.buttons.map((b) => [b.text, b.style]), [['Cancel', 'cancel'], ['Send Request', 'default']]);
+    assert.equal(alert.message, DELETION_CONFIRM_MESSAGE);
+    assert.deepEqual(alert.buttons.map((b) => [b.text, b.style]), [['Cancel', 'cancel'], ['Continue', 'default']]);
     __pressAlertButton('Cancel');
     assert.equal(await answer, false);
     assert.equal(sent.length, 0, 'Cancel sent nothing');
   });
 
-  test('the confirmation says what happens, how long it takes and what may be kept (App Review 5.1.1(v))', () => {
+  test('the message: a request for IT, raised by the person, updated on that ticket; no time promised', () => {
     assert.equal(
-      deletionConfirmMessage(5),
-      'This asks Mount Meru IT to delete your Service Desk account and the personal data linked to it. IT completes it by hand within 5 working days and replies on the request ticket. Records Mount Meru must keep, such as tickets you raised, may be kept. Your Mount Meru work account (Microsoft) is not affected. If you sign in to Setu again, a new Service Desk account is created.',
+      DELETION_CONFIRM_MESSAGE,
+      'This opens a new Service Desk request, filled in for you, asking Mount Meru IT to delete your Setu / Service Desk account. Choose a category and create it as you would any ticket: nothing is sent until you do. IT deletes the account and updates you on that ticket. Records Mount Meru must keep, such as tickets you raised, may be kept. Your Mount Meru work account (Microsoft) is not affected.',
     );
-    assert.match(deletionConfirmMessage(1), /within 1 working day and/);
+    assert.doesNotMatch(DELETION_CONFIRM_MESSAGE, TIMELINE);
   });
 
-  test('the category: the named one, found by exact name in LKP-1, and only if active', () => {
-    const c = (id, name, isActive = true) => ({ id, name, isActive });
-    const list = [c('a', 'Access Requests'), c('b', 'Account deletion', false), c('d', ' Account Deletion ')];
-    assert.equal(findDeletionCategory(list, 'account deletion')?.id, 'd', 'case and outer spaces ignored; the inactive one skipped');
-    assert.equal(findDeletionCategory(list, 'Account'), null, 'never a partial match');
-    assert.equal(findDeletionCategory(list, ''), null);
-    const src = code(read('src/screens/profile/ProfileScreen.tsx'));
-    assert.match(src, /useCategories\(\{ enabled: false \}\)/, 'LKP-1 only when a request is sent, never on opening Profile');
-    assert.match(src, /if \(!category\) \{\s*hapticOutcome\('error'\);/, 'no category: nothing is sent');
+  test('on Continue, Create Ticket opens filled in: the subject, and the description with the signed-in email', () => {
+    assert.match(flow, /navigation\.navigate\('CreateTicket', \{ prefill: accountDeletionPrefill\(user\) \}\);/);
+    const prefill = accountDeletionPrefill(user);
+    assert.deepEqual(prefill, {
+      title: 'Account deletion request',
+      description: 'Please delete my Setu / Service Desk account (asha.mrema@mountmerugroup.com)',
+    });
+    assert.deepEqual(Object.keys(prefill).sort(), ['description', 'title'], 'the text only: never a category or anything else');
+    assert.equal(accountDeletionPrefill({ email: '  x@y.z ' }).description, 'Please delete my Setu / Service Desk account (x@y.z)');
+    assert.equal(deletionTicketDescription(''), 'Please delete my Setu / Service Desk account', 'no email: no empty brackets');
+    assert.equal(DELETION_TICKET_TITLE, 'Account deletion request');
+    for (const text of Object.values(prefill)) assert.doesNotMatch(text.replace('asha.mrema@mountmerugroup.com', ''), TIMELINE);
+    // As filled in, the form is NOT ready to send: the person must still choose the category (the normal validation).
+    assert.equal(validateNewTicket({ ...prefill, categoryId: null }), 'Please select a Category');
+    assert.equal(validateNewTicket({ ...prefill, categoryId: 'cat-picked' }), null);
   });
 
-  test('the row shows only once its category and working days are set; the success shows the new ticket number', () => {
-    assert.deepEqual(accountRows({ privacyPolicyUrl: '', deletionCategory: '', deletionWorkingDays: 0 }), { privacyPolicy: false, requestDeletion: false });
-    assert.equal(accountRows({ privacyPolicyUrl: '', deletionCategory: 'Access', deletionWorkingDays: 0 }).requestDeletion, false);
-    assert.equal(accountRows({ privacyPolicyUrl: '', deletionCategory: 'Access', deletionWorkingDays: 5 }).requestDeletion, true);
-    const src = code(read('src/screens/profile/ProfileScreen.tsx'));
-    assert.match(src, /const canRequestDeletion = ACCOUNT_ROWS\.requestDeletion && !!user && !placeholder;/);
-    assert.match(src, /Alert\.alert\('Request Sent', `Ticket #\$\{ticket\.ticketNumber\} was created\./);
-    assert.match(src, /\{ text: 'View Ticket', onPress: \(\) => navigation\.navigate\('TicketDetail', \{ ticketId: ticket\.id \}\) \}/);
+  test('nothing is sent without the person\'s tap: Profile creates no ticket, looks nothing up and picks no category', () => {
+    assert.doesNotMatch(profile, /useCreateTicket|useCategories|createTicket\(|categoryId|findDeletionCategory|requireOnline/);
+    assert.doesNotMatch(flow, /mutateAsync|refetch|apiClient|Alert\.alert/, 'the flow only asks, then navigates');
+    assert.equal(profile.split('mutateAsync(').length - 1, 1, "Profile's one write is its own profile save (USR-2)");
+    assert.match(profile, /await update\.mutateAsync\(\{ form, before: profile\.data \}\);/);
+    // Create Ticket sends only from submit(): validation, then its own "Create this ticket?" confirmation, then TKT-2.
+    const submit = create.slice(create.indexOf('async function submit()'), create.indexOf('const busy = create.isPending;'));
+    const order = ['validateNewTicket({ title, description, categoryId })', "title: 'Create this ticket?'", 'if (!ok) return;', 'create.mutateAsync('];
+    const at = order.map((needle) => submit.indexOf(needle));
+    assert.ok(at.every((i) => i >= 0), JSON.stringify(at));
+    assert.deepEqual([...at].sort((a, b) => a - b), at, 'validated, confirmed, then sent');
+    assert.equal(create.split('create.mutateAsync(').length - 1, 1, 'one send, in submit()');
+  });
+
+  test('Create Ticket: `prefill` seeds only the first title and description; the category comes from the cascade only', () => {
+    assert.match(create, /const prefill = route\.params\?\.prefill;/);
+    assert.match(create, /const \[initialTitle\] = useState\(\(\) => \(prefill \? `\$\{INITIAL_TITLE\}\$\{prefill\.title\}` : INITIAL_TITLE\)\);/);
+    assert.match(create, /const \[initialDescription\] = useState\(\(\) => prefill\?\.description \?\? ''\);/);
+    assert.match(create, /const \[title, setTitle\] = useState\(initialTitle\);/);
+    assert.match(create, /const \[description, setDescription\] = useState\(initialDescription\);/);
+    assert.equal(create.split('prefill').length - 1, 5, 'read once (2), used for the two starting texts only (3)');
+    assert.match(create, /const categoryId = itemId \|\| subId \|\| topId;/);
+    // Closing an unchanged pre-filled form asks nothing, as an empty one; any change of the person's is guarded.
+    assert.match(create, /const dirty = title !== initialTitle \|\| description\.trim\(\) !== initialDescription\.trim\(\) \|\| !!categoryId \|\| files\.length > 0;/);
+    assert.match(read('src/types/navigation.ts'), /CreateTicket: \{ prefill\?: CreateTicketPrefill \} \| undefined;/);
+    assert.match(read('src/types/navigation.ts'), /export interface CreateTicketPrefill \{\s*title: string;\s*description: string;\s*\}/);
+  });
+
+  test('every role that can create tickets gets it, and TKT-2 sends the person\'s category with the text', async () => {
+    // The row is not role-gated (only a real signed-in account), as Create Ticket is open to every role.
+    assert.match(profile, /const canRequestDeletion = !!user && !placeholder;/);
+    assert.doesNotMatch(flow, /role|isStaff|isAgentOrAdmin|createTicketPermissions/);
+    assert.doesNotMatch(read('src/screens/tickets/TicketListScreen.tsx').match(/\/\/ "\+" FAB[\s\S]*?<\/Pressable>/)[0], /role|isStaff/);
+    const prefill = accountDeletionPrefill(user);
+    for (const role of USER_ROLES) {
+      sent.length = 0;
+      // As useCreateTicket() builds it from the form: the description as <p> HTML, source API; nothing else filled in.
+      await createTicket({ ...prefill, description: plainTextToHtml(prefill.description), categoryId: 'cat-picked', source: MOBILE_TICKET_SOURCE, impact: undefined, urgency: undefined }, role);
+      assert.equal(sent.length, 1, role);
+      assert.equal(sent[0].method, 'post');
+      assert.equal(sent[0].url, '/tickets');
+      assert.deepEqual(sent[0].data, {
+        title: 'Account deletion request',
+        description: '<p>Please delete my Setu / Service Desk account (asha.mrema@mountmerugroup.com)</p>',
+        categoryId: 'cat-picked',
+        source: 'API',
+      }, role);
+    }
+  });
+
+  test('no hard-coded category and no timeline, anywhere: the module, legal.ts, Profile and the build guard', () => {
+    const module = code(read('src/utils/accountDeletion.ts'));
+    // "Choose a category" is the only mention: an instruction to the person, never a value, field or lookup.
+    assert.doesNotMatch(module.replace('Choose a category and create it', ''), /categor/i);
+    for (const rel of ['src/config/legal.ts', 'src/screens/profile/ProfileScreen.tsx', 'src/utils/accountDeletion.ts', 'scripts/eas-build-guard.js']) {
+      assert.doesNotMatch(code(read(rel)), /ACCOUNT_DELETION_CATEGORY|ACCOUNT_DELETION_WORKING_DAYS|deletionCategory|deletionWorkingDays/, rel);
+    }
+    const hint = profile.match(/label="Request Account Deletion"\s*hint="([^"]+)"/)[1];
+    assert.equal(hint, 'Asks you to confirm, then opens a new request for IT to delete your Service Desk account');
+    for (const text of [DELETION_CONFIRM_TITLE, DELETION_CONFIRM_MESSAGE, DELETION_CONFIRM_LABEL, DELETION_TICKET_TITLE, hint]) {
+      assert.doesNotMatch(text, TIMELINE, text);
+    }
   });
 });
 
 // ── 9. Privacy policy and the release guard ──────────────────
 
-describe('the privacy policy (H1) and the release guard', () => {
+describe('the privacy policy (H1), the support URL (H7) and the release guard', () => {
   const env = (prod) => `const API_BASE_URLS = {\n  UAT: 'https://uat.example.invalid/api/v1',\n  PROD: '${prod}',\n};`;
-  const legal = ({ url = '', category = '', days = 0 } = {}) =>
-    `export const PRIVACY_POLICY_URL = '${url}';\nexport const ACCOUNT_DELETION_CATEGORY = '${category}';\nexport const ACCOUNT_DELETION_WORKING_DAYS = ${days};\n`;
-  const ready = { url: 'https://www.example.invalid/privacy', category: 'Access Requests', days: 5 };
+  const legal = ({ url = '', support = '' } = {}) =>
+    `export const PRIVACY_POLICY_URL = '${url}';\nexport const SUPPORT_URL = '${support}';\n`;
+  const ready = { url: 'https://www.example.invalid/privacy', support: 'https://www.example.invalid' };
   const PROD = 'https://prod.example.invalid/api/v1';
+  const production = (legalSource, envSource = env(PROD)) => verdict({ profile: 'production', appEnv: 'PROD', envSource, legalSource });
 
   test('a production build fails with an empty privacy URL, even once the PROD API URL is set', () => {
-    const result = verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: legal({ ...ready, url: '' }) });
+    const result = production(legal({ ...ready, url: '' }));
     assert.equal(result.ok, false);
     assert.equal(result.lines.length, 2);
     assert.match(result.lines[0], /no PRIVACY_POLICY_URL/);
   });
 
-  test('…and with a URL that is not https, or no deletion category or working days', () => {
-    assert.match(verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: legal({ ...ready, url: 'http://x.invalid' }) }).lines.join(' '), /PRIVACY_POLICY_URL/);
-    assert.match(verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: legal({ ...ready, category: '' }) }).lines.join(' '), /ACCOUNT_DELETION_CATEGORY/);
-    assert.match(verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: legal({ ...ready, days: 0 }) }).lines.join(' '), /ACCOUNT_DELETION_WORKING_DAYS/);
-    assert.equal(verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: null }).ok, false, 'unreadable: fails closed');
+  test('…and with a privacy or support URL that is not https, or no support URL; unreadable fails closed', () => {
+    assert.match(production(legal({ ...ready, url: 'http://x.invalid' })).lines.join(' '), /PRIVACY_POLICY_URL/);
+    assert.match(production(legal({ ...ready, support: '' })).lines.join(' '), /no SUPPORT_URL/);
+    assert.match(production(legal({ ...ready, support: 'http://x.invalid' })).lines.join(' '), /SUPPORT_URL/);
+    assert.match(production(legal({ ...ready, support: 'mailto:it@example.invalid' })).lines.join(' '), /SUPPORT_URL/, 'a URL, not an email');
+    assert.equal(production(null).ok, false, 'unreadable legal.ts: fails closed');
+    assert.equal(production(legal(ready), null).ok, false, 'unreadable env.ts: fails closed');
+    assert.match(production(legal(ready), env('')).lines.join(' '), /no PROD API URL/);
   });
 
-  test('with every value set it passes; preview and development builds never need them', () => {
-    assert.deepEqual(verdict({ profile: 'production', appEnv: 'PROD', envSource: env(PROD), legalSource: legal(ready) }), { ok: true, lines: [] });
+  test('with the PROD URL and both links it passes; preview and development builds never need them', () => {
+    assert.deepEqual(production(legal(ready)), { ok: true, lines: [] });
     assert.equal(verdict({ profile: 'preview', appEnv: 'UAT', envSource: env(''), legalSource: legal() }).ok, true);
     assert.equal(verdict({ profile: 'preview', appEnv: 'PROD', envSource: env(PROD), legalSource: legal(ready) }).ok, false, 'PROD only on production (rule 4)');
+    assert.equal(verdict({ profile: 'production', appEnv: 'UAT', envSource: env(PROD), legalSource: legal(ready) }).ok, false, 'production must target PROD');
   });
 
-  test('this repo today: production is refused (no PROD URL, no privacy URL, no deletion values)', () => {
-    const result = verdict({ profile: 'production', appEnv: 'PROD', envSource: read('src/config/env.ts'), legalSource: read('src/config/legal.ts') });
-    assert.equal(result.ok, false);
-    const text = result.lines.join(' ');
-    for (const name of ['PROD API URL', 'PRIVACY_POLICY_URL', 'ACCOUNT_DELETION_CATEGORY', 'ACCOUNT_DELETION_WORKING_DAYS']) assert.ok(text.includes(name), name);
-    assert.deepEqual(legalValuesFrom(read('src/config/legal.ts')), {
-      privacyPolicyUrl: PRIVACY_POLICY_URL,
-      deletionCategory: ACCOUNT_DELETION_CATEGORY,
-      deletionWorkingDays: ACCOUNT_DELETION_WORKING_DAYS,
-    });
+  test('iOS-9b: the guard requires exactly the PROD URL and the two links; the deletion values are gone', () => {
+    assert.deepEqual(Object.keys(legalValuesFrom(legal(ready))).sort(), ['privacyPolicyUrl', 'supportUrl']);
+    assert.doesNotMatch(code(read('scripts/eas-build-guard.js')), /ACCOUNT_DELETION|WORKING_DAYS/);
+  });
+
+  test('this repo: the production profile passes the guard, with the approved PROD URL and both links set', () => {
+    assert.deepEqual(production(read('src/config/legal.ts'), read('src/config/env.ts')), { ok: true, lines: [] });
+    assert.deepEqual(legalValuesFrom(read('src/config/legal.ts')), { privacyPolicyUrl: PRIVACY_POLICY_URL, supportUrl: SUPPORT_URL });
+    assert.equal(PRIVACY_POLICY_URL, 'https://www.mountmerugroup.com/privacy-policy');
+    assert.equal(SUPPORT_URL, 'https://www.mountmerugroup.com');
+    for (const url of [PRIVACY_POLICY_URL, SUPPORT_URL]) assert.match(url, /^https:\/\/\S+$/);
+  });
+
+  test('the support URL is for App Store Connect only: nothing in the app shows or imports it', () => {
+    const users = sourceFiles('src').filter((rel) => rel !== 'src/config/legal.ts' && /\bSUPPORT_URL\b/.test(code(read(rel))));
+    assert.deepEqual(users, []);
   });
 
   test('the Privacy Policy row: only with an https URL, opened in Safari; no link to nothing (A2)', () => {
-    assert.equal(accountRows({ privacyPolicyUrl: '', deletionCategory: '', deletionWorkingDays: 0 }).privacyPolicy, false);
-    assert.equal(accountRows({ privacyPolicyUrl: 'http://x.invalid', deletionCategory: '', deletionWorkingDays: 0 }).privacyPolicy, false);
-    assert.equal(accountRows({ privacyPolicyUrl: 'https://www.example.invalid/privacy', deletionCategory: '', deletionWorkingDays: 0 }).privacyPolicy, true);
+    assert.equal(accountRows({ privacyPolicyUrl: '' }).privacyPolicy, false);
+    assert.equal(accountRows({ privacyPolicyUrl: 'http://x.invalid' }).privacyPolicy, false);
+    assert.equal(accountRows({ privacyPolicyUrl: 'https://www.example.invalid/privacy' }).privacyPolicy, true);
+    assert.equal(accountRows({ privacyPolicyUrl: PRIVACY_POLICY_URL }).privacyPolicy, true, 'this build shows it');
     const src = code(read('src/screens/profile/ProfileScreen.tsx'));
     assert.match(src, /Linking\.openURL\(PRIVACY_POLICY_URL\)/);
     assert.match(src, /\{ACCOUNT_ROWS\.privacyPolicy \? \(\s*<AccountRow icon="shield-checkmark-outline" label="Privacy Policy"/);

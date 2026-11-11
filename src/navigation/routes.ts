@@ -123,6 +123,7 @@ export const WITHOUT_GET_ID: Partial<Record<StackRoute | SheetRoute, string>> = 
   TicketLink: 'Holds no state of its own: everything comes from `link`, so a reused resolver resolves the new link.',
   TicketList: 'The list root; a filter from Home replaces the one shown, as on Android (`pop: true`).',
   ServiceCatalog: 'The catalogue root; `view` and `resetAt` switch what it shows, as on Android.',
+  CreateTicket: 'A new ticket, no record yet: `prefill` (iOS-9b, the account-deletion request) only seeds its first text.',
 };
 
 type GetId = (options: { params: Readonly<object | undefined> }) => string | undefined;

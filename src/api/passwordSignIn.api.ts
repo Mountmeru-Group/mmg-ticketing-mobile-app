@@ -5,8 +5,8 @@
 // readSession() as AUTH-P2 (src/api/auth.api.ts) with AUTH-P1's options (token, name and expiry aliases; only the
 // token, user.id and user.role required). A body without `user.countryId` is completed from AUTH-2 (GET /auth/me) or
 // refused, never stored without it.
-// - Only a UAT build bundles this module: LoginScreen.tsx loads the form behind a build-time gate, so a production
-//   bundle has no email sign-in code or string (scripts/verify-release-bundle.js).
+// - Every build bundles this module, UAT and PROD (iOS-9b, as Android 6b5e46c); until then a build-time gate kept it out
+//   of production bundles. scripts/verify-release-bundle.js now requires it in both, and "/auth/login" in neither.
 // - Cookies: `withCredentials: false` (client.ts) sends no jar cookie (React Native's RCTNetworking.mm:319). Whether the
 //   answer sets one is not yet confirmed (ask A32). Since R1 it no longer blocks testers: whatever the answer, iOS's
 //   cookie store is emptied right after it, before AUTH-2 and before the session is stored (./cookieShield.ts).
@@ -35,7 +35,7 @@ const S_NULL = ['string', 'null'] as const;
  * AUTH-P1 200 body (src/types/mobile-password-contract.ts): the OPTIONAL single-name fields only. The alias groups (the
  * token, the name, the expiry) are reported by readSession() itself, as "none of … present". A missing
  * `user.countryId` is also what makes the app ask AUTH-2 for it (below). Android keeps this in responseSpecs.ts; on iOS
- * it lives here, so a production bundle does not carry it.
+ * it lives here, with the rest of the email sign-in (iOS-5g).
  */
 const MOBILE_PASSWORD_OPTIONAL_SPEC: readonly FieldSpec[] = [
   { path: 'user.email', kinds: S },
@@ -165,7 +165,7 @@ function isNoSuchRoute(error: unknown): boolean {
 }
 
 /**
- * One `[auth]` line per answer, at debug level, in every UAT build (as Android's): Metro, and the device log. The path,
+ * One `[auth]` line per answer, at debug level, in every build (as Android's): Metro, and the device log. The path,
  * statuses and key names only: never the email, the password, a token or a message from the server.
  */
 function logAuth(message: string): void {
@@ -186,7 +186,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     // skipAuth: there is no session yet, and a stale token must not ride along.
     const res = await apiClient.post<unknown>(path, body, { skipAuth: true });
     if (res.headers['set-cookie'] !== undefined) {
-      // The value is never logged. The open item (no Set-Cookie, A32) is unanswered: say so, in every UAT build.
+      // The value is never logged. The open item (no Set-Cookie, A32) is unanswered: say so, in every build.
       // The cookie itself does not outlive this answer: the shield below deletes it (R1).
       logAuth(`POST /api/v1${path} sent Set-Cookie; the app expects no cookie (02 §2 #5)`);
       if (__DEV__) console.warn(`[API drift] AUTH-P1 POST /api/v1${path} sent Set-Cookie; the app expects no cookie (02 §2 #5)`);

@@ -9,9 +9,9 @@
 // - The environment chip shows on every build except production (SHOW_ENVIRONMENT_CHIP, src/config/env.ts).
 // - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
 //   iOS (iOS-5f): VoiceOver hears "Copyright <year> Mount Meru Group" (copyrightLabel), as TalkBack does.
-// - Below the pill, on UAT builds only (EMAIL_SIGN_IN_ENABLED): email and password sign-in, ./EmailSignInForm.tsx
-//   (2026-11-05, ASSUMED contract, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
-//   single flight, and the pill is locked while an email sign-in runs.
+// - Below the pill, on every build, UAT and PROD alike: email and password sign-in, ./EmailSignInForm.tsx
+//   (2026-11-05; opened to PROD 2026-11-06 on Android, iOS-9b on iOS, 02-AUTH.md §8). Microsoft stays the primary
+//   action. The two sign-ins share one single flight, and the pill is locked while an email sign-in runs.
 // - With the form open, Login measures the form's "Sign in" and scrolls just enough to show all of it, 16 dp clear of
 //   the keyboard or the screen's foot (./emailFormLayout.ts revealScrollY). It does so when the button is laid out or
 //   moves (the form opens; an error appears above it), when the keyboard opens, and when the scroll view is resized
@@ -19,10 +19,12 @@
 // - iOS (iOS-5c): Android's file with one difference: __DEV__ builds keep the developer-token button, because deleting
 //   that screen is on the iOS-9 list (docs/ios/ANDROID-DELTA.md §5, item 1). Release builds never contain it.
 // - iOS (iOS-5g; ANDROID-DELTA.md §10.7): the email sign-in calls ONE path, the backend team's confirmed POST
-//   /auth/mobile/login (./passwordSignInAttempt.ts). Two gates, both UAT only: EMAIL_SIGN_IN_ENABLED at run time, as
-//   on Android, and a build-time gate (EmailSignInForm below), so a production bundle has no email sign-in code or
-//   string at all (scripts/verify-release-bundle.js). The Microsoft flow (the iOS redirect, PKCE, the private sheet) is
-//   unchanged. While an email sign-in runs, VoiceOver skips the locked pill as TalkBack does.
+//   /auth/mobile/login (./passwordSignInAttempt.ts), never POST /auth/login. iOS-9b removed its two UAT-only gates (the
+//   run-time flag in src/config/env.ts and the build-time require here), as Android 6b5e46c removed its one: every bundle,
+//   preview and production, carries it (scripts/verify-release-bundle.js requires it in both). The R1 cookie shield
+//   still empties iOS's cookie store after every sign-in answer (src/api/cookieShield.ts). The Microsoft flow (the iOS
+//   redirect, PKCE, the private sheet) is unchanged. While an email sign-in runs, VoiceOver skips the locked pill as
+//   TalkBack does.
 // TODO(later phase):
 // - AUTH-1 decides which buttons show; `microsoftEnabled` describes the WEB SSO only (01 AUTH-1).
 // - SYS-1 health check on start / after a network error.
@@ -37,29 +39,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, OfflineBanner, OutlineButton } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
-import { EMAIL_SIGN_IN_ENABLED, ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
+import { ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
 import { reduceMotionEnabled, useSingleFlight } from '@/hooks';
 import { REAUTH_NOTICE, useAuthStore } from '@/store/auth.store';
 import { colors, loginLayout, loginType, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { copyrightLabel, copyrightLine, copyrightYear } from '@/utils/copyright';
+import { EmailSignInForm } from './EmailSignInForm';
 import { revealScrollY, type ScrollViewport } from './emailFormLayout';
 import { SignInButton } from './SignInButton';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
 
 const { reference, logoCard } = loginLayout;
-
-/**
- * iOS (iOS-5g): the email sign-in's form, on a UAT build only. Expo writes EXPO_PUBLIC_APP_ENV into the bundle when it
- * builds it, so a production build reads `'PROD' !== 'PROD' ? require(…) : null`, which Metro folds away before it
- * collects the bundle's modules: the form, ./passwordSignInAttempt.ts, src/api/passwordSignIn.api.ts and their strings
- * are not in that bundle at all. EMAIL_SIGN_IN_ENABLED (src/config/env.ts) is the run-time gate, as on Android; both say
- * UAT for the same builds (EXPO_PUBLIC_APP_ENV unset or UAT).
- */
-const EmailSignInForm: typeof import('./EmailSignInForm').EmailSignInForm | null =
-  process.env.EXPO_PUBLIC_APP_ENV !== 'PROD'
-    ? (require('./EmailSignInForm') as typeof import('./EmailSignInForm')).EmailSignInForm
-    : null;
 
 /** The redirect URI this build sends to Microsoft (src/config/auth.config.ts), for the __DEV__ hint. */
 function describeRedirectUri(): string {
@@ -270,19 +261,17 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
                 >
                   <SignInButton busy={signingIn} onPress={startSignIn} />
                 </View>
-                {EMAIL_SIGN_IN_ENABLED && EmailSignInForm ? (
-                  <EmailSignInForm
-                    ssoBusy={signingIn}
-                    run={once}
-                    onBusyChange={emailBusyChanged}
-                    onMicrosoft={startSignIn}
-                    onOpen={() => {
-                      emailOpen.current = true;
-                    }}
-                    submitRef={submit}
-                    onSubmitLayout={revealSubmit}
-                  />
-                ) : null}
+                <EmailSignInForm
+                  ssoBusy={signingIn}
+                  run={once}
+                  onBusyChange={emailBusyChanged}
+                  onMicrosoft={startSignIn}
+                  onOpen={() => {
+                    emailOpen.current = true;
+                  }}
+                  submitRef={submit}
+                  onSubmitLayout={revealSubmit}
+                />
                 {/* Which backend this build talks to, for testers (04 M1). Never on a production build. */}
                 {SHOW_ENVIRONMENT_CHIP ? (
                   <View accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">

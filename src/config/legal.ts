@@ -1,23 +1,19 @@
-// Values App Review needs from the app (docs/ios/APP-STORE-COMPLIANCE.md H1, H6), set once per release. iOS-4.
-// - Empty means "not decided yet": the row that needs a value is not shown at all (no link to nothing, no request that
-//   can't be sent: compliance A2), and scripts/eas-build-guard.js refuses a `production` build until all three are set.
-// - Plain literals only: the build guard reads this file as text, before anything is installed.
+// Values App Review needs from the app and from App Store Connect (docs/ios/APP-STORE-COMPLIANCE.md H1, H7), set once
+// per release. iOS-4; iOS-9b set them and replaced the deletion category and working days (see utils/accountDeletion.ts).
+// - Empty means "not decided yet": a row that needs a value is not shown at all (no link to nothing: compliance A2), and
+//   scripts/eas-build-guard.js refuses a `production` build until both are https links.
+// - Plain literals only: the build guard and the release check read this file as text, before anything is installed.
 // This file must stay free of runtime imports.
 
 /**
  * MMG's published privacy policy (App Review 5.1.1(i): "within the app in an easily accessible manner"). An https URL,
- * opened in Safari from Profile › Account › Privacy Policy. Owner: Ronit / legal. Empty until MMG publishes it.
+ * opened in Safari from Profile › Account › Privacy Policy, and the same URL in App Store Connect's Privacy Policy URL
+ * field. Owner: Ronit / legal. Set 2026-11-11 (iOS-9b).
  */
-export const PRIVACY_POLICY_URL = '';
+export const PRIVACY_POLICY_URL = 'https://www.mountmerugroup.com/privacy-policy';
 
 /**
- * The Service Desk category an account-deletion request is filed under (App Review 5.1.1(v); utils/accountDeletion.ts):
- * its exact name, looked up in LKP-1 (GET /categories?flat=true) when the person sends the request. Owner: Ronit / IT.
+ * App Store Connect's Support URL (App Review 1.5, compliance H7). Not shown in the app: kept here as the one place the
+ * release reads it from, so it is checked (an https link) with the privacy policy. Owner: Ronit. Set 2026-11-11 (iOS-9b).
  */
-export const ACCOUNT_DELETION_CATEGORY = '';
-
-/**
- * How many working days IT takes to delete an account once asked. The confirmation says it, as Apple requires for a
- * manual deletion ("Inform the person how long it will take to delete the account"). 0 = not agreed with IT yet.
- */
-export const ACCOUNT_DELETION_WORKING_DAYS = 0;
+export const SUPPORT_URL = 'https://www.mountmerugroup.com';

@@ -8,11 +8,13 @@
 //   - contains a test-login marker, a backend secret name, a client-secret VALUE, a token-shaped UUID or "Bearer <uuid>";
 //   - names the client-secret option outside expo-auth-session's own modules;
 //   - lacks the iOS redirect msauth.com.mountmeru.servicedesk://auth, or contains the Android form (msauth://);
-//   - (preview) lacks the UAT API URL, or names any mountmerugroup.com host that is not allowed;
+//   - (iOS-9b) lacks its OWN profile's API URL (preview: UAT; production: PROD, which must be set), holds the OTHER
+//     profile's API URL (JS or Hermes), or names any mountmerugroup.com host but its own API host. The privacy and support
+//     links (src/config/legal.ts) are set aside first, ONLY as those exact URLs;
 //   - reaches an Android-only API from app code (comments do not count), or bundles the drawer navigator;
 //   - (iOS-5g) holds the web login path "/auth/login" (iOS never calls it, 01 §iOS-A);
-//   - (iOS-5g) production: holds ANY email sign-in module or string (G9 is UAT only, behind a build-time gate in
-//     LoginScreen.tsx); preview: lacks any of them (proving the gate keeps the UAT build whole).
+//   - (iOS-5g; iOS-9b) lacks any email sign-in module or string, in preview AND production: G9 is on both since iOS-9b,
+//     as on Android 6b5e46c (until then production had to hold none of them).
 // Android's false positives, fixed here (02-AUTH.md §7.6 item 8; PERFORMANCE.md §9.3):
 //   - `client_secret` / `clientSecret` are expo-auth-session's own option names. The names are now allowed only inside
 //     node_modules/expo-auth-session, and secret VALUES are searched instead (manifest §4.10, approved 2026-10-28);
@@ -24,7 +26,7 @@
 // Prints counts only — never a matched value.
 //
 // Usage: npm run verify:release-bundle                          (the preview profile: EXPO_PUBLIC_APP_ENV=UAT)
-//        npm run verify:release-bundle -- --profile production  (EXPO_PUBLIC_APP_ENV=PROD; before iOS-9 only)
+//        npm run verify:release-bundle -- --profile production  (the production profile: EXPO_PUBLIC_APP_ENV=PROD)
 //        add --keep to keep the bundles in the temp folder for inspection.
 const { spawnSync } = require('child_process');
 const fs = require('fs');
@@ -47,10 +49,26 @@ const readRepo = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
 // ── What the bundle may contain, read from the repo so it can't drift ──
 const envSource = readRepo('src/config/env.ts');
-const UAT_API_URL = (envSource.match(/^\s*UAT:\s*'([^']+)'/m) ?? [])[1];
+const UAT_API_URL = (envSource.match(/^\s*UAT:\s*'([^']+)'/m) ?? [])[1] ?? '';
 const PROD_API_URL = (envSource.match(/^\s*PROD:\s*'([^']*)'/m) ?? [])[1] ?? '';
 const hostOf = (url) => (url ? url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase() : null);
-const ALLOWED_HOSTS = [hostOf(UAT_API_URL), hostOf(PROD_API_URL)].filter(Boolean);
+/**
+ * iOS-9b: ONE API URL per bundle (src/config/env.ts picks it at build time). A bundle must hold its own profile's URL
+ * and never the other's, and may name no mountmerugroup.com host but its own API host.
+ */
+const OWN_API_URL = profile === 'production' ? PROD_API_URL : UAT_API_URL;
+const OTHER_API_URL = profile === 'production' ? UAT_API_URL : PROD_API_URL;
+const ALLOWED_HOSTS = [hostOf(OWN_API_URL)].filter(Boolean);
+/**
+ * iOS-9b: the release links in src/config/legal.ts (the privacy policy, shown in Profile; the support URL, App Store
+ * Connect's). Set aside before the host search ONLY as these exact, whole URLs, longest first: their host anywhere else,
+ * and any other path on it, still fail.
+ */
+const legalSource = readRepo('src/config/legal.ts');
+const LEGAL_URLS = ['PRIVACY_POLICY_URL', 'SUPPORT_URL']
+  .map((name) => [name, (legalSource.match(new RegExp(`^export const ${name} = '([^']*)';`, 'm')) ?? [])[1] ?? ''])
+  .filter(([, url]) => /^https:\/\/\S+$/.test(url))
+  .sort((a, b) => b[1].length - a[1].length);
 const IOS_REDIRECT = (readRepo('src/config/auth.config.ts').match(/IOS_AUTH_REDIRECT_URI = '([^']+)'/) ?? [])[1];
 const authConfig = readRepo('src/config/auth.config.ts');
 const PUBLIC_UUIDS = new Set(
@@ -75,6 +93,8 @@ const EXAMPLE_EMAILS = {
  * `https://name@host`), and no domain label continuing after it.
  */
 const wholeAddress = (address) => new RegExp(`(?<![\\w.%+@:/-])${address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.[\\w-])`, 'g');
+/** `url` standing alone: no URL character directly before it, and none after it (so never a longer path or host). */
+const wholeUrl = (url) => new RegExp(`(?<![\\w.%+@:/-])${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w.~%+@:/?#&=-])`, 'g');
 
 const DEV_TOKEN_NEEDLES = [
   'DevTokenScreen', 'DevTokenForm', 'Developer session token', 'Developer: use a UAT session token',
@@ -87,8 +107,8 @@ const PLACEHOLDER_NEEDLES = ['DEV PLACEHOLDER', 'DevPlaceholderScreen', 'replace
 /** Test-login markers and the backend's secret names (02 §6). The client-secret option names are checked below. */
 const FORBIDDEN_NEEDLES = ['x-test-secret', 'TEST_AUTH_SECRET', '/auth/test-login', 'AZURE_AD', 'sd_session=', '/auth/login'];
 /**
- * iOS-5g: the email and password sign-in (G9, UAT only). Its modules, and strings only it holds. A production bundle must
- * have none of them; a preview (UAT) bundle must have all of them.
+ * iOS-5g: the email and password sign-in (G9). Its modules, and strings only it holds. iOS-9b (as Android 6b5e46c): every
+ * bundle, preview and production, must have all of them. "/auth/login" stays forbidden in all (FORBIDDEN_NEEDLES).
  */
 const EMAIL_SIGN_IN_MODULES = [
   'src/screens/auth/EmailSignInForm.tsx', 'src/screens/auth/passwordSignInAttempt.ts', 'src/api/passwordSignIn.api.ts',
@@ -214,33 +234,36 @@ const nameOwners = [...new Set(modules.filter((m) => SECRET_NAMES.some((n) => m.
 const strayOwners = nameOwners.filter((rel) => !SECRET_NAME_OWNERS.some((owner) => rel.includes(owner)));
 if (strayOwners.length) problems.push(`the client-secret option is named outside expo-auth-session: ${strayOwners.join(', ')}`);
 
-// iOS-5g: the email sign-in is in a preview bundle, whole, and in no production bundle, in any form.
+// iOS-5g: the email sign-in, whole. iOS-9b: in every bundle, preview and production (until then production had none).
 const emailModules = EMAIL_SIGN_IN_MODULES.filter((rel) => modules.some((m) => m.rel === rel));
 const emailStrings = Object.fromEntries(Object.entries(targets).map(([k, t]) => [k, EMAIL_SIGN_IN_NEEDLES.filter((n) => count(t, n) > 0).length]));
-if (profile === 'production') {
-  if (emailModules.length) problems.push(`the production bundle contains email sign-in module(s): ${emailModules.join(', ')}`);
-  for (const [k, c] of Object.entries(emailStrings)) if (c > 0) problems.push(`${k} (production) contains ${c} email sign-in string(s)`);
-} else {
-  const missing = EMAIL_SIGN_IN_MODULES.filter((rel) => !emailModules.includes(rel));
-  if (missing.length) problems.push(`the preview bundle lacks email sign-in module(s): ${missing.join(', ')}`);
-  const absent = EMAIL_SIGN_IN_NEEDLES.filter((n) => count(js, n) === 0);
-  if (absent.length) problems.push(`release JS (preview) lacks email sign-in string(s): ${absent.map((n) => JSON.stringify(n)).join(', ')}`);
-}
+const missingEmailModules = EMAIL_SIGN_IN_MODULES.filter((rel) => !emailModules.includes(rel));
+if (missingEmailModules.length) problems.push(`the ${profile} bundle lacks email sign-in module(s): ${missingEmailModules.join(', ')}`);
+const absentEmailStrings = EMAIL_SIGN_IN_NEEDLES.filter((n) => count(js, n) === 0);
+if (absentEmailStrings.length) problems.push(`release JS (${profile}) lacks email sign-in string(s): ${absentEmailStrings.map((n) => JSON.stringify(n)).join(', ')}`);
 
 // The iOS redirect, and never the Android one.
 if (!IOS_REDIRECT || count(js, IOS_REDIRECT) === 0) problems.push('release JS lacks the iOS redirect (src/config/auth.config.ts IOS_AUTH_REDIRECT_URI)');
 for (const [k, t] of Object.entries(targets)) if (count(t, 'msauth://') > 0) problems.push(`${k} contains the Android redirect form "msauth://"`);
 
-// Hosts, and the UAT API URL in a preview build.
+// Hosts, and the API URLs (iOS-9b: the bundle's own, never the other profile's).
 // iOS-5h (Android f67265c): the example address is set aside first, ONLY as that exact, whole address (EXAMPLE_EMAILS);
-// then every mountmerugroup.com name is a host. iOS-5g skipped any domain right after "@", which also hid a host written
-// as `https://user@host` and any other address at the domain.
+// iOS-9b: then the legal links, ONLY as those exact, whole URLs (LEGAL_URLS); then every mountmerugroup.com name is a
+// host. iOS-5g skipped any domain right after "@", which also hid a host written as `https://user@host` and any other
+// address at the domain.
 const examples = Object.keys(EXAMPLE_EMAILS).map((address) => [address, (js.match(wholeAddress(address)) ?? []).length]);
-const hostJs = Object.keys(EXAMPLE_EMAILS).reduce((t, address) => t.replace(wholeAddress(address), ' '), js);
+const withoutExamples = Object.keys(EXAMPLE_EMAILS).reduce((t, address) => t.replace(wholeAddress(address), ' '), js);
+const legalLinks = LEGAL_URLS.map(([name, url]) => [name, (withoutExamples.match(wholeUrl(url)) ?? []).length]);
+const hostJs = LEGAL_URLS.reduce((t, [, url]) => t.replace(wholeUrl(url), ' '), withoutExamples);
 const hosts = [...new Set((hostJs.match(/[a-z0-9.-]*mountmerugroup\.com/gi) ?? []).map((h) => h.toLowerCase()))];
 const badHosts = hosts.filter((h) => !ALLOWED_HOSTS.includes(h));
 if (badHosts.length) problems.push(`release JS names hosts that are not allowed: ${badHosts.join(', ')}`);
-if (profile === 'preview' && (!UAT_API_URL || count(js, UAT_API_URL) === 0)) problems.push('release JS (preview) lacks the UAT API URL from src/config/env.ts');
+const ownName = profile === 'production' ? 'PROD' : 'UAT';
+const otherName = profile === 'production' ? 'UAT' : 'PROD';
+if (!OWN_API_URL) problems.push(`src/config/env.ts has no ${ownName} API URL: the ${profile} bundle has nothing to talk to`);
+else if (count(js, OWN_API_URL) === 0) problems.push(`release JS (${profile}) lacks the ${ownName} API URL from src/config/env.ts`);
+if (!OTHER_API_URL) problems.push(`src/config/env.ts has no ${otherName} API URL to check against (failing closed)`);
+else for (const [k, t] of Object.entries(targets)) if (count(t, OTHER_API_URL) > 0) problems.push(`${k} (${profile}) contains the ${otherName} API URL: one API URL per bundle (src/config/env.ts)`);
 
 // Token-shaped values: UUID v4 literals that are neither public IDs nor defined by library code.
 const v4 = [...new Set((js.match(/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi) ?? []).map((u) => u.toLowerCase()))];
@@ -268,9 +291,11 @@ if (drawer.length) problems.push(`the release bundle contains @react-navigation/
 
 console.log(`\nPlaceholder strings: ${PLACEHOLDER_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)} · forbidden markers: ${FORBIDDEN_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)}`);
 console.log(`Client-secret option names: ${nameCount} in release JS, defined by ${nameOwners.length} module(s), ${strayOwners.length} outside expo-auth-session · secret-value matches: ${SECRET_VALUE_PATTERNS.filter((re) => re.test(js)).length}`);
-console.log(`Email sign-in (G9, UAT only): ${emailModules.length}/${EMAIL_SIGN_IN_MODULES.length} modules · strings ${Object.entries(emailStrings).map(([k, c]) => `${k}: ${c}/${EMAIL_SIGN_IN_NEEDLES.length}`).join('  ')} (${profile === 'production' ? 'must be none' : 'must be all'}) · "/auth/login": ${count(js, '/auth/login')}`);
+console.log(`Email sign-in (G9, every build): ${emailModules.length}/${EMAIL_SIGN_IN_MODULES.length} modules · strings ${Object.entries(emailStrings).map(([k, c]) => `${k}: ${c}/${EMAIL_SIGN_IN_NEEDLES.length}`).join('  ')} (JS must be all) · "/auth/login": ${count(js, '/auth/login')}`);
 console.log(`iOS redirect: ${IOS_REDIRECT && count(js, IOS_REDIRECT) > 0 ? 'present' : 'MISSING'} · Android "msauth://": ${count(js, 'msauth://')}`);
-console.log(`mountmerugroup.com hosts: ${hosts.join(', ') || 'none'} · UAT API URL: ${UAT_API_URL && count(js, UAT_API_URL) > 0 ? 'present' : 'absent'}${profile === 'preview' ? ' (required)' : ''}`);
+console.log(`mountmerugroup.com hosts: ${hosts.join(', ') || 'none'} (allowed: ${ALLOWED_HOSTS.join(', ') || 'none'})`);
+console.log(`API URLs: ${ownName} ${OWN_API_URL && count(js, OWN_API_URL) > 0 ? 'present' : 'ABSENT'} (required) · ${otherName} ${Object.entries(targets).map(([k, t]) => `${k}: ${OTHER_API_URL ? count(t, OTHER_API_URL) : '?'}`).join('  ')} (must be 0)`);
+console.log(`Legal links set aside before the host search: ${legalLinks.map(([n, c]) => `${n} ${c}×`).join('; ') || 'none'}`);
 console.log(`Example email addresses set aside before the host search: ${examples.map(([a, n]) => `${EXAMPLE_EMAILS[a]} ${n}×`).join('; ')}`);
 console.log(`UUID-v4 literals: ${v4.length} (${v4.filter((u) => PUBLIC_UUIDS.has(u)).length} public IDs, ${v4.filter((u) => !PUBLIC_UUIDS.has(u) && libraryUuid(u)).length} library constants, ${v4.filter((u) => debugIds.has(u)).length} build debug id, ${unexplained.length} unexplained)`);
 console.log(`Android-only APIs reached from app code: ${androidApis.length} · drawer modules: ${drawer.length}`);
@@ -288,4 +313,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`PASS (${profile}) — no dev-token or placeholder string, test-login marker, client-secret value, token-shaped value,`);
-console.log('unapproved host or reachable Android-only API; the iOS redirect is present' + (profile === 'preview' ? ', and the UAT API URL.' : '.'));
+console.log(`unapproved host, ${otherName} API URL or reachable Android-only API; the iOS redirect, the email sign-in and the ${ownName} API URL are present.`);

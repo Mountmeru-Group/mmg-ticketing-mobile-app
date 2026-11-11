@@ -6,14 +6,15 @@
 //   request  { username, email, password }: the same input under both names, exactly Android's body
 //   200      a token, a user with an id and a role; everything else optional, under any of the aliases below
 //   errors   400 · 401 · 403 · 429 · 5xx as the clone's /auth/login and AUTH-P2 answer them (02-AUTH.md §8)
-//   cookie   ⏳ whether the 200 sets one is NOT yet confirmed: an open item that blocks shipping to testers
+//   cookie   ⏳ whether the 200 sets one is NOT yet confirmed by the backend team (06 A32). Mitigated on the device
+//            since R1: iOS's cookie store is emptied after every answer (src/api/cookieShield.ts). Not blocking
 //            (docs/ios/APP-STORE-COMPLIANCE.md, G9 section)
 //
 // EVERY wire name the app relies on for this endpoint is in THIS file. Like mobile-sso-contract.ts, and unlike the
 // rest of src/types/, it is not copied from 03-DATA-MODEL.md. src/api/passwordSignIn.api.ts reads it through
 // readSession() (src/api/auth.api.ts) and maps it onto AuthUser.
-// iOS: imported directly, never through src/types/index.ts, so that a production bundle, which has no email sign-in
-// (LoginScreen.tsx), does not carry this module either.
+// iOS: imported directly, never through src/types/index.ts (iOS-5g: that kept it out of production bundles, which had no
+// email sign-in until iOS-9b; every bundle carries it now).
 import type { UUID } from './api';
 import type { UserRole } from './enums';
 
