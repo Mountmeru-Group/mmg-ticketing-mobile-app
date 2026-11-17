@@ -7,6 +7,7 @@
 > - **Not** from Swagger: `/api/docs` covers about 95 of 300 paths and has known errors.
 > - File references are relative to `backend/src/` unless prefixed.
 > - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
+> - **2026-11-17 (Ronit's written brief):** SVW-1..4, the saved views, added from the source at `7df97c8` (§10.6; full contract with sources: `16-SAVED-VIEWS.md`). TKT-1's Status filter (several values) added to the mobile filters.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
 
@@ -307,7 +308,8 @@ export const assignTicketSchema = z.object({
 
 | Filter | Parameter and value | Who | Options from |
 |---|---|---|---|
-| Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, one value | every role | the 03 enum, in that order |
+| Status (2026-11-17) | `status=OPEN,IN_PROGRESS`: **one** comma-separated value, any number of 03 statuses, in the web's order. **The only filter TKT-1 reads several values for** (ctrl:114-116). Repeated keys arrive as an array and give a 500 (`16-SAVED-VIEWS.md` §7) | every role | the 03 enum, in the web's order (`TicketsListPage.tsx:28`); multi-select (`OptionSheet multiple`) |
+| Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, **one** value. A list is not read: a comma value is not an enum value (500) | every role | the 03 enum, in that order |
 | Category | `categoryId=<top-level category id>`. **Exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name |
 | Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500). **G7:** a Home tile also sets both, from the Home period, as the web's dashboard links do: UTC days of the device clock (`FE:pages/dashboard/DashboardPage.tsx:72-86`; `src/utils/dashboard-period.ts` `periodListDates`; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1) | every role | the system date picker, or a Home tile |
 | Technician | `assignedToId=<user id>` | ADMIN, AGENT | USR-3 `role=AGENT` (the web lists active AGENTs) |
@@ -315,6 +317,8 @@ export const assignTicketSchema = z.object({
 
   - Technician and group are never sent for END_USER or L2_MANAGER, even if set: their lookups are 403 for those roles (`permissions.ts` `ticketListFilters`).
   - One `assignedToId`: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other, as the web's single select does.
+  - One `status` (2026-11-17): a named filter that sends a status (Open, My open, Pending, Resolved, Closed, the Home tiles) and the Status filter replace each other, the last choice winning. Overdue and Due soon send `sla` and combine with it.
+  - **Category, technician and group stay single.** `categoryId`, `assignedToId` and `teamId` are exact matches (ctrl:120-122). A comma list matches nothing, so it gives an empty list with no error; repeated keys give a 500. The web portal's multi-select category control ("Select All 1/38") is in no branch of the clone (`16-SAVED-VIEWS.md` §7). Ask the web team for that source before the app sends more than one.
 
 ### TKT-2 `POST /api/v1/tickets` — MVP
 - **Purpose:** raise a ticket.
@@ -1224,6 +1228,45 @@ Out of scope until G8 (Appendix A). Evidence for the G8 build, and what the web 
   - Tests: `tests/rbac/audit-log.test.mjs` (every param, the path fallback, the unknown-number check).
 - **Source:** `app.ts:30, :137`; `modules/auditLog/auditLog.router.ts:8`; `auditLog.controller.ts:5-67`; `utils/pagination.ts:16-44`; `schema.prisma:558-577` (all at `7df97c8`).
 
+### 10.6 Saved views (`/api/v1/saved-views`, `app.ts:160`): 2026-11-17
+
+Out of scope until 2026-11-17 (Appendix A). Since then the app's "Saved filters" are these views, the same list as the web portal's "Views". **Full contract, with a source line for every statement: `16-SAVED-VIEWS.md`.**
+
+- **Auth:** `requireAuth` only (`savedViews.router.ts:7-10`): every role, each person their own views. There is no role guard, no country, and nothing is shared.
+- **Shape:** `SavedView` (03 §C). Each view holds:
+  - `filters`: **one JSON object**, stored as the client sent it (`savedViews.controller.ts:9`, `z.any()`);
+  - `columns`;
+  - `isDefault`;
+  - `entityType`.
+- **The web's `filters`:** up to eight string keys, `status`, `priority`, `sortBy`, `assignedToId`, `teamId`, `categoryId`, `fromDate`, `toDate` (`FE:pages/tickets/TicketsListPage.tsx:190-199`). The web reads back only those (`:223-232`). The app writes exactly these keys and no others.
+
+#### SVW-1 `GET /api/v1/saved-views?entityType=ticket` — 2026-11-17
+- **Query:** `entityType`, exact; the app always sends `ticket`.
+- **200:** a plain array (shape (d)) of the caller's views, `createdAt desc` (`savedViews.controller.ts:14-24`).
+- **Mobile:** loaded while the Filters sheet is open. staleTime 60 s; re-read when the sheet opens only once that has passed (`src/hooks/useSavedViews.ts`).
+
+#### SVW-2 `POST /api/v1/saved-views` — 2026-11-17
+- **Body (zod, `savedViews.controller.ts:6-12`):**
+  - `name`, at least 1 character;
+  - `entityType`, at least 1 character;
+  - `filters`, anything (**a missing or null `filters` is a 500**, `05` B.43);
+  - `columns`, string[], default `[]`;
+  - `isDefault`, default `false`.
+- **201:** the new row. With `isDefault: true`, every other default of that user and entity type is cleared first (`:31-36`).
+- **Mobile sends only** `{ name, entityType: 'ticket', filters }`:
+  - `filters` carries only the eight keys above, only those set, every value a string;
+  - the name is trimmed, at most 40 characters, and not a name already in the list;
+  - never `columns`, never `isDefault`.
+
+#### SVW-3 `PUT /api/v1/saved-views/:id` — 2026-11-17
+- **Body:** `savedViewSchema.partial()` (`:49`). A key left out stays as stored.
+- **200:** the row. **404** "View not found"; **403** "Not authorized" for anyone but the owner (`:45-47`).
+- **Mobile sends `{ name }` only (rename).** So a view's filters, including any the app cannot show, are never rewritten. The app never updates a view's filters.
+
+#### SVW-4 `DELETE /api/v1/saved-views/:id` — 2026-11-17
+- **200:** `{ "message": "View deleted" }`. 404 and 403 as SVW-3 (`:65-71`).
+- **Mobile:** after a confirmation. A 404 counts as already deleted: the view leaves the list.
+
 ---
 
 ## Appendix A — Out of scope for mobile (names only)
@@ -1264,7 +1307,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | closure-rules (`/closure-rules`) | all (ADMIN-only and never enforced; see ask A10) |
 | user-groups (`/user-groups`) | all |
 | query-builder (`/query-builder`) | all (⚠ injection, `05` §C.14) |
-| saved-views (`/saved-views`) | all |
+| saved-views (`/saved-views`) | none since 2026-11-17: SVW-1..4 (§10.6). Never sent: `columns`, `isDefault`, an `entityType` other than `ticket` |
 | surveys (`/surveys`) | all (incl. `POST /:id/responses`; surveys are never triggered automatically) |
 | sites (`/sites`), departments (`/departments`), operational-hours (`/operational-hours`), holidays (`/holidays`) | all |
 | email (`/email`) | all (`/settings`, `/settings/test-imap`, `/settings/test-smtp`, `/poll`) |
@@ -1273,7 +1316,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**60 documented endpoints:** 33 MVP and 27 Phase 2 (APR-4 added in G3, AUD-1 in G8). Also:
+**64 documented endpoints:** 33 MVP and 31 Phase 2 (APR-4 added in G3, AUD-1 in G8, SVW-1..4 on 2026-11-17). Also:
 - AUTH-P1, P2, P3 and P5 (§1.4), PENDING backend asks;
 - NTF-5 and NTF-6 (§9), confirmed in writing by the backend team on 2026-11-05 and in the source at `7df97c8`. They replace AUTH-P4.
 
@@ -1343,3 +1386,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SCR-5 | POST | `/service-catalog/requests` | any | P2 (G4) |
 | SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |
 | AUD-1 | GET | `/audit-logs`, else `/audit-log` (§10.5) | ADMIN | P2 (G8; confirmed 2026-11-05) |
+| SVW-1 | GET | `/saved-views?entityType=ticket` | any (own) | 2026-11-17 |
+| SVW-2 | POST | `/saved-views` `{ name, entityType, filters }` | any | 2026-11-17 |
+| SVW-3 | PUT | `/saved-views/:id` `{ name }` | owner | 2026-11-17 |
+| SVW-4 | DELETE | `/saved-views/:id` | owner | 2026-11-17 |

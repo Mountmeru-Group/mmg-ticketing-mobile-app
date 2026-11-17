@@ -61,6 +61,18 @@ export function drawerRoutes(role: UserRole): DrawerRoute[] {
   return routes;
 }
 
+// ── The environment switch: every role, behind a password (2026-11-17, Ronit's third brief) ──
+// The second brief's ADMIN rule (only an ADMIN could switch, or stay on UAT) is gone. A password gates the switch
+// (utils/switch-password.ts); the role decides nothing. Any role may sign in on UAT and stay there across restarts.
+
+/**
+ * The drawer's "Service Desk environment" row, beside Sign out: every role. The role is deliberately not read: the
+ * password decides who switches. (The row also needs a release build: a development build is UAT only.)
+ */
+export function offersEnvironmentSwitch(_role: UserRole): boolean {
+  return true;
+}
+
 // ── Audit log: ADMIN only (G8, docs/G8-WEB-AUDIT.md) ──────────
 // The server's own rule: AUD-1 is `requireAuth, adminOnly` (auditLog.router.ts:8), a 403 for every other role. Unlike
 // the web's pages, which have no route guards (ROLE-MATRIX.md §1), the server enforces this one; the app mirrors it for
@@ -453,15 +465,18 @@ export function bulkActions(viewer: Pick<AuthUser, 'id' | 'role'> | null): BulkA
 }
 
 /**
- * The Filters sheet on M3 (Phase G2, docs/G2-WEB-FILTERS.md §2): which of the five filters this person gets.
- * - Priority, category, created date: every role, as on the web (LKP-1 is open to every role).
+ * The Filters sheet on M3 (Phase G2, docs/G2-WEB-FILTERS.md §2): which filters this person gets. The same list decides
+ * what a saved view may hold for them (utils/saved-filters.ts).
+ * - Status (2026-11-17, several at once), priority, category, created date: every role, as on the web. The web's status
+ *   select has no role check (TicketsListPage.tsx:484-491), and every role already sends `status` through the quick
+ *   filters; LKP-1 is open to every role.
  * - Technician and group: ADMIN and AGENT (triage and country-locked alike). Their options come from USR-3 and LKP-2,
  *   which are `agentOrAdmin`: the web shows END_USER and L2_MANAGER these selects, but always empty (403), so they are
  *   left out here, and ticketListQuery() never sends them for those roles.
  */
 export function ticketListFilters(viewer: Pick<AuthUser, 'role'> | null): TicketListFilterKey[] {
   const role: UserRole = viewer?.role ?? 'END_USER';
-  const keys: TicketListFilterKey[] = ['priority', 'category', 'date'];
+  const keys: TicketListFilterKey[] = ['status', 'priority', 'category', 'date'];
   if (isAgentOrAdmin(role)) keys.push('technician', 'group');
   return keys;
 }

@@ -200,11 +200,11 @@ describe('build profiles and store identity', () => {
     assert.match(source, /^\s*PROD: 'https:\/\/servicedesk\.mountmerugroup\.com\/api\/v1',$/m);
   });
 
-  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (5)', () => {
-    // versionCode 2 was the first AAB uploaded to Play, versionCode 5 the latest (on Play by 2026-11-17); Play rejects
-    // any upload not above the last one it received.
+  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (6)', () => {
+    // versionCode 2 was the first AAB uploaded to Play, versionCode 6 the latest (on Play by the second brief of
+    // 2026-11-17); Play rejects any upload not above the last one it received.
     assert.equal(app.version, '1.0.0');
-    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 5, String(app.android.versionCode));
+    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 6, String(app.android.versionCode));
   });
 
   test("ShortcutBadger's 16 launcher-badge permissions are blocked, and nothing the app needs is", () => {

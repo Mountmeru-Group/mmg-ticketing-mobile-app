@@ -1,8 +1,11 @@
-// The environment switch sheet (2026-11-17), opened by the gear on Login's red panel. Release builds only: a development
-// build has no gear (CAN_SWITCH_ENVIRONMENT, src/config/env.ts) and could not switch to PROD anyway.
+// The environment switch sheet (2026-11-17), opened by the drawer's "Service Desk environment" row beside Sign out
+// (./DrawerContent.tsx), for every role in a release build (CAN_SWITCH_ENVIRONMENT, src/config/env.ts), and only after
+// a correct switch password (./EnvironmentPasswordSheet.tsx). It gets that entry's single-use pass and hands it to
+// switchEnvironment(), which refuses to leave Production without one. Login has no switch.
 // - Lists Production and UAT with their host names. The one in use says so; Production carries the DEFAULT badge.
 // - "Switch and sign out" runs switchEnvironment() (src/api/environmentSwitch.ts): push token off the current
-//   environment, sign-out, the whole query cache and the filter state cleared, then the new environment stored.
+//   environment, sign-out, the whole query cache and the filter state cleared, then the new environment stored. Login
+//   then shows on the new environment, where any role may sign in.
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -13,10 +16,19 @@ import {
 } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useEnvironmentStore } from '@/store/environment.store';
+import type { SwitchPass } from '@/utils/switch-password';
 
 export const SWITCH_LABEL = 'Switch and sign out';
 
-export function EnvironmentSheet({ visible, onClose, onSwitched }: { visible: boolean; onClose: () => void; onSwitched: () => void }) {
+export function EnvironmentSheet({
+  visible, pass, onClose, onSwitched,
+}: {
+  visible: boolean;
+  /** From a correct switch password, good for one switch (utils/switch-password.ts). */
+  pass: SwitchPass | null;
+  onClose: () => void;
+  onSwitched?: () => void;
+}) {
   const active = useEnvironmentStore((s) => s.environment);
   const [chosen, setChosen] = useState<AppEnvironment>(active);
   const [switching, setSwitching] = useState(false);
@@ -39,11 +51,12 @@ export function EnvironmentSheet({ visible, onClose, onSwitched }: { visible: bo
       setSwitching(true);
       setError(null);
       try {
-        await switchEnvironment(chosen);
-        onSwitched();
+        await switchEnvironment(chosen, pass);
+        onSwitched?.();
         onClose();
       } catch {
-        setError("Couldn't switch. Try again.");
+        // The pass is used up by then: another try needs the password again.
+        setError("Couldn't switch. Close this and enter the password again.");
       } finally {
         setSwitching(false);
       }

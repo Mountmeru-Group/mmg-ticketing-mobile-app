@@ -2,11 +2,15 @@
 // Status lists are always sent as ONE comma-separated `status` value built from the 03 enum only:
 // an unknown status value gives a 500 (01 TKT-1).
 // Phase G2 adds the web's "More Filters" (priority, category, created date, technician, group): docs/G2-WEB-FILTERS.md.
+// 2026-11-17 adds STATUS, the one filter TKT-1 reads several values for (one comma-separated `status`,
+// tickets.controller.ts:114-116; docs/web-system/16-SAVED-VIEWS.md §7). The other five stay single: the server reads
+// one value each, and two would return a wrong list (an id list matches nothing) or a 500.
 import {
   TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type Category, type Team, type TicketListQuery, type TicketPriority,
   type TicketStatus, type UserRole,
 } from '@/types';
-import { PRIORITY_LABELS } from './format';
+import { PRIORITY_LABELS, statusLabel } from './format';
+import { multiSelectSummary } from './multi-select';
 import { isAgentOrAdmin } from './roles';
 import { dayToDueDate, formatDueDay } from './tasks';
 
@@ -180,10 +184,13 @@ export function roleDefaultTicketQuery(role: UserRole): Pick<TicketListQuery, 'c
 // All five are SERVER-SIDE TKT-1 params, as on the web (TicketsListPage.tsx:256-268): nothing is filtered on the device.
 // Which roles get which filter is decided in permissions.ts (ticketListFilters); this file only builds the query.
 
-/** The five filters of the Filters sheet. `date` is the created-date range (From and To). */
-export type TicketListFilterKey = 'priority' | 'category' | 'date' | 'technician' | 'group';
+/**
+ * The filters of the Filters sheet. `date` is the created-date range (From and To). `status` (2026-11-17) is the only
+ * one that holds several values; every other holds one.
+ */
+export type TicketListFilterKey = 'status' | 'priority' | 'category' | 'date' | 'technician' | 'group';
 
-export const TICKET_LIST_FILTER_KEYS: readonly TicketListFilterKey[] = ['priority', 'category', 'date', 'technician', 'group'];
+export const TICKET_LIST_FILTER_KEYS: readonly TicketListFilterKey[] = ['status', 'priority', 'category', 'date', 'technician', 'group'];
 
 /** A picked category, technician or group, with its name for the summary line (the technician comes from a search). */
 export interface FilterPick {
@@ -192,6 +199,11 @@ export interface FilterPick {
 }
 
 export interface TicketAdvancedFilters {
+  /**
+   * Statuses, any number (2026-11-17), in STATUS_FILTER_OPTIONS order; empty = all. Sent as ONE comma-separated
+   * `status`, the only form TKT-1 reads several values in (tickets.controller.ts:114-116).
+   */
+  status: readonly TicketStatus[];
   priority: TicketPriority | null;
   /** A top-level category: the web offers only those (TicketsListPage.tsx:580). */
   category: FilterPick | null;
@@ -204,8 +216,30 @@ export interface TicketAdvancedFilters {
 }
 
 export const NO_ADVANCED_FILTERS: TicketAdvancedFilters = {
-  priority: null, category: null, fromDate: null, toDate: null, technician: null, group: null,
+  status: [], priority: null, category: null, fromDate: null, toDate: null, technician: null, group: null,
 };
+
+/** Statuses in the web's order (TicketsListPage.tsx:28): the Status filter's options. */
+export const STATUS_FILTER_OPTIONS: readonly TicketStatus[] = [
+  'OPEN', 'IN_PROGRESS', 'PENDING', 'ON_HOLD', 'PENDING_MGMT_REVIEW', 'PENDING_MASTER_DATA', 'PENDING_PARTNER',
+  'PENDING_USER_CONFIRM', 'PENDING_USER_INFO', 'RESOLVED', 'CANCELED', 'CLOSED',
+];
+
+/**
+ * A status list as the app keeps and sends it: only 03 enum values (anything else is a 500, 01 TKT-1), each once, in
+ * STATUS_FILTER_OPTIONS order. Anything that is not an array is no statuses.
+ */
+export function cleanStatusList(values: unknown): TicketStatus[] {
+  if (!Array.isArray(values)) return [];
+  const known = TICKET_STATUSES as readonly string[];
+  const wanted = new Set(values.filter((v): v is TicketStatus => typeof v === 'string' && known.includes(v)));
+  return STATUS_FILTER_OPTIONS.filter((s) => wanted.has(s));
+}
+
+/** The Status field's closed text: "Open", "Open +2" (the first in option order), or null for none. */
+export function statusFilterSummary(statuses: readonly TicketStatus[]): string | null {
+  return multiSelectSummary(cleanStatusList(statuses).map(statusLabel));
+}
 
 /** The web's technician list is active users with role AGENT only (TicketsListPage.tsx:155): the same people via USR-3. */
 export const TECHNICIAN_FILTER_ROLES: readonly UserRole[] = ['AGENT'];
@@ -220,6 +254,8 @@ export function isFilterDay(day: string | null | undefined): day is string {
 
 function isActive(filters: TicketAdvancedFilters, key: TicketListFilterKey): boolean {
   switch (key) {
+    case 'status':
+      return cleanStatusList(filters.status).length > 0;
     case 'priority':
       return filters.priority !== null;
     case 'category':
@@ -241,13 +277,17 @@ export function activeAdvancedFilters(
   return TICKET_LIST_FILTER_KEYS.filter((key) => allowed.includes(key) && isActive(filters, key));
 }
 
-/** The TKT-1 params for the five filters, only for the allowed ones (the date range counts as one filter). */
+/**
+ * The TKT-1 params for the sheet's filters, only for the allowed ones (the date range counts as one filter). Status is
+ * the one comma list; every other key carries exactly one value.
+ */
 export function advancedFilterQuery(
   filters: TicketAdvancedFilters,
   allowed: readonly TicketListFilterKey[],
-): Pick<TicketListQuery, 'priority' | 'categoryId' | 'fromDate' | 'toDate' | 'assignedToId' | 'teamId'> {
+): Pick<TicketListQuery, 'status' | 'priority' | 'categoryId' | 'fromDate' | 'toDate' | 'assignedToId' | 'teamId'> {
   const on = new Set(activeAdvancedFilters(filters, allowed));
   return {
+    ...(on.has('status') ? { status: cleanStatusList(filters.status).join(',') } : {}),
     ...(on.has('priority') && filters.priority ? { priority: filters.priority } : {}),
     ...(on.has('category') && filters.category ? { categoryId: filters.category.id } : {}),
     ...(on.has('date') && isFilterDay(filters.fromDate) ? { fromDate: filters.fromDate } : {}),
@@ -265,6 +305,19 @@ const SETS_TECHNICIAN: ReadonlySet<TicketNamedFilter> = new Set<TicketNamedFilte
 
 export function namedFilterSetsTechnician(filter: TicketNamedFilter): boolean {
   return SETS_TECHNICIAN.has(filter);
+}
+
+/**
+ * Named filters that send `status` (2026-11-17). TKT-1 has one `status`, so these and the Status filter replace each
+ * other, as the technician slot does: the last choice wins. Overdue, Due soon (they send `sla`), Unassigned and All
+ * leave the Status filter alone.
+ */
+const SETS_STATUS: ReadonlySet<TicketNamedFilter> = new Set<TicketNamedFilter>([
+  'OPEN', 'MY_OPEN', 'PENDING', 'RESOLVED', 'CLOSED', ...HOME_TILE_FILTERS,
+]);
+
+export function namedFilterSetsStatus(filter: TicketNamedFilter): boolean {
+  return SETS_STATUS.has(filter);
 }
 
 export interface TicketFilterState {
@@ -296,16 +349,30 @@ export function appliedTicketPeriod(
   return advanced.fromDate === period.fromDate && advanced.toDate === period.toDate ? period : null;
 }
 
-/** Pick a named filter. "My open" or "Unassigned" drops a technician filter (one slot, last choice wins). */
+/**
+ * Pick a named filter. "My open" or "Unassigned" drops a technician filter, and a named filter that sends a status
+ * drops the Status filter (one slot each, last choice wins).
+ */
 export function withNamedFilter(state: TicketFilterState, filter: TicketNamedFilter): TicketFilterState {
-  const advanced = namedFilterSetsTechnician(filter) && state.advanced.technician ? { ...state.advanced, technician: null } : state.advanced;
+  let advanced = state.advanced;
+  if (namedFilterSetsTechnician(filter) && advanced.technician) advanced = { ...advanced, technician: null };
+  if (namedFilterSetsStatus(filter) && cleanStatusList(advanced.status).length > 0) advanced = { ...advanced, status: [] };
   return { filter, advanced };
 }
 
-/** Change some of the five. Picking a technician while "My open" or "Unassigned" is on moves the named filter to All. */
+/**
+ * Change some of the sheet's filters. Picking a technician while "My open" or "Unassigned" is on, or statuses while a
+ * named filter that sends a status is on, moves the named filter to All.
+ */
 export function withAdvancedFilters(state: TicketFilterState, patch: Partial<TicketAdvancedFilters>): TicketFilterState {
-  const advanced = { ...state.advanced, ...patch };
-  const filter = patch.technician && namedFilterSetsTechnician(state.filter) ? 'ALL' : state.filter;
+  const advanced: TicketAdvancedFilters = {
+    ...state.advanced,
+    ...patch,
+    ...(patch.status !== undefined ? { status: cleanStatusList(patch.status) } : {}),
+  };
+  const takesTechnician = !!patch.technician && namedFilterSetsTechnician(state.filter);
+  const takesStatus = patch.status !== undefined && advanced.status.length > 0 && namedFilterSetsStatus(state.filter);
+  const filter = takesTechnician || takesStatus ? 'ALL' : state.filter;
   return { filter, advanced };
 }
 
@@ -334,7 +401,8 @@ export function ticketListQuery({
     ...roleDefaultTicketQuery(me.role),
     ...(countryId !== undefined ? { countryId } : {}),
     ...advancedFilterQuery(advanced, allowed),
-    // After the five, so a named filter's `assignedToId` (My open, Unassigned) replaces a Technician filter's.
+    // After the sheet's filters, so a named filter's `assignedToId` (My open, Unassigned) replaces a Technician
+    // filter's, and its `status` a Status filter's (the stores never keep both; this is the request's own guard).
     ...ticketFilterQuery(filter, me),
     ...ticketSortQuery(sort),
     ...(search ? { search } : {}),
@@ -372,6 +440,7 @@ export function activeFilterLabels({
   if (filter !== 'ALL') labels.push(TICKET_FILTER_LABELS[filter]);
   if (search) labels.push(`“${search}”`);
   for (const key of activeAdvancedFilters(advanced, allowed)) {
+    if (key === 'status') labels.push(statusFilterSummary(advanced.status) ?? '');
     if (key === 'priority' && advanced.priority) labels.push(`${PRIORITY_LABELS[advanced.priority]} priority`);
     if (key === 'category' && advanced.category) labels.push(advanced.category.name);
     if (key === 'date') labels.push(dateRangeLabel(advanced.fromDate, advanced.toDate) ?? '');

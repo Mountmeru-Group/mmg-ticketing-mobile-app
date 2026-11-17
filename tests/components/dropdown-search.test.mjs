@@ -109,7 +109,8 @@ describe('OptionSheet: the one shared dropdown, and the only place its search li
 
   test('the field clears when the sheet closes, however it closes', () => {
     assert.match(sheet, /useEffect\(\(\) => \{\s*if \(!visible\) setQuery\(''\);\s*\}, \[visible\]\);/);
-    assert.match(sheet, /const close = useStableCallback\(\(\) => \{\s*setQuery\(''\);\s*onClose\(\);/);
+    // 2026-11-17: closing also hands a multi-select's ticks to the caller, once, before onClose (tests/filters/multi-select).
+    assert.match(sheet, /const close = useStableCallback\(\(\) => \{\s*setQuery\(''\);\s*if \(props\.multiple === true && !sameChoices\(draft, props\.selectedValues\)\) props\.onChange\(draft as T\[\]\);\s*onClose\(\);/);
     assert.match(sheet, /const pick = useStableCallback\(\(value: string\) => \{\s*setQuery\(''\);/);
   });
 

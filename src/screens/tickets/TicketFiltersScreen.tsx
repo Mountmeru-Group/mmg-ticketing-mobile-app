@@ -1,15 +1,20 @@
-// M3 Filters sheet (Phase G2): the web ticket list's "More Filters" row plus its priority select, on a phone.
+// M3 Filters sheet (Phase G2): the web ticket list's "More Filters" row plus its status and priority selects, on a phone.
 // The web's behaviour, filter by filter with sources: docs/G2-WEB-FILTERS.md.
 //
-// - WHICH filters: ticketListFilters() (utils/permissions.ts) alone. Priority, category and created date for everyone;
-//   technician and group for ADMIN and AGENT (their lookups, USR-3 and LKP-2, are 403 for END_USER and L2_MANAGER).
-// - Every pick applies at once, as each web select does on change; the list behind refetches. Nothing is written to the
-//   server: these are TKT-1 query params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
+// - WHICH filters: ticketListFilters() (utils/permissions.ts) alone. Status, priority, category and created date for
+//   everyone; technician and group for ADMIN and AGENT (their lookups, USR-3 and LKP-2, are 403 for END_USER and
+//   L2_MANAGER).
+// - STATUS (2026-11-17) is the one multi-select (OptionSheet `multiple`): TKT-1 reads several statuses as one comma list
+//   (16-SAVED-VIEWS.md §7). Priority, category, technician and group stay single: the server reads one value each.
+//   Picking statuses replaces a quick filter that sends a status, as a technician replaces "My open".
+// - Every pick applies at once, as each web select does on change; the list behind refetches. Status's ticks apply once,
+//   when its sheet closes (one request, not one per tick). Nothing is written to the server: these are TKT-1 query
+//   params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
 // - Options as on the web: priorities in its order; active top-level categories by name (LKP-1); every group, inactive
 //   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`).
-// - "Clear all" is the web's Clear: named filter, search, the five filters and the sort. The country stays.
-// - SAVED FILTERS at the top (2026-11-17, ./SavedFilters.tsx): kept on this phone only, per user and per environment.
-//   A chip applies its whole set at once; what one holds is cut to this role by sanitizeSavedFilter().
+// - "Clear all" is the web's Clear: named filter, search, the sheet's filters and the sort. The country stays.
+// - SAVED FILTERS at the top (./SavedFilters.tsx): the Service Desk's saved views, the same list as the web portal's
+//   (2026-11-17). A chip applies the view at once, cut to this role (decodeSavedView).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -24,22 +29,25 @@ import { countryName, useCategories, useCountryOptions, useTeams, useTickets } f
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
-import type { TicketPriority, TicketStackScreenProps } from '@/types';
+import type { TicketPriority, TicketStackScreenProps, TicketStatus } from '@/types';
 import { notify } from '@/utils/dialogs';
-import { PRIORITY_LABELS, formatDisplayName } from '@/utils/format';
+import { PRIORITY_LABELS, formatDisplayName, statusLabel } from '@/utils/format';
 import { ticketListFilters } from '@/utils/permissions';
-import { captureSavedFilter, sanitizeSavedFilter, type SavedTicketFilter } from '@/utils/saved-filters';
+import type { SavedFilterContent, TicketListFilterState } from '@/utils/saved-filters';
 import { DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 import {
-  PRIORITY_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels, categoryFilterOptions,
-  countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed, listCountryParam,
-  namedFilterSetsTechnician, type TicketNamedFilter,
+  PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels,
+  categoryFilterOptions, countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed,
+  listCountryParam, namedFilterSetsStatus, namedFilterSetsTechnician, statusFilterSummary, type TicketNamedFilter,
 } from '@/utils/ticket-filters';
 import { SavedFiltersBlock } from './SavedFilters';
 
 const ALL = '__ALL__';
 
-type Picker = 'priority' | 'category' | 'technician' | 'group';
+type Picker = 'status' | 'priority' | 'category' | 'technician' | 'group';
+
+/** The Status filter's options, in the web's order (TicketsListPage.tsx:28). */
+const STATUS_OPTIONS: readonly SheetOption<TicketStatus>[] = STATUS_FILTER_OPTIONS.map((s) => ({ value: s, label: statusLabel(s) }));
 
 export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'TicketFilters'>) {
   const user = useAuthStore((s) => s.user);
@@ -85,23 +93,18 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
   const fromDay = isFilterDay(advanced.fromDate) ? advanced.fromDate : null;
   const toDay = isFilterDay(advanced.toDate) ? advanced.toDate : null;
   const technicianSlotTaken = namedFilterSetsTechnician(activeFilter);
+  const statusSlotTaken = namedFilterSetsStatus(activeFilter);
 
-  // Saved filters (2026-11-17): the list's state as one would hold it. The country's name, for its chip, comes from the
-  // same lookup the list's country selector already loaded (same key: no extra request).
+  // Saved filters: the list's state, for "Save these filters" and for the chip that matches. The country's name, for the
+  // "not kept" note, comes from the same lookup the list's country selector already loaded (same key: no extra request).
   const countryMode = user ? countrySelectorMode(user) : 'hidden';
   const countries = useCountryOptions({ enabled: countryMode === 'switch' && ticketCountryId !== null });
-  const current = user
-    ? captureSavedFilter(
-        {
-          ticketFilter: activeFilter, ticketSort, ticketSearch, ticketCountryId, ticketAdvanced: advanced,
-          countryName: countryName(countries.data?.find((c) => c.id === ticketCountryId)),
-        },
-        user,
-      )
-    : null;
-  const applySaved = (filter: SavedTicketFilter) => {
-    if (user) applySavedTicketFilter(sanitizeSavedFilter(filter, user));
+  const listState: TicketListFilterState = {
+    ticketFilter: activeFilter, ticketSort, ticketSearch, ticketCountryId, ticketAdvanced: advanced,
+    countryName: countryName(countries.data?.find((c) => c.id === ticketCountryId)),
   };
+  // Already cut to this role by decodeSavedView(); the store sets exactly these fields.
+  const applySaved = (content: SavedFilterContent) => applySavedTicketFilter(content);
 
   const total = list.total;
   const showLabel = total === undefined ? 'Show tickets' : `Show ${total} ${total === 1 ? 'ticket' : 'tickets'}`;
@@ -126,13 +129,27 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
       />
       <OfflineBanner />
       <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
-        {current ? <SavedFiltersBlock current={current} onApply={applySaved} /> : null}
+        {user ? <SavedFiltersBlock list={listState} onApply={applySaved} /> : null}
 
         <Text className="mx-4 mb-2 text-xs text-gray-500">
           Every filter applies at once, together with the quick filter{activeFilter !== 'ALL' ? ` (${TICKET_FILTER_LABELS[activeFilter]})` : ''}, the search and the sort.
         </Text>
 
         <FormCard>
+          {allowed.includes('status') ? (
+            <SelectField
+              label="Status"
+              hint={
+                statusSlotTaken
+                  ? `Picking statuses replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
+                  : 'Pick as many as you need.'
+              }
+              value={statusFilterSummary(advanced.status)}
+              placeholder="All statuses"
+              onPress={() => setPicker('status')}
+            />
+          ) : null}
+
           {allowed.includes('priority') ? (
             <SelectField
               label="Priority"
@@ -201,6 +218,18 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
       <View style={{ paddingBottom: insets.bottom + 8 }} className="border-t border-border bg-white px-4 pt-3">
         <SubmitButton label={showLabel} onPress={() => navigation.goBack()} />
       </View>
+
+      {allowed.includes('status') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'status'}
+          title="Status"
+          options={STATUS_OPTIONS}
+          selectedValues={advanced.status}
+          onChange={(values) => setTicketAdvanced({ status: values })}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
 
       <OptionSheet
         visible={picker === 'priority'}

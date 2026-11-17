@@ -44,8 +44,11 @@ export { useMarkAllNotificationsRead, useMarkNotificationRead } from './useNotif
 export { useDecideApproval, type ApprovalDecision } from './useApprovals';
 export { useKbHelpfulVote } from './useKnowledgeBase';
 export { useSignOut, useUpdateProfile } from './useProfile';
-// Saved ticket filters, on the phone only (2026-11-17)
-export { useSavedTicketFilters } from './useSavedFilters';
+// Saved filters = the Service Desk's saved ticket views, synced with the web portal (2026-11-17)
+export {
+  SAVED_VIEWS_STALE_TIME_MS, useCreateSavedView, useDeleteSavedView, useLegacySavedFilters, useRenameSavedView,
+  useSavedTicketViews, useSavedViewNames,
+} from './useSavedViews';
 export { useDeleteTask, useSaveTask, useToggleTask } from './useTasks';
 // Phase G3 writes
 export { useDeleteAttachment } from './useDeleteAttachment';

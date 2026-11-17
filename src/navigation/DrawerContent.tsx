@@ -12,6 +12,11 @@
 // - Audit log (G8): ADMIN only, after Announcements below a divider, before Settings. Its route is registered for ADMIN
 //   only (AppDrawer.tsx), and the server answers 403 to anyone else (docs/G8-WEB-AUDIT.md).
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
+// - Service Desk environment (2026-11-17, third brief): every role (permissions.ts offersEnvironmentSwitch), release
+//   builds only (CAN_SWITCH_ENVIRONMENT), in the account card just above Sign out. It asks for the switch password FIRST
+//   (./EnvironmentPasswordSheet.tsx); only a correct one opens ./EnvironmentSheet.tsx, with a single-use pass that is
+//   revoked when the sheet closes. Every switch asks again.
+// - The UAT chip in the header band whenever UAT is in use, for anyone (showEnvironmentChip): never on Production.
 // - Layout follows the web sidebar (frontend/src/layouts/AppLayout.tsx), top to bottom:
 //   - a white header band with the logo (44 dp tall, 72 dp wide) and the app name beside it;
 //   - the nav rows, which scroll when they overflow: the current module as a filled brand-red row, idle rows in the
@@ -21,20 +26,24 @@
 //   - the version line, above the bottom inset.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { DrawerContentComponentProps } from '@react-navigation/drawer';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components';
-import { APP_VERSION } from '@/config/env';
+import { APP_VERSION, CAN_SWITCH_ENVIRONMENT, ENVIRONMENT_NAMES, environmentLabel, showEnvironmentChip } from '@/config/env';
 import { countryName, useCountryOptions, usePendingApprovals, useSignOut } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useEnvironmentStore } from '@/store/environment.store';
 import { colors, palette } from '@/theme';
 import type { AppDrawerParamList } from '@/types';
 import { formatDisplayName, initials } from '@/utils/format';
-import { drawerItems, type DrawerItem } from '@/utils/permissions';
+import { drawerItems, offersEnvironmentSwitch, type DrawerItem } from '@/utils/permissions';
 import { ROLE_LABELS } from '@/utils/roles';
+import { revokeSwitchPass, type SwitchPass } from '@/utils/switch-password';
 import { countrySelectorMode } from '@/utils/ticket-filters';
+import { EnvironmentPasswordSheet } from './EnvironmentPasswordSheet';
+import { EnvironmentSheet } from './EnvironmentSheet';
 
 interface DrawerRow {
   key: string;
@@ -76,6 +85,16 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
   const locked = !!user && countrySelectorMode(user) === 'locked';
   const countries = useCountryOptions({ enabled: locked });
   const lockedCountry = locked ? countryName(countries.data?.find((c) => c.id === user?.countryId)) : null;
+  // The switch: every role, wherever the build can switch at all. The password, not the role, decides who switches.
+  const offersSwitch = CAN_SWITCH_ENVIRONMENT && offersEnvironmentSwitch(role);
+  // password → (correct) → sheet, with the pass that one switch needs. Back to idle, pass revoked, however it ends.
+  const [switchStep, setSwitchStep] = useState<'idle' | 'password' | 'sheet'>('idle');
+  const [switchPass, setSwitchPass] = useState<SwitchPass | null>(null);
+  const endSwitch = () => {
+    revokeSwitchPass(switchPass);
+    setSwitchPass(null);
+    setSwitchStep('idle');
+  };
 
   // `pop: true`: return to the module's root if it is already in the stack, instead of stacking another copy (v7).
   const go = (route: keyof AppDrawerParamList) => () => {
@@ -116,6 +135,12 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
         <Text accessibilityRole="header" className="ml-3 flex-1 text-lg font-bold text-gray-900" numberOfLines={1}>
           Setu
         </Text>
+        {/* Which backend: whenever UAT is in use, for anyone. Never on Production. */}
+        {showEnvironmentChip(environment) ? (
+          <View accessibilityLabel={`Connected to ${environmentLabel(environment)}`} className="rounded-full bg-amber-100 px-2.5 py-0.5">
+            <Text className="text-xs font-semibold text-amber-800">{environment}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Only the rows scroll, so the account card stays pinned to the bottom however many rows there are. */}
@@ -156,6 +181,25 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
             <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
           </Pressable>
           <View className="mx-3 border-t border-gray-100" />
+          {offersSwitch ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Service Desk environment: ${ENVIRONMENT_NAMES[environment]}`}
+                accessibilityHint="Asks for the switch password. Switching signs you out"
+                onPress={() => setSwitchStep('password')}
+                className="min-h-12 flex-row items-center px-3 active:bg-gray-50"
+              >
+                <View className="h-6 w-6 items-center justify-center">
+                  <Ionicons name="swap-horizontal-outline" size={24} color={colors.nav.idleFg} />
+                </View>
+                <Text className="ml-4 flex-1 text-base font-medium text-gray-700">Service Desk environment</Text>
+                <Text className="mr-1 text-sm text-gray-500">{ENVIRONMENT_NAMES[environment]}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
+              </Pressable>
+              <View className="mx-3 border-t border-gray-100" />
+            </>
+          ) : null}
           {/* Web: the user menu's Sign out, `text-red-600 hover:bg-red-50`. */}
           <Pressable
             accessibilityRole="button"
@@ -183,6 +227,19 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
         v{APP_VERSION} · {environment}
         {__DEV__ ? ' · dev build' : ''}
       </Text>
+      {offersSwitch ? (
+        <>
+          <EnvironmentPasswordSheet
+            visible={switchStep === 'password'}
+            onCancel={endSwitch}
+            onUnlocked={(pass) => {
+              setSwitchPass(pass);
+              setSwitchStep('sheet');
+            }}
+          />
+          <EnvironmentSheet visible={switchStep === 'sheet' && switchPass !== null} pass={switchPass} onClose={endSwitch} />
+        </>
+      ) : null}
     </View>
   );
 }

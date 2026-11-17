@@ -400,3 +400,15 @@ export const AUTH_ME_OPTIONAL_SPEC: readonly FieldSpec[] = [
   { path: 'user.displayName', kinds: S },
   { path: 'user.ldapSamAccount', kinds: S_NULL },
 ];
+
+/** `SavedView` (SVW-1 rows, SVW-2/3 bodies; 03 §C, 2026-11-17). `filters` is checked by the app when it is read. */
+export const SAVED_VIEW_SPEC: readonly FieldSpec[] = [
+  { path: 'id', kinds: S },
+  { path: 'name', kinds: S },
+  { path: 'entityType', kinds: S },
+  { path: 'filters', kinds: ['object', 'array', 'string', 'number', 'boolean', 'null'] },
+  { path: 'columns', kinds: ARR },
+  { path: 'userId', kinds: S },
+  { path: 'isDefault', kinds: ['boolean'] },
+  { path: 'createdAt', kinds: S },
+];

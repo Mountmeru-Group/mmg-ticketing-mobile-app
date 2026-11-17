@@ -256,6 +256,7 @@ There is no URL field. Build URLs as `/api/v1/tickets/{ticketId}/attachments/{id
 | Announcement | `:1010-1028` | Phase 2 |
 | KBCategory / KBArticle | `:511-552` | Phase 2 |
 | ServiceCategory / ServiceItem / ServiceRequest | `:927-997` | Phase 2. `ServiceRequest.status` reuses `TicketStatus`; `requestNumber` is an autoincrement Int |
+| **SavedView** | `:1783-1796` (at `7df97c8`) | `id, name, entityType, filters Json, columns String[], userId, isDefault (false), createdAt`. One JSON blob of filters per view, per user only. Contract and sources: `16-SAVED-VIEWS.md` (2026-11-17) |
 
 ---
 
@@ -700,6 +701,29 @@ export interface ServiceRequest extends ServiceRequestScalars {
 export interface CreateServiceRequestBody {
   serviceItemId: UUID; priority?: TicketPriority; formData: Record<string, unknown>; notes?: string | null;
 }
+
+// ── Saved views (SVW-1..4, 2026-11-17; 16-SAVED-VIEWS.md) ────
+/** One `saved_views` row, every column, as SVW-1/2/3 return it (schema.prisma:1783-1796; no include). */
+export interface SavedView {
+  id: UUID; name: string;                       // name: not trimmed, not unique, no maximum (05 B.42)
+  entityType: string;                           // the web writes and lists 'ticket' only
+  filters: unknown;                             // Json: whatever the client sent; never trusted to be an object
+  columns: string[];                            // table columns (a newer web branch), not filters
+  userId: UUID; isDefault: boolean;             // isDefault: at most one per user and entityType; nothing reads it
+  createdAt: ISODateString;                     // no updatedAt
+}
+/** The keys the web's ticket list writes into `filters` and reads back (TicketsListPage.tsx:190-199, :223-232). */
+export interface SavedViewFilters {
+  status?: string;                              // one TicketStatus, or a comma list
+  priority?: string; sortBy?: string;           // sortBy: 'priority' | 'sla' (left out = updated)
+  assignedToId?: string;                        // a user id, or 'unassigned'
+  teamId?: string; categoryId?: string;
+  fromDate?: string; toDate?: string;           // 'YYYY-MM-DD'
+}
+/** SVW-2 POST /saved-views as the app sends it: never `columns`, never `isDefault`. */
+export interface CreateSavedViewBody { name: string; entityType: 'ticket'; filters: SavedViewFilters; }
+/** SVW-3 PUT /saved-views/:id as the app sends it: the name only, so stored filters are never rewritten. */
+export interface RenameSavedViewBody { name: string; }
 ```
 
 **Type-to-endpoint map**

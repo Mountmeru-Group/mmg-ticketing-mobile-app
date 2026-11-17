@@ -1199,50 +1199,67 @@ Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11
 
 ## 17. Environment switch, saved filters, dropdown search (2026-11-17)
 
-Ronit's written brief. Not yet seen on a device: no build was made. The layout notes below are what to check on the
-next build (360 dp, 100 / 130 / 200 % text).
+Ronit's written briefs (three on 2026-11-17): the second replaced 17.2 and added 17.4; the third replaced 17.1 (the
+second brief's ADMIN-only switch is gone). Not yet seen on a device: no build was made. The layout notes below are what
+to check on the next build (360 dp, 100 / 130 / 200 % text).
 
-### 17.1 The environment switch (Login)
-- **Gear**: `settings-outline`, 22 dp, white (`colors.login.headline`) on the red panel, in the logo card's row at the
-  **top right** of the panel. 44 × 44 dp target, a ripple in `colors.login.circle`. Label "Service Desk environment",
-  hint "Choose Production or UAT". **Release builds only** (`CAN_SWITCH_ENVIRONMENT`): a development build has no gear.
-  Locked (half opacity, no touch) while a Microsoft or email sign-in runs, as the pill is.
-- **Sheet** (`src/screens/auth/EnvironmentSheet.tsx`), title "Service Desk environment":
+### 17.1 The environment switch (the drawer, every role, behind a password)
+- **Login has no switch.** The gear on the red panel is gone; the logo is alone in the panel's top row.
+- **Drawer row**, in the account card, between the profile row and **Sign out**, with the same hairline separators:
+  - `swap-horizontal-outline`, 24 dp, idle grey (`colors.nav.idleFg`);
+  - "Service Desk environment" (base, medium, gray-700);
+  - the environment in use on the right ("Production" / "UAT", sm, gray-500), then a chevron;
+  - 48 dp tall. TalkBack: "Service Desk environment: Production", hint "Asks for the switch password. Switching signs you out".
+- **Who sees it:** **every role** (`permissions.ts` `offersEnvironmentSwitch`, which reads no role), in release builds only (`CAN_SWITCH_ENVIRONMENT`). The password decides who switches.
+- **Password prompt first** (`src/navigation/EnvironmentPasswordSheet.tsx`), title "Switch password". It rises above the keyboard.
+  - One line, sm gray-600: "For testing only. Most people never need this: Setu stays on Production."
+  - **Password** (required): a masked field, autofocused. No autofill, autocorrect, capitals or spell check, so no password manager offers to save it.
+  - At the field's right, a 44 dp eye button (`eye-outline` / `eye-off-outline`) that shows or hides what was typed, with `aria-label` "Show password" / "Hide password".
+  - Wrong: the field turns red-600 and is emptied. Under it, in red-700: "That password is wrong. 4 tries left before a 60-second wait."
+  - The 5th wrong try: "That password is wrong. Too many wrong tries: try again in 60 seconds."
+  - Any try during the lock is refused without checking: "Too many wrong tries. Try again in 42 seconds." The prompt opens with that line if the lock is still running. There is no countdown timer.
+  - **Continue** (filled, disabled while the field is empty, a spinner while checking), then **Cancel** (outline). Cancel, back and a tap outside all close it and change nothing.
+  - Only a correct password opens the sheet. **It is asked again for every switch.**
+- **Sheet** (`src/navigation/EnvironmentSheet.tsx`), title "Service Desk environment":
   - one line of help: switching signs you out and clears everything Setu has loaded;
-  - a radio row per environment, Production first: the name, the host name under it (`text-xs`, gray-600), a
-    **DEFAULT** badge on Production (gray-100 / gray-700) and **IN USE** on the active one (green-50 / green-800);
-  - one filled button, **"Switch and sign out"**, disabled until another environment is picked, with a spinner while it
-    runs. A failure says "Couldn't switch. Try again." in red-700 above it.
-- After a switch: the sheet closes, Login stays, the chip appears (UAT) or goes (Production), an old failure banner is
-  cleared, and the email form starts empty (it is keyed by environment).
+  - a radio row per environment, Production first: the name, the host name under it (`text-xs`, gray-600), a **DEFAULT** badge on Production (gray-100 / gray-700) and **IN USE** on the active one (green-50 / green-800);
+  - one filled button, **"Switch and sign out"**, disabled until another environment is picked, with a spinner while it runs. A failure says "Couldn't switch. Close this and enter the password again." in red-700 above it.
+- **After a switch:** signed out, Login on the new environment, the email form empty (keyed by environment). Any role may sign in there and stays signed in across restarts. The choice persists.
+- **On UAT's Login:** under the UAT chip, a text button **"Use Production"** (sm, medium, blue-700, 44 dp). It goes to Production only, needs no password, and is locked (half opacity) while a sign-in runs.
+- **The UAT chip** (amber-100 / amber-800, `text-xs` semibold) shows whenever UAT is in use, **for anyone**: on Login (with the host, as before) and in the drawer's header band, right of "Setu" (just "UAT"). Never on Production.
 
-### 17.2 Saved filters (Tickets › Filters)
-On the phone only: never synced with the web portal, no backend call. Per user AND per environment, up to 20.
+### 17.2 Saved filters (Tickets › Filters): the Service Desk's saved views
+**Synced with the web portal (2026-11-17, second brief).** They are the web's "Views", stored on the Service Desk per person and per environment. Contract: `docs/web-system/16-SAVED-VIEWS.md`. They are no longer kept on the phone.
 - **Where**: a SAVED FILTERS block at the top of the Filters sheet, above the filter card.
   - Header: "SAVED FILTERS" (xs, semibold, uppercase, gray-500) and, when any exist, a **Manage** link (blue-700, 44 dp).
-  - The saved ones as `FilterChip`s (role button), wrapping, 8 dp apart. The chip whose set is exactly what is on the
-    list right now is **filled brand red** (the chip's active style); change any filter and it empties again. Two can
-    never be filled at once: the same set cannot be saved twice.
-  - Under them a **dashed** "Save these filters" button (44 dp, bookmark icon). Disabled, with the reason under it in
-    xs gray-600, when the list already holds 20 ("Delete one in Manage to save another") or these exact filters are
-    already saved ("…already saved as “Name”"). With none saved yet, one line says what it is for.
-- **Tapping a chip** applies its whole set at once (quick filter, search, sort, the five filters, and the country when it
-  holds one; anything it does not hold is cleared, as a Home tile does). The "Show N tickets" count updates with it.
-- **Save sheet**, "Save these filters": first, read-only, **exactly what is being captured**, as small grey pills
-  ("Quick filter: Open", "Search: “vpn”", "Priority: High", "Category: Network", "Created 01 Nov 2026 – 30 Nov 2026",
-  "Technician: …", "Group: …", "Sort: Priority", "Country: Kenya" / "All countries"), with "Applying it later sets exactly
-  these. Anything else is cleared." Then the **Name** field (required, trimmed, at most 40 characters; `maxLength`
-  stops typing at 40), "Save filter" and "Cancel". A refused name is said under the field in red-700: empty, too long, or
-  "You already have a saved filter called “X”. Choose another name." (any case). The sheet rises above the keyboard.
-- **Manage** ("Saved filters (n of 20)"): one row per filter, its name and a two-line summary of the same pills; a
-  pencil (**Rename**: the same name rules, in the same sheet) and a red bin (**Delete**, which asks first: "Delete “X”?
-  The saved filter is removed from this phone. Your tickets and the filters on the list are not changed."). Nothing else.
-- **What one holds**, decided from the list's state: the quick filter, the applied search, the sort, the Filters
-  sheet's five (priority, category, created From/To, technician, group) **as far as the role may send them**
-  (`ticketListFilters()`, `utils/permissions.ts`), and the country **only for ADMIN and the triage AGENT**
-  (`countrySelectorMode() === 'switch'`). Not the Home period's name: a tile's dates are kept as plain dates.
-- **Role**: every role with the Filters sheet can save. A role that cannot filter by technician or group never saves
-  one; a filter read later is cut to the role again, on the phone too, so it never outlives the role's permissions.
+  - **The chips:**
+    - the views as `FilterChip`s (role button), **newest first** (the web's order), wrapping, 8 dp apart;
+    - the chip whose filters are exactly what is on the list right now (and no search typed) is **filled brand red**;
+    - a view holding something the app cannot apply carries an `alert-circle-outline` icon in its chip.
+  - **While loading:** one xs gray-500 line ("Loading your saved filters…", or "…load when you're back online"). A failure says so in red-700, with a **Retry** link. It is never an empty list.
+  - With none saved: "Save the filters you use often, then tap one to apply it. They are on the web portal's Views too."
+  - Under them, the **dashed** "Save these filters" button (44 dp, bookmark icon). It is disabled until the list has loaded, or with the reason under it (xs, gray-600):
+    - an SLA quick filter is on: "“Overdue” can't be saved: the web portal's views have no SLA filter. Pick another quick filter first.";
+    - these exact filters are saved already: "…already saved as “Name”".
+  - There is **no cap of 20** any more: the server and the web have none.
+- **Tapping a chip** applies the view at once, as the web's "load view" does:
+  - the quick filter, the sort and the sheet's filters are set;
+  - the search and the Home period are cleared;
+  - **the country is kept**.
+  - When the app left something out, an amber note (amber-50, xs amber-900, `alert-circle`) appears under the chips until the next tap: "“Name” is applied without: Group (not available to your role); Sort “created” (not on the app)."
+- **Save sheet**, "Save these filters":
+  - "What this filter holds" as grey pills: "Quick filter: Open", "Status: Open, In Progress", "Priority: High", "Category: Network", "Created …", "Technician: …", "Group: …", "Sort: Priority". Hint: "Saved on the Service Desk: it is on the web portal's Views too."
+  - "**Not kept in a saved filter**", as pills: "Search “vpn”", "Country: Kenya". Hint: "As on the web portal: applying one clears the search and keeps the country."
+  - Then the **Name** field: required, trimmed, at most 40 characters, not a name already in the list (any case). Then "Save filter" and "Cancel".
+  - A failure is said under the field in red-700, in the write-error words ("…It may have been saved — refresh before trying again." for a network error or a 5xx). The list is then re-read.
+  - Success: the sheet closes; toast "Saved “X”. It's on the web portal too."
+- **Manage** ("Saved filters (n)"): one row per view, with:
+  - its name, and a two-line summary of the same pills;
+  - for a view with parts the app cannot apply, a third line in amber-800: "Not on the app: …";
+  - a pencil, **Rename**: the name only, so the filters stay exactly as saved;
+  - a red bin, **Delete**. It asks first: "Delete “X”? It is deleted from the Service Desk, so it goes from the web portal too. Your tickets are not changed." A view already deleted elsewhere counts as deleted and leaves the list.
+- **The phone-only filters of versionCode 6:** an amber card under the button, "Saved on this phone by the previous version". It lists each by name with what it held, and says they were never uploaded. **Dismiss** asks first, then removes them from the phone. They are never applied or uploaded.
+- **Role:** a view only holds what that role may send (`ticketListFilters()`, `isTicketFilterAllowed()`). Reading a view applies the same rules.
 
 ### 17.3 Search on long dropdowns
 - **One component**: `OptionSheet` (`src/components/OptionSheet.tsx`). Every dropdown in the app is one, so each gets
@@ -1265,3 +1282,17 @@ On the phone only: never synced with the web portal, no backend call. Per user A
 - **TalkBack**: once typing pauses (0.5 s), the number of matches is announced ("3 matches", "1 match", "No matches").
 - Device checks (next build): a 38-category list on a 360 × 640 phone with the keyboard up (the field and at least two
   rows visible); 200 % text; TalkBack hears the count.
+
+### 17.4 Multi-select dropdowns (2026-11-17, second brief)
+- **Only where the server reads several values: Status.** TKT-1 reads one comma-separated `status` (`16-SAVED-VIEWS.md` §7). Priority, category, technician and group stay single-choice: the server reads one value each.
+- **One component:** `OptionSheet` with `multiple` (`src/components/OptionSheet.tsx`). No second dropdown exists.
+- **The field (closed):** "Status" first in the Filters card, placeholder "All statuses". With some chosen: the first in option order, then "+n" ("Open +2"). Hint: "Pick as many as you need.", or, while a quick filter that sends a status is on, "Picking statuses replaces the “Open” quick filter."
+- **The sheet:**
+  - the search field as in 17.3. Status has 12 options, so it has one;
+  - then a pinned **"Select all"** row (48 dp, base medium): a checkbox (`checkbox` brand red / `remove-circle` brand red when some are chosen / `square-outline` grey), the label, and the web's count on the right ("1/12", sm gray-600). With a search typed it reads "Select all shown", and it ticks or unticks only the options the search shows;
+  - then the options with checkboxes (`accessibilityRole="checkbox"`, ticked in brand red);
+  - a footer with **Clear** (outline, disabled when nothing is ticked) and **Done** (filled), side by side, 12 dp apart.
+- **When it applies:** ticks change a draft. The choice reaches the list **once, when the sheet closes**: Done, back, or a tap outside. So the list makes one request, not one per tick.
+- **TalkBack:** each row is a checkbox with its state; "Select all" says "Select all, 1 of 12 selected" and is "mixed" when some are chosen.
+- **Saved views** carry several statuses ("Status: Open, In Progress") and restore them.
+- Device checks (next build): the Status sheet on a 360 × 640 phone with the keyboard up (the field, "Select all" and two rows visible); 200 % text; the footer clear of the gesture bar.

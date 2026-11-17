@@ -143,7 +143,7 @@ Before G1: 35 SAME, 11 NOT BUILT, 105 rows. G1 moved four rows to ✅ SAME and s
 | Filter by technician or group | ADMIN, AGENT (END_USER, L2_MANAGER: error) | ADMIN, AGENT | ✅ SAME | In the Filters sheet. The web shows END_USER and L2_MANAGER these two lists, always empty; mobile leaves them out. Technicians are found by name (the web lists its first 100). Built in G2. |
 | Filter by priority, category or date | All roles | All roles | ✅ SAME | In the Filters sheet, combined with the quick filters, search and sort. As on the web, the category filter lists top-level categories and skips tickets filed under their sub-categories, and the date is the day the ticket was created. Built in G2. |
 | Export the list to a spreadsheet | All roles | Nobody | ⊘ OUT OF SCOPE | |
-| Saved views | All roles | Nobody | ⊘ OUT OF SCOPE | |
+| Saved views | All roles | All roles (2026-11-17: synced with the web, each role's view holds only the filters it can send) | ✅ SAME | `16-SAVED-VIEWS.md` |
 | Switch the country filter (any country or "All") | ADMIN, triage AGENT | ADMIN, triage AGENT | ✅ SAME | L2_MANAGER has no country filter on either. |
 | Country filter fixed to your own country | plain AGENT | plain AGENT | ✅ SAME | Shown with a lock. |
 | See your country filter, read-only | END_USER | Nobody | ⊘ OUT OF SCOPE | Mobile always shows a requester all of their own tickets. |
@@ -450,7 +450,7 @@ Three ✅ SAME rows also contain web controls that always fail, or do nothing, w
 | Capability | Why mobile skips it |
 |---|---|
 | Export the list to a spreadsheet | It builds a file by paging through every ticket: desk work, not phone work. |
-| Saved views | Desktop filter sets; mobile uses fixed quick filters instead. |
+| ~~Saved views~~ | Built 2026-11-17: the Filters sheet's saved filters are the web's views (`docs/web-system/16-SAVED-VIEWS.md`). |
 | See your country filter, read-only | Mobile always shows a requester every ticket they raised, whatever the country, so a country label would be wrong. |
 | Change the ticket's country: plain AGENT | Decided in G2: an AGENT locked to one country keeps the ticket's country locked, as 05 §A.12 locks their list. Moving a ticket to another country would move it out of their own queue. ADMIN and the triage AGENT change it as on the web. |
 | Set mode, level and source when creating | The server throws away mode and level on a new ticket, and mobile sets the source itself. |

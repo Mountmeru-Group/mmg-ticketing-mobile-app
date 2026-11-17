@@ -1,6 +1,9 @@
 // The runtime environment switch (2026-11-17), as a RELEASE build runs it: Production by default on a fresh install,
 // the choice kept across a restart, and a switch that removes the device token from the OLD environment first, then
 // signs out and clears the session, the 15-day clock, SecureStore, the query cache and the filter state.
+// Since the third brief of 2026-11-17 a switch away from Production needs the switch password: each one below is made
+// with a pass from a correct entry of a TEST password (the real one is never in the repository). The password gate
+// itself, and that any role may use UAT: tests/environment/switch-password.test.mjs.
 //
 // This file runs as a release build: __DEV__ is set to false BEFORE the app's modules load (dynamic imports below), and
 // node --test runs every test file in its own process, so no other file sees it. The development build's side (UAT only,
@@ -26,6 +29,7 @@ const { apiClient } = await import('../../src/api/client.ts');
 const { ApiClientError } = await import('../../src/api/errors.ts');
 const { getAttachmentViewRequest } = await import('../../src/api/attachments.api.ts');
 const { switchEnvironment } = await import('../../src/api/environmentSwitch.ts');
+const { createSwitchPasswordGate } = await import('../../src/utils/switch-password.ts');
 const { DEFAULT_DASHBOARD_PERIOD } = await import('../../src/utils/dashboard-period.ts');
 const { NO_ADVANCED_FILTERS } = await import('../../src/utils/ticket-filters.ts');
 
@@ -35,6 +39,16 @@ const SESSION_KEYS = ['mmg.session.token', 'mmg.session.issuedAt', 'mmg.session.
 const FULL_AUTH_KEY = 'mmg.auth.fullAuthAt';
 const USER = { id: 'user-admin', email: 'admin@example.test', displayName: 'Admin', role: 'ADMIN', countryId: null };
 const FCM_TOKEN = 'fcm-token-SWITCH';
+
+/** A pass from a correct switch password: a test password with its own hash, never the app's. One switch each. */
+const TEST_PASSWORD = 'correct horse battery';
+async function unlockedPass() {
+  const { createHash } = await import('node:crypto');
+  const gate = createSwitchPasswordGate({ expectedSha256: createHash('sha256').update(TEST_PASSWORD).digest('hex') });
+  const result = await gate.check(TEST_PASSWORD);
+  assert.equal(result.ok, true);
+  return result.pass;
+}
 
 // ── The network: every request is recorded with the environment and session at the moment it was sent ──
 const sent = [];
@@ -99,7 +113,7 @@ describe('a release build: Production on a fresh install, the choice kept until 
   });
 
   test('the environment persists across a restart: switched to UAT, a cold start is still on UAT', async () => {
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     assert.equal(secureStore.__snapshot()[ENVIRONMENT_KEY], 'UAT');
     // A second, fresh copy of the store module: what a cold start loads. Same Keystore.
     const restarted = await import(`../../src/store/environment.store.ts?restart=${Date.now()}`);
@@ -110,7 +124,7 @@ describe('a release build: Production on a fresh install, the choice kept until 
   });
 
   test('…and it changes only when the person switches back: then Production is kept', async () => {
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     await switchEnvironment('PROD');
     assert.equal(secureStore.__snapshot()[ENVIRONMENT_KEY], 'PROD');
     useEnvironmentStore.setState({ environment: 'UAT', restored: false });
@@ -119,7 +133,7 @@ describe('a release build: Production on a fresh install, the choice kept until 
   });
 
   test('a sign-out does not reset it: only switchEnvironment() changes it', async () => {
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     await useAuthStore.getState().clearSession(null, { forgetFullAuth: true });
     assert.equal(secureStore.__snapshot()[ENVIRONMENT_KEY], 'UAT');
     assert.equal(activeEnvironment(), 'UAT');
@@ -150,7 +164,7 @@ describe('switching: the old environment is left completely before the new one i
 
   test('1. NTF-6 deletes the device token from PRODUCTION, while its session is still valid, before anything else', async () => {
     await busyOnProduction();
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     const ntf6 = sent.findIndex((r) => r.method === 'delete' && r.url === '/notifications/device-token');
     assert.equal(ntf6, 0, 'the first request');
     assert.deepEqual(
@@ -167,7 +181,7 @@ describe('switching: the old environment is left completely before the new one i
 
   test('2–5. session, 15-day clock and SecureStore session keys gone; query cache empty; filters and period reset; UAT stored', async () => {
     await busyOnProduction();
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
 
     const auth = useAuthStore.getState();
     assert.deepEqual(
@@ -200,7 +214,7 @@ describe('switching: the old environment is left completely before the new one i
     await busyOnProduction();
     const seen = [];
     const stop = useEnvironmentStore.subscribe((s) => seen.push({ env: s.environment, signedIn: useAuthStore.getState().isAuthenticated, cached: queryClient.getQueryCache().getAll().length }));
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     stop();
     assert.deepEqual(seen, [{ env: 'UAT', signedIn: false, cached: 0 }]);
   });
@@ -211,7 +225,7 @@ describe('switching: the old environment is left completely before the new one i
     assert.ok(secureStore.__snapshot()[FULL_AUTH_KEY], 'an ordinary sign-out keeps the 15-day date');
     queryClient.setQueryData(['auth', 'config'], { ok: true });
     useUiStore.getState().setTicketFilter('CLOSED');
-    await switchEnvironment('UAT');
+    await switchEnvironment('UAT', await unlockedPass());
     assert.deepEqual(sent, []);
     assert.equal(secureStore.__snapshot()[FULL_AUTH_KEY], undefined, 'the switch clears the 15-day clock too');
     assert.equal(queryClient.getQueryCache().getAll().length, 0);

@@ -85,7 +85,10 @@ describe('Login environment chip: whenever UAT is in use, in any build; never on
     assert.match(branch, /\{environmentLabel\(environment\)\}/);
     // Outside the branch the label is only imported, never rendered.
     assert.deepEqual(rest.match(/environmentLabel/g), ['environmentLabel']);
-    assert.match(rest, /^import \{ CAN_SWITCH_ENVIRONMENT, environmentLabel, showEnvironmentChip \} from '@\/config\/env';$/m);
+    assert.match(
+      rest,
+      /^import \{ CAN_SWITCH_ENVIRONMENT, DEFAULT_ENVIRONMENT, ENVIRONMENT_NAMES, environmentLabel, showEnvironmentChip \} from '@\/config\/env';$/m,
+    );
     // The environment in use, from its store: never a value fixed when the file loaded.
     assert.match(rest, /const environment = useEnvironmentStore\(\(s\) => s\.environment\);/);
   });
