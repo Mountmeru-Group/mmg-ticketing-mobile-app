@@ -25,9 +25,10 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components';
-import { APP_ENV, APP_VERSION } from '@/config/env';
+import { APP_VERSION } from '@/config/env';
 import { countryName, useCountryOptions, usePendingApprovals, useSignOut } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { useEnvironmentStore } from '@/store/environment.store';
 import { colors, palette } from '@/theme';
 import type { AppDrawerParamList } from '@/types';
 import { formatDisplayName, initials } from '@/utils/format';
@@ -64,6 +65,7 @@ const DRAWER_ROWS: Record<
 
 export function DrawerContent({ navigation, state }: DrawerContentComponentProps) {
   const user = useAuthStore((s) => s.user);
+  const environment = useEnvironmentStore((s) => s.environment);
   const insets = useSafeAreaInsets();
   const role = user?.role ?? 'END_USER';
   const activeRoute = state.routes[state.index]?.name;
@@ -177,7 +179,8 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
         </View>
       </View>
       <Text className="px-4 py-3 text-xs text-gray-500">
-        v{APP_VERSION} · {APP_ENV}
+        {/* The environment in use (the person's choice since 2026-11-17), not one fixed by the build. */}
+        v{APP_VERSION} · {environment}
         {__DEV__ ? ' · dev build' : ''}
       </Text>
     </View>

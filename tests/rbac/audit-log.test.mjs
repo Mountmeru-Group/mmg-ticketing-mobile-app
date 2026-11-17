@@ -292,7 +292,7 @@ describe('Audit log: the path (the written /audit-logs, then the source\'s /audi
   });
 
   test('both paths carry the session as a Bearer token', async () => {
-    useAuthStore.setState({ token: 'admin-session', user: PERSONAS.ADMIN, issuedAt: Date.now(), isAuthenticated: true, isLoading: false });
+    useAuthStore.setState({ token: 'admin-session', user: PERSONAS.ADMIN, issuedAt: Date.now(), environment: 'UAT', isAuthenticated: true, isLoading: false });
     routes['/audit-logs'] = HTML(200);
     await listAuditLog({});
     assert.deepEqual(sent.map((r) => r.auth), ['Bearer admin-session', 'Bearer admin-session']);

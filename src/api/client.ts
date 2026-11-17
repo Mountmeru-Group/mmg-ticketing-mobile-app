@@ -1,7 +1,6 @@
 // The one HTTP client for `/api/v1` (01 §0, 02 §5.2–§5.3).
 import axios, { type AxiosResponse } from 'axios';
 
-import { API_BASE_URL } from '@/config/env';
 import {
   REAUTH_NOTICE,
   SESSION_ENDED_MESSAGE,
@@ -10,6 +9,8 @@ import {
   useAuthStore,
   type ClearSessionOptions,
 } from '@/store/auth.store';
+import { activeEnvironment, apiBaseUrl } from '@/store/environment.store';
+import { useSavedFiltersStore } from '@/store/savedFilters.store';
 import { useUiStore } from '@/store/ui.store';
 import type { ApiError } from '@/types';
 import { ApiClientError } from './errors';
@@ -30,8 +31,9 @@ export interface MessageResponse {
 export const DEFAULT_TIMEOUT_MS = 30_000; // 02 §5.2
 export const UPLOAD_TIMEOUT_MS = 120_000;
 
+// No `baseURL` here: the environment is the person's choice (2026-11-17), so each request takes the one in use when it
+// is sent (the request interceptor below). Nothing holds a URL from an earlier environment.
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
   timeout: DEFAULT_TIMEOUT_MS,
   // Never send or accept cookies: an `sd_session` cookie overrides the Bearer header server-side (02 §2 #5).
   withCredentials: false,
@@ -54,7 +56,21 @@ const UNAUTHORIZED_MESSAGES: Record<string, string> = {
 export async function endSession(message: string | null, options?: ClearSessionOptions): Promise<void> {
   queryClient.clear();
   useUiStore.getState().reset();
+  // Only the in-memory copy: saved filters stay on the phone for this person's next sign-in (savedFilters.store.ts).
+  useSavedFiltersStore.getState().reset();
   await useAuthStore.getState().clearSession(message, options);
+}
+
+/**
+ * The session token, only if it was issued by the environment in use: a UAT token never reaches production, nor the
+ * reverse. Null when there is no session, or when it belongs to another environment (then sending it is refused).
+ * The environment switch signs out before it changes anything (src/api/environmentSwitch.ts), so a mismatch means a
+ * bug or an interrupted switch; restoreSession() also drops another environment's session on a cold start.
+ */
+export function sessionTokenForActiveEnvironment(): string | null {
+  const { token, environment } = useAuthStore.getState();
+  if (!token || environment !== activeEnvironment()) return null;
+  return token;
 }
 
 /**
@@ -128,10 +144,18 @@ function normaliseError(error: unknown): ApiClientError {
 // ── Interceptors ─────────────────────────────────────────────
 
 apiClient.interceptors.request.use((config) => {
+  // The environment in use right now. Absolute URLs (SYS-1 health) are not affected: axios ignores the base for them.
+  config.baseURL = apiBaseUrl();
   if (config.skipAuth) return config;
 
   const { token, issuedAt } = useAuthStore.getState();
   if (!token) return config;
+
+  // A token from another environment is never sent (2026-11-17): end that session instead.
+  if (sessionTokenForActiveEnvironment() === null) {
+    void endSession(SESSION_ENDED_MESSAGE);
+    throw new ApiClientError('client', 401, { error: 'Session belongs to another environment' });
+  }
 
   // 8-hour hard expiry: don't send a token we already know is dead (02 §5.4).
   if (issuedAt === null || isSessionExpired(issuedAt)) {

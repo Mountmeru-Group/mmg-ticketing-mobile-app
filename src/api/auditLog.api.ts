@@ -30,7 +30,7 @@ export const AUDIT_FILTER_KEYS = ['action', 'entityType', 'dateFrom', 'dateTo', 
 /** The path that last answered, in this run of the app. Memory only: a cold start finds it again. */
 let answeringPath: AuditLogPath | null = null;
 
-/** Starts again from the written path, as a fresh run of the app does. For tests. */
+/** Starts again from the written path, as a fresh run of the app does. Tests, and the environment switch. */
 export function forgetAuditLogPath(): void {
   answeringPath = null;
 }

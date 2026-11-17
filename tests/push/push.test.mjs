@@ -27,7 +27,7 @@ import {
 } from '../../src/push/registration.ts';
 import { useAuthStore } from '../../src/store/auth.store.ts';
 import { usePushStore } from '../../src/store/push.store.ts';
-import { APP_ORIGIN, parseTicketLink } from '../../src/utils/deep-links.ts';
+import { appOrigin, parseTicketLink } from '../../src/utils/deep-links.ts';
 import { deviceTokenFailure, pushNotice, pushTapAction, pushTicketLink } from '../../src/utils/push.ts';
 import { PERSONAS } from '../rbac/personas.mjs';
 
@@ -108,7 +108,8 @@ const logs = [];
 const realInfo = console.info;
 
 function signIn(persona = PERSONAS.ADMIN) {
-  useAuthStore.setState({ token: 'session-token', user: persona, issuedAt: Date.now(), isAuthenticated: true, isLoading: false, signOutMessage: null });
+  // A session of the environment in use (UAT in a development build): the client sends no other (2026-11-17).
+  useAuthStore.setState({ token: 'session-token', user: persona, issuedAt: Date.now(), environment: 'UAT', isAuthenticated: true, isLoading: false, signOutMessage: null });
 }
 function signOutLocally() {
   useAuthStore.setState({ token: null, user: null, issuedAt: null, isAuthenticated: false, isLoading: false });
@@ -380,7 +381,7 @@ describe('token rotation and taps', () => {
 
   test('a tap opens data.ticketId through the existing resolver\'s link format', () => {
     const link = pushTicketLink({ type: 'TICKET_COMMENT', ticketId: TICKET_ID, ticketNumber: '5266', notificationId: 'n-1' });
-    assert.equal(link, `${APP_ORIGIN}/tickets/${TICKET_ID}`);
+    assert.equal(link, `${appOrigin()}/tickets/${TICKET_ID}`);
     assert.deepEqual(parseTicketLink(link), { ok: true, target: { kind: 'id', id: TICKET_ID } });
   });
 

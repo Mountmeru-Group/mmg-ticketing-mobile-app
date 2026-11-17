@@ -1,9 +1,8 @@
 // Attachment endpoints (01 §4). Mounted under /api/v1/tickets/:ticketId/attachments.
-import { API_BASE_URL } from '@/config/env';
-import { useAuthStore } from '@/store/auth.store';
+import { apiBaseUrl } from '@/store/environment.store';
 import type { Attachment, UserRole } from '@/types';
 import { canDeleteAttachments } from '@/utils/permissions';
-import { UPLOAD_TIMEOUT_MS, apiClient, type MessageResponse } from './client';
+import { UPLOAD_TIMEOUT_MS, apiClient, sessionTokenForActiveEnvironment, type MessageResponse } from './client';
 import { clientError } from './errors';
 import { seg } from './helpers';
 
@@ -92,9 +91,10 @@ export interface AuthenticatedRequest {
 }
 
 function authenticatedRequest(path: string): AuthenticatedRequest {
-  const { token } = useAuthStore.getState();
+  // The environment in use, and its own session's token only: never another environment's (client.ts).
+  const token = sessionTokenForActiveEnvironment();
   return {
-    uri: `${API_BASE_URL}${path}`,
+    uri: `${apiBaseUrl()}${path}`,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   };
 }

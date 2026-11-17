@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CommonActions, DrawerActions, DrawerRouter, StackActions } from '@react-navigation/routers';
 
-import { APP_ORIGIN, parseTicketLink } from '../../src/utils/deep-links.ts';
+import { appOrigin, parseTicketLink } from '../../src/utils/deep-links.ts';
 import {
   canReadAnnouncements, canUseKnowledgeBase, drawerItems, drawerRoutes, showAnnouncementBanner,
 } from '../../src/utils/permissions.ts';
@@ -270,11 +270,11 @@ describe('KB and announcements: no entry point remains for anyone but ADMIN', ()
   test('a KB or announcement link tapped inside a description, reply or email is not an in-app link', () => {
     // Only ticket links resolve in the app (TicketLink screen); anything else opens in the browser (HtmlText).
     for (const link of [
-      `${APP_ORIGIN}/kb`,
-      `${APP_ORIGIN}/kb/articles/reset-your-vpn`,
-      `${APP_ORIGIN}/knowledge-base/reset-your-vpn`,
-      `${APP_ORIGIN}/announcements`,
-      `${APP_ORIGIN}/announcements/123`,
+      `${appOrigin()}/kb`,
+      `${appOrigin()}/kb/articles/reset-your-vpn`,
+      `${appOrigin()}/knowledge-base/reset-your-vpn`,
+      `${appOrigin()}/announcements`,
+      `${appOrigin()}/announcements/123`,
     ]) {
       assert.deepEqual(parseTicketLink(link), { ok: false, reason: 'not-a-ticket-link' }, link);
     }

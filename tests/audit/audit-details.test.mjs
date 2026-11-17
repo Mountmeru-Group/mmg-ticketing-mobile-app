@@ -9,7 +9,7 @@ import {
   AUDIT_ACTIONS, AUDIT_ACTION_LABELS, auditActionLabel, auditDayLabel, auditListRows, auditTicketLink, auditTime,
   formatAuditDetails, parseAuditTicketNumber,
 } from '../../src/utils/audit-log.ts';
-import { APP_ORIGIN, parseTicketLink } from '../../src/utils/deep-links.ts';
+import { appOrigin, parseTicketLink } from '../../src/utils/deep-links.ts';
 
 const A = '3f2a9c1e-1111-4111-8111-111111111111';
 const B = 'b7d4e2a0-2222-4222-8222-222222222222';
@@ -194,7 +194,7 @@ describe('Action labels', () => {
 describe('Ticket links and numbers', () => {
   test('a ticket opens through the deep-link resolver, by id', () => {
     const link = auditTicketLink({ id: A, ticketNumber: 12, title: 'x' });
-    assert.equal(link, `${APP_ORIGIN}/tickets/${A}`);
+    assert.equal(link, `${appOrigin()}/tickets/${A}`);
     assert.deepEqual(parseTicketLink(link), { ok: true, target: { kind: 'id', id: A } });
   });
   test('no ticket (deleted, or none), no link; a bad id falls back to the number', () => {
@@ -206,8 +206,8 @@ describe('Ticket links and numbers', () => {
     assert.equal(parseAuditTicketNumber('1234'), 1234);
     assert.equal(parseAuditTicketNumber('#1234'), 1234);
     assert.equal(parseAuditTicketNumber('  # 77 '), 77);
-    assert.equal(parseAuditTicketNumber(`${APP_ORIGIN}/ticket/55`), 55);
-    for (const text of ['', 'jane', '0', '12a', '1234567890', `${APP_ORIGIN}/tickets/${A}`, 'https://elsewhere.example/ticket/5']) {
+    assert.equal(parseAuditTicketNumber(`${appOrigin()}/ticket/55`), 55);
+    for (const text of ['', 'jane', '0', '12a', '1234567890', `${appOrigin()}/tickets/${A}`, 'https://elsewhere.example/ticket/5']) {
       assert.equal(parseAuditTicketNumber(text), null, text);
     }
   });

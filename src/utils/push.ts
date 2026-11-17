@@ -3,7 +3,7 @@
 // expo-notifications side is src/push/platform.ts, the flow is src/push/registration.ts.
 // The backend half (FCM send, NTF-5/NTF-6) is NOT YET DEPLOYED: MOBILE-BACKEND-REQUIREMENTS.md §1, 01 NTF-5/NTF-6.
 import { ApiClientError } from '@/api/errors';
-import { APP_ORIGIN, parseTicketLink } from './deep-links';
+import { appOrigin, parseTicketLink } from './deep-links';
 
 /**
  * - `checking`      not worked out yet: signed out, or the check is still running.
@@ -109,7 +109,7 @@ export function pushTicketLink(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) return null;
   const { ticketId, ticketNumber } = data as Record<string, unknown>;
   const candidates: string[] = [];
-  if (typeof ticketId === 'string' && ticketId.trim()) candidates.push(`${APP_ORIGIN}/tickets/${encodeURIComponent(ticketId.trim())}`);
+  if (typeof ticketId === 'string' && ticketId.trim()) candidates.push(`${appOrigin()}/tickets/${encodeURIComponent(ticketId.trim())}`);
   if (typeof ticketNumber === 'string' || typeof ticketNumber === 'number') candidates.push(`#${String(ticketNumber).trim()}`);
   for (const link of candidates) {
     if (parseTicketLink(link).ok) return link;

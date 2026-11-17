@@ -6,7 +6,10 @@
 // - After the 15-day sign-out (02 §5.8) the message slot says why ("Signed out for security"), in the info tone.
 // - The attempt itself, the messages and the stale-banner rule are in ./signInAttempt.ts; the button and its motion
 //   are ./SignInButton.tsx; this file only lays out.
-// - The environment chip shows on every build except production (SHOW_ENVIRONMENT_CHIP, src/config/env.ts).
+// - The environment chip shows whenever UAT is in use, in any build; never on Production (showEnvironmentChip,
+//   src/config/env.ts). Since 2026-11-17 the environment is the person's choice: the gear at the top right of the red
+//   panel opens ./EnvironmentSheet.tsx (release builds only, CAN_SWITCH_ENVIRONMENT). It is locked while a sign-in runs,
+//   so a sign-in always finishes in the environment it started in.
 // - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
 // - Below the pill, on every build, UAT and PROD alike: email and password sign-in, ./EmailSignInForm.tsx
 //   (2026-11-05; opened to PROD 2026-11-06, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
@@ -23,18 +26,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Keyboard, KeyboardAvoidingView, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  AppState, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, OfflineBanner, OutlineButton } from '@/components';
 import { getAuthRedirectUri } from '@/config/auth.config';
-import { ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP } from '@/config/env';
+import { CAN_SWITCH_ENVIRONMENT, environmentLabel, showEnvironmentChip } from '@/config/env';
 import { reduceMotionEnabled, useSingleFlight } from '@/hooks';
 import { REAUTH_NOTICE, useAuthStore } from '@/store/auth.store';
+import { useEnvironmentStore } from '@/store/environment.store';
 import { colors, loginLayout, loginType, palette } from '@/theme';
 import type { AuthStackScreenProps } from '@/types';
 import { copyrightLabel, copyrightLine, copyrightYear } from '@/utils/copyright';
 import { EmailSignInForm } from './EmailSignInForm';
+import { EnvironmentSheet } from './EnvironmentSheet';
 import { revealScrollY, type ScrollViewport } from './emailFormLayout';
 import { SignInButton } from './SignInButton';
 import { FAILURE_COPY, attemptSignIn, createStaleFailureGuard, type Failure, type SignInOutcome } from './signInAttempt';
@@ -62,6 +69,10 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
   const inFlight = useRef(false);
   // An email sign-in is running: the Microsoft pill is locked until it ends.
   const [emailBusy, setEmailBusy] = useState(false);
+  // The environment in use (the person's choice), and its switch sheet.
+  const environment = useEnvironmentStore((s) => s.environment);
+  const [environmentSheet, setEnvironmentSheet] = useState(false);
+  const environmentLocked = signingIn || emailBusy;
 
   // The email form's "Sign in" must show, whole and tappable, as soon as the form opens, and stay above the keyboard.
   // Refs, not state: none of this re-renders Login.
@@ -186,8 +197,26 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
               {/* Same place as on every other screen: the top of the screen, full width. */}
               <OfflineBanner />
               <View style={styles.cardContent}>
-                <View style={styles.logoCard}>
-                  <BrandLogo width={logoCard.width - 2 * logoCard.padX} height={logoCard.height - 2 * logoCard.padY} />
+                <View style={styles.topRow}>
+                  <View style={styles.logoCard}>
+                    <BrandLogo width={logoCard.width - 2 * logoCard.padX} height={logoCard.height - 2 * logoCard.padY} />
+                  </View>
+                  {/* Top right of the red panel: which Service Desk to use. Release builds only; locked during a sign-in. */}
+                  {CAN_SWITCH_ENVIRONMENT ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Service Desk environment"
+                      accessibilityHint="Choose Production or UAT"
+                      accessibilityState={{ disabled: environmentLocked }}
+                      disabled={environmentLocked}
+                      onPress={() => setEnvironmentSheet(true)}
+                      hitSlop={4}
+                      android_ripple={{ color: colors.login.circle, borderless: true, radius: 22 }}
+                      style={[styles.gear, environmentLocked ? styles.locked : null]}
+                    >
+                      <Ionicons name="settings-outline" size={22} color={colors.login.headline} />
+                    </Pressable>
+                  ) : null}
                 </View>
                 <View style={styles.grow} />
                 <Text accessibilityRole="header" maxFontSizeMultiplier={loginType.headlineMaxScale} style={styles.headline}>
@@ -250,6 +279,8 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
                   <SignInButton busy={signingIn} onPress={startSignIn} />
                 </View>
                 <EmailSignInForm
+                  // Keyed by environment: what was typed for one Service Desk is never sent to the other after a switch.
+                  key={environment}
                   ssoBusy={signingIn}
                   run={once}
                   onBusyChange={emailBusyChanged}
@@ -260,10 +291,10 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
                   submitRef={submit}
                   onSubmitLayout={revealSubmit}
                 />
-                {/* Which backend this build talks to, for testers (04 M1). Never on a production build. */}
-                {SHOW_ENVIRONMENT_CHIP ? (
-                  <View accessibilityLabel={`Connected to ${ENVIRONMENT_LABEL}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">
-                    <Text className="text-xs font-semibold text-amber-800">{ENVIRONMENT_LABEL}</Text>
+                {/* Which backend the app talks to (04 M1): whenever UAT is in use, in any build. Never on Production. */}
+                {showEnvironmentChip(environment) ? (
+                  <View accessibilityLabel={`Connected to ${environmentLabel(environment)}`} className="mt-3 rounded-full bg-amber-100 px-2.5 py-0.5">
+                    <Text className="text-xs font-semibold text-amber-800">{environmentLabel(environment)}</Text>
                   </View>
                 ) : null}
                 {__DEV__ ? (
@@ -282,6 +313,14 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {CAN_SWITCH_ENVIRONMENT ? (
+        <EnvironmentSheet
+          visible={environmentSheet}
+          onClose={() => setEnvironmentSheet(false)}
+          // The old environment's failure banner says nothing about the new one.
+          onSwitched={() => setFailure(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -305,6 +344,9 @@ const styles = StyleSheet.create({
     paddingTop: loginLayout.cardTopPadding,
     paddingBottom: loginLayout.cardBottomPadding,
   },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  // 44 dp target; the icon is white on the red card (colors.login.headline).
+  gear: { width: 44, height: 44, marginTop: -6, marginRight: -10, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   logoCard: {
     width: logoCard.width,
     height: logoCard.height,

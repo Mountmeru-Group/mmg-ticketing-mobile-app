@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeWriteError, isSessionEndedError } from '@/api/errors';
 import { useIsOffline } from '@/api/network';
-import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
+import { APP_VERSION, environmentLabel } from '@/config/env';
 import {
   Card, ErrorState, FieldLabel, InlineError, LoadingSkeleton, OfflineBanner, OptionSheet, QueryBanner, ScreenHeader,
   SubmitButton, type SheetOption,
@@ -26,6 +26,7 @@ import {
   type ProfileForm,
 } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
+import { useEnvironmentStore } from '@/store/environment.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
 import type { AppDrawerScreenProps, UserProfile } from '@/types';
@@ -53,6 +54,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
   const insets = useSafeAreaInsets();
   const offline = useIsOffline();
   const user = useAuthStore((s) => s.user);
+  const environment = useEnvironmentStore((s) => s.environment);
   const profile = useProfile();
   const update = useUpdateProfile();
   const { signOut, signingOut } = useSignOut();
@@ -233,7 +235,7 @@ export function ProfileScreen(_props: AppDrawerScreenProps<'Profile'>) {
 
         <Card title="App">
           <ReadOnly label="Version" value={APP_VERSION} />
-          <ReadOnly label="Environment" value={ENVIRONMENT_LABEL} />
+          <ReadOnly label="Environment" value={environmentLabel(environment)} />
         </Card>
 
         <View className="mx-4">

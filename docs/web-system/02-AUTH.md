@@ -233,6 +233,7 @@ This is how the mobile app must behave once (a) or (b) exists. There is **no ref
   - Refresh it from `GET /auth/me` on every cold start and every foreground after more than 15 minutes.
   - The server's copy can be stale too (see `05` §C), so the authorisation decision always belongs to the server.
 - On boot, read the token from SecureStore into memory once. The Axios interceptor reads the in-memory copy, not SecureStore, on every request.
+- **Since 2026-11-17** the session is stored with the environment it was created on (`mmg.session.environment`), and the API environment is the person's choice (`mmg.app.environment`, kept across sign-outs). See §9.
 
 ### 5.2 Axios instance
 ```ts
@@ -712,3 +713,54 @@ The email path needs no Microsoft redirect, so it also works in a development bu
 **Alternative with no new endpoint** (unchanged). A dedicated Entra reviewer account, signing in through the existing Microsoft sign-in.
 - It needs AUTH-P2 on PROD (§7.6 item 1).
 - It also needs an MFA exclusion for that one account, which is IT's decision (`docs/G9-PASSWORD-LOGIN.md` §10).
+
+## 9. The runtime environment switch (2026-11-17)
+
+Ronit's written brief, 2026-11-17. Until then the API environment was fixed per EAS profile (`EXPO_PUBLIC_APP_ENV`).
+Now the person chooses it on Login. Code: `src/config/env.ts` (the rules), `src/store/environment.store.ts` (the
+choice), `src/api/environmentSwitch.ts` (the switch), `src/screens/auth/EnvironmentSheet.tsx` (the sheet).
+
+### 9.1 Which environment is in use
+- **Release build** (any EAS profile): Production and UAT are offered. A **fresh install is on Production, always**.
+- The choice is stored on the phone (SecureStore key `mmg.app.environment`, not a secret) and **kept until the person
+  changes it**. A sign-out does not reset it; the app does not go back to Production on each launch.
+- A missing, unknown or unreadable stored value is the default again (Production).
+- **Development build** (`__DEV__`): **UAT only**. No gear, a stored `PROD` is ignored, saving `PROD` is refused and
+  `apiBaseUrlFor('PROD')` throws (CLAUDE.md rule 4). The switch applies to release builds only.
+- Every request reads the environment when it is sent (`client.ts` sets `baseURL` per request). Nothing keeps a URL.
+
+### 9.2 Switching ("Switch and sign out"), in this order
+1. If a session and a push token exist: NTF-6 deletes this phone's device token from the **current** environment, while
+   its session still works (`unregisterPushForSignOut`, at most 3 s, silent). Then AUTH-3, as an explicit sign-out does
+   (§5.5; at most 5 s, result ignored).
+2. Sign out: `clearSession(null, { forgetFullAuth: true })`. The session, the **15-day clock** (§5.8) and every session
+   key in SecureStore are deleted, so the next sign-in, in the new environment, is challenged.
+3. `queryClient.clear()`: no list from one environment can appear under the other.
+4. The in-memory filter and period state (`ui.store` reset), the in-memory saved-filter list, and the routes learned
+   from the old backend (the email sign-in path, §8; the audit-log path) are forgotten.
+5. The new environment is stored. Login is already showing (RootNavigator follows the auth store).
+
+On Login nobody is signed in, so steps 1 and 2 usually send nothing: an earlier sign-out already removed the token.
+They still run, so the switch is safe wherever it is called from. While a sign-in runs, the gear is locked.
+
+### 9.3 A token never crosses environments
+- `setSession()` stores the environment the session was created on (SecureStore key `mmg.session.environment`, one of
+  the session keys, so every sign-out deletes it).
+- The request interceptor refuses to send a token whose environment is not the one in use: the request fails with a
+  401 `client` error, nothing leaves the phone, and that session is ended (`SESSION_ENDED_MESSAGE`).
+- Attachment views and downloads (`attachments.api.ts`, outside the API client) send the header only for a session of
+  the environment in use.
+- `restoreSession()` reads the environment first, then drops a stored session from any other environment.
+- Saved filters are kept per user AND per environment, so a UAT filter (UAT ids) is never offered on Production
+  (`docs/brand/UI-STANDARDS.md` §17.2).
+
+### 9.4 Upgrading from a build before 2026-11-17
+A session stored by versionCode 5 or earlier names no environment, so it **cannot be placed and is not restored**: the
+person sees "Your session has ended. Please sign in again." once. The 15-day date is kept, so Microsoft does not challenge
+that sign-in unless 15 days are due. A `preview` tester's install lands on Production (no choice was stored yet) and
+switches to UAT once. Without this, a UAT session from a `preview` APK would be sent to Production after the update.
+
+### 9.5 Not changed
+`src/config/auth.config.ts`, the Entra registration and redirect URIs, AUTH-P2 and the email sign-in, and the 15-day
+re-authentication itself. The Microsoft app registration is the same for both environments; only the Service Desk host
+the token exchange goes to follows the choice.

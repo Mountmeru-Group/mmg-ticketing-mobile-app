@@ -31,9 +31,12 @@ function sourceFiles(dir) {
 
 // ── The environment chip ─────────────────────────────────────
 
-describe('Login environment chip: never on a production build', () => {
+// 2026-11-17: the environment is the person's choice (Login's gear), no longer fixed by the build. The chip follows the
+// environment IN USE: shown whenever UAT is in use, in any build; never on Production. Until then it followed the build
+// (every build but a production release), which these tests pinned.
+describe('Login environment chip: whenever UAT is in use, in any build; never on Production', () => {
   let copy = 0;
-  /** A fresh src/config/env.ts, as a build with this __DEV__ and EXPO_PUBLIC_APP_ENV evaluates it. */
+  /** A fresh src/config/env.ts, as a build with this __DEV__ (and a stray EXPO_PUBLIC_APP_ENV, now ignored) evaluates it. */
   async function loadEnv(dev, appEnv) {
     const saved = { dev: globalThis.__DEV__, appEnv: process.env.EXPO_PUBLIC_APP_ENV };
     globalThis.__DEV__ = dev;
@@ -48,16 +51,17 @@ describe('Login environment chip: never on a production build', () => {
     }
   }
 
-  test('a release build of the production profile does not show it', async () => {
-    const env = await loadEnv(false, 'PROD');
-    assert.equal(env.APP_ENV, 'PROD');
-    assert.equal(env.SHOW_ENVIRONMENT_CHIP, false);
+  test('on UAT it shows, in a release build and in a development build alike', async () => {
+    for (const dev of [false, true]) {
+      const env = await loadEnv(dev, undefined);
+      assert.equal(env.showEnvironmentChip('UAT'), true, `dev=${dev}`);
+    }
   });
 
-  test('every other build shows it: preview (UAT), nothing set, and development', async () => {
-    for (const [dev, appEnv] of [[false, 'UAT'], [false, undefined], [true, 'UAT'], [true, undefined]]) {
-      const env = await loadEnv(dev, appEnv);
-      assert.equal(env.SHOW_ENVIRONMENT_CHIP, true, `dev=${dev} env=${appEnv}`);
+  test('on Production it never shows, whatever the build or a stray EXPO_PUBLIC_APP_ENV says', async () => {
+    for (const appEnv of ['PROD', 'UAT', undefined]) {
+      const env = await loadEnv(false, appEnv);
+      assert.equal(env.showEnvironmentChip('PROD'), false, String(appEnv));
     }
   });
 
@@ -69,20 +73,21 @@ describe('Login environment chip: never on a production build', () => {
     }
   });
 
-  test('Login renders the chip, and its label, only inside the SHOW_ENVIRONMENT_CHIP branch', () => {
+  test('Login renders the chip, and its label, only inside the showEnvironmentChip(environment) branch', () => {
     const login = read('src/screens/auth/LoginScreen.tsx');
-    const open = '{SHOW_ENVIRONMENT_CHIP ? (';
+    const open = '{showEnvironmentChip(environment) ? (';
     const start = login.indexOf(open);
-    assert.notEqual(start, -1, 'the chip must be gated');
+    assert.notEqual(start, -1, 'the chip must be gated on the environment in use');
     assert.equal(login.split(open).length - 1, 1);
     const end = login.indexOf(') : null}', start);
     const branch = login.slice(start, end);
     const rest = login.slice(0, start) + login.slice(end);
-    assert.match(branch, /\{ENVIRONMENT_LABEL\}/);
+    assert.match(branch, /\{environmentLabel\(environment\)\}/);
     // Outside the branch the label is only imported, never rendered.
-    assert.deepEqual(rest.match(/ENVIRONMENT_LABEL/g), ['ENVIRONMENT_LABEL']);
-    // 2026-11-06: the import brought EMAIL_SIGN_IN_ENABLED too until email sign-in was opened to PROD.
-    assert.match(rest, /^import \{ ENVIRONMENT_LABEL, SHOW_ENVIRONMENT_CHIP \} from '@\/config\/env';$/m);
+    assert.deepEqual(rest.match(/environmentLabel/g), ['environmentLabel']);
+    assert.match(rest, /^import \{ CAN_SWITCH_ENVIRONMENT, environmentLabel, showEnvironmentChip \} from '@\/config\/env';$/m);
+    // The environment in use, from its store: never a value fixed when the file loaded.
+    assert.match(rest, /const environment = useEnvironmentStore\(\(s\) => s\.environment\);/);
   });
 });
 

@@ -1,7 +1,7 @@
 // EAS Build profiles (JSON5: comments are allowed in eas.json). How to build, sign and distribute: docs/RELEASE.md.
-// Every profile sets EXPO_PUBLIC_APP_ENV, which src/config/env.ts turns into the API base URL. No URL lives here.
-// scripts/eas-build-guard.js runs first on the build server: it refuses a production build if the PROD URL in
-// src/config/env.ts is ever emptied again, and refuses PROD on any other profile.
+// No profile chooses the API environment (2026-11-17): the person chooses it in the app (Login → gear), and every
+// release build starts on Production. No URL and no EXPO_PUBLIC_APP_ENV live here: scripts/eas-build-guard.js runs
+// first on the build server and refuses a build that sets EXPO_PUBLIC_APP_ENV, or one whose env.ts lacks a URL.
 {
   "cli": {
     "version": ">= 24.8.0",
@@ -9,20 +9,18 @@
     "appVersionSource": "local"
   },
   "build": {
-    // Installable APK for testers, pointed at UAT. This is the first build to run.
+    // Installable APK for testers. Starts on Production like every release build: testers switch to UAT once, on
+    // Login's gear, and the app keeps that choice.
     "preview": {
       "node": "24.18.0",
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_APP_ENV": "UAT" }
+      "android": { "buildType": "apk" }
     },
-    // Store AAB for Google Play, pointed at PRODUCTION (URL set 2026-10-29). Check the pre-release checklist in
-    // docs/RELEASE.md §5 before every build of this profile.
+    // Store AAB for Google Play. Check the pre-release checklist in docs/RELEASE.md §5 before every build of this profile.
     "production": {
       "node": "24.18.0",
       "distribution": "store",
-      "android": { "buildType": "app-bundle" },
-      "env": { "EXPO_PUBLIC_APP_ENV": "PROD" }
+      "android": { "buildType": "app-bundle" }
     }
   }
 }
