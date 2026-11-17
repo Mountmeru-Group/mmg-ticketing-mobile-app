@@ -34,8 +34,11 @@ import { NAMES, PERSONAS, forEachPersona } from './personas.mjs';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 
-const ALL_FIVE = ['priority', 'category', 'date', 'technician', 'group'];
-const THREE = ['priority', 'category', 'date'];
+// 2026-11-17: Status (several at once) for every role, as the web's status select; first, as in the sheet.
+const ALL_FIVE = ['status', 'priority', 'category', 'date', 'technician', 'group'];
+const THREE = ['status', 'priority', 'category', 'date'];
+/** The five single-value filters the G2 tests below were written for. */
+const SINGLE_FIVE = ['priority', 'category', 'date', 'technician', 'group'];
 
 /** Every one of the five set, as if a stale state held them all. */
 const EVERYTHING = {
@@ -426,8 +429,10 @@ describe('wiring: the list and the Filters sheet take every filter decision from
       technician: /allowed\.includes\('technician'\) \? \(\s*<SelectField\s+label="Technician"/,
       group: /allowed\.includes\('group'\) \? \(\s*<SelectField\s+label="Group"/,
     };
-    for (const key of ALL_FIVE) assert.match(src, GUARDED[key], key);
-    for (const label of ['label="Priority"', 'label="Category"', 'label="Created"', 'label="Technician"', 'label="Group"']) {
+    for (const key of SINGLE_FIVE) assert.match(src, GUARDED[key], key);
+    assert.match(src, /allowed\.includes\('status'\) \? \(\s*<SelectField\s+label="Status"/, 'status');
+    assert.match(src, /allowed\.includes\('status'\) \? \(\s*<OptionSheet\s+multiple/, 'status sheet');
+    for (const label of ['label="Status"', 'label="Priority"', 'label="Category"', 'label="Created"', 'label="Technician"', 'label="Group"']) {
       assert.equal(src.split(label).length - 1, 1, label);
     }
     assert.match(src, /allowed\.includes\('technician'\) \? \(\s*<PersonPickerSheet/);

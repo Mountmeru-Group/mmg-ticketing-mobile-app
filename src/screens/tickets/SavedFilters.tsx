@@ -1,29 +1,62 @@
-// SAVED FILTERS, at the top of the M3 Filters sheet (2026-11-17). On this phone only: nothing is sent to the Service
-// Desk and nothing syncs with the web portal (src/store/savedFilters.store.ts). Rules: src/utils/saved-filters.ts.
-// - The saved ones as chips. Tapping one applies its whole set at once; the chip whose set is on the list right now is
-//   filled brand red. "Manage" renames and deletes (a delete asks first).
-// - "Save these filters" (dashed) opens a sheet: a name, and the exact list of what is being captured.
-// - Every role that has the Filters sheet can save; a filter holds only what that role may send.
+// SAVED FILTERS, at the top of the M3 Filters sheet. Since the second brief of 2026-11-17 they are the Service Desk's saved
+// ticket views: the same list as the web portal's "Views", per user and per environment (SVW-1..4, 16-SAVED-VIEWS.md).
+// Rules: src/utils/saved-filters.ts. Requests and cache: src/hooks/useSavedViews.ts.
+// - The views as chips, newest first (the web's order). Tapping one applies it at once, cut to this role; the chip whose
+//   filters are on the list right now is filled brand red. A view holding something the app cannot apply carries a
+//   warning icon, and after tapping it a note under the chips says exactly what was left out.
+// - "Save these filters" (dashed) opens a sheet: what the view will hold, what it will not (the search, the country), and
+//   a name. Refused, with the reason, when the quick filter cannot be held (an SLA one) or the same filters are saved.
+// - "Manage" renames (the name only: the view's filters are never rewritten) and deletes (asks first; it is deleted on
+//   the web too).
+// - Nothing is shown as saved, renamed or deleted until the Service Desk says so. Failures are said where they happened.
+// - The phone-only filters of versionCode 6 are listed once, under the chips, until the person dismisses them.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { describeError, describeWriteError } from '@/api/errors';
 import { FieldLabel, FilterChip, OutlineButton, Sheet, SubmitButton } from '@/components';
-import { useSavedTicketFilters } from '@/hooks';
-import { colors, palette } from '@/theme';
-import { confirmAction, notify } from '@/utils/dialogs';
 import {
-  SAVED_FILTER_LIMIT, SAVED_FILTER_NAME_MAX, SavedFilterError, sameSavedFilterContent, savedFilterChips,
-  savedFilterSaveProblem, type SavedFilterContent, type SavedTicketFilter,
+  useCreateSavedView, useDeleteSavedView, useLegacySavedFilters, useRenameSavedView, useSavedTicketViews, useSavedViewNames,
+} from '@/hooks';
+import { useAuthStore } from '@/store/auth.store';
+import { colors, palette } from '@/theme';
+import type { SavedView } from '@/types';
+import { confirmAction, notify, reportWriteError } from '@/utils/dialogs';
+import {
+  SAVED_FILTER_NAME_MAX, captureSavedView, cleanSavedFilterName, decodeSavedView, sameSavedViewFilters, savedViewChips,
+  savedViewSaveProblem, type DecodedSavedView, type SavedFilterContent, type SavedViewCapture, type TicketListFilterState,
 } from '@/utils/saved-filters';
 
-const failure = (error: unknown) => (error instanceof SavedFilterError ? error.message : "Couldn't save that on this phone. Try again.");
+type DecodedView = DecodedSavedView & { view: SavedView };
 
-/** `current`: the list's filters right now, as a saved filter would hold them (captureSavedFilter). */
-export function SavedFiltersBlock({ current, onApply }: { current: SavedFilterContent; onApply: (filter: SavedTicketFilter) => void }) {
-  const { items, ready, save, rename, remove } = useSavedTicketFilters();
+/** `list`: the ticket list's filters right now. `onApply`: put a view's content on the list (ui.store). */
+export function SavedFiltersBlock({ list, onApply }: { list: TicketListFilterState; onApply: (content: SavedFilterContent) => void }) {
+  const user = useAuthStore((s) => s.user);
+  const views = useSavedTicketViews({ enabled: !!user });
+  const names = useSavedViewNames(views.data);
+  const legacy = useLegacySavedFilters(user);
   const [sheet, setSheet] = useState<'save' | 'manage' | null>(null);
-  const saveProblem = ready ? savedFilterSaveProblem(items, current) : null;
+  // After applying a view the app could not apply whole: what it left out. Cleared by the next tap.
+  const [note, setNote] = useState<string | null>(null);
+  if (!user) return null;
+
+  const capture = captureSavedView(list, user);
+  const decoded: DecodedView[] = (views.data ?? []).map((view) => ({ view, ...decodeSavedView(view.filters, user, names) }));
+  const ready = views.data !== undefined;
+  const saveProblem = ready ? savedViewSaveProblem(views.data, capture) : null;
+  const isActive = (d: DecodedView) =>
+    !list.ticketSearch && !capture.refusal && d.leftOut.length === 0 && sameSavedViewFilters(d.view.filters, capture.filters);
+
+  const apply = (d: DecodedView) => {
+    const name = cleanSavedFilterName(d.view.name);
+    if (!d.content) {
+      setNote(`“${name}” can't be applied: the app can't read its filters. It is unchanged on the web portal.`);
+      return;
+    }
+    onApply(d.content);
+    setNote(d.leftOut.length > 0 ? `“${name}” is applied without: ${d.leftOut.join('; ')}.` : null);
+  };
 
   return (
     <View className="mx-4 mb-3">
@@ -31,7 +64,7 @@ export function SavedFiltersBlock({ current, onApply }: { current: SavedFilterCo
         <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500" accessibilityRole="header">
           Saved filters
         </Text>
-        {items.length > 0 ? (
+        {decoded.length > 0 ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Manage saved filters"
@@ -43,14 +76,27 @@ export function SavedFiltersBlock({ current, onApply }: { current: SavedFilterCo
         ) : null}
       </View>
 
-      {items.length > 0 ? (
+      {decoded.length > 0 ? (
         <View className="mb-2 flex-row flex-wrap" style={{ gap: 8 }}>
-          {items.map((f) => (
-            <FilterChip key={f.id} label={f.name} role="button" active={sameSavedFilterContent(f, current)} onPress={() => onApply(f)} />
+          {decoded.map((d) => (
+            <FilterChip
+              key={d.view.id}
+              label={cleanSavedFilterName(d.view.name)}
+              role="button"
+              icon={d.leftOut.length > 0 ? 'alert-circle-outline' : undefined}
+              active={isActive(d)}
+              onPress={() => apply(d)}
+            />
           ))}
         </View>
-      ) : ready ? (
-        <Text className="mb-2 text-xs text-gray-500">Save the filters you use often, then tap one to apply it. Kept on this phone only.</Text>
+      ) : null}
+      <ListState query={views} empty={ready && decoded.length === 0} />
+
+      {note ? (
+        <View accessibilityRole="alert" className="mb-2 flex-row items-start rounded-lg bg-amber-50 p-3">
+          <Ionicons name="alert-circle" size={16} color={palette.amber[800]} />
+          <Text className="ml-2 flex-1 text-xs text-amber-900">{note}</Text>
+        </View>
       ) : null}
 
       <Pressable
@@ -58,25 +104,50 @@ export function SavedFiltersBlock({ current, onApply }: { current: SavedFilterCo
         accessibilityState={{ disabled: !ready || !!saveProblem }}
         disabled={!ready || !!saveProblem}
         onPress={() => setSheet('save')}
-        className={`min-h-11 flex-row items-center justify-center rounded-lg border border-dashed px-4 py-2 ${saveProblem ? 'border-gray-300' : 'border-gray-400 active:bg-gray-100'}`}
+        className={`min-h-11 flex-row items-center justify-center rounded-lg border border-dashed px-4 py-2 ${saveProblem || !ready ? 'border-gray-300' : 'border-gray-400 active:bg-gray-100'}`}
       >
-        <Ionicons name="bookmark-outline" size={16} color={saveProblem ? colors.text.muted : colors.text.body} />
-        <Text className={`ml-2 text-sm font-medium ${saveProblem ? 'text-gray-500' : 'text-gray-700'}`}>Save these filters</Text>
+        <Ionicons name="bookmark-outline" size={16} color={saveProblem || !ready ? colors.text.muted : colors.text.body} />
+        <Text className={`ml-2 text-sm font-medium ${saveProblem || !ready ? 'text-gray-500' : 'text-gray-700'}`}>Save these filters</Text>
       </Pressable>
       {saveProblem ? <Text className="mt-1 text-xs text-gray-600">{saveProblem}</Text> : null}
 
-      <SaveFilterSheet
-        visible={sheet === 'save'}
-        content={current}
-        onClose={() => setSheet(null)}
-        onSave={async (name) => {
-          const saved = await save(name, current);
-          notify(`Saved “${saved.name}”.`);
-        }}
-      />
-      <ManageFiltersSheet visible={sheet === 'manage'} items={items} onClose={() => setSheet(null)} onRename={rename} onRemove={remove} />
+      {legacy.items.length > 0 ? <LegacyNotice items={legacy.items} onDismiss={legacy.dismiss} /> : null}
+
+      <SaveFilterSheet visible={sheet === 'save'} capture={capture} existing={views.data ?? []} onClose={() => setSheet(null)} />
+      <ManageFiltersSheet visible={sheet === 'manage'} items={decoded} existing={views.data ?? []} onClose={() => setSheet(null)} />
     </View>
   );
+}
+
+/** Loading, offline and failed states of the list; nothing once it has loaded (or the hint when it is empty). */
+function ListState({
+  query, empty,
+}: {
+  query: { data: unknown; isError: boolean; error: unknown; fetchStatus: string; refetch: () => Promise<unknown> };
+  empty: boolean;
+}) {
+  if (empty) {
+    return (
+      <Text className="mb-2 text-xs text-gray-500">
+        Save the filters you use often, then tap one to apply it. They are on the web portal's Views too.
+      </Text>
+    );
+  }
+  if (query.data !== undefined) return null;
+  if (query.fetchStatus === 'paused') {
+    return <Text className="mb-2 text-xs text-gray-500">Your saved filters load when you're back online.</Text>;
+  }
+  if (query.isError) {
+    return (
+      <View accessibilityRole="alert" className="mb-2 flex-row items-center">
+        <Text className="flex-1 text-xs text-red-700">Couldn't load your saved filters. {describeError(query.error)}</Text>
+        <Pressable accessibilityRole="button" onPress={() => void query.refetch()} className="h-11 justify-center pl-3 active:opacity-60">
+          <Text className="text-sm font-medium text-blue-700">Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return <Text className="mb-2 text-xs text-gray-500">Loading your saved filters…</Text>;
 }
 
 /** A name field with its rules: required, trimmed, at most SAVED_FILTER_NAME_MAX characters, not a name already used. */
@@ -85,7 +156,7 @@ function NameForm({
 }: {
   initial: string;
   submitLabel: string;
-  /** Resolves when done; throws SavedFilterError with the reason to show. */
+  /** Resolves when done; throws with the reason to show. */
   onSubmit: (name: string) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -100,7 +171,7 @@ function NameForm({
     try {
       await onSubmit(name);
     } catch (e) {
-      setError(failure(e));
+      setError(describeWriteError(e));
     } finally {
       setBusy(false);
     }
@@ -115,7 +186,8 @@ function NameForm({
           setName(text);
           if (error) setError(null);
         }}
-        maxLength={SAVED_FILTER_NAME_MAX}
+        // A name from the web can be longer: then nothing is cut, and the rule is said on Save.
+        maxLength={initial.length > SAVED_FILTER_NAME_MAX ? undefined : SAVED_FILTER_NAME_MAX}
         autoFocus
         returnKeyType="done"
         onSubmitEditing={() => void submit()}
@@ -139,34 +211,50 @@ function NameForm({
   );
 }
 
+function Pills({ items, label }: { items: readonly string[]; label: string }) {
+  return (
+    <View className="mb-4 flex-row flex-wrap" style={{ gap: 6 }} accessibilityLabel={`${label}: ${items.join(', ')}`}>
+      {items.map((item) => (
+        <View key={item} className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1">
+          <Text className="text-xs text-gray-700">{item}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function SaveFilterSheet({
-  visible, content, onClose, onSave,
+  visible, capture, existing, onClose,
 }: {
   visible: boolean;
-  content: SavedFilterContent;
+  capture: SavedViewCapture;
+  existing: readonly SavedView[];
   onClose: () => void;
-  onSave: (name: string) => Promise<void>;
 }) {
-  const chips = savedFilterChips(content);
+  const create = useCreateSavedView();
   return (
     <Sheet visible={visible} title="Save these filters" onClose={onClose} avoidKeyboard height="tall">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        {/* Exactly what is captured, read-only, so nothing is a surprise when it is applied later. */}
-        <FieldLabel label="What this filter holds" hint="Applying it later sets exactly these. Anything else is cleared." />
-        <View className="mb-4 flex-row flex-wrap" style={{ gap: 6 }} accessibilityLabel={`This filter holds: ${chips.join(', ')}`}>
-          {chips.map((chip) => (
-            <View key={chip} className="rounded-full border border-gray-300 bg-gray-50 px-3 py-1">
-              <Text className="text-xs text-gray-700">{chip}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Exactly what is captured, read-only, so nothing is a surprise when it is applied later, here or on the web. */}
+        <FieldLabel
+          label="What this filter holds"
+          hint="Saved on the Service Desk: it is on the web portal's Views too. Applying it later sets exactly these."
+        />
+        <Pills items={savedViewChips(capture.content)} label="This filter holds" />
+        {capture.notKept.length > 0 ? (
+          <>
+            <FieldLabel label="Not kept in a saved filter" hint="As on the web portal: applying one clears the search and keeps the country." />
+            <Pills items={capture.notKept} label="Not kept" />
+          </>
+        ) : null}
         {visible ? (
           <NameForm
             initial=""
             submitLabel="Save filter"
             onSubmit={async (name) => {
-              await onSave(name);
+              const view = await create.mutateAsync({ name, filters: capture.filters, existing });
               onClose();
+              notify(`Saved “${cleanSavedFilterName(view.name)}”. It's on the web portal too.`);
             }}
             onCancel={onClose}
           />
@@ -177,38 +265,41 @@ function SaveFilterSheet({
 }
 
 function ManageFiltersSheet({
-  visible, items, onClose, onRename, onRemove,
+  visible, items, existing, onClose,
 }: {
   visible: boolean;
-  items: readonly SavedTicketFilter[];
+  items: readonly DecodedView[];
+  existing: readonly SavedView[];
   onClose: () => void;
-  onRename: (id: string, name: string) => Promise<void>;
-  onRemove: (id: string) => Promise<void>;
 }) {
-  const [renaming, setRenaming] = useState<SavedTicketFilter | null>(null);
+  const rename = useRenameSavedView();
+  const remove = useDeleteSavedView();
+  const [renaming, setRenaming] = useState<SavedView | null>(null);
   useEffect(() => {
     if (!visible) setRenaming(null);
   }, [visible]);
 
-  const askToDelete = async (filter: SavedTicketFilter) => {
+  const askToDelete = async (view: SavedView) => {
+    const name = cleanSavedFilterName(view.name);
     const ok = await confirmAction({
-      title: `Delete “${filter.name}”?`,
-      message: 'The saved filter is removed from this phone. Your tickets and the filters on the list are not changed.',
+      title: `Delete “${name}”?`,
+      message: 'It is deleted from the Service Desk, so it goes from the web portal too. Your tickets are not changed.',
       confirmLabel: 'Delete',
       destructive: true,
     });
     if (!ok) return;
     try {
-      await onRemove(filter.id);
+      const { alreadyGone } = await remove.mutateAsync({ id: view.id });
+      notify(alreadyGone ? `“${name}” was already deleted.` : `Deleted “${name}”.`);
     } catch (e) {
-      notify(failure(e));
+      reportWriteError(`Couldn't delete “${name}”`, e);
     }
   };
 
   return (
     <Sheet
       visible={visible}
-      title={renaming ? `Rename “${renaming.name}”` : `Saved filters (${items.length} of ${SAVED_FILTER_LIMIT})`}
+      title={renaming ? `Rename “${cleanSavedFilterName(renaming.name)}”` : `Saved filters (${items.length})`}
       onClose={onClose}
       avoidKeyboard={renaming !== null}
       height="tall"
@@ -217,10 +308,10 @@ function ManageFiltersSheet({
         <View className="px-4 pb-2">
           <NameForm
             key={renaming.id}
-            initial={renaming.name}
+            initial={cleanSavedFilterName(renaming.name)}
             submitLabel="Save name"
             onSubmit={async (name) => {
-              await onRename(renaming.id, name);
+              await rename.mutateAsync({ id: renaming.id, name, existing });
               setRenaming(null);
             }}
             onCancel={() => setRenaming(null)}
@@ -229,34 +320,81 @@ function ManageFiltersSheet({
       ) : (
         <ScrollView>
           {items.length === 0 ? <Text className="px-4 py-6 text-center text-sm text-gray-500">No saved filters.</Text> : null}
-          {items.map((f) => (
-            <View key={f.id} className="min-h-14 flex-row items-center border-b border-gray-100 py-2 pl-4">
-              <View className="flex-1">
-                <Text className="text-base text-gray-900">{f.name}</Text>
-                <Text className="text-xs text-gray-500" numberOfLines={2}>
-                  {savedFilterChips(f).join(' · ')}
-                </Text>
+          {items.map((d) => {
+            const name = cleanSavedFilterName(d.view.name);
+            return (
+              <View key={d.view.id} className="min-h-14 flex-row items-center border-b border-gray-100 py-2 pl-4">
+                <View className="flex-1">
+                  <Text className="text-base text-gray-900">{name}</Text>
+                  {d.content ? (
+                    <Text className="text-xs text-gray-500" numberOfLines={2}>
+                      {savedViewChips(d.content).join(' · ')}
+                    </Text>
+                  ) : null}
+                  {d.leftOut.length > 0 ? (
+                    <Text className="text-xs text-amber-800" numberOfLines={3}>
+                      Not on the app: {d.leftOut.join('; ')}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rename ${name}`}
+                  onPress={() => setRenaming(d.view)}
+                  className="h-11 w-11 items-center justify-center active:opacity-60"
+                >
+                  <Ionicons name="pencil-outline" size={20} color={colors.text.body} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${name}`}
+                  disabled={remove.isPending}
+                  onPress={() => void askToDelete(d.view)}
+                  className="mr-1 h-11 w-11 items-center justify-center active:opacity-60"
+                >
+                  <Ionicons name="trash-outline" size={20} color={palette.red[700]} />
+                </Pressable>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Rename ${f.name}`}
-                onPress={() => setRenaming(f)}
-                className="h-11 w-11 items-center justify-center active:opacity-60"
-              >
-                <Ionicons name="pencil-outline" size={20} color={colors.text.body} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Delete ${f.name}`}
-                onPress={() => void askToDelete(f)}
-                className="mr-1 h-11 w-11 items-center justify-center active:opacity-60"
-              >
-                <Ionicons name="trash-outline" size={20} color={palette.red[700]} />
-              </Pressable>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
     </Sheet>
+  );
+}
+
+/** versionCode 6 kept saved filters on this phone only. Listed once, never uploaded, removed only on Dismiss. */
+function LegacyNotice({ items, onDismiss }: { items: readonly { name: string; chips: string[] }[]; onDismiss: () => Promise<void> }) {
+  const dismiss = async () => {
+    const ok = await confirmAction({
+      title: 'Remove them from this phone?',
+      message: 'They were never on the Service Desk, so they cannot be brought back. Save again any you still need.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await onDismiss();
+    } catch {
+      notify("Couldn't remove them from this phone. Try again.");
+    }
+  };
+  return (
+    <View className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <Text className="text-sm font-semibold text-amber-900">Saved on this phone by the previous version</Text>
+      <Text className="mt-1 text-xs text-amber-900">
+        Saved filters now live on the Service Desk, shared with the web portal. These were never uploaded and are no longer
+        offered. To keep one, set the same filters and save them again.
+      </Text>
+      {items.map((item) => (
+        <View key={item.name} className="mt-2">
+          <Text className="text-sm text-amber-900">{item.name}</Text>
+          <Text className="text-xs text-amber-800">{item.chips.join(' · ')}</Text>
+        </View>
+      ))}
+      <View className="mt-3 self-start">
+        <OutlineButton label="Dismiss" compact onPress={() => void dismiss()} />
+      </View>
+    </View>
   );
 }

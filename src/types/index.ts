@@ -15,4 +15,5 @@ export * from './announcement';
 export * from './kb';
 export * from './service-catalog';
 export * from './audit';
+export * from './savedView';
 export * from './navigation';

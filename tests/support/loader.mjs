@@ -16,6 +16,7 @@ const STUBS = {
   'expo-secure-store': 'expo-secure-store.mjs',
   'expo-auth-session': 'expo-auth-session.mjs',
   'expo-haptics': 'expo-haptics.mjs',
+  'expo-crypto': 'expo-crypto.mjs',
 };
 
 function firstFile(base) {

@@ -14,18 +14,22 @@ enabled for production, and the table of every remaining UAT/PROD difference (§
 Updated 2026-11-17 for the fifth production build: versionCode 6. The API environment became a RUNTIME choice (Login's
 gear): no profile fixes it, every release build starts on Production, and the build guard, the bundle check and their
 tests were rewritten for that (§1, §5d, §6). Saved filters on the phone and search on long dropdowns ship in it too. Not built.
+Updated 2026-11-17 (second and third briefs) for the sixth production build: versionCode 7. Saved filters sync with the
+web portal (the Service Desk's saved views), Status is a multi-select, and the environment switch moved into the drawer,
+for everyone, behind a password (the second brief's ADMIN-only rule was withdrawn by the third) (§5e). versionCode 6 is on
+Google Play. Not built.
 
 **Where things stand**
 
 | Item | State |
 |---|---|
-| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`6`** (`app.json`, set 2026-11-17). versionCode `5` is the latest AAB on Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
+| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`7`** (`app.json`, set 2026-11-17, second brief). versionCode `6` is the latest AAB on Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29, 2026-11-03 and 2026-11-06). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
-| `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build: testers switch to UAT once, on Login's gear, and the app keeps that choice (§1) |
+| `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build. Since the third brief of that day testers switch in the drawer (beside Sign out), with the **switch password** Ronit gives them; any role may then use UAT (§5e) |
 | Signing in | **Microsoft sign-in and email and password sign-in, on every build (UAT and PROD)** since 2026-11-06: the backend confirmed the email endpoint on PRODUCTION (⚠ contract still assumed, 02-AUTH §8). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5). AUTH-P2 is live on UAT (02-AUTH §7); production is still unconfirmed (§5) |
-| `production` AAB | **versionCode 6: ready to build, not built** (§5d). versionCode 5 is already on Google Play. It starts on **PRODUCTION** and can be switched to UAT by the person (§1). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
+| `production` AAB | **versionCode 7: ready to build, not built** (§5e). versionCode 6 is already on Google Play. It starts on **PRODUCTION**; anyone with the switch password can switch to UAT from the drawer (§5e). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
 
 ---
 
@@ -696,6 +700,94 @@ box on long dropdowns. R4 and R5 relaxed for this repo for that work; no EAS bui
 `tests/filters/saved-filters.test.mjs`, `tests/components/dropdown-search.test.mjs`.
 
 **Checks**: `npx tsc --noEmit` clean. `npm test`: **1327 pass, 0 fail** (1265 before). `npm run verify:release-bundle`: **PASS** (one bundle; only the two approved hosts; the development build's PROD-refusal message found in the control and absent from release, so the dev-only guard is stripped as before). Local Metro bundling only: no EAS build.
+
+**Build command (Ronit runs it, from the repo root, after review and commit):**
+```
+npm run verify:release-bundle
+eas build --platform android --profile production
+```
+
+## 5e. Sixth production build, versionCode 7 (2026-11-17, second and third briefs): synced saved filters, multi-select, a password-gated switch
+
+Not built. Ronit's written briefs of 2026-11-17 (the second and third of the day). R4 and R5 relaxed for this repo for
+that work. No EAS build was run, nothing was committed, the live UAT and PROD APIs were not called.
+
+**Done in this repo**
+- [x] **Saved filters sync with the web portal.** They are the Service Desk's saved views (SVW-1..4,
+  `docs/web-system/16-SAVED-VIEWS.md`, UI-STANDARDS §17.2): listed, created, renamed and deleted through the API, never
+  optimistic, refused offline.
+  - The app writes exactly the web's eight filter keys.
+  - Search and country are not part of a view (as on the web).
+  - The SLA quick filters cannot be held, so saving them is refused.
+  - A view's parts the app cannot apply are named, never dropped; rename sends the name only.
+  - staleTime 60 s.
+- [x] **The phone-only filters of versionCode 6 are not uploaded.** They are listed once in the Filters sheet with what
+  they held, and removed from the phone only on Dismiss (16 §9).
+- [x] **Status is a multi-select**, the only one: TKT-1 reads several statuses as one comma list. Category, technician,
+  group and priority stay single, because the server reads one value each; the web's multi-category control is not in
+  any pushed source (16 §7). `OptionSheet` gained `multiple` (UI-STANDARDS §17.4).
+- [x] **The environment switch is the drawer's "Service Desk environment" row**, beside Sign out, **for every role**,
+  behind the **switch password** (02-AUTH §9.6, UI-STANDARDS §17.1). Login has no gear; on UAT it has a one-way "Use
+  Production" link.
+  - Only a SHA-256 hash is in the source (`src/utils/switch-password.ts`), checked with `expo-crypto` (already a
+    dependency).
+  - 5 wrong tries lock it for 60 s. The count is in memory only.
+  - A correct entry is good for one switch.
+  - It is a speed bump, not a control: the work-account sign-in is the control.
+- [x] **The second brief's ADMIN rule is gone** (third brief):
+  - the row is no longer ADMIN-only;
+  - a non-ADMIN's UAT sign-in is no longer refused;
+  - a UAT session survives a restart for any role;
+  - a cold start keeps the chosen environment;
+  - the "Setu is on Production" notice, `canSwitchEnvironment`, `canUseEnvironment` and `src/api/environmentPolicy.ts` are removed.
+  - The nine source and test files it had changed are back to their committed versions.
+- [x] **versionCode** `6` → **`7`** (`app.json`). `version` stays `1.0.0`. Package, slug, schemes and EAS projectId unchanged.
+- [x] No library added or installed.
+
+**What a tester on versionCode 6 sees after updating**
+
+| Before the update | After |
+|---|---|
+| Switched to UAT and signed in (any role) | Still on UAT, still signed in |
+| On UAT's Login | Still on UAT; "Use Production" under the chip |
+| On Production | Still on Production. Switching now needs the switch password, from the drawer |
+| Saved filters on the phone | Listed under "Saved on this phone by the previous version" until dismissed; no longer applied |
+
+**Tests**
+- New:
+  - `tests/filters/saved-views.test.mjs`: the contract round-trips both ways, roles, refusals, left-out parts, failures, offline, the old list;
+  - `tests/filters/multi-select.test.mjs`: the Status query on the wire, single filters unchanged, the OptionSheet rules;
+  - `tests/environment/switch-password.test.mjs`, a release build:
+    - the row for all five roles, and no role rule left;
+    - a wrong password gives no pass and changes nothing; the right one opens the sheet;
+    - the lockout and its expiry; the count resets on success and on a restart;
+    - nothing typed is logged, stored or sent;
+    - a correct entry is not remembered;
+    - every non-ADMIN role signs in on UAT and stays there after a restart;
+    - the plaintext password is absent from every file in the repository.
+    - It uses a test password; the real one is searched for by its hash only.
+- Rewritten:
+  - `tests/environment/switch-release.test.mjs`: back to its committed version, plus a test password's pass for each switch to UAT;
+  - `dev-build.test.mjs`: Login has no gear; the sheet passes the pass;
+  - `tests/rbac/list-filters.test.mjs`: Status for every role;
+  - `tests/components/dropdown-search.test.mjs`: close hands the ticks over;
+  - `tests/motion/start-up-and-login.test.mjs`: the import line;
+  - `tests/release/production-readiness.test.mjs`: versionCode above 6.
+- Removed:
+  - `tests/filters/saved-filters.test.mjs` (the phone-only store is gone);
+  - `tests/environment/admin-only-uat.test.mjs` (the ADMIN rule is gone; replaced by `switch-password.test.mjs`).
+
+**Checks**
+- `npx tsc --noEmit`: clean.
+- `npm test`: **1380 pass, 0 fail**.
+- `npm run verify:release-bundle`: **PASS**.
+  - Only the two approved hosts.
+  - The switch password in plain text: 0 in release JS and Hermes; its hash: present.
+  - The development build's PROD-refusal string is found in the control and absent from release.
+- Local Metro bundling only: no EAS build.
+
+**For Ronit to decide**
+- The web's multi-category source: ask the web team to push it before the app sends several categories (16 §7).
 
 **Build command (Ronit runs it, from the repo root, after review and commit):**
 ```

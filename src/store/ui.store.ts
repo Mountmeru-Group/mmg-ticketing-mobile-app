@@ -4,8 +4,8 @@
 // The Home period (G6) lives here too: kept while the app is open, back to the web's default ("This month") after a
 // restart or a sign-out. The web keeps it in component state, so it is back to "This Month" on every visit to its
 // dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
-// Saved filters (2026-11-17) are stored on the phone by their own store (savedFilters.store.ts); applying one only sets
-// the fields below. reset() also runs on the environment switch (src/api/environmentSwitch.ts).
+// Saved filters are the Service Desk's saved views (2026-11-17, src/hooks/useSavedViews.ts); applying one only sets the
+// fields below. reset() also runs on the environment switch (src/api/environmentSwitch.ts).
 import { create } from 'zustand';
 
 import {
@@ -24,7 +24,7 @@ interface UiState {
   ticketSort: TicketSortOption;
   /** M3 country selector (05 §A.12): a country id, or null for "All countries". Only ADMIN and triage AGENT change it. */
   ticketCountryId: string | null;
-  /** M3 Filters sheet (Phase G2): priority, category, created date, technician, group. */
+  /** M3 Filters sheet (Phase G2): status (several, 2026-11-17), priority, category, created date, technician, group. */
   ticketAdvanced: TicketAdvancedFilters;
   /** M3 search box as typed, and the search applied (on the keyboard's search key, normalised). */
   ticketSearchText: string;
@@ -54,8 +54,9 @@ interface UiState {
   /** The period chip's ✕ (G7): drops the created-date filter the tile set. Nothing else changes. */
   clearTicketPeriod: () => void;
   /**
-   * A saved filter's chip on the Filters sheet: its whole set at once (quick filter, search, sort, the five, and the
-   * country when it holds one). Pass it through sanitizeSavedFilter() for the viewer first (the Filters sheet does).
+   * A saved view's chip on the Filters sheet, as the web's loadView: its quick filter, sort and sheet filters at once; the
+   * search and the Home period are cleared; the country is kept (a view holds none). Pass what decodeSavedView() gave for
+   * the viewer (the Filters sheet does).
    */
   applySavedTicketFilter: (content: SavedFilterContent) => void;
   dismissAnnouncement: (id: string) => void;
@@ -88,7 +89,8 @@ const INITIAL = {
 
 export const useUiStore = create<UiState>()((set) => ({
   ...INITIAL,
-  // One technician slot: "My open" / "Unassigned" and the Technician filter replace each other (ticket-filters.ts).
+  // One technician slot and one status slot: "My open" / "Unassigned" and the Technician filter, and a quick filter that
+  // sends a status and the Status filter, replace each other (ticket-filters.ts).
   setTicketFilter: (filter) =>
     set((s) => {
       const next = withNamedFilter({ filter: s.ticketFilter, advanced: s.ticketAdvanced }, filter);

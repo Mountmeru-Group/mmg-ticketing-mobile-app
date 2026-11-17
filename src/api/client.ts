@@ -10,7 +10,6 @@ import {
   type ClearSessionOptions,
 } from '@/store/auth.store';
 import { activeEnvironment, apiBaseUrl } from '@/store/environment.store';
-import { useSavedFiltersStore } from '@/store/savedFilters.store';
 import { useUiStore } from '@/store/ui.store';
 import type { ApiError } from '@/types';
 import { ApiClientError } from './errors';
@@ -54,10 +53,9 @@ const UNAUTHORIZED_MESSAGES: Record<string, string> = {
  * `forgetFullAuth` also deletes the 15-day date, so the next sign-in is challenged (02 §5.8).
  */
 export async function endSession(message: string | null, options?: ClearSessionOptions): Promise<void> {
+  // Saved views live in this cache only (they are the Service Desk's, 2026-11-17), so they go with it.
   queryClient.clear();
   useUiStore.getState().reset();
-  // Only the in-memory copy: saved filters stay on the phone for this person's next sign-in (savedFilters.store.ts).
-  useSavedFiltersStore.getState().reset();
   await useAuthStore.getState().clearSession(message, options);
 }
 

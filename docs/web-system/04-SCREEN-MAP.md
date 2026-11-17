@@ -59,7 +59,7 @@
 | **All 21 Admin pages, Business-rule builder, SLA/priority matrix editors** | Bulk configuration with large forms. Errors there affect everyone |
 | **KB authoring and rich-text editor with inline images** | Inline base64 images hit the 2 MB JSON limit, and web publishing is broken |
 | **Ticket-detail extras** (Associations to problems/changes, Submit for approval, Worklog/Reminder/Checklist placeholder tabs, Print, "Duplicate", "Email the Technician") | Several are dead or fake on web (`05` §B.33). Problem/change linking calls routes that don't exist |
-| **Saved views** | Desktop filter sets; mobile uses fixed quick filters |
+| ~~**Saved views**~~ | **Built 2026-11-17**: M3 Filters › Saved filters are the web's saved views (SVW-1..4, `16-SAVED-VIEWS.md`) |
 
 ---
 
@@ -192,7 +192,7 @@ P-IDs are stable. Items moved into the MVP keep their ID and are marked as moved
 | Asset management (CRUD, vendors, contracts, licences, tree), Purchase Orders, Projects | Wide tables, Gantt, line items. Staff asset **lookup** is Phase 2 (P18) |
 | Surveys (admin and responses) | Never triggered automatically; the web response path is dead |
 | KB authoring | Rich-text authoring with inline images; publish flow broken |
-| Ticket CSV export, saved views, print | Desktop workflows |
+| Ticket CSV export, print | Desktop workflows (saved views: built 2026-11-17, `16-SAVED-VIEWS.md`) |
 | SSE live stream | Broken server-side; replaced by polling now and push later |
 | Expo Web build | Blocked by single-origin CORS; not a target |
 | **Ticket delete** (single or bulk; SDP has it) | No `DELETE /tickets/:id` route and no web equivalent; MMG uses status CANCELED (`08` 1.13) |

@@ -716,17 +716,28 @@ The email path needs no Microsoft redirect, so it also works in a development bu
 
 ## 9. The runtime environment switch (2026-11-17)
 
-Ronit's written brief, 2026-11-17. Until then the API environment was fixed per EAS profile (`EXPO_PUBLIC_APP_ENV`).
-Now the person chooses it on Login. Code: `src/config/env.ts` (the rules), `src/store/environment.store.ts` (the
-choice), `src/api/environmentSwitch.ts` (the switch), `src/screens/auth/EnvironmentSheet.tsx` (the sheet).
+Ronit's written briefs, 2026-11-17. Until then the API environment was fixed per EAS profile (`EXPO_PUBLIC_APP_ENV`).
+- **First brief:** anyone chose it, on Login's gear.
+- **Second brief, the same day:** only an ADMIN could switch, from the drawer, and only an ADMIN could stay on UAT.
+  **Withdrawn by the third brief.**
+- **Third brief, the same day (in force):** the switch is in the drawer, for everyone, behind a **password** (§9.6). Any
+  role may sign in on UAT and stay there.
+
+Code:
+- `src/config/env.ts`: the build's rules;
+- `src/utils/switch-password.ts`: the password gate (a hash, the lockout, the single-use pass);
+- `src/store/environment.store.ts`: the choice;
+- `src/api/environmentSwitch.ts`: the switch;
+- `src/navigation/EnvironmentPasswordSheet.tsx`: the password prompt;
+- `src/navigation/EnvironmentSheet.tsx`: the sheet.
 
 ### 9.1 Which environment is in use
 - **Release build** (any EAS profile): Production and UAT are offered. A **fresh install is on Production, always**.
 - The choice is stored on the phone (SecureStore key `mmg.app.environment`, not a secret) and **kept until the person
   changes it**. A sign-out does not reset it; the app does not go back to Production on each launch.
 - A missing, unknown or unreadable stored value is the default again (Production).
-- **Development build** (`__DEV__`): **UAT only**. No gear, a stored `PROD` is ignored, saving `PROD` is refused and
-  `apiBaseUrlFor('PROD')` throws (CLAUDE.md rule 4). The switch applies to release builds only.
+- **Development build** (`__DEV__`): **UAT only**. There is no switch: a stored `PROD` is ignored, saving `PROD` is
+  refused and `apiBaseUrlFor('PROD')` throws (CLAUDE.md rule 4). The switch applies to release builds only.
 - Every request reads the environment when it is sent (`client.ts` sets `baseURL` per request). Nothing keeps a URL.
 
 ### 9.2 Switching ("Switch and sign out"), in this order
@@ -736,12 +747,16 @@ choice), `src/api/environmentSwitch.ts` (the switch), `src/screens/auth/Environm
 2. Sign out: `clearSession(null, { forgetFullAuth: true })`. The session, the **15-day clock** (§5.8) and every session
    key in SecureStore are deleted, so the next sign-in, in the new environment, is challenged.
 3. `queryClient.clear()`: no list from one environment can appear under the other.
-4. The in-memory filter and period state (`ui.store` reset), the in-memory saved-filter list, and the routes learned
-   from the old backend (the email sign-in path, §8; the audit-log path) are forgotten.
-5. The new environment is stored. Login is already showing (RootNavigator follows the auth store).
+4. The in-memory filter and period state (`ui.store` reset) and the routes learned from the old backend (the email
+   sign-in path, §8; the audit-log path) are forgotten. The saved filters are the Service Desk's saved views now
+   (`16-SAVED-VIEWS.md`); they lived in the query cache, emptied in step 3.
+5. The new environment is stored. Login shows (RootNavigator follows the auth store).
 
-On Login nobody is signed in, so steps 1 and 2 usually send nothing: an earlier sign-out already removed the token.
-They still run, so the switch is safe wherever it is called from. While a sign-in runs, the gear is locked.
+Who can switch (third brief): anyone who knows the switch password (§9.6). The drawer's "Service Desk environment"
+row, beside Sign out, is shown to every role in a release build. `switchEnvironment()` refuses any environment but
+Production without the pass a correct password gives (`PASSWORD_REQUIRED`). Login's only control is the "Use Production"
+link, shown on UAT only. It goes nowhere else, so it needs no password; it is locked while a sign-in runs. From Login
+nobody is signed in, so steps 1 and 2 send nothing.
 
 ### 9.3 A token never crosses environments
 - `setSession()` stores the environment the session was created on (SecureStore key `mmg.session.environment`, one of
@@ -751,8 +766,8 @@ They still run, so the switch is safe wherever it is called from. While a sign-i
 - Attachment views and downloads (`attachments.api.ts`, outside the API client) send the header only for a session of
   the environment in use.
 - `restoreSession()` reads the environment first, then drops a stored session from any other environment.
-- Saved filters are kept per user AND per environment, so a UAT filter (UAT ids) is never offered on Production
-  (`docs/brand/UI-STANDARDS.md` §17.2).
+- Saved filters are the Service Desk's saved views (`16-SAVED-VIEWS.md`): each environment's database has its own, and
+  the app holds them only in the query cache. A UAT view (UAT ids) is never offered on Production.
 
 ### 9.4 Upgrading from a build before 2026-11-17
 A session stored by versionCode 5 or earlier names no environment, so it **cannot be placed and is not restored**: the
@@ -764,3 +779,39 @@ switches to UAT once. Without this, a UAT session from a `preview` APK would be 
 `src/config/auth.config.ts`, the Entra registration and redirect URIs, AUTH-P2 and the email sign-in, and the 15-day
 re-authentication itself. The Microsoft app registration is the same for both environments; only the Service Desk host
 the token exchange goes to follows the choice.
+
+### 9.6 The switch password (2026-11-17, third brief)
+Ronit's decision, in writing: the second brief's ADMIN rule is **replaced by a password**. Anyone may open the switch;
+only someone with the password can change environment. The password is not written in this repository, in any file.
+
+**Removed with the ADMIN rule** (all of it):
+- the drawer row for ADMIN only;
+- a non-ADMIN's UAT sign-in refused and ended;
+- a non-ADMIN's stored UAT session ended at a cold start;
+- a cold start with nobody signed in on UAT going to Production;
+- the "Setu is on Production" notice;
+- the role rules `canSwitchEnvironment` and `canUseEnvironment`, and `src/api/environmentPolicy.ts`.
+
+**Now:**
+- **Who:** every role sees the row (`permissions.ts` `offersEnvironmentSwitch`, which reads no role), in release builds.
+  Any role may sign in on UAT, and a UAT session survives a restart like any other. The chosen environment persists.
+- **Order:** the row asks for the password FIRST (`EnvironmentPasswordSheet`). Only a correct one opens the environment
+  sheet. Switching then runs exactly as §9.2.
+- **Stored as a hash:** `SWITCH_PASSWORD_SHA256` in `src/utils/switch-password.ts`, a SHA-256 hash as lowercase hex.
+  - What is typed is hashed on the phone with `expo-crypto` (`digestStringAsync`, already a dependency: nothing was
+    installed), and only the hashes are compared.
+  - The plaintext is in no source file, test or doc. `tests/environment/switch-password.test.mjs` scans every file in
+    the repository, and `npm run verify:release-bundle` scans the release JavaScript and Hermes bytecode. Both search by
+    the hash (`scripts/password-scan.js`, every 12-character window), so neither holds the password.
+- **Honest limits:** this stops a curious employee, not a determined one. The app ships the hash, so anyone can
+  decompile it and patch the check out, or test guesses against the hash offline. It is a speed bump. **The real
+  control is that both environments need a Mount Meru work account.**
+- **Lockout:** after **5** wrong tries in a row, every try is refused for **60 seconds**, and the prompt says how long
+  is left. The count is in memory only: it resets on a correct entry and when the app restarts.
+- **Never remembered:** a correct entry gives a single-use pass. `switchEnvironment()` uses it up, and the drawer revokes
+  it when the sheet closes. Every switch asks again.
+- **Never logged, stored or sent:** what is typed stays in the prompt's field until the check, then the field is
+  cleared, right or wrong. There is no console call in the gate or the prompt, in any build. Nothing goes to SecureStore
+  or the network.
+- **The UAT chip** shows whenever UAT is in use, for anyone: on Login, and in the drawer's header. Production stays the
+  default on a fresh install, and development builds stay UAT-only.
