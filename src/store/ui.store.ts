@@ -4,11 +4,14 @@
 // The Home period (G6) lives here too: kept while the app is open, back to the web's default ("This month") after a
 // restart or a sign-out. The web keeps it in component state, so it is back to "This Month" on every visit to its
 // dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
+// Saved filters (2026-11-17) are stored on the phone by their own store (savedFilters.store.ts); applying one only sets
+// the fields below. reset() also runs on the environment switch (src/api/environmentSwitch.ts).
 import { create } from 'zustand';
 
 import {
   DEFAULT_DASHBOARD_PERIOD, NO_CUSTOM_RANGE, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
+import { savedFilterUiState, type SavedFilterContent } from '@/utils/saved-filters';
 import {
   NO_ADVANCED_FILTERS, withAdvancedFilters, withNamedFilter,
   type TicketAdvancedFilters, type TicketListPeriod, type TicketNamedFilter, type TicketSortOption,
@@ -50,6 +53,11 @@ interface UiState {
   openTicketList: (filter: TicketNamedFilter, period?: TicketListPeriod | null) => void;
   /** The period chip's ✕ (G7): drops the created-date filter the tile set. Nothing else changes. */
   clearTicketPeriod: () => void;
+  /**
+   * A saved filter's chip on the Filters sheet: its whole set at once (quick filter, search, sort, the five, and the
+   * country when it holds one). Pass it through sanitizeSavedFilter() for the viewer first (the Filters sheet does).
+   */
+  applySavedTicketFilter: (content: SavedFilterContent) => void;
   dismissAnnouncement: (id: string) => void;
   restoreAnnouncement: (id: string) => void;
   setHomePeriod: (period: DashboardPeriod) => void;
@@ -106,6 +114,7 @@ export const useUiStore = create<UiState>()((set) => ({
     }),
   clearTicketPeriod: () =>
     set((s) => ({ ticketAdvanced: { ...s.ticketAdvanced, fromDate: null, toDate: null }, ticketPeriod: null })),
+  applySavedTicketFilter: (content) => set(savedFilterUiState(content)),
   dismissAnnouncement: (id) =>
     set((s) => (s.dismissedAnnouncementIds.includes(id) ? s : { dismissedAnnouncementIds: [...s.dismissedAnnouncementIds, id] })),
   restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),

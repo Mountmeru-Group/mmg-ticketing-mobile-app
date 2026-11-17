@@ -48,7 +48,11 @@ const FAKE = {
 };
 const EMAIL = 'play.reviewer@mountmerugroup.com';
 const UAT_API = 'https://uat-servicedesk.mountmerugroup.com/api/v1';
-const KEYS = { token: 'mmg.session.token', issuedAt: 'mmg.session.issuedAt', user: 'mmg.session.user', fullAuthAt: 'mmg.auth.fullAuthAt' };
+const KEYS = {
+  token: 'mmg.session.token', issuedAt: 'mmg.session.issuedAt', user: 'mmg.session.user', fullAuthAt: 'mmg.auth.fullAuthAt',
+  // 2026-11-17: the session names its environment (UAT in a development build).
+  environment: 'mmg.session.environment',
+};
 const [P1, P2, P3, P4] = MOBILE_PASSWORD_PATHS;
 
 /** A plausible 200: AUTH-P2's shape (A32 asked for it), for an AGENT locked to one country. Values are fakes. */
@@ -702,7 +706,8 @@ describe('the session is stored exactly as after Microsoft sign-in', () => {
     const before = Date.now();
     assert.deepEqual(await signIn(), { type: 'signed-in' });
     const stored = secureStore.__snapshot();
-    assert.deepEqual(Object.keys(stored).sort(), [KEYS.fullAuthAt, KEYS.issuedAt, KEYS.token, KEYS.user].sort());
+    assert.deepEqual(Object.keys(stored).sort(), [KEYS.environment, KEYS.fullAuthAt, KEYS.issuedAt, KEYS.token, KEYS.user].sort());
+    assert.equal(stored[KEYS.environment], 'UAT');
     const issuedAt = Number(stored[KEYS.issuedAt]);
     const fullAuthAt = Number(stored[KEYS.fullAuthAt]);
     assert.ok(issuedAt >= before && issuedAt <= Date.now());

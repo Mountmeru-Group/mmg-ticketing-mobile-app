@@ -560,15 +560,18 @@ caption "Opening Microsoft…" says what is happening (and TalkBack announces it
 
 ### 10.6 The environment chip
 
-- Shown on every build **except production**: `SHOW_ENVIRONMENT_CHIP` in `src/config/env.ts` is `APP_ENV !== 'PROD'`.
-  `APP_ENV` is PROD only in a release build of the `production` EAS profile: development builds refuse PROD, and
-  `scripts/eas-build-guard.js` refuses PROD on every other profile.
-- Login renders it inside `{SHOW_ENVIRONMENT_CHIP ? (…) : null}`, so on production it is not in the tree at all, not
-  just hidden.
-- Profile (M10) still shows the environment line on every build; only Login's chip changed.
-- Tests: `tests/motion/start-up-and-login.test.mjs` evaluates `env.ts` as a production release build (false), a
-  preview release build, a build with nothing set and a development build (true), and checks the label is rendered
-  nowhere else on Login.
+**Since 2026-11-17** the chip follows the environment **in use**, not the build (the environment is the person's choice,
+§17.1):
+- Shown whenever **UAT** is in use, in **any** build, so a person on UAT always knows. Never on Production:
+  `showEnvironmentChip(environment)` in `src/config/env.ts` is `environment === 'UAT'`.
+- Login renders it inside `{showEnvironmentChip(environment) ? (…) : null}`, with `environment` from
+  `useEnvironmentStore`, so on Production it is not in the tree at all, and it appears or goes the moment the person
+  switches.
+- Profile (M10) shows the environment line on every build, and the drawer's "v1.0.0 · PROD" line names the environment
+  in use (both follow the store).
+- Tests: `tests/motion/start-up-and-login.test.mjs` (UAT shows in a release and a development build; PROD never, whatever
+  a stray `EXPO_PUBLIC_APP_ENV` says; the label rendered nowhere else on Login).
+- Before 2026-11-17: shown on every build except a production release (`SHOW_ENVIRONMENT_CHIP = APP_ENV !== 'PROD'`).
 
 ### 10.7 Layout checks (arithmetic, not run on a device)
 
@@ -1193,3 +1196,72 @@ Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11
 2. The three colours on white and on a selected card; "Breached …" with its date and time.
 3. A ticket on hold: "Paused while on hold", no time. A resolved one: no line, no gap.
 4. First load: the skeleton and the cards line up; no jump.
+
+## 17. Environment switch, saved filters, dropdown search (2026-11-17)
+
+Ronit's written brief. Not yet seen on a device: no build was made. The layout notes below are what to check on the
+next build (360 dp, 100 / 130 / 200 % text).
+
+### 17.1 The environment switch (Login)
+- **Gear**: `settings-outline`, 22 dp, white (`colors.login.headline`) on the red panel, in the logo card's row at the
+  **top right** of the panel. 44 × 44 dp target, a ripple in `colors.login.circle`. Label "Service Desk environment",
+  hint "Choose Production or UAT". **Release builds only** (`CAN_SWITCH_ENVIRONMENT`): a development build has no gear.
+  Locked (half opacity, no touch) while a Microsoft or email sign-in runs, as the pill is.
+- **Sheet** (`src/screens/auth/EnvironmentSheet.tsx`), title "Service Desk environment":
+  - one line of help: switching signs you out and clears everything Setu has loaded;
+  - a radio row per environment, Production first: the name, the host name under it (`text-xs`, gray-600), a
+    **DEFAULT** badge on Production (gray-100 / gray-700) and **IN USE** on the active one (green-50 / green-800);
+  - one filled button, **"Switch and sign out"**, disabled until another environment is picked, with a spinner while it
+    runs. A failure says "Couldn't switch. Try again." in red-700 above it.
+- After a switch: the sheet closes, Login stays, the chip appears (UAT) or goes (Production), an old failure banner is
+  cleared, and the email form starts empty (it is keyed by environment).
+
+### 17.2 Saved filters (Tickets › Filters)
+On the phone only: never synced with the web portal, no backend call. Per user AND per environment, up to 20.
+- **Where**: a SAVED FILTERS block at the top of the Filters sheet, above the filter card.
+  - Header: "SAVED FILTERS" (xs, semibold, uppercase, gray-500) and, when any exist, a **Manage** link (blue-700, 44 dp).
+  - The saved ones as `FilterChip`s (role button), wrapping, 8 dp apart. The chip whose set is exactly what is on the
+    list right now is **filled brand red** (the chip's active style); change any filter and it empties again. Two can
+    never be filled at once: the same set cannot be saved twice.
+  - Under them a **dashed** "Save these filters" button (44 dp, bookmark icon). Disabled, with the reason under it in
+    xs gray-600, when the list already holds 20 ("Delete one in Manage to save another") or these exact filters are
+    already saved ("…already saved as “Name”"). With none saved yet, one line says what it is for.
+- **Tapping a chip** applies its whole set at once (quick filter, search, sort, the five filters, and the country when it
+  holds one; anything it does not hold is cleared, as a Home tile does). The "Show N tickets" count updates with it.
+- **Save sheet**, "Save these filters": first, read-only, **exactly what is being captured**, as small grey pills
+  ("Quick filter: Open", "Search: “vpn”", "Priority: High", "Category: Network", "Created 01 Nov 2026 – 30 Nov 2026",
+  "Technician: …", "Group: …", "Sort: Priority", "Country: Kenya" / "All countries"), with "Applying it later sets exactly
+  these. Anything else is cleared." Then the **Name** field (required, trimmed, at most 40 characters; `maxLength`
+  stops typing at 40), "Save filter" and "Cancel". A refused name is said under the field in red-700: empty, too long, or
+  "You already have a saved filter called “X”. Choose another name." (any case). The sheet rises above the keyboard.
+- **Manage** ("Saved filters (n of 20)"): one row per filter, its name and a two-line summary of the same pills; a
+  pencil (**Rename**: the same name rules, in the same sheet) and a red bin (**Delete**, which asks first: "Delete “X”?
+  The saved filter is removed from this phone. Your tickets and the filters on the list are not changed."). Nothing else.
+- **What one holds**, decided from the list's state: the quick filter, the applied search, the sort, the Filters
+  sheet's five (priority, category, created From/To, technician, group) **as far as the role may send them**
+  (`ticketListFilters()`, `utils/permissions.ts`), and the country **only for ADMIN and the triage AGENT**
+  (`countrySelectorMode() === 'switch'`). Not the Home period's name: a tile's dates are kept as plain dates.
+- **Role**: every role with the Filters sheet can save. A role that cannot filter by technician or group never saves
+  one; a filter read later is cut to the role again, on the phone too, so it never outlives the role's permissions.
+
+### 17.3 Search on long dropdowns
+- **One component**: `OptionSheet` (`src/components/OptionSheet.tsx`). Every dropdown in the app is one, so each gets
+  the search the moment its list is long; no screen adds its own. `PersonPickerSheet` and `TemplatePickerSheet` keep
+  their own searches, unchanged.
+- **Threshold: more than 10 options**, the "All …" row included (`OPTION_SEARCH_THRESHOLD`, `utils/option-search.ts`).
+  About ten 48 dp rows fit a sheet on a typical phone; past that the list must be scrolled. None of the app's fixed lists
+  reaches it (priority 5, impact and urgency 5, closure code 7, change status at most 9, audit action 10, audit entity 4,
+  audit dates 7): a field over a short list is noise.
+- Which dropdowns get it when long: **Filters** › Category, Group; **Tickets** › Country; **Create ticket** › Category,
+  Subcategory, Item, Group; **Ticket detail** editors › Category, Subcategory, Item, Country; **Assign** › Group;
+  **Profile** › Country; **Service request** form › every select field from the catalogue.
+- **The field**: the app's `SearchField` (44 dp, search icon, clear button), pinned above the list (outside it, so it
+  never scrolls away), placeholder "Search…", label **"Search <title>"** (e.g. "Search Category").
+- Case-insensitive, matching **anywhere** in the label ("twor" finds Network). No match: one plain line, "Nothing matches
+  “…”." (sm, gray-500, centred), never an empty sheet.
+- **Keyboard**: the sheet rises above it (`KeyboardAvoidingView` inside the modal) and shrinks to the room left, so the
+  list still scrolls; a tap on an option with the keyboard up picks it at once (`keyboardShouldPersistTaps`).
+- **Clears** whenever the sheet closes: a pick, back, a tap outside, or the screen hiding it.
+- **TalkBack**: once typing pauses (0.5 s), the number of matches is announced ("3 matches", "1 match", "No matches").
+- Device checks (next build): a 38-category list on a 360 × 640 phone with the keyboard up (the field and at least two
+  rows visible); 200 % text; TalkBack hears the count.

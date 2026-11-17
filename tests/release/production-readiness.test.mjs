@@ -1,9 +1,11 @@
 // First production build (2026-10-29): what must stay true for a Google Play build. Microsoft sign-in is the only
-// way in (the __DEV__ developer-token screen is deleted), PROD is reachable only from a release build of the
-// `production` EAS profile, and the store identity in app.json does not drift. docs/RELEASE.md §5.
+// way in (the __DEV__ developer-token screen is deleted), PROD is never reachable from a development build (since
+// 2026-11-17 every RELEASE build starts on PROD and may switch to UAT), and the store identity in app.json does not
+// drift. docs/RELEASE.md §5.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -71,9 +73,12 @@ describe('sign-in: Microsoft, and email on UAT and PROD, are the only ways into 
   });
 });
 
-describe('environment: PROD only from a release build', () => {
+// 2026-11-17: the environment is a RUNTIME choice (Login's gear), no longer fixed by the EAS profile. Until then these
+// tests pinned "PROD only from a release build of the production profile" (EXPO_PUBLIC_APP_ENV=PROD); that premise is
+// gone. What stays: a development build can never use PROD. The switch itself: tests/environment/.
+describe('environment: every release build starts on Production and may switch; a development build is UAT only', () => {
   let copy = 0;
-  /** A fresh src/config/env.ts, evaluated as a build with this __DEV__ and EXPO_PUBLIC_APP_ENV would evaluate it. */
+  /** A fresh src/config/env.ts, evaluated as a build with this __DEV__ (and a stray EXPO_PUBLIC_APP_ENV) would evaluate it. */
   async function loadEnv(dev, appEnv) {
     const saved = { dev: globalThis.__DEV__, appEnv: process.env.EXPO_PUBLIC_APP_ENV };
     globalThis.__DEV__ = dev;
@@ -88,53 +93,84 @@ describe('environment: PROD only from a release build', () => {
     }
   }
 
-  test('a release build of the production profile talks to production', async () => {
-    const env = await loadEnv(false, 'PROD');
-    assert.equal(env.APP_ENV, 'PROD');
-    assert.equal(env.API_BASE_URL, PROD_URL);
-    assert.equal(env.HEALTH_URL, 'https://servicedesk.mountmerugroup.com/health');
-    assert.equal(env.ENVIRONMENT_LABEL, 'PROD · servicedesk.mountmerugroup.com');
+  test('a release build offers Production and UAT, starts on Production, and has the switch', async () => {
+    const env = await loadEnv(false, undefined);
+    assert.deepEqual(env.SELECTABLE_ENVIRONMENTS, ['PROD', 'UAT']);
+    assert.equal(env.DEFAULT_ENVIRONMENT, 'PROD');
+    assert.equal(env.CAN_SWITCH_ENVIRONMENT, true);
+    assert.equal(env.apiBaseUrlFor('PROD'), PROD_URL);
+    assert.equal(env.healthUrlFor('PROD'), 'https://servicedesk.mountmerugroup.com/health');
+    assert.equal(env.environmentLabel('PROD'), 'PROD · servicedesk.mountmerugroup.com');
+    assert.equal(env.apiBaseUrlFor('UAT'), UAT_URL);
+    assert.equal(env.environmentLabel('UAT'), 'UAT · uat-servicedesk.mountmerugroup.com');
   });
 
-  test('a release build of preview (UAT), or with nothing set, talks to UAT', async () => {
-    for (const appEnv of ['UAT', undefined, 'prod', 'QA']) {
+  test('EXPO_PUBLIC_APP_ENV no longer decides anything: Production is the release default whatever it says', async () => {
+    for (const appEnv of ['UAT', 'PROD', undefined, 'prod', 'QA']) {
       const env = await loadEnv(false, appEnv);
-      assert.equal(env.API_BASE_URL, UAT_URL, String(appEnv));
+      assert.equal(env.DEFAULT_ENVIRONMENT, 'PROD', String(appEnv));
+      assert.deepEqual(env.SELECTABLE_ENVIRONMENTS, ['PROD', 'UAT'], String(appEnv));
     }
+    assert.doesNotMatch(read('src/config/env.ts'), /process\.env/);
   });
 
-  test('a development build refuses PROD and otherwise talks to UAT', async () => {
-    await assert.rejects(loadEnv(true, 'PROD'), /a development build must never point at production/);
-    const env = await loadEnv(true, undefined);
-    assert.equal(env.API_BASE_URL, UAT_URL);
-    assert.equal(env.ENVIRONMENT_LABEL, 'UAT · uat-servicedesk.mountmerugroup.com · development build');
+  test('a development build refuses PROD: UAT only, no switch, and a PROD URL is never handed out', async () => {
+    for (const appEnv of ['PROD', undefined]) {
+      const env = await loadEnv(true, appEnv);
+      assert.deepEqual(env.SELECTABLE_ENVIRONMENTS, ['UAT'], String(appEnv));
+      assert.equal(env.DEFAULT_ENVIRONMENT, 'UAT');
+      assert.equal(env.CAN_SWITCH_ENVIRONMENT, false);
+      assert.equal(env.isSelectableEnvironment('PROD'), false);
+      assert.throws(() => env.apiBaseUrlFor('PROD'), /a development build must never point at production/);
+      assert.equal(env.apiBaseUrlFor('UAT'), UAT_URL);
+      assert.equal(env.environmentLabel('UAT'), 'UAT · uat-servicedesk.mountmerugroup.com · development build');
+    }
   });
 });
 
 describe('EAS build guard (scripts/eas-build-guard.js)', () => {
-  function guard(profile, appEnv) {
+  function guard(profile, appEnv, script = path.join(REPO, 'scripts', 'eas-build-guard.js')) {
     const env = { ...process.env };
     delete env.EAS_BUILD_PROFILE;
     delete env.EXPO_PUBLIC_APP_ENV;
     if (profile !== undefined) env.EAS_BUILD_PROFILE = profile;
     if (appEnv !== undefined) env.EXPO_PUBLIC_APP_ENV = appEnv;
-    return spawnSync(process.execPath, [path.join(REPO, 'scripts', 'eas-build-guard.js')], { env, encoding: 'utf8' }).status;
+    return spawnSync(process.execPath, [script], { env, encoding: 'utf8' }).status;
   }
 
-  test('permits production with PROD, and preview with UAT', () => {
-    assert.equal(guard('production', 'PROD'), 0);
-    assert.equal(guard('preview', 'UAT'), 0);
+  test('permits every profile that leaves the environment to the app', () => {
+    for (const profile of ['production', 'preview', undefined]) assert.equal(guard(profile, undefined), 0, String(profile));
   });
 
-  test('refuses PROD on every other profile', () => {
-    for (const profile of ['preview', 'development', 'anything-else', undefined]) {
-      assert.equal(guard(profile, 'PROD'), 1, String(profile));
+  test('refuses any profile that still sets EXPO_PUBLIC_APP_ENV, whatever its value', () => {
+    for (const profile of ['production', 'preview', 'development', undefined]) {
+      for (const appEnv of ['PROD', 'UAT', '']) assert.equal(guard(profile, appEnv), 1, `${profile} ${appEnv}`);
     }
   });
 
-  test('refuses a production build that does not target PROD', () => {
-    assert.equal(guard('production', 'UAT'), 1);
-    assert.equal(guard('production', undefined), 1);
+  test('refuses every profile when env.ts lacks either URL, or cannot be read (fails closed)', () => {
+    // A copy of the guard next to a fake env.ts, in the OS temp folder: the repo's own env.ts is never touched.
+    const source = read('src/config/env.ts');
+    const cases = {
+      'no PROD': source.replace(/^(\s*PROD:\s*)'[^']*'/m, "$1''"),
+      'no UAT': source.replace(/^(\s*UAT:\s*)'[^']*'/m, "$1''"),
+      'no env.ts': null,
+    };
+    for (const [name, fake] of Object.entries(cases)) {
+      if (fake !== null) assert.notEqual(fake, source, `${name}: the fake differs`);
+      const root = mkdtempSync(path.join(tmpdir(), 'mmg-guard-'));
+      try {
+        mkdirSync(path.join(root, 'scripts'));
+        mkdirSync(path.join(root, 'src', 'config'), { recursive: true });
+        writeFileSync(path.join(root, 'scripts', 'eas-build-guard.js'), read('scripts/eas-build-guard.js'));
+        if (fake !== null) writeFileSync(path.join(root, 'src', 'config', 'env.ts'), fake);
+        for (const profile of ['production', 'preview']) {
+          assert.equal(guard(profile, undefined, path.join(root, 'scripts', 'eas-build-guard.js')), 1, `${name}, ${profile}`);
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
   });
 });
 
@@ -143,16 +179,19 @@ describe('build profiles and store identity', () => {
   const eas = JSON.parse(read('eas.json').replace(/^\s*\/\/.*$/gm, ''));
   const app = JSON.parse(read('app.json')).expo;
 
-  test('production is a store AAB on PROD; preview is an internal APK on UAT; no URL in eas.json', () => {
+  // 2026-11-17: no profile chooses the environment any more (it was EXPO_PUBLIC_APP_ENV PROD / UAT per profile).
+  test('production is a store AAB, preview an internal APK; neither sets an environment; no URL in eas.json', () => {
     assert.deepEqual(
       { distribution: eas.build.production.distribution, buildType: eas.build.production.android.buildType, env: eas.build.production.env },
-      { distribution: 'store', buildType: 'app-bundle', env: { EXPO_PUBLIC_APP_ENV: 'PROD' } },
+      { distribution: 'store', buildType: 'app-bundle', env: undefined },
     );
     assert.deepEqual(
       { distribution: eas.build.preview.distribution, buildType: eas.build.preview.android.buildType, env: eas.build.preview.env },
-      { distribution: 'internal', buildType: 'apk', env: { EXPO_PUBLIC_APP_ENV: 'UAT' } },
+      { distribution: 'internal', buildType: 'apk', env: undefined },
     );
-    assert.doesNotMatch(read('eas.json'), /https?:\/\//);
+    const json = JSON.stringify(eas);
+    assert.doesNotMatch(json, /https?:\/\//);
+    assert.doesNotMatch(json, /EXPO_PUBLIC_APP_ENV/);
   });
 
   test('src/config/env.ts holds exactly the two approved URLs', () => {
@@ -161,11 +200,11 @@ describe('build profiles and store identity', () => {
     assert.match(source, /^\s*PROD: 'https:\/\/servicedesk\.mountmerugroup\.com\/api\/v1',$/m);
   });
 
-  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (4)', () => {
-    // versionCode 2 was the first AAB uploaded to Play, versionCode 4 the latest (2026-11-06); Play rejects any upload
-    // not above the last one it received.
+  test('version 1.0.0 with a versionCode above the last one uploaded to Google Play (5)', () => {
+    // versionCode 2 was the first AAB uploaded to Play, versionCode 5 the latest (on Play by 2026-11-17); Play rejects
+    // any upload not above the last one it received.
     assert.equal(app.version, '1.0.0');
-    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 4, String(app.android.versionCode));
+    assert.ok(Number.isInteger(app.android.versionCode) && app.android.versionCode > 5, String(app.android.versionCode));
   });
 
   test("ShortcutBadger's 16 launcher-badge permissions are blocked, and nothing the app needs is", () => {

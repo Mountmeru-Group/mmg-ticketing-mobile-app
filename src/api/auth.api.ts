@@ -36,7 +36,7 @@ import {
   getAuthRedirectUri,
   isMicrosoftSignInConfigured,
 } from '@/config/auth.config';
-import { API_HOST, HEALTH_URL } from '@/config/env';
+import { apiHost, healthUrl } from '@/store/environment.store';
 import {
   MOBILE_PASSWORD_PATHS,
   MOBILE_SSO_PATH,
@@ -70,7 +70,7 @@ export interface HealthResponse {
  * Connectivity / maintenance check on app start or after a network error.
  */
 export async function getHealth(): Promise<HealthResponse> {
-  const res = await apiClient.get<HealthResponse>(HEALTH_URL, { skipAuth: true });
+  const res = await apiClient.get<HealthResponse>(healthUrl(), { skipAuth: true });
   return res.data;
 }
 
@@ -292,7 +292,7 @@ function classifyExchangeFailure(error: unknown): MicrosoftSignInError {
   const http = `${AUTH_P2} → HTTP ${status ?? '?'}`;
 
   if (kind === 'network' || kind === 'timeout') {
-    return new MicrosoftSignInError('network', `${AUTH_P2}: ${kind === 'timeout' ? 'timed out' : 'no answer'} (${API_HOST})`);
+    return new MicrosoftSignInError('network', `${AUTH_P2}: ${kind === 'timeout' ? 'timed out' : 'no answer'} (${apiHost()})`);
   }
   // For a non-JSON body `said` is only the client's fallback text, so it is not quoted as the server's.
   const answer = kind === 'not-json' ? ' with a non-JSON body' : ` "${said}"`;
@@ -300,7 +300,7 @@ function classifyExchangeFailure(error: unknown): MicrosoftSignInError {
   // AUTH-P2 never answers 404 itself: it auto-creates unknown users, so there is no "no account" case. Any 404/405,
   // Express's HTML "Cannot POST" (01 §0.5) or a JSON catch-all, means the route is not deployed on this server.
   if (status === 404 || status === 405) {
-    return new MicrosoftSignInError('endpoint-missing', `${http}${answer}: the route is not deployed on ${API_HOST}`, status);
+    return new MicrosoftSignInError('endpoint-missing', `${http}${answer}: the route is not deployed on ${apiHost()}`, status);
   }
   if (status === 429) return new MicrosoftSignInError('rate-limited', `${http}${answer}`, status);
   if (kind === 'not-json') {
@@ -670,7 +670,10 @@ export interface PasswordSignInSession {
  */
 let answeringPath: MobilePasswordPath | null = null;
 
-/** Starts the next email sign-in from the first path again, as a fresh run of the app does. For tests. */
+/**
+ * Starts the next email sign-in from the first path again, as a fresh run of the app does. Tests, and the environment
+ * switch: the path that answered on one backend says nothing about the other (src/api/environmentSwitch.ts).
+ */
 export function forgetPasswordSignInPath(): void {
   answeringPath = null;
 }
@@ -732,10 +735,10 @@ export async function signInWithPassword(email: string, password: string): Promi
   }
 
   if (answer === null) {
-    logAuth(`none of ${MOBILE_PASSWORD_PATHS.join(', ')} exists on ${API_HOST}`);
+    logAuth(`none of ${MOBILE_PASSWORD_PATHS.join(', ')} exists on ${apiHost()}`);
     throw new PasswordSignInError(
       'unavailable',
-      `POST /api/v1{${MOBILE_PASSWORD_PATHS.join(', ')}} each answered 404 with an HTML body: no such route on ${API_HOST}`,
+      `POST /api/v1{${MOBILE_PASSWORD_PATHS.join(', ')}} each answered 404 with an HTML body: no such route on ${apiHost()}`,
       { status: 404 },
     );
   }
@@ -751,7 +754,7 @@ function classifyPasswordFailure(error: unknown, path: MobilePasswordPath): Pass
   }
   const { kind, status } = error;
   if (kind === 'network' || kind === 'timeout') {
-    return new PasswordSignInError('network', `${at}: ${kind === 'timeout' ? 'timed out' : 'no answer'} (${API_HOST})`, { path });
+    return new PasswordSignInError('network', `${at}: ${kind === 'timeout' ? 'timed out' : 'no answer'} (${apiHost()})`, { path });
   }
   const http = `${at} → HTTP ${status ?? '?'}`;
   // Only a JSON `{ error }` holds the route's own words; for anything else `body.error` is the client's fallback text.

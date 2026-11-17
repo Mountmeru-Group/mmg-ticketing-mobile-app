@@ -18,7 +18,7 @@ import { queryKeys, type TicketListKeyParams } from '@/hooks/queryKeys';
 import { useAuthStore } from '@/store/auth.store';
 import { colors } from '@/theme';
 import type { Ticket, TicketStackScreenProps } from '@/types';
-import { APP_ORIGIN, parseTicketLink } from '@/utils/deep-links';
+import { appOrigin, parseTicketLink } from '@/utils/deep-links';
 import { roleDefaultTicketQuery } from '@/utils/ticket-filters';
 
 export function TicketLinkScreen({ navigation, route }: TicketStackScreenProps<'TicketLink'>) {
@@ -61,7 +61,7 @@ export function TicketLinkScreen({ navigation, route }: TicketStackScreenProps<'
       <EmptyState
         icon="swap-horizontal-outline"
         title="Link from another Service Desk"
-        message={`This app is connected to ${APP_ORIGIN.replace(/^https?:\/\//, '')}, so it can't open tickets from other environments. You can open the link in your browser instead.`}
+        message={`This app is connected to ${appOrigin().replace(/^https?:\/\//, '')}, so it can't open tickets from other environments. You can open the link in your browser instead.`}
         actionLabel="Open in browser"
         onAction={() => {
           if (/^https?:\/\//i.test(link.trim())) Linking.openURL(link.trim()).catch(() => undefined);

@@ -5,10 +5,14 @@
 //   `issuedAt`, then it is treated as logged out. A 401 from the server is still the final word (02 §5.4).
 // - On top of that, every 15 days the user is signed out and Microsoft must challenge the next sign-in (02 §5.8).
 //   That clock is `fullAuthAt`, kept under its own key: an 8-hour sign-out never touches it.
+// - A session belongs to the environment it was created on (2026-11-17, the runtime environment switch): it is stored
+//   with it, restoreSession() drops one from any other environment, and the API client never sends it elsewhere.
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 
+import type { AppEnvironment } from '@/config/env';
 import { USER_ROLES, type AuthUser } from '@/types';
+import { activeEnvironment, useEnvironmentStore } from './environment.store';
 
 /** SESSION_TTL_HOURS default is 8 and absolute (02 §1.1). */
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -21,6 +25,9 @@ const KEYS = {
   // AuthUser holds no secret. It is stored here only because AsyncStorage is not installed.
   // From Phase 3 it is refreshed from GET /auth/me on every cold start (02 §5.1).
   user: 'mmg.session.user',
+  // The environment the session was created on. A session stored without it (a build from before 2026-11-17, when the
+  // environment was fixed per EAS profile) cannot be placed, so it is not restored: the person signs in once more.
+  environment: 'mmg.session.environment',
 } as const;
 
 export function isSessionExpired(issuedAt: number, now: number = Date.now()): boolean {
@@ -115,6 +122,8 @@ interface AuthState {
   token: string | null;
   /** Epoch ms when the session was obtained. */
   issuedAt: number | null;
+  /** The environment the session was created on; its token is never sent to another (src/api/client.ts). */
+  environment: AppEnvironment | null;
   /**
    * Epoch ms of the last sign-in Microsoft was told to challenge, or null (none, or unreadable). Outlives the session:
    * the next sign-in reads it to decide whether to challenge (02 §5.8).
@@ -135,6 +144,7 @@ const LOGGED_OUT = {
   user: null,
   token: null,
   issuedAt: null,
+  environment: null,
   isAuthenticated: false,
   isLoading: false,
 } as const;
@@ -166,13 +176,16 @@ export const useAuthStore = create<AuthState>()((set) => ({
   fullAuthAt: null,
 
   setSession: async ({ token, user, issuedAt = Date.now(), fullAuthAt }) => {
+    // The sign-in that produced this token went to the environment in use; the switch is locked while one runs (Login).
+    const environment = activeEnvironment();
     await SecureStore.setItemAsync(KEYS.token, token);
     await SecureStore.setItemAsync(KEYS.issuedAt, String(issuedAt));
     await SecureStore.setItemAsync(KEYS.user, JSON.stringify(user));
+    await SecureStore.setItemAsync(KEYS.environment, environment);
     // Last, so a failed session write never leaves a fresh date behind (a cold start wipes the partial session).
     if (fullAuthAt !== undefined) await SecureStore.setItemAsync(FULL_AUTH_KEY, String(fullAuthAt));
     set({
-      token, user, issuedAt, isAuthenticated: true, isLoading: false, signOutMessage: null,
+      token, user, issuedAt, environment, isAuthenticated: true, isLoading: false, signOutMessage: null,
       ...(fullAuthAt !== undefined ? { fullAuthAt } : {}),
     });
   },
@@ -186,14 +199,19 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   restoreSession: async () => {
     set({ isLoading: true });
+    // The environment first: a stored session is only good in the environment it was created on.
+    const environments = useEnvironmentStore.getState();
+    if (!environments.restored) await environments.restoreEnvironment();
+    const environment = activeEnvironment();
     // Read on its own: a missing, corrupt or unreadable date means "due", and never fails the session read (02 §5.8).
     const fullAuthAt = await readFullAuthAt();
     set({ fullAuthAt });
     try {
-      const [token, issuedAtRaw, userRaw] = await Promise.all([
+      const [token, issuedAtRaw, userRaw, environmentRaw] = await Promise.all([
         SecureStore.getItemAsync(KEYS.token),
         SecureStore.getItemAsync(KEYS.issuedAt),
         SecureStore.getItemAsync(KEYS.user),
+        SecureStore.getItemAsync(KEYS.environment),
       ]);
       const issuedAt = issuedAtRaw === null ? Number.NaN : Number(issuedAtRaw);
       const user = parseStoredUser(userRaw);
@@ -210,12 +228,18 @@ export const useAuthStore = create<AuthState>()((set) => ({
         set({ ...LOGGED_OUT, signOutMessage: REAUTH_NOTICE.message, fullAuthAt: null });
         return;
       }
+      // Another environment's session (or one stored before sessions named theirs): never sent here. Sign in again.
+      if (environmentRaw !== environment) {
+        await wipeStoredSession();
+        set({ ...LOGGED_OUT, signOutMessage: SESSION_ENDED_MESSAGE });
+        return;
+      }
       if (isSessionExpired(issuedAt)) {
         await wipeStoredSession();
         set({ ...LOGGED_OUT, signOutMessage: SESSION_ENDED_MESSAGE });
         return;
       }
-      set({ token, user, issuedAt, isAuthenticated: true, isLoading: false, signOutMessage: null });
+      set({ token, user, issuedAt, environment, isAuthenticated: true, isLoading: false, signOutMessage: null });
     } catch {
       // Android Keystore can fail to decrypt after a device restore (08 §8.2). Treat as logged out.
       await wipeStoredSession();

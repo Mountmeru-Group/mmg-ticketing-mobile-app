@@ -4,8 +4,8 @@
 //
 // - EAS: GOOGLE_SERVICES_JSON is an EAS *file* environment variable, visibility "secret", set in BOTH the `preview` and
 //   the `production` environments (production added 2026-11-06). EAS writes the file on the build server and sets the
-//   variable to its path. This file reads the variable and nothing else: it never looks at the build profile or at
-//   EXPO_PUBLIC_APP_ENV, so a UAT build and a PROD build take the same path and both get Firebase.
+//   variable to its path. This file reads the variable and nothing else: it never looks at the build profile, so every
+//   build gets Firebase. (The API environment is a runtime choice since 2026-11-17; no build variable selects it.)
 // - On this machine: the file sits at the repo root and is git-ignored (.gitignore). EAS uploads only what git tracks,
 //   so a file placed there never reaches an EAS build by itself. A local native build uses it only when asked:
 //   `GOOGLE_SERVICES_JSON=./google-services.json npx expo run:android`.

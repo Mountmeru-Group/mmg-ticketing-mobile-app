@@ -11,18 +11,21 @@ check made to pass again (it had failed since G9 on an example email address, §
 differently from the UAT build that was tested (§5b). Not built.
 Updated 2026-11-06 (later) for the fourth production build: versionCode 5, email sign-in opened to PRODUCTION, push
 enabled for production, and the table of every remaining UAT/PROD difference (§5c). Not built.
+Updated 2026-11-17 for the fifth production build: versionCode 6. The API environment became a RUNTIME choice (Login's
+gear): no profile fixes it, every release build starts on Production, and the build guard, the bundle check and their
+tests were rewritten for that (§1, §5d, §6). Saved filters on the phone and search on long dropdowns ship in it too. Not built.
 
 **Where things stand**
 
 | Item | State |
 |---|---|
-| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`4`** (`app.json`, set 2026-11-06). versionCode `3` (set 2026-11-03) is the latest AAB uploaded to Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
+| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`6`** (`app.json`, set 2026-11-17). versionCode `5` is the latest AAB on Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29, 2026-11-03 and 2026-11-06). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
-| `preview` APK | Ready to build with your Expo account (§2). It points at **UAT** |
+| `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build: testers switch to UAT once, on Login's gear, and the app keeps that choice (§1) |
 | Signing in | **Microsoft sign-in and email and password sign-in, on every build (UAT and PROD)** since 2026-11-06: the backend confirmed the email endpoint on PRODUCTION (⚠ contract still assumed, 02-AUTH §8). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5). AUTH-P2 is live on UAT (02-AUTH §7); production is still unconfirmed (§5) |
-| `production` AAB | **versionCode 5: ready to build, not built** (§2a, §5c). versionCode 4 is already on Google Play. It points at **PRODUCTION**, with email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
+| `production` AAB | **versionCode 6: ready to build, not built** (§5d). versionCode 5 is already on Google Play. It starts on **PRODUCTION** and can be switched to UAT by the person (§1). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
 
 ---
 
@@ -30,30 +33,38 @@ enabled for production, and the table of every remaining UAT/PROD difference (§
 
 | Profile | Output | Distribution | Backend | Notes |
 |---|---|---|---|---|
-| `development` | Dev-client APK | internal | UAT | Not in `eas.json`. Needs `expo-dev-client`, which is not installed (§8) |
-| `preview` | APK | internal | UAT | Release-mode build for testers |
-| `production` | AAB | store | PROD | Google Play. PROD URL `https://servicedesk.mountmerugroup.com/api/v1` set in `src/config/env.ts` on 2026-10-29 |
+| `development` | Dev-client APK | internal | UAT only | Not in `eas.json`. Needs `expo-dev-client`, which is not installed (§8). A `__DEV__` build is UAT only, whatever is stored, and has no switch |
+| `preview` | APK | internal | Person's choice; **Production** on a fresh install | Release-mode build for testers. Testers switch to UAT once (Login → gear) |
+| `production` | AAB | store | Person's choice; **Production** on a fresh install | Google Play. PROD URL `https://servicedesk.mountmerugroup.com/api/v1` set in `src/config/env.ts` on 2026-10-29 |
 
-How the backend is chosen:
-- Each profile sets `EXPO_PUBLIC_APP_ENV`. `src/config/env.ts` maps it to a URL. **No URL is in `eas.json`.**
-- Anything other than `PROD` resolves to UAT.
-- A `__DEV__` build refuses `PROD` outright.
-- A release build refuses `PROD` while the PROD URL is empty.
+How the backend is chosen (since 2026-11-17; before that, each profile set `EXPO_PUBLIC_APP_ENV`):
+- **The person chooses**, on Login: the gear at the top right of the red panel opens a sheet with Production and UAT and
+  their host names. "Switch and sign out" signs out and clears everything first (02-AUTH §9).
+- A fresh install is on **Production**, in every release build. The choice is stored on the phone
+  (`src/store/environment.store.ts`, SecureStore key `mmg.app.environment`) and kept until the person changes it back.
+- A `__DEV__` build is **UAT only**: it has no gear, ignores a stored PROD, and `apiBaseUrlFor('PROD')` throws
+  (CLAUDE.md rule 4). This is the development-build guard, unchanged in strength; it now lives only in the app.
+- **No URL and no environment is in `eas.json`.** `EXPO_PUBLIC_APP_ENV` is no longer read by anything.
+- Upgrading from versionCode 5 or earlier: the old session named no environment, so it is not restored; the person signs
+  in once more (02-AUTH §9.4). A `preview` tester lands on Production and switches to UAT once.
 
-**Build guard.** `scripts/eas-build-guard.js` runs on the EAS server before `npm install` (`eas-build-pre-install` hook in `package.json`). It fails the build within seconds when:
-- the profile is `production` and the PROD URL in `src/config/env.ts` is empty, or the profile doesn't set `EXPO_PUBLIC_APP_ENV=PROD`; or
-- any other profile sets `EXPO_PUBLIC_APP_ENV=PROD`.
+**Build guard.** `scripts/eas-build-guard.js` runs on the EAS server before `npm install` (`eas-build-pre-install` hook in `package.json`). Since 2026-11-17 it fails the build within seconds, on **every** profile, when:
+- the PROD or the UAT URL in `src/config/env.ts` is missing or empty (every release build starts on PROD and offers UAT), or `env.ts` cannot be read (fails closed); or
+- `EXPO_PUBLIC_APP_ENV` is set at all, in `eas.json` or as an EAS environment variable (the app ignores it, and it would mislead).
+
+Its old rules (PROD refused on any profile but `production`; `production` refused without PROD) assumed the URL was
+fixed per profile, and are gone with that premise.
 
 Preview the guard's verdict locally (Git Bash):
 
 ```sh
-EAS_BUILD_PROFILE=production EXPO_PUBLIC_APP_ENV=PROD node scripts/eas-build-guard.js   # OK (since 2026-10-29)
-EAS_BUILD_PROFILE=preview    EXPO_PUBLIC_APP_ENV=UAT  node scripts/eas-build-guard.js   # OK
-EAS_BUILD_PROFILE=preview    EXPO_PUBLIC_APP_ENV=PROD node scripts/eas-build-guard.js   # refused
+EAS_BUILD_PROFILE=production node scripts/eas-build-guard.js                              # OK
+EAS_BUILD_PROFILE=preview    node scripts/eas-build-guard.js                              # OK
+EAS_BUILD_PROFILE=production EXPO_PUBLIC_APP_ENV=PROD node scripts/eas-build-guard.js     # refused: no longer used
 ```
 
-`npm test` runs the same verdicts (`tests/release/production-readiness.test.mjs`). On 2026-10-29 an unchanged copy of the
-guard, pointed at an `env.ts` with an empty PROD URL, still refused `production`.
+`npm test` runs the same verdicts (`tests/release/production-readiness.test.mjs`), including a copy of the guard pointed
+at an `env.ts` with an empty PROD URL, one with an empty UAT URL, and none at all: each refused for both profiles.
 
 **Versioning.** `cli.appVersionSource` is `local`, so `app.json` is the only source of `version` and `android.versionCode`.
 - Bump `android.versionCode` by 1 for every build you hand out or upload. Never reuse a number: Android refuses to install a lower versionCode over a higher one, and Play rejects duplicates.
@@ -631,7 +642,7 @@ Not built. Ronit's instruction: production should match UAT except where a diffe
 |---|---|---|---|
 | API base URL | `uat-servicedesk.../api/v1` | `servicedesk.../api/v1` | The environment itself |
 | EAS profile, artifact | APK, internal distribution | AAB, store distribution | Play takes an AAB; testers need an installable APK |
-| `EXPO_PUBLIC_APP_ENV` | `UAT` | `PROD` | Selects the URL; `eas-build-guard.js` refuses PROD on any other profile and UAT on `production` |
+| `EXPO_PUBLIC_APP_ENV` | `UAT` | `PROD` | Selects the URL; `eas-build-guard.js` refuses PROD on any other profile and UAT on `production`. **Superseded 2026-11-17 (§5d): no profile sets it; the person chooses on Login** |
 | Development builds | Allowed, UAT only | Refused (`__DEV__` + PROD throws) | CLAUDE.md rule 4 |
 | Login environment chip | Shown (`SHOW_ENVIRONMENT_CHIP`) | Not rendered | Labels the environment for testers; users don't need it. Kept on purpose |
 | Environment label on Profile and in the drawer | `UAT . host` | `PROD . host` | Not a gate: same code, different value |
@@ -645,6 +656,53 @@ npm run verify:release-bundle -- --prod
 eas build --platform android --profile production
 ```
 
+## 5d. Fifth production build, versionCode 6 (2026-11-17): the environment is the person's choice
+
+Not built. Ronit's written brief (2026-11-17): a runtime environment switch, saved filters on the phone, and a search
+box on long dropdowns. R4 and R5 relaxed for this repo for that work; no EAS build was run.
+
+**Done in this repo**
+- [x] **Runtime environment switch** (02-AUTH §9, UI-STANDARDS §17). Production by default on a fresh install, kept until
+  changed, switched from Login's gear. The switch removes this phone's push token from the CURRENT environment (NTF-6,
+  while its session works), sends AUTH-3, signs out (session, 15-day clock, SecureStore), clears the whole query cache,
+  resets the filter and period state, and only then stores the new environment.
+- [x] **No token crosses environments.** A session is stored with its environment; the API client refuses to send it
+  anywhere else (and ends it); a cold start drops one from the other environment; attachment views carry no header from
+  another environment.
+- [x] **Saved filters** on the phone only, per user and per environment, at most 20, cut to the role (UI-STANDARDS §17.2).
+  No backend call; nothing syncs with the web portal.
+- [x] **Search on long dropdowns**: one component (`OptionSheet`), more than 10 options (UI-STANDARDS §17.3).
+- [x] **versionCode** `5` → **`6`** (`app.json`). `version` stays `1.0.0`. Package, slug, schemes and EAS projectId unchanged.
+- [x] No library added. Persistence uses `expo-secure-store`, already installed.
+
+**Every guard and test that assumed a URL fixed per profile, and what was done**
+
+| Guard or test | Assumed | Now |
+|---|---|---|
+| `src/config/env.ts` | `EXPO_PUBLIC_APP_ENV` picks the URL at load; `APP_ENV`, `API_BASE_URL`, `HEALTH_URL`, `API_HOST`, `ENVIRONMENT_LABEL`, `SHOW_ENVIRONMENT_CHIP` constants | Rules only: `SELECTABLE_ENVIRONMENTS` (dev: UAT; release: PROD, UAT), `DEFAULT_ENVIRONMENT` (dev UAT, release PROD), `apiBaseUrlFor(env)` (dev refuses PROD), `showEnvironmentChip(env)`. The environment in use is in `src/store/environment.store.ts` |
+| `src/api/client.ts` | `baseURL` fixed in `axios.create` | Set per request from the environment in use; a token from another environment is refused |
+| `src/utils/deep-links.ts` | `APP_ORIGIN` constant | `appOrigin()`, read per call (also in `audit-log.ts`, `push.ts`, `TicketLinkScreen`) |
+| `src/api/attachments.api.ts`, `src/api/auth.api.ts` | `API_BASE_URL`, `API_HOST`, `HEALTH_URL` constants | `apiBaseUrl()`, `apiHost()`, `healthUrl()` per call; attachments send only the active environment's token |
+| `scripts/eas-build-guard.js` | PROD only on `production`; `production` must set PROD | Both URLs required on every profile; `EXPO_PUBLIC_APP_ENV` refused if set (§1) |
+| `eas.json` | `env.EXPO_PUBLIC_APP_ENV` per profile | Removed from both profiles |
+| `scripts/verify-release-bundle.js` | `--prod` bundles with `EXPO_PUBLIC_APP_ENV=PROD` | One bundle for every profile; the variable is removed from the bundler's environment; `--prod` only prints a note (§6) |
+| `.env.example`, `app.config.js` comment | `EXPO_PUBLIC_APP_ENV` documented | Say it is no longer used |
+| `tests/release/production-readiness.test.mjs` | "PROD only from a release build of `production`"; guard verdicts per profile; `eas.json` env per profile; versionCode > 4 | Release: PROD and UAT, PROD default, switch; the variable is ignored; dev: UAT only, PROD throws. Guard: every profile OK without the variable, refused with it, refused without either URL. `eas.json` has no env. versionCode > 5 |
+| `tests/motion/start-up-and-login.test.mjs` | Chip on every build but a production release; gated on `SHOW_ENVIRONMENT_CHIP` | Chip on UAT in any build, never on PROD; gated on `showEnvironmentChip(environment)` from the store |
+| `tests/auth/reauth.test.mjs`, `password-sign-in.test.mjs`, `push.test.mjs`, `rbac/audit-log.test.mjs` | A session is just token, issuedAt, user | The seeded or injected session names its environment (`UAT`, a dev build); the stored keys include `mmg.session.environment` |
+| `tests/push/push.test.mjs`, `audit/audit-details.test.mjs`, `rbac/kb-announcements.test.mjs` | `APP_ORIGIN` constant | `appOrigin()` |
+
+**New tests** (62): `tests/environment/switch-release.test.mjs` (runs as a release build), `tests/environment/dev-build.test.mjs`,
+`tests/filters/saved-filters.test.mjs`, `tests/components/dropdown-search.test.mjs`.
+
+**Checks**: `npx tsc --noEmit` clean. `npm test`: **1327 pass, 0 fail** (1265 before). `npm run verify:release-bundle`: **PASS** (one bundle; only the two approved hosts; the development build's PROD-refusal message found in the control and absent from release, so the dev-only guard is stripped as before). Local Metro bundling only: no EAS build.
+
+**Build command (Ronit runs it, from the repo root, after review and commit):**
+```
+npm run verify:release-bundle
+eas build --platform android --profile production
+```
+
 ## 6. Release bundle check (`npm run verify:release-bundle`)
 
 Until 2026-10-29 this section was "Proof the developer-token screen is not in a release bundle".
@@ -653,8 +711,10 @@ Until 2026-10-29 this section was "Proof the developer-token screen is not in a 
 
 **Method** (`scripts/verify-release-bundle.js`):
 1. Builds the JS bundle exactly as a release build's Gradle task does: `expo export:embed --platform android --dev false --minify true`, plus a source map.
-   - `npm run verify:release-bundle` bundles with `EXPO_PUBLIC_APP_ENV=UAT`, as `preview` does.
-   - `npm run verify:release-bundle -- --prod` bundles with `PROD`, as `production` does. **Run this one before every production build.**
+   - Since 2026-11-17 there is **one** bundle for every profile: the environment is chosen in the app, so `preview` and
+     `production` bundle the same JavaScript (both URLs, as before). `EXPO_PUBLIC_APP_ENV` is removed from the
+     bundler's environment. `-- --prod` is no longer a mode (it prints a note). **Run it before every production build.**
+   - Before 2026-11-17: `npm run verify:release-bundle` bundled with `EXPO_PUBLIC_APP_ENV=UAT`, and `-- --prod` with `PROD`.
 2. Compiles it to Hermes bytecode with the project's `hermesc`, as the release build does.
 3. Builds a **development** bundle as a control. A `__DEV__`-only string from `src/config/env.ts` must be in the control and absent from release. That proves the search works and that `__DEV__` code is stripped.
 4. Fails on any of these:

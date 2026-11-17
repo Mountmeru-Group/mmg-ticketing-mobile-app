@@ -47,6 +47,8 @@ const KEYS = {
   issuedAt: 'mmg.session.issuedAt',
   user: 'mmg.session.user',
   fullAuthAt: 'mmg.auth.fullAuthAt',
+  // 2026-11-17: the environment the session was created on. A development build (these tests) is always on UAT.
+  environment: 'mmg.session.environment',
 };
 const FAKE = {
   idToken: 'fake-microsoft-id-token-REAUTH',
@@ -129,6 +131,7 @@ async function phoneHolds({ issuedAgo = 1 * HOUR, fullAuth } = {}) {
   await secureStore.setItemAsync(KEYS.token, FAKE.token);
   await secureStore.setItemAsync(KEYS.issuedAt, String(now - issuedAgo));
   await secureStore.setItemAsync(KEYS.user, JSON.stringify(USER));
+  await secureStore.setItemAsync(KEYS.environment, 'UAT');
   if (fullAuth !== undefined) {
     await secureStore.setItemAsync(KEYS.fullAuthAt, typeof fullAuth === 'string' ? fullAuth : String(now - fullAuth));
   }

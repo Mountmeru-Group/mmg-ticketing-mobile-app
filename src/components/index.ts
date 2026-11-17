@@ -24,6 +24,7 @@ export { PressableCard, usePressFeedback } from './PressFeedback';
 export { PriorityBadge } from './PriorityBadge';
 export { RecentTicketRow } from './RecentTicketRow';
 export { ScreenHeader } from './ScreenHeader';
+export { Sheet } from './Sheet';
 export { SlaBadge } from './SlaBadge';
 export { SlaDeadline } from './SlaDeadline';
 export { StatusBadge } from './StatusBadge';

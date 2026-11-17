@@ -8,6 +8,8 @@
 // - Options as on the web: priorities in its order; active top-level categories by name (LKP-1); every group, inactive
 //   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`).
 // - "Clear all" is the web's Clear: named filter, search, the five filters and the sort. The country stays.
+// - SAVED FILTERS at the top (2026-11-17, ./SavedFilters.tsx): kept on this phone only, per user and per environment.
+//   A chip applies its whole set at once; what one holds is cut to this role by sanitizeSavedFilter().
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -18,7 +20,7 @@ import {
   ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, PersonPickerSheet, ScreenHeader, SelectField,
   SubmitButton, type SheetOption,
 } from '@/components';
-import { useCategories, useTeams, useTickets } from '@/hooks';
+import { countryName, useCategories, useCountryOptions, useTeams, useTickets } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
@@ -26,12 +28,14 @@ import type { TicketPriority, TicketStackScreenProps } from '@/types';
 import { notify } from '@/utils/dialogs';
 import { PRIORITY_LABELS, formatDisplayName } from '@/utils/format';
 import { ticketListFilters } from '@/utils/permissions';
+import { captureSavedFilter, sanitizeSavedFilter, type SavedTicketFilter } from '@/utils/saved-filters';
 import { DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 import {
   PRIORITY_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels, categoryFilterOptions,
-  formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed, listCountryParam, namedFilterSetsTechnician,
-  type TicketNamedFilter,
+  countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed, listCountryParam,
+  namedFilterSetsTechnician, type TicketNamedFilter,
 } from '@/utils/ticket-filters';
+import { SavedFiltersBlock } from './SavedFilters';
 
 const ALL = '__ALL__';
 
@@ -42,6 +46,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
   const insets = useSafeAreaInsets();
   const {
     ticketFilter, ticketSort, ticketCountryId, ticketSearch, ticketAdvanced: advanced, setTicketAdvanced, clearTicketFilters,
+    applySavedTicketFilter,
   } = useUiStore();
   const [picker, setPicker] = useState<Picker | null>(null);
 
@@ -81,6 +86,23 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
   const toDay = isFilterDay(advanced.toDate) ? advanced.toDate : null;
   const technicianSlotTaken = namedFilterSetsTechnician(activeFilter);
 
+  // Saved filters (2026-11-17): the list's state as one would hold it. The country's name, for its chip, comes from the
+  // same lookup the list's country selector already loaded (same key: no extra request).
+  const countryMode = user ? countrySelectorMode(user) : 'hidden';
+  const countries = useCountryOptions({ enabled: countryMode === 'switch' && ticketCountryId !== null });
+  const current = user
+    ? captureSavedFilter(
+        {
+          ticketFilter: activeFilter, ticketSort, ticketSearch, ticketCountryId, ticketAdvanced: advanced,
+          countryName: countryName(countries.data?.find((c) => c.id === ticketCountryId)),
+        },
+        user,
+      )
+    : null;
+  const applySaved = (filter: SavedTicketFilter) => {
+    if (user) applySavedTicketFilter(sanitizeSavedFilter(filter, user));
+  };
+
   const total = list.total;
   const showLabel = total === undefined ? 'Show tickets' : `Show ${total} ${total === 1 ? 'ticket' : 'tickets'}`;
 
@@ -104,6 +126,8 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
       />
       <OfflineBanner />
       <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
+        {current ? <SavedFiltersBlock current={current} onApply={applySaved} /> : null}
+
         <Text className="mx-4 mb-2 text-xs text-gray-500">
           Every filter applies at once, together with the quick filter{activeFilter !== 'ALL' ? ` (${TICKET_FILTER_LABELS[activeFilter]})` : ''}, the search and the sort.
         </Text>

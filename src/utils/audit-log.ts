@@ -14,7 +14,7 @@
 // Any other key becomes "Label: before → after" (objects as JSON). A payload that is not an object (array, string,
 // number) is shown raw. It never throws: anything unexpected ends in the raw block.
 import type { AuditAction, AuditLogEntry, AuditLogQuery } from '@/types';
-import { APP_ORIGIN, parseTicketLink } from './deep-links';
+import { appOrigin, parseTicketLink } from './deep-links';
 import {
   IMPACT_LABELS, PRIORITY_LABELS, URGENCY_LABELS, formatDate, formatDisplayName, formatShortDate, statusLabel,
 } from './format';
@@ -210,7 +210,7 @@ export function parseAuditTicketNumber(text: string): number | null {
 export function auditTicketLink(ticket: AuditLogEntry['ticket'] | undefined): string | null {
   if (!ticket || typeof ticket !== 'object') return null;
   const candidates: string[] = [];
-  if (typeof ticket.id === 'string' && ticket.id) candidates.push(`${APP_ORIGIN}/tickets/${encodeURIComponent(ticket.id)}`);
+  if (typeof ticket.id === 'string' && ticket.id) candidates.push(`${appOrigin()}/tickets/${encodeURIComponent(ticket.id)}`);
   if (typeof ticket.ticketNumber === 'number') candidates.push(`#${ticket.ticketNumber}`);
   return candidates.find((link) => parseTicketLink(link).ok) ?? null;
 }

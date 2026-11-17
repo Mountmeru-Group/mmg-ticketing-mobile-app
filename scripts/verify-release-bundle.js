@@ -15,8 +15,10 @@
 // proving both that the search works and that __DEV__ code is stripped from the release bundle.
 // Prints counts and file names only — never a matched value.
 //
-// Usage: npm run verify:release-bundle            EXPO_PUBLIC_APP_ENV=UAT, as the preview profile builds
-//        npm run verify:release-bundle -- --prod  EXPO_PUBLIC_APP_ENV=PROD, as the production profile builds
+// Usage: npm run verify:release-bundle
+// One bundle covers every profile since 2026-11-17: the API environment is chosen in the app, not by the build, so the
+// preview and production profiles bundle the same JavaScript (both URLs, as before). There is no `--prod` mode any
+// more; EXPO_PUBLIC_APP_ENV is removed from the bundler's environment so a stray local value cannot leak in.
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -25,7 +27,9 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const out = path.join(os.tmpdir(), 'mmg-release-check');
 const expoCli = require.resolve('expo/bin/cli', { paths: [root] });
-const APP_ENV = process.argv.includes('--prod') ? 'PROD' : 'UAT';
+if (process.argv.includes('--prod')) {
+  console.log('Note: --prod is no longer a separate mode (the environment is a runtime choice); one bundle is checked.');
+}
 /** Both API hosts of src/config/env.ts: its URL table is bundled whole, so every bundle names both. */
 const ALLOWED_HOSTS = ['uat-servicedesk.mountmerugroup.com', 'servicedesk.mountmerugroup.com'];
 /** Public identifiers, not secrets (02-AUTH §7.1). Exact values: any other UUID-v4 literal still fails. */
@@ -67,6 +71,13 @@ const CONTROL_NEEDLES = [
 /** Only inside `if (__DEV__)` in src/config/env.ts: in the development control, never in release. */
 const DEV_ONLY_NEEDLE = 'a development build must never point at production';
 
+/** The bundler's environment without EXPO_PUBLIC_APP_ENV, which the app no longer reads (src/config/env.ts). */
+function withoutAppEnv(env) {
+  const copy = { ...env };
+  delete copy.EXPO_PUBLIC_APP_ENV;
+  return copy;
+}
+
 function bundle(dev) {
   const dir = path.join(out, dev ? 'dev' : 'release');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -77,11 +88,11 @@ function bundle(dev) {
     '--entry-file', 'index.ts', '--bundle-output', file, '--assets-dest', path.join(dir, 'res'),
     ...(dev ? [] : ['--reset-cache', '--sourcemap-output', `${file}.map`]),
   ];
-  console.log(`Bundling ${dev ? 'development control' : `release (EXPO_PUBLIC_APP_ENV=${APP_ENV})`} bundle…`);
+  console.log(`Bundling ${dev ? 'development control' : 'release'} bundle…`);
   const r = spawnSync(process.execPath, args, {
     cwd: root,
     stdio: ['ignore', 'ignore', 'inherit'],
-    env: { ...process.env, EXPO_PUBLIC_APP_ENV: dev ? 'UAT' : APP_ENV, NODE_ENV: dev ? 'development' : 'production' },
+    env: { ...withoutAppEnv(process.env), NODE_ENV: dev ? 'development' : 'production' },
   });
   if (r.status !== 0 || !fs.existsSync(file)) throw new Error(`expo export:embed failed (dev=${dev})`);
   return file;
@@ -245,4 +256,4 @@ if (problems.length) {
   console.error(`FAIL — ${problems.length} problem(s):\n${problems.map((p) => `  - ${p}`).join('\n')}`);
   process.exit(1);
 }
-console.log(`PASS (${APP_ENV}) — no dev-token screen, forbidden auth marker, secret value, token-shaped value or unapproved host in the release bundle.`);
+console.log(`PASS — no dev-token screen, forbidden auth marker, secret value, token-shaped value or unapproved host in the release bundle.`);

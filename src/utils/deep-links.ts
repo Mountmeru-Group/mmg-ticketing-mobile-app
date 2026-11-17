@@ -4,11 +4,12 @@
 //   ${APP_URL}/ticket/<ticketNumber>     the web's TicketRedirectPage route (number → ticket)
 //   ${APP_URL}/tickets/<uuid>            the web's ticket detail route (approval emails, `ticketUrl`)
 //   ${APP_URL}/tickets/<ticketNumber>    the triage email (a web bug A18 reports; handled here anyway)
-// APP_URL is the web origin of the environment this build talks to (UAT for every dev build, 00 §3). A link to another
-// environment is NOT resolved: its ticket numbers and ids belong to a different database.
+// APP_URL is the web origin of the environment the app is using right now (the person's choice since 2026-11-17; UAT
+// for every dev build, 00 §3). A link to another environment is NOT resolved: its ticket numbers and ids belong to a
+// different database. The origin is read on every call, never kept, so a switch takes effect at once.
 // Only links that reach the app are handled — tapped inside a description, comment, announcement or KB article, or
 // pasted into the Tickets search box. The OS never routes links to the app: that needs ask A18 (out of scope).
-import { API_BASE_URL } from '@/config/env';
+import { appOrigin } from '@/store/environment.store';
 
 export type TicketLinkTarget = { kind: 'id'; id: string } | { kind: 'number'; ticketNumber: number };
 
@@ -20,8 +21,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Ticket numbers are autoincrement integers; cap the length so a pasted ID-like string can't overflow. */
 const NUMBER_RE = /^\d{1,9}$/;
 
-/** `https://uat-servicedesk.mountmerugroup.com` — the web app's origin for this build's environment. */
-export const APP_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+/** `https://uat-servicedesk.mountmerugroup.com` — the web app's origin in the environment in use. Read when called. */
+export { appOrigin };
 
 function hostOf(origin: string): string {
   return origin.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
@@ -61,7 +62,7 @@ export function parseTicketLink(input: string): TicketLinkParse {
 
   const route = /^\/tickets?\/([^/]+)\/?$/i.exec(path);
   if (!route) return { ok: false, reason: 'not-a-ticket-link' };
-  if (host !== hostOf(APP_ORIGIN)) return { ok: false, reason: 'other-environment' };
+  if (host !== hostOf(appOrigin())) return { ok: false, reason: 'other-environment' };
 
   let target: TicketLinkTarget | null = null;
   try {
