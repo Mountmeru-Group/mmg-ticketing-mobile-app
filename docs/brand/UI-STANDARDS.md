@@ -1620,7 +1620,7 @@ Android's §17.2, §17.3 and §18.1 apply on iOS as written: the same rules, wor
 **Not on iOS:** §10.6's "Since 2026-11-17" rule, §17.1 and §18.2–§18.4: the environment switch, Login's "Use Production" link, the drawer's Environment row and card, the environment sheet and its chip colours (`colors.environment`, amber-950). iOS has no switch (`02-AUTH.md` §iOS-C) and no drawer; More and Profile are unchanged.
 
 **Multi-select (§18.1) in an iOS page sheet** (`OptionSheet` `multiple` on `PageSheet`, §iOS-A.2):
-- **The bar:** **Clear** on the left, in place of ✕ (dimmed and disabled while nothing is ticked); the title; **Done** on the right, bold. No footer. Android puts Clear and Done side by side at the bottom (Ronit, decision 4).
+- **The bar:** **Clear** on the left, in place of ✕ (dimmed and disabled while nothing is ticked); the title; **Done** on the right, bold. No footer. Android puts Clear and Done side by side at the bottom (Ronit, decision 4). An exception to §iOS-A.2's "Done always comes with Cancel": closing applies the ticks, as Android's back does, so there is nothing to cancel; Clear is the way back to none.
 - **Closing applies the ticks, however it closes:** Done or a swipe down, as Android's Done, back and tap outside. One request.
 - Under the bar, pinned: the search field (when the list is long, and always for Technician), then "Select all". The list scrolls beneath them.
 - **Keyboard:** the list's insets follow the keyboard (`automaticallyAdjustKeyboardInsets`), so every row can still be reached; a drag on the list puts the keyboard away; a tap on a row with the keyboard up ticks it at once.

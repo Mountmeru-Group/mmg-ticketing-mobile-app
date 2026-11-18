@@ -84,3 +84,72 @@ describe('the search rule (utils/option-search.ts)', () => {
     assert.equal(CLOSURE_CODES.length, 6);
   });
 });
+
+// iOS (iOS-5i step 5): Android's OptionSheet block, on iOS's PageSheet. Each change from Android's 723e2fc is marked "iOS".
+describe('OptionSheet: the one shared dropdown, and the only place its search lives', () => {
+  const sheet = read('src/components/OptionSheet.tsx');
+
+  test('the field shows only for a long list with its options loaded, pinned above the list', () => {
+    // 2026-11-18: `known` is the options plus any chosen value they lack (a multi-select's), so it counts as the list. A
+    // server search (`remote`, the technician filter) always has its field: the field IS how its list is filled.
+    assert.match(sheet, /const searchable = remote !== null \|\| \(children === undefined && isSearchableList\(known\.length\)\);/);
+    // iOS: `my-2` (the page sheet's bar sits right above it; Android's frame had its title's padding).
+    assert.match(sheet, /\{searchable \? \(\s*<View className="mx-4 my-2">\s*<SearchField/);
+    // Above the FlatList, outside it: it stays put while the list scrolls.
+    assert.ok(sheet.indexOf('<SearchField') < sheet.indexOf('<FlatList'));
+    assert.match(sheet, /return searchable \? filterOptionsByLabel\(known, query\) : known;/);
+  });
+
+  test('no match: a plain line, not an empty sheet', () => {
+    assert.match(sheet, /ListEmptyComponent=\{\s*!remote && searchable && typed \? \(\s*<Text[^>]*>\{noOptionMatchText\(query\)\}<\/Text>/);
+    assert.match(sheet, /const typed = query\.trim\(\) !== '';/);
+  });
+
+  test('iOS: the keyboard never hides a row, a drag puts it away, and a tap on an option with it up picks at once', () => {
+    // Android: its Sheet frame rises above the keyboard (KeyboardAvoidingView). iOS: a page sheet, whose list's insets
+    // follow the keyboard (UI-STANDARDS §iOS-A.17).
+    assert.match(sheet, /<PageSheet\s+visible=\{visible\}\s+title=\{title\}\s+onClose=\{close\}\s+onDismiss=\{onDismiss\}/);
+    assert.match(sheet, /keyboardShouldPersistTaps="handled"/);
+    assert.match(sheet, /keyboardDismissMode="on-drag"/);
+    assert.match(sheet, /automaticallyAdjustKeyboardInsets/);
+  });
+
+  test('the field clears when the sheet closes, however it closes', () => {
+    assert.match(sheet, /useEffect\(\(\) => \{\s*if \(!visible\) setOwnQuery\(''\);/);
+    // A server search's field belongs to the caller: closing empties it through the caller (setQuery → onQueryChange).
+    assert.match(sheet, /const setQuery = \(text: string\) => \(remote \? remote\.onQueryChange\(text\) : setOwnQuery\(text\)\);/);
+    // Closing also hands a multi-select's ticks to the caller, once, before onClose (tests/filters/multi-select).
+    assert.match(sheet, /const close = useStableCallback\(\(\) => \{\s*setQuery\(''\);\s*if \(multi && !sameChoices\(draft, committed \?\? \[\]\)\) \{[\s\S]*?multi\.onChange\(draft as T\[\], chosen as SheetOption<T>\[\]\);\s*\}\s*onClose\(\);/);
+    assert.match(sheet, /const pick = useStableCallback\(\(value: string\) => \{\s*setQuery\(''\);/);
+  });
+
+  test('accessible: a real label naming the list, and the number of matches announced', () => {
+    assert.match(sheet, /accessibilityLabel=\{`Search \$\{title\}`\}/);
+    assert.match(sheet, /AccessibilityInfo\.announceForAccessibility\(optionSearchAnnouncement\(settledCount\)\)/);
+    assert.match(sheet, /const settled = useDebouncedValue\(query, ANNOUNCE_AFTER_MS\);/);
+  });
+
+  test('every dropdown in the app is an OptionSheet: no screen builds its own single-choice sheet or search', () => {
+    // iOS: every <Modal> in src/ is PageSheet (the frame of every picker sheet) or a full-screen dialog.
+    const modals = sourceFiles('src').filter((rel) => /<Modal\b/.test(read(rel))).sort();
+    assert.deepEqual(modals, [
+      'src/components/BulkProgressModal.tsx',
+      'src/components/ImageViewerModal.tsx',
+      'src/components/PageSheet.tsx', // iOS: OptionSheet, PersonPickerSheet, TemplatePickerSheet and DatePickerSheet use it
+    ]);
+    // iOS: its own list of OptionSheet users (some of Android's lists are iOS action sheets, iOS-3b/3c).
+    const users = sourceFiles('src').filter((rel) => /<OptionSheet\b/.test(read(rel))).sort();
+    assert.deepEqual(users, [
+      'src/screens/audit/AuditLogScreen.tsx',
+      'src/screens/catalog/ServiceFormFieldInput.tsx',
+      'src/screens/dashboard/HomeScreen.tsx',
+      'src/screens/profile/ProfileScreen.tsx',
+      'src/screens/tickets/AssignPickerScreen.tsx',
+      'src/screens/tickets/CreateTicketScreen.tsx',
+      'src/screens/tickets/TicketFiltersScreen.tsx',
+      'src/screens/tickets/TicketListScreen.tsx',
+      'src/screens/tickets/TicketPropertyEditors.tsx',
+    ]);
+    for (const rel of users) assert.doesNotMatch(read(rel), /filterOptionsByLabel|isSearchableList/, `${rel} must not add its own`);
+  });
+});

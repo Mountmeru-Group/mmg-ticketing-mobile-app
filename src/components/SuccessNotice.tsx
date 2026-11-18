@@ -1,8 +1,9 @@
 // The success notice (iOS, docs/ios/00-PORT-MANIFEST.md §7; utils/successNotice.ts): a dark capsule near the top of the
 // screen, a tick and the message, in place of Android's toast. Non-modal: it takes no touches, so what is under it
 // stays usable, and it goes by itself after motion.successNotice.visible. VoiceOver hears it from showSuccessNotice()
-// rather than by focusing it, so the capsule is hidden from VoiceOver. Mounted once, by RootNavigator, over the tabs; a
-// page sheet that stays open after a write is presented above the app and covers it.
+// rather than by focusing it, so the capsule is hidden from VoiceOver. Mounted by RootNavigator, over the tabs; a page
+// sheet that stays open after a write is presented above the app and covers that host, so since iOS-5i such a sheet
+// mounts its own (the Filters sheet, PageSheet's `notices`; Ronit, decision 4), placed by `top`.
 // Reduce Motion (hooks/useReduceMotion.ts): no fade, the capsule appears and goes at once.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
@@ -23,7 +24,8 @@ interface Shown {
   opacity: Animated.Value;
 }
 
-export function SuccessNoticeHost() {
+/** `top`: inside a sheet, from the sheet's top edge; otherwise under the status bar. */
+export function SuccessNoticeHost({ top }: { top?: number } = {}) {
   const insets = useSafeAreaInsets();
   const [shown, setShown] = useState<Shown | null>(null);
 
@@ -61,7 +63,7 @@ export function SuccessNoticeHost() {
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ position: 'absolute', top: insets.top + 8, left: 16, right: 16, alignItems: 'center' }}
+      style={{ position: 'absolute', top: top ?? insets.top + 8, left: 16, right: 16, alignItems: 'center' }}
     >
       <Animated.View style={{ opacity: shown.opacity }} className="max-w-full flex-row items-center rounded-full bg-gray-900 px-4 py-2.5">
         {/* iOS-4: a partial outcome (notifyWarning) shows an amber mark, never the success tick. */}

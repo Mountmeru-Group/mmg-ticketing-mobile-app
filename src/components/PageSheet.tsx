@@ -6,6 +6,9 @@
 //   "Replacing transitions in x-, y-, and z-axes with fades to avoid motion").
 // - The page sheet covers the bottom of the screen, so the content keeps clear of the home indicator.
 // What a sheet lists, and what picking a row does, is unchanged: only the frame is new.
+// iOS-5i: `notices` mounts a success-notice host inside the sheet, for a sheet that stays open after a write (the saved
+// filters' Manage sheet): the app's one host sits under any open page sheet, so the notice would not be seen (Ronit,
+// decision 4). VoiceOver hears every notice anyway (utils/successNotice.ts).
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
@@ -13,9 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { colors } from '@/theme';
+import { SuccessNoticeHost } from './SuccessNotice';
+
+/** The bar's height (min-h-14) and a gap: where an in-sheet notice sits. */
+const NOTICE_TOP = 64;
 
 export function PageSheet({
-  visible, title, onClose, onDismiss, left, right, children,
+  visible, title, onClose, onDismiss, left, right, notices = false, children,
 }: {
   visible: boolean;
   title: string;
@@ -30,6 +37,8 @@ export function PageSheet({
   left?: ReactNode;
   /** The trailing button, e.g. DatePickerSheet's Done. */
   right?: ReactNode;
+  /** Show success notices inside this sheet (iOS-5i): for a sheet that stays open after a write. */
+  notices?: boolean;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -52,6 +61,7 @@ export function PageSheet({
           <View className="min-w-16 items-end">{right ?? null}</View>
         </View>
         {children}
+        {notices ? <SuccessNoticeHost top={NOTICE_TOP} /> : null}
       </View>
     </Modal>
   );
@@ -66,11 +76,28 @@ function SheetClose({ onPress }: { onPress: () => void }) {
   );
 }
 
-/** A text button in a sheet's bar (Cancel, Done), in the brand tint, at least 44 pt. */
-export function SheetTextButton({ label, onPress, bold = false }: { label: string; onPress: () => void; bold?: boolean }) {
+/**
+ * A text button in a sheet's bar (Cancel, Done, Clear), in the brand tint, at least 44 pt. `disabled` (iOS-5i: Clear with
+ * nothing ticked) dims it and VoiceOver says "dimmed".
+ */
+export function SheetTextButton({
+  label, onPress, bold = false, disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  bold?: boolean;
+  disabled?: boolean;
+}) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} className="min-h-11 min-w-11 justify-center px-2 active:opacity-60">
-      <Text className={`text-base text-primary ${bold ? 'font-semibold' : ''}`}>{label}</Text>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className="min-h-11 min-w-11 justify-center px-2 active:opacity-60"
+    >
+      <Text className={`text-base ${disabled ? 'text-gray-400' : 'text-primary'} ${bold ? 'font-semibold' : ''}`}>{label}</Text>
     </Pressable>
   );
 }
