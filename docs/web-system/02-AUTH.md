@@ -237,6 +237,8 @@ This is how the mobile app must behave once (a) or (b) exists. There is **no ref
   - Refresh it from `GET /auth/me` on every cold start and every foreground after more than 15 minutes.
   - The server's copy can be stale too (see `05` §C), so the authorisation decision always belongs to the server.
 - On boot, read the token from SecureStore into memory once. The Axios interceptor reads the in-memory copy, not SecureStore, on every request.
+- **Since 2026-11-17** the session is stored with the environment it was created on (`mmg.session.environment`), and the API environment is the person's choice (`mmg.app.environment`, kept across sign-outs). See §9.
+  - **iOS: not on iOS** (iOS-5i, §iOS-C). iOS has one API URL per bundle, chosen at build time; neither key exists.
 
 ### 5.2 Axios instance
 ```ts
@@ -890,3 +892,113 @@ Ported from Android `dev` @ `d8626bc` (G9 `999943e`, and E1 in `d8626bc`; `docs/
 - **iOS-5h (Ronit, 2026-11-08):** Android opened the email sign-in to PRODUCTION in `6b5e46c` (2026-11-06), after the backend team confirmed the endpoint on PROD (§8 item 7, Android's). **iOS keeps both gates.** Matching Android `6b5e46c` is on the iOS-9 list, **after the backend team confirms no `Set-Cookie` and PROD is approved** (CLAUDE.md I3), together with the App Review demo-login route (compliance A4; `docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer `Set-Cookie` (§8 item 4 is still open on Android too).
 
 **Tests:** `tests/auth/password-sign-in.test.mjs` (Android's, with "one path" in place of "path discovery"), `tests/auth/ios-password-sign-in.test.mjs` (the iOS-only checks: one path, the gates, the Keychain, the password), `tests/login/sign-in-button.test.mjs` (E1), `tests/auth/ios-cookie-shield.test.mjs` (R1). Device checks: `UAT-TEST-PLAN-IOS.md` G20.
+
+## 9. The runtime environment switch (2026-11-17)
+
+> **iOS:** this section is Android's text, verbatim at `723e2fc`. **None of it is on iOS** (Ronit, iOS-5i decision 1, 2026-11-18): §iOS-C.
+
+Ronit's written briefs, 2026-11-17. Until then the API environment was fixed per EAS profile (`EXPO_PUBLIC_APP_ENV`).
+- **First brief:** anyone chose it, on Login's gear.
+- **Second brief, the same day:** only an ADMIN could switch, from the drawer, and only an ADMIN could stay on UAT.
+  **Withdrawn by the third brief.**
+- **Third brief, the same day:** the switch in the drawer, for everyone, behind a **password**. **Removed on 2026-11-18.**
+- **2026-11-18 (in force):** the switch is in the drawer for **ADMIN only, with no password** (§9.6). Any role may sign
+  in on UAT and stay there.
+
+Code:
+- `src/config/env.ts`: the build's rules;
+- `src/utils/permissions.ts` `canSwitchEnvironment`: who may switch (ADMIN);
+- `src/store/environment.store.ts`: the choice;
+- `src/api/environmentSwitch.ts`: the switch;
+- `src/navigation/EnvironmentSheet.tsx`: the sheet (`EnvironmentChip.tsx`: its chips and the drawer's).
+
+### 9.1 Which environment is in use
+- **Release build** (any EAS profile): Production and UAT are offered. A **fresh install is on Production, always**.
+- The choice is stored on the phone (SecureStore key `mmg.app.environment`, not a secret) and **kept until the person
+  changes it**. A sign-out does not reset it; the app does not go back to Production on each launch.
+- A missing, unknown or unreadable stored value is the default again (Production).
+- **Development build** (`__DEV__`): **UAT only**. There is no switch: a stored `PROD` is ignored, saving `PROD` is
+  refused and `apiBaseUrlFor('PROD')` throws (CLAUDE.md rule 4). The switch applies to release builds only.
+- Every request reads the environment when it is sent (`client.ts` sets `baseURL` per request). Nothing keeps a URL.
+
+### 9.2 Switching ("Switch and sign out"), in this order
+1. If a session and a push token exist: NTF-6 deletes this phone's device token from the **current** environment, while
+   its session still works (`unregisterPushForSignOut`, at most 3 s, silent). Then AUTH-3, as an explicit sign-out does
+   (§5.5; at most 5 s, result ignored).
+2. Sign out: `clearSession(null, { forgetFullAuth: true })`. The session, the **15-day clock** (§5.8) and every session
+   key in SecureStore are deleted, so the next sign-in, in the new environment, is challenged.
+3. `queryClient.clear()`: no list from one environment can appear under the other.
+4. The in-memory filter and period state (`ui.store` reset) and the routes learned from the old backend (the email
+   sign-in path, §8; the audit-log path) are forgotten. The saved filters are the Service Desk's saved views now
+   (`16-SAVED-VIEWS.md`); they lived in the query cache, emptied in step 3.
+5. The new environment is stored. Login shows (RootNavigator follows the auth store).
+
+Who can switch (2026-11-18): a signed-in **ADMIN** (§9.6). The drawer's "Environment" row, in the account card, is shown
+to ADMIN only, in a release build. `switchEnvironment()` refuses any environment but Production for anyone else
+(`ADMIN_ONLY_SWITCH`). Login's only control is the "Use Production" link, shown on UAT only. It goes nowhere else, so
+anyone may use it; it is locked while a sign-in runs. From Login nobody is signed in, so steps 1 and 2 send nothing.
+
+### 9.3 A token never crosses environments
+- `setSession()` stores the environment the session was created on (SecureStore key `mmg.session.environment`, one of
+  the session keys, so every sign-out deletes it).
+- The request interceptor refuses to send a token whose environment is not the one in use: the request fails with a
+  401 `client` error, nothing leaves the phone, and that session is ended (`SESSION_ENDED_MESSAGE`).
+- Attachment views and downloads (`attachments.api.ts`, outside the API client) send the header only for a session of
+  the environment in use.
+- `restoreSession()` reads the environment first, then drops a stored session from any other environment.
+- Saved filters are the Service Desk's saved views (`16-SAVED-VIEWS.md`): each environment's database has its own, and
+  the app holds them only in the query cache. A UAT view (UAT ids) is never offered on Production.
+
+### 9.4 Upgrading from a build before 2026-11-17
+A session stored by versionCode 5 or earlier names no environment, so it **cannot be placed and is not restored**: the
+person sees "Your session has ended. Please sign in again." once. The 15-day date is kept, so Microsoft does not challenge
+that sign-in unless 15 days are due. A `preview` tester's install lands on Production (no choice was stored yet) and
+switches to UAT once. Without this, a UAT session from a `preview` APK would be sent to Production after the update.
+
+### 9.5 Not changed
+`src/config/auth.config.ts`, the Entra registration and redirect URIs, AUTH-P2 and the email sign-in, and the 15-day
+re-authentication itself. The Microsoft app registration is the same for both environments; only the Service Desk host
+the token exchange goes to follows the choice.
+
+### 9.6 ADMIN only, no password (2026-11-18)
+Ronit's decision, in writing: the switch is for **ADMIN only**, and the **password is removed**.
+
+**Removed: the password gate of the third brief** (all of it): the prompt (`EnvironmentPasswordSheet.tsx`), the SHA-256
+hash and the 5-try / 60-second lockout (`src/utils/switch-password.ts`), the single-use pass and `PASSWORD_REQUIRED`,
+the every-role rule `offersEnvironmentSwitch`, `scripts/password-scan.js` and the gate's tests. `expo-crypto` stays: it
+was added for the Microsoft sign-in (Phase 2) and `expo-auth-session` depends on it. `tests/environment/
+admin-switch.test.mjs` proves the gate is gone from `src/`, and `npm run verify:release-bundle` from the release bundle,
+by a fingerprint of the old hash (`scripts/removed-gate-scan.js`), so neither holds the hash or the password.
+
+**Now:**
+- **Who switches:** ADMIN (`permissions.ts` `canSwitchEnvironment`), in release builds. For every other role the drawer
+  row is absent and the sheet is not mounted. The sheet is not a route and no navigation state is saved, so no link
+  or restored state reaches it. `switchEnvironment()` checks the same rule for any move off Production.
+- **Who uses UAT:** anyone. **Not brought back** from the second brief: a non-ADMIN's UAT sign-in is not refused, a
+  stored UAT session is not ended at a cold start, and a signed-out cold start on UAT is not sent to Production. A
+  non-ADMIN who has a UAT session keeps it; they simply cannot switch. The chosen environment persists.
+- **Switching** runs exactly as §9.2.
+- **The UAT chip** shows whenever UAT is in use, for anyone: on Login, and in the drawer's header. Production stays the
+  default on a fresh install, and development builds stay UAT-only.
+
+## iOS-C. iOS: no runtime environment switch (`ios-dev`, iOS-5i, 2026-11-18)
+
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). §9 above is Android's text, verbatim at `723e2fc`.
+
+**Ronit's decision 1 (iOS-5i, 2026-11-18): Android's runtime environment switch is NOT ported.** iOS keeps CLAUDE.md rule I3: **one API URL per bundle, chosen at build time.** The `production` profile builds the PROD URL in and the `preview` profile the UAT URL (`src/config/env.ts`, iOS-9b), and each bundle holds only its own (`scripts/verify-release-bundle.js`).
+
+This is an iOS **build and release** difference, not a product difference: every person on a given build uses the backend that build was made for, as before.
+
+Why:
+- **App Review, Guideline 2.3.1 (hidden or undocumented features).** A control that points an App Store build at another backend, shown to some accounts only, is the kind of switch 2.3.1 is about. iOS has none in any release build (`docs/ios/APP-STORE-COMPLIANCE.md` K4).
+- **Data.** With one URL per bundle, an App Store install can never send a production session, ticket or attachment to UAT, nor a UAT token to production. Android needs §9.3's token tagging to prevent that; iOS has nothing to guard.
+- **Testers** keep their own builds: TestFlight (`preview`) is UAT, the App Store (`production`) is PROD.
+
+What that means for the code (none of Android's switch files is on iOS):
+- No environment store and no stored choice: neither `mmg.app.environment` nor `mmg.session.environment` exists. A session is not tagged; `restoreSession()` is unchanged.
+- No `switchEnvironment()`, no `canSwitchEnvironment` (nobody may switch, ADMIN included), no Environment row or sheet, no "Use Production" link on Login, and no password gate (it never existed on iOS).
+- The API client keeps its one `baseURL`; `APP_ORIGIN` (deep links, the audit log) stays a constant of the build.
+- Login's environment chip keeps its build-time rule (`SHOW_ENVIRONMENT_CHIP`): on every build except `production`. Profile shows the build's environment line.
+- **No shared piece was needed.** Saved views (ported in iOS-5i) touch Android's environment store only in the versionCode-6 notice, which is not ported.
+
+**The proof:** `tests/release/no-environment-switch.test.mjs` (the source), and `verify-release-bundle` for both profiles (no switch text, keys or names in either bundle).

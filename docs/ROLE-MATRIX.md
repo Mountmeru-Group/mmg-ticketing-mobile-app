@@ -289,7 +289,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | L8 | Country selector · L2 | hidden | hidden | MATCH | same |
 | L9 | Country selector · END_USER | hidden | read-only `—` | **NARROWER**, *decision* D8 (END_USER always sends `countryId=`). This conflicts with the text of 05 §A.12 → §8 item 3 | same; `src/screens/profile/ProfileScreen.tsx:216` |
 | L10 | Technician / Group filters (Filters sheet) | ADMIN, AGENT (triage and country-locked alike); same option lists for all of them, as on the web | all; END_USER and L2 get 403 and an always-empty list | MATCH for ADMIN, AGENT. **NARROWER** for END_USER and L2, *defect avoided* (403, G2) | `src/screens/tickets/TicketFiltersScreen.tsx` → perm `ticketListFilters`; query `ticket-filters.ts` `ticketListQuery` |
-| L11 | CSV export, saved views | – | all | N/A (04 §2.3) | – |
+| L11 | CSV export, saved views | – | all | CSV export N/A (04 §2.3). Saved views: all roles since 2026-11-17, cut to the filters each role can send (`ticketListFilters`; `16-SAVED-VIEWS.md`) | – |
 | L12 | Priority, category and created-date filters (Filters sheet) | all | all | MATCH (G2) | same |
 
 ### 2.4 Ticket detail (M4)
