@@ -78,6 +78,7 @@ Rules used:
 | **iOS-9b** | **The `production` profile** (Ronit, 2026-11-11): the PROD API (approved by Ronit's manager, for `production` only; one URL per bundle), version 1.0.0 (runtime 1.0.0), `eas.json` production build numbers and `submit.production`, G9 on production builds (Android `6b5e46c`), the in-app deletion request through a pre-filled Create Ticket, the privacy and support links, ATS pinned. `preview` unchanged. Built 2026-11-11 (§4.24; `ANDROID-DELTA.md` §5) |
 | **R1b** | **Expo SDK 57 patch versions** (Ronit, 2026-11-08), the only package change allowed: `npx expo install --fix`, Expo's own pins (`expo` 57.0.32, `expo-image-picker` 57.0.21, `expo-sharing` 57.0.25, `expo-splash-screen` 57.0.11, `expo-updates` 57.0.27), and one `expo-constants` (57.0.23). Joins build 0.2.0 (2). Built 2026-11-08 (§4.23) |
 | **iOS-5i** | **Android sync to `723e2fc`** (Ronit, 2026-11-18): multi-select on every ticket filter (Status for every role; TKT-1 comma lists, ⚠ ASSUMED), search on long dropdowns, and saved filters as the web's saved views (SVW-1..4, every build; confirmed on PROD). Android's run-time environment switch not ported (I3, compliance K4); S3 not ported (Android-only). The final step deleted the developer-token screen (the iOS-9 list's item 1), gave the Alerts notice iOS's wording, and set version 1.1.0. **Built 2026-11-18** in seven steps (§4.25) |
+| **R1c** | **Expo SDK 57 patch versions, again** (Ronit, 2026-11-18), before the 1.1.0 builds, with R1b's discipline: `npx expo install --fix`, Expo's own pins (`expo` 57.0.33, `expo-auth-session` 57.0.17, `expo-sharing` 57.0.26, `expo-updates` 57.0.28); `app.json` kept; one `expo-constants`. **Built 2026-11-18** (§4.26) |
 | **iOS-6** | **Microsoft SSO** on iOS (redirect `msauth.com.mountmeru.servicedesk://auth`). Pulled forward and built 2026-10-28 (§4.10); verified on a device in iOS-7 |
 | **iOS-7** | **EAS project + first build → TestFlight (full-system test):** EAS project `setu-ios` (`projectId`), the Apple Developer and App Store Connect records, privacy manifest, the iOS release guide, `expo-updates` with the `ios-preview` channel, and the test login if you approve §8 |
 | **iOS-8** | **Testing-team rounds** on TestFlight, with the iOS UAT test plan |
@@ -1713,7 +1714,25 @@ No `eas` command, no API call, no new package. The Android folder was not opened
 
 **Results:** `RELEASE-IOS.md` §10 and `ANDROID-DELTA.md` §12.6. `npm test` 1954 (1793 before); `verify-release-bundle` PASS on both profiles; mutations caught in every step.
 
-## 5. SKIP
+### 4.26 R1c: Expo SDK 57 patch versions, again (built 2026-11-18)
+
+**The brief (Ronit, 2026-11-18):** align the four packages `expo-doctor` reported after iOS-5i, before the 1.1.0 builds, as R1b did: Expo's pinned versions only, no `--legacy-peer-deps`; `app.json` stays as it is; a duplicated native module fixed with a targeted `npm update <pkg> --prefer-dedupe`, never a full `npm dedupe`.
+
+**Built:**
+- **`npx expo install --check`, then `--fix`:** `expo` 57.0.32 → 57.0.33, `expo-auth-session` 57.0.16 → 57.0.17, `expo-sharing` 57.0.25 → 57.0.26, `expo-updates` 57.0.27 → 57.0.28. The lock file takes their own dependencies: `@expo/cli` 57.0.34, `@expo/config-plugins` 57.0.13, `@expo/fingerprint` 0.20.16, `@expo/metro-file-map` 57.0.5, `@expo/prebuild-config` 57.0.21, `expo-linking` 57.0.14, `expo-modules-autolinking` 57.0.18, `expo-modules-core` 57.0.26, `ws` 8.23.0 (under `expo`); `glob` 14.0.6 and `path-scurry` 3.0.0 hoisted to the top level, so the four nested `glob` 14.0.4 trees (under `@expo/config`, `@expo/config-plugins`, `expo`, `expo-updates`) are gone; one nested `minimatch` 11.0.9 under `glob`.
+- **`app.json`, unchanged:** `--fix` again added `"expo-sharing"` to its plugins (a no-op without options, R1b); `git restore app.json`. It holds version 1.1.0 and the ATS pin, as before.
+- **One `expo-constants`:** after `--fix` there were three nested copies of 57.0.24 (under `expo`, `expo-auth-session`, `expo-linking`) and none at the top level. `npm update expo-constants --prefer-dedupe` made it one, 57.0.24, at the top level. That step changed five lock entries: the three nested copies removed, the top-level one added, and `yaml` 1.10.3's flag put back to `devOptional` (`--fix` had set `dev`). Over all of R1c, `yaml` is unchanged.
+- **Changed:** `package.json` (four lines) and `package-lock.json` (33 entries).
+- **Not changed:** the one `npm ls` warning that was already in the lock: tailwindcss's `postcss-load-config` 6.0.1 has an optional peer `yaml ^2.4.2` and finds 1.10.3. `npm audit` (38 reported, npm's count) is not acted on: `npm audit fix` is not an Expo pin.
+
+**Results:**
+- `npm ci --dry-run` up to date.
+- `expo-doctor` **20/21**: the known render-html notice only, and no duplicate dependencies.
+- `tsc` 0. **1,954** tests passing.
+- `verify-release-bundle` `preview`: **PASS** (2,329 modules, 219 app code; the UAT URL only; G9 4/4 and 7/7; saved views 4/4 and 3/3; developer-token strings 0 of 12 in release and control; 4 UUIDs, all explained). The `production` check and `expo export` were still running when R1c was committed (Ronit asked for the commit then).
+
+**Android:** still on its own Expo patches. A later sync must not take these four lines back.
+
 
 Whole files:
 

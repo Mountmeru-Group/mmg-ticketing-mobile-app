@@ -635,10 +635,10 @@ New iOS sections take letters: 02 **§iOS-C**, UI-STANDARDS **§iOS-A.17**, 16 *
 |---|---|
 | `npx tsc --noEmit` | 0 errors |
 | `npm test` | **1954 / 1954** (1793 before iOS-5i) |
-| `npx expo-doctor` | 19/21: the known `react-native-render-html` notice, and four Expo patch releases after R1b (Ronit's decision, `RELEASE-IOS.md` §10) |
+| `npx expo-doctor` | 19/21: the known `react-native-render-html` notice, and four Expo patch releases after R1b, **aligned in R1c** (2026-11-18, manifest §4.26): 20/21 |
 | `npm ci --dry-run` | up to date |
 | `verify-release-bundle` | **PASS** `preview`, **PASS** `production`: 0 of 12 developer-token strings in release and control; saved views 4/4 and 3/3; G9 4/4 and 7/7; one API URL each |
 | `expo export --platform ios` | UAT and PROD: 2,322 modules, one API URL each, the new Alerts wording |
 | Mutations | Step 7: 18 of 18 unit (P1 equivalent, dropped), 3 of 3 bundle level; the phase: 15, 23, 9, 14, 17 (steps 2–6) |
 
-**Still open:** TKT-1's comma lists (⚠ ASSUMED, `06` §iOS-A item 2); the `Set-Cookie` answer (A32, mitigated by R1); the Expo patch alignment (Ronit).
+**Still open:** TKT-1's comma lists (⚠ ASSUMED, `06` §iOS-A item 2); the `Set-Cookie` answer (A32, mitigated by R1). The Expo patch alignment is done (R1c).
