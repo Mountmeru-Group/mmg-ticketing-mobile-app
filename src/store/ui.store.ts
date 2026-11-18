@@ -4,6 +4,10 @@
 // The Home period (G6) lives here too: kept while the app is open, back to the web's default ("This month") after a
 // restart or a sign-out. The web keeps it in component state, so it is back to "This Month" on every visit to its
 // dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
+// Saved filters are the Service Desk's saved views (2026-11-17); applying one only sets the fields below.
+// iOS (iOS-5i): the store has no saved-view action of its own. src/hooks/useSavedViews.ts sets these fields itself, so a
+// production bundle, where saved views are off (src/screens/tickets/savedViewsGate.ts), holds nothing of them. iOS has no
+// environment switch (docs/web-system/02-AUTH.md §iOS-C).
 import { create } from 'zustand';
 
 import {
@@ -21,7 +25,7 @@ interface UiState {
   ticketSort: TicketSortOption;
   /** M3 country selector (05 §A.12): a country id, or null for "All countries". Only ADMIN and triage AGENT change it. */
   ticketCountryId: string | null;
-  /** M3 Filters sheet (Phase G2): priority, category, created date, technician, group. */
+  /** M3 Filters sheet (Phase G2): status (several, 2026-11-17), priority, category, created date, technician, group. */
   ticketAdvanced: TicketAdvancedFilters;
   /** M3 search box as typed, and the search applied (on the keyboard's search key, normalised). */
   ticketSearchText: string;
@@ -80,7 +84,8 @@ const INITIAL = {
 
 export const useUiStore = create<UiState>()((set) => ({
   ...INITIAL,
-  // One technician slot: "My open" / "Unassigned" and the Technician filter replace each other (ticket-filters.ts).
+  // One technician slot and one status slot: "My open" / "Unassigned" and the Technician filter, and a quick filter that
+  // sends a status and the Status filter, replace each other (ticket-filters.ts).
   setTicketFilter: (filter) =>
     set((s) => {
       const next = withNamedFilter({ filter: s.ticketFilter, advanced: s.ticketAdvanced }, filter);

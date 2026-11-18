@@ -12,6 +12,10 @@
 // iOS (docs/ios/00-PORT-MANIFEST.md §6 #3): a page sheet over the whole app, closed with the bar's ✕ or a swipe down;
 // "Clear all" sits on the right of the navigation bar. The dates use the iOS calendar in a sheet (DatePickerSheet)
 // instead of Android's system date dialog, and still send the device's calendar day.
+//
+// iOS-5i step 2 (interim, until step 6): the filters are LISTS now (utils/ticket-filters.ts, Android 723e2fc), but this
+// sheet still picks one value each, as before: a pick is stored as a one-element list and "All …" as an empty one, so
+// TKT-1 is sent exactly as before (one value, no comma). The multi-select sheets come in step 6.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -32,7 +36,7 @@ import { DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/ta
 import {
   PRIORITY_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels, categoryFilterOptions,
   formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed, listCountryParam, namedFilterSetsTechnician,
-  type TicketNamedFilter,
+  picksSummary, priorityFilterSummary, type TicketNamedFilter,
 } from '@/utils/ticket-filters';
 
 const ALL = '__ALL__';
@@ -119,7 +123,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
           {allowed.includes('priority') ? (
             <SelectField
               label="Priority"
-              value={advanced.priority ? PRIORITY_LABELS[advanced.priority] : null}
+              value={priorityFilterSummary(advanced.priority)}
               placeholder="All priorities"
               onPress={() => setPicker('priority')}
             />
@@ -129,7 +133,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
             <SelectField
               label="Category"
               hint="Top-level categories. Tickets filed under a sub-category or item of it are not included."
-              value={advanced.category?.name ?? null}
+              value={picksSummary(advanced.category)}
               placeholder="All categories"
               onPress={() => setPicker('category')}
             />
@@ -164,7 +168,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
                   ? `Picking a technician replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
                   : undefined
               }
-              value={advanced.technician?.name ?? null}
+              value={picksSummary(advanced.technician)}
               placeholder="All technicians"
               onPress={() => setPicker('technician')}
             />
@@ -173,7 +177,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
           {allowed.includes('group') ? (
             <SelectField
               label="Group"
-              value={advanced.group?.name ?? null}
+              value={picksSummary(advanced.group)}
               placeholder="All groups"
               onPress={() => setPicker('group')}
             />
@@ -189,8 +193,8 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
         visible={picker === 'priority'}
         title="Priority"
         options={priorityOptions}
-        selected={advanced.priority ?? ALL}
-        onSelect={(value) => setTicketAdvanced({ priority: value === ALL ? null : value })}
+        selected={advanced.priority[0] ?? ALL}
+        onSelect={(value) => setTicketAdvanced({ priority: value === ALL ? [] : [value] })}
         onClose={() => setPicker(null)}
       />
 
@@ -198,10 +202,10 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
         visible={picker === 'category'}
         title="Category"
         options={[{ value: ALL, label: 'All categories' }, ...categoryOptions.map((c) => ({ value: c.id, label: c.name }))]}
-        selected={advanced.category?.id ?? ALL}
+        selected={advanced.category[0]?.id ?? ALL}
         onSelect={(value) => {
           const choice = categoryOptions.find((c) => c.id === value);
-          setTicketAdvanced({ category: value === ALL || !choice ? null : choice });
+          setTicketAdvanced({ category: value === ALL || !choice ? [] : [choice] });
         }}
         onClose={() => setPicker(null)}
       >
@@ -215,10 +219,10 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
           { value: ALL, label: 'All groups' },
           ...groupOptions.map((g) => ({ value: g.id, label: g.name, description: g.inactive ? 'Inactive group' : undefined })),
         ]}
-        selected={advanced.group?.id ?? ALL}
+        selected={advanced.group[0]?.id ?? ALL}
         onSelect={(value) => {
           const choice = groupOptions.find((g) => g.id === value);
-          setTicketAdvanced({ group: value === ALL || !choice ? null : { id: choice.id, name: choice.name } });
+          setTicketAdvanced({ group: value === ALL || !choice ? [] : [{ id: choice.id, name: choice.name }] });
         }}
         onClose={() => setPicker(null)}
       >
@@ -235,13 +239,13 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
               key: 'all',
               label: 'All technicians',
               onPress: () => {
-                setTicketAdvanced({ technician: null });
+                setTicketAdvanced({ technician: [] });
                 setPicker(null);
               },
             },
           ]}
           onPick={(person) => {
-            setTicketAdvanced({ technician: { id: person.id, name: formatDisplayName(person.displayName) || person.email } });
+            setTicketAdvanced({ technician: [{ id: person.id, name: formatDisplayName(person.displayName) || person.email }] });
             setPicker(null);
           }}
           onClose={() => setPicker(null)}

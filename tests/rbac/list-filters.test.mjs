@@ -34,17 +34,23 @@ import { NAMES, PERSONAS, forEachPersona } from './personas.mjs';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 
-const ALL_FIVE = ['priority', 'category', 'date', 'technician', 'group'];
-const THREE = ['priority', 'category', 'date'];
+// 2026-11-17: Status (several at once) for every role, as the web's status select; first, as in the sheet.
+const ALL_FIVE = ['status', 'priority', 'category', 'date', 'technician', 'group'];
+const THREE = ['status', 'priority', 'category', 'date'];
+/** The five filters the G2 tests below were written for. */
+const SINGLE_FIVE = ['priority', 'category', 'date', 'technician', 'group'];
 
-/** Every one of the five set, as if a stale state held them all. */
+/**
+ * Every one of the five set, as if a stale state held them all. ONE value each (2026-11-18: each is a list now), so every
+ * expectation below is also the proof that a single value is sent exactly as before the multi-select.
+ */
 const EVERYTHING = {
-  priority: 'HIGH',
-  category: { id: 'cat-hw', name: 'Hardware' },
+  priority: ['HIGH'],
+  category: [{ id: 'cat-hw', name: 'Hardware' }],
   fromDate: '2026-10-01',
   toDate: '2026-10-22',
-  technician: { id: 'tech-1', name: 'Jane Tech' },
-  group: { id: 'team-1', name: 'Service Desk' },
+  technician: [{ id: 'tech-1', name: 'Jane Tech' }],
+  group: [{ id: 'team-1', name: 'Service Desk' }],
 };
 
 const queryFor = (p, extra = {}) =>
@@ -156,12 +162,12 @@ describe('TKT-1: the filters become query parameters, never for a role that cann
   test('each filter alone sends only its own parameter', () => {
     const admin = ticketListFilters(PERSONAS.ADMIN);
     const only = (patch) => advancedFilterQuery({ ...NO_ADVANCED_FILTERS, ...patch }, admin);
-    assert.deepEqual(only({ priority: 'URGENT' }), { priority: 'URGENT' });
-    assert.deepEqual(only({ category: { id: 'c1', name: 'C' } }), { categoryId: 'c1' });
+    assert.deepEqual(only({ priority: ['URGENT'] }), { priority: 'URGENT' });
+    assert.deepEqual(only({ category: [{ id: 'c1', name: 'C' }] }), { categoryId: 'c1' });
     assert.deepEqual(only({ fromDate: '2026-10-01' }), { fromDate: '2026-10-01' });
     assert.deepEqual(only({ toDate: '2026-10-22' }), { toDate: '2026-10-22' });
-    assert.deepEqual(only({ technician: { id: 'u1', name: 'U' } }), { assignedToId: 'u1' });
-    assert.deepEqual(only({ group: { id: 't1', name: 'T' } }), { teamId: 't1' });
+    assert.deepEqual(only({ technician: [{ id: 'u1', name: 'U' }] }), { assignedToId: 'u1' });
+    assert.deepEqual(only({ group: [{ id: 't1', name: 'T' }] }), { teamId: 't1' });
     assert.deepEqual(only({}), {});
   });
 
@@ -211,7 +217,7 @@ describe('TKT-1: the filters become query parameters, never for a role that cann
 // ── 3. One technician slot ───────────────────────────────────
 
 describe('"My open" and "Unassigned" share the technician slot with the Technician filter', () => {
-  const tech = { id: 'tech-1', name: 'Jane Tech' };
+  const tech = [{ id: 'tech-1', name: 'Jane Tech' }];
 
   for (const name of ['AGENT', 'TRIAGE_AGENT', 'ADMIN']) {
     test(`${name}: a quick filter that sets the technician wins over a stale Technician filter`, () => {
@@ -224,9 +230,9 @@ describe('"My open" and "Unassigned" share the technician slot with the Technici
   }
 
   test('choosing "My open" or "Unassigned" drops the Technician filter; other quick filters keep it', () => {
-    const state = { filter: 'ALL', advanced: { ...NO_ADVANCED_FILTERS, technician: tech, priority: 'LOW' } };
+    const state = { filter: 'ALL', advanced: { ...NO_ADVANCED_FILTERS, technician: tech, priority: ['LOW'] } };
     for (const f of ['MY_OPEN', 'UNASSIGNED', 'UNASSIGNED_KPI']) {
-      assert.deepEqual(withNamedFilter(state, f), { filter: f, advanced: { ...NO_ADVANCED_FILTERS, priority: 'LOW' } }, f);
+      assert.deepEqual(withNamedFilter(state, f), { filter: f, advanced: { ...NO_ADVANCED_FILTERS, priority: ['LOW'] } }, f);
     }
     for (const f of ['ALL', 'OPEN', 'PENDING', 'OVERDUE', 'DUE_SOON', 'RESOLVED', 'CLOSED', 'ACTIVE_KPI']) {
       assert.deepEqual(withNamedFilter(state, f), { filter: f, advanced: state.advanced }, f);
@@ -237,8 +243,8 @@ describe('"My open" and "Unassigned" share the technician slot with the Technici
     for (const f of ['MY_OPEN', 'UNASSIGNED', 'UNASSIGNED_KPI']) {
       const state = { filter: f, advanced: NO_ADVANCED_FILTERS };
       assert.deepEqual(withAdvancedFilters(state, { technician: tech }), { filter: 'ALL', advanced: { ...NO_ADVANCED_FILTERS, technician: tech } }, f);
-      assert.equal(withAdvancedFilters(state, { priority: 'HIGH' }).filter, f, f);
-      assert.equal(withAdvancedFilters(state, { technician: null }).filter, f, f);
+      assert.equal(withAdvancedFilters(state, { priority: ['HIGH'] }).filter, f, f);
+      assert.equal(withAdvancedFilters(state, { technician: [] }).filter, f, f);
     }
     assert.equal(withAdvancedFilters({ filter: 'OPEN', advanced: NO_ADVANCED_FILTERS }, { technician: tech }).filter, 'OPEN');
   });
@@ -391,10 +397,10 @@ describe('state: Clear all, arriving from a Home tile, signing out', () => {
 
   test('the store keeps the one-technician-slot rule', () => {
     store().reset();
-    store().setTicketAdvanced({ technician: { id: 'tech-1', name: 'Jane' } });
+    store().setTicketAdvanced({ technician: [{ id: 'tech-1', name: 'Jane' }, { id: 'tech-2', name: 'John' }] });
     store().setTicketFilter('MY_OPEN');
-    assert.equal(store().ticketAdvanced.technician, null);
-    store().setTicketAdvanced({ technician: { id: 'tech-1', name: 'Jane' } });
+    assert.deepEqual(store().ticketAdvanced.technician, []);
+    store().setTicketAdvanced({ technician: [{ id: 'tech-1', name: 'Jane' }] });
     assert.equal(store().ticketFilter, 'ALL');
     store().reset();
   });
@@ -415,6 +421,8 @@ describe('wiring: the list and the Filters sheet take every filter decision from
     assert.ok(src.includes('activeAdvancedFilters(ticketAdvanced, allowedMore)'));
   });
 
+  // iOS-5i step 2, INTERIM: the 6b5e46c form of this test (single-select sheets), until step 6 restores Android's
+  // 723e2fc form verbatim with the multi-select sheets. ALL_FIVE meant these five then.
   test('the Filters sheet renders each filter only when ticketListFilters() lists it', () => {
     const src = read('src/screens/tickets/TicketFiltersScreen.tsx');
     assert.ok(src.includes('ticketListFilters(user)'));
@@ -426,7 +434,7 @@ describe('wiring: the list and the Filters sheet take every filter decision from
       technician: /allowed\.includes\('technician'\) \? \(\s*<SelectField\s+label="Technician"/,
       group: /allowed\.includes\('group'\) \? \(\s*<SelectField\s+label="Group"/,
     };
-    for (const key of ALL_FIVE) assert.match(src, GUARDED[key], key);
+    for (const key of SINGLE_FIVE) assert.match(src, GUARDED[key], key);
     for (const label of ['label="Priority"', 'label="Category"', 'label="Created"', 'label="Technician"', 'label="Group"']) {
       assert.equal(src.split(label).length - 1, 1, label);
     }

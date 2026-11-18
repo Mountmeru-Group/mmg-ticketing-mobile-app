@@ -2,11 +2,18 @@
 // Status lists are always sent as ONE comma-separated `status` value built from the 03 enum only:
 // an unknown status value gives a 500 (01 TKT-1).
 // Phase G2 adds the web's "More Filters" (priority, category, created date, technician, group): docs/G2-WEB-FILTERS.md.
+// 2026-11-17 adds STATUS as a multi-select. 2026-11-18 (Ronit's brief): status, priority, category, technician and group
+// ALL hold several values, each sent as ONE parameter with its values joined by commas (`categoryId=a,b,c`), as the live
+// web portal sends them. That format was read from a URL Ronit copied from the UAT portal, NOT from source: the web clone
+// still reads priority, category, technician and group as one value (tickets.controller.ts:117-122 on every branch), so
+// the deployed server differs from the source (01-API-CONTRACT.md TKT-1). One value is sent exactly as before (no comma);
+// none, not at all. The HTTP client encodes the query; nothing here builds a query string.
 import {
   TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type Category, type Team, type TicketListQuery, type TicketPriority,
   type TicketStatus, type UserRole,
 } from '@/types';
-import { PRIORITY_LABELS } from './format';
+import { PRIORITY_LABELS, statusLabel } from './format';
+import { multiSelectSummary } from './multi-select';
 import { isAgentOrAdmin } from './roles';
 import { dayToDueDate, formatDueDay } from './tasks';
 
@@ -180,10 +187,13 @@ export function roleDefaultTicketQuery(role: UserRole): Pick<TicketListQuery, 'c
 // All five are SERVER-SIDE TKT-1 params, as on the web (TicketsListPage.tsx:256-268): nothing is filtered on the device.
 // Which roles get which filter is decided in permissions.ts (ticketListFilters); this file only builds the query.
 
-/** The five filters of the Filters sheet. `date` is the created-date range (From and To). */
-export type TicketListFilterKey = 'priority' | 'category' | 'date' | 'technician' | 'group';
+/**
+ * The filters of the Filters sheet. `date` is the created-date range (From and To). Every other one holds any number of
+ * values (2026-11-18).
+ */
+export type TicketListFilterKey = 'status' | 'priority' | 'category' | 'date' | 'technician' | 'group';
 
-export const TICKET_LIST_FILTER_KEYS: readonly TicketListFilterKey[] = ['priority', 'category', 'date', 'technician', 'group'];
+export const TICKET_LIST_FILTER_KEYS: readonly TicketListFilterKey[] = ['status', 'priority', 'category', 'date', 'technician', 'group'];
 
 /** A picked category, technician or group, with its name for the summary line (the technician comes from a search). */
 export interface FilterPick {
@@ -191,21 +201,102 @@ export interface FilterPick {
   name: string;
 }
 
+/**
+ * The sheet's filters. Every list: empty = no filter (the key is not sent); one value = sent as before; several = ONE
+ * comma-separated parameter (advancedFilterQuery).
+ */
 export interface TicketAdvancedFilters {
-  priority: TicketPriority | null;
-  /** A top-level category: the web offers only those (TicketsListPage.tsx:580). */
-  category: FilterPick | null;
+  /** Statuses, in STATUS_FILTER_OPTIONS order. */
+  status: readonly TicketStatus[];
+  /** Priorities, in PRIORITY_FILTER_OPTIONS order. */
+  priority: readonly TicketPriority[];
+  /** Top-level categories: the web offers only those (TicketsListPage.tsx:580). */
+  category: readonly FilterPick[];
   /** Created on or after this day, `YYYY-MM-DD` (the device's calendar day, as the browser's date input gives it). */
   fromDate: string | null;
   /** Created on or before this day, `YYYY-MM-DD`. */
   toDate: string | null;
-  technician: FilterPick | null;
-  group: FilterPick | null;
+  technician: readonly FilterPick[];
+  group: readonly FilterPick[];
 }
 
 export const NO_ADVANCED_FILTERS: TicketAdvancedFilters = {
-  priority: null, category: null, fromDate: null, toDate: null, technician: null, group: null,
+  status: [], priority: [], category: [], fromDate: null, toDate: null, technician: [], group: [],
 };
+
+/**
+ * A server id as the app sends it in a filter: UUID characters only. Never a comma, so a joined list always splits back
+ * into the same ids.
+ */
+const FILTER_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+export function isFilterId(value: unknown): value is string {
+  return typeof value === 'string' && FILTER_ID.test(value);
+}
+
+/** Statuses in the web's order (TicketsListPage.tsx:28): the Status filter's options. */
+export const STATUS_FILTER_OPTIONS: readonly TicketStatus[] = [
+  'OPEN', 'IN_PROGRESS', 'PENDING', 'ON_HOLD', 'PENDING_MGMT_REVIEW', 'PENDING_MASTER_DATA', 'PENDING_PARTNER',
+  'PENDING_USER_CONFIRM', 'PENDING_USER_INFO', 'RESOLVED', 'CANCELED', 'CLOSED',
+];
+
+/**
+ * A status list as the app keeps and sends it: only 03 enum values (anything else is a 500, 01 TKT-1), each once, in
+ * STATUS_FILTER_OPTIONS order. Anything that is not an array is no statuses.
+ */
+export function cleanStatusList(values: unknown): TicketStatus[] {
+  if (!Array.isArray(values)) return [];
+  const known = TICKET_STATUSES as readonly string[];
+  const wanted = new Set(values.filter((v): v is TicketStatus => typeof v === 'string' && known.includes(v)));
+  return STATUS_FILTER_OPTIONS.filter((s) => wanted.has(s));
+}
+
+/** The Status field's closed text: "Open", "Open +2" (the first in option order), or null for none. */
+export function statusFilterSummary(statuses: readonly TicketStatus[]): string | null {
+  return multiSelectSummary(cleanStatusList(statuses).map(statusLabel));
+}
+
+/** A priority list as the app keeps and sends it: 03 enum values only, each once, in PRIORITY_FILTER_OPTIONS order. */
+export function cleanPriorityList(values: unknown): TicketPriority[] {
+  if (!Array.isArray(values)) return [];
+  const known = TICKET_PRIORITIES as readonly string[];
+  const wanted = new Set(values.filter((v): v is TicketPriority => typeof v === 'string' && known.includes(v)));
+  return TICKET_PRIORITIES.filter((p) => wanted.has(p));
+}
+
+/** The Priority field's closed text: "High", "High +1", or null for none. */
+export function priorityFilterSummary(priorities: readonly TicketPriority[]): string | null {
+  return multiSelectSummary(cleanPriorityList(priorities).map((p) => PRIORITY_LABELS[p]));
+}
+
+/**
+ * Picks as the app keeps and sends them: each a `{ id, name }` with a sendable id (isFilterId), each id once, in the
+ * order given. Anything that is not an array is none.
+ */
+export function cleanPicks(values: unknown): FilterPick[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const out: FilterPick[] = [];
+  for (const value of values) {
+    if (typeof value !== 'object' || value === null) continue;
+    const { id, name } = value as Partial<FilterPick>;
+    if (!isFilterId(id) || typeof name !== 'string' || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name });
+  }
+  return out;
+}
+
+/** A category, technician or group field's closed text: "Afrikomart", "Afrikomart +2", or null for none. */
+export function picksSummary(picks: readonly FilterPick[]): string | null {
+  return multiSelectSummary(cleanPicks(picks).map((p) => p.name));
+}
+
+/** The ids of picks, joined for TKT-1: "a" for one, "a,b,c" for several, undefined for none (the key is not sent). */
+function joinedIds(picks: readonly FilterPick[]): string | undefined {
+  const ids = cleanPicks(picks).map((p) => p.id);
+  return ids.length > 0 ? ids.join(',') : undefined;
+}
 
 /** The web's technician list is active users with role AGENT only (TicketsListPage.tsx:155): the same people via USR-3. */
 export const TECHNICIAN_FILTER_ROLES: readonly UserRole[] = ['AGENT'];
@@ -220,16 +311,18 @@ export function isFilterDay(day: string | null | undefined): day is string {
 
 function isActive(filters: TicketAdvancedFilters, key: TicketListFilterKey): boolean {
   switch (key) {
+    case 'status':
+      return cleanStatusList(filters.status).length > 0;
     case 'priority':
-      return filters.priority !== null;
+      return cleanPriorityList(filters.priority).length > 0;
     case 'category':
-      return filters.category !== null;
+      return cleanPicks(filters.category).length > 0;
     case 'date':
       return isFilterDay(filters.fromDate) || isFilterDay(filters.toDate);
     case 'technician':
-      return filters.technician !== null;
+      return cleanPicks(filters.technician).length > 0;
     case 'group':
-      return filters.group !== null;
+      return cleanPicks(filters.group).length > 0;
   }
 }
 
@@ -241,19 +334,27 @@ export function activeAdvancedFilters(
   return TICKET_LIST_FILTER_KEYS.filter((key) => allowed.includes(key) && isActive(filters, key));
 }
 
-/** The TKT-1 params for the five filters, only for the allowed ones (the date range counts as one filter). */
+/**
+ * The TKT-1 params for the sheet's filters, only for the allowed ones (the date range counts as one filter). Each list is
+ * ONE parameter, its values joined by commas: one value has no comma, and an empty list sends no key at all, never an
+ * empty value. The strings go to axios as params, which encodes them; no query string is built here.
+ */
 export function advancedFilterQuery(
   filters: TicketAdvancedFilters,
   allowed: readonly TicketListFilterKey[],
-): Pick<TicketListQuery, 'priority' | 'categoryId' | 'fromDate' | 'toDate' | 'assignedToId' | 'teamId'> {
+): Pick<TicketListQuery, 'status' | 'priority' | 'categoryId' | 'fromDate' | 'toDate' | 'assignedToId' | 'teamId'> {
   const on = new Set(activeAdvancedFilters(filters, allowed));
+  const categoryId = on.has('category') ? joinedIds(filters.category) : undefined;
+  const assignedToId = on.has('technician') ? joinedIds(filters.technician) : undefined;
+  const teamId = on.has('group') ? joinedIds(filters.group) : undefined;
   return {
-    ...(on.has('priority') && filters.priority ? { priority: filters.priority } : {}),
-    ...(on.has('category') && filters.category ? { categoryId: filters.category.id } : {}),
+    ...(on.has('status') ? { status: cleanStatusList(filters.status).join(',') } : {}),
+    ...(on.has('priority') ? { priority: cleanPriorityList(filters.priority).join(',') } : {}),
+    ...(categoryId ? { categoryId } : {}),
     ...(on.has('date') && isFilterDay(filters.fromDate) ? { fromDate: filters.fromDate } : {}),
     ...(on.has('date') && isFilterDay(filters.toDate) ? { toDate: filters.toDate } : {}),
-    ...(on.has('technician') && filters.technician ? { assignedToId: filters.technician.id } : {}),
-    ...(on.has('group') && filters.group ? { teamId: filters.group.id } : {}),
+    ...(assignedToId ? { assignedToId } : {}),
+    ...(teamId ? { teamId } : {}),
   };
 }
 
@@ -265,6 +366,19 @@ const SETS_TECHNICIAN: ReadonlySet<TicketNamedFilter> = new Set<TicketNamedFilte
 
 export function namedFilterSetsTechnician(filter: TicketNamedFilter): boolean {
   return SETS_TECHNICIAN.has(filter);
+}
+
+/**
+ * Named filters that send `status` (2026-11-17). TKT-1 has one `status`, so these and the Status filter replace each
+ * other, as the technician slot does: the last choice wins. Overdue, Due soon (they send `sla`), Unassigned and All
+ * leave the Status filter alone.
+ */
+const SETS_STATUS: ReadonlySet<TicketNamedFilter> = new Set<TicketNamedFilter>([
+  'OPEN', 'MY_OPEN', 'PENDING', 'RESOLVED', 'CLOSED', ...HOME_TILE_FILTERS,
+]);
+
+export function namedFilterSetsStatus(filter: TicketNamedFilter): boolean {
+  return SETS_STATUS.has(filter);
 }
 
 export interface TicketFilterState {
@@ -296,16 +410,34 @@ export function appliedTicketPeriod(
   return advanced.fromDate === period.fromDate && advanced.toDate === period.toDate ? period : null;
 }
 
-/** Pick a named filter. "My open" or "Unassigned" drops a technician filter (one slot, last choice wins). */
+/**
+ * Pick a named filter. "My open" or "Unassigned" drops a technician filter, and a named filter that sends a status
+ * drops the Status filter (one slot each, last choice wins).
+ */
 export function withNamedFilter(state: TicketFilterState, filter: TicketNamedFilter): TicketFilterState {
-  const advanced = namedFilterSetsTechnician(filter) && state.advanced.technician ? { ...state.advanced, technician: null } : state.advanced;
+  let advanced = state.advanced;
+  if (namedFilterSetsTechnician(filter) && cleanPicks(advanced.technician).length > 0) advanced = { ...advanced, technician: [] };
+  if (namedFilterSetsStatus(filter) && cleanStatusList(advanced.status).length > 0) advanced = { ...advanced, status: [] };
   return { filter, advanced };
 }
 
-/** Change some of the five. Picking a technician while "My open" or "Unassigned" is on moves the named filter to All. */
+/**
+ * Change some of the sheet's filters. Picking a technician while "My open" or "Unassigned" is on, or statuses while a
+ * named filter that sends a status is on, moves the named filter to All.
+ */
 export function withAdvancedFilters(state: TicketFilterState, patch: Partial<TicketAdvancedFilters>): TicketFilterState {
-  const advanced = { ...state.advanced, ...patch };
-  const filter = patch.technician && namedFilterSetsTechnician(state.filter) ? 'ALL' : state.filter;
+  const advanced: TicketAdvancedFilters = {
+    ...state.advanced,
+    ...patch,
+    ...(patch.status !== undefined ? { status: cleanStatusList(patch.status) } : {}),
+    ...(patch.priority !== undefined ? { priority: cleanPriorityList(patch.priority) } : {}),
+    ...(patch.category !== undefined ? { category: cleanPicks(patch.category) } : {}),
+    ...(patch.technician !== undefined ? { technician: cleanPicks(patch.technician) } : {}),
+    ...(patch.group !== undefined ? { group: cleanPicks(patch.group) } : {}),
+  };
+  const takesTechnician = patch.technician !== undefined && advanced.technician.length > 0 && namedFilterSetsTechnician(state.filter);
+  const takesStatus = patch.status !== undefined && advanced.status.length > 0 && namedFilterSetsStatus(state.filter);
+  const filter = takesTechnician || takesStatus ? 'ALL' : state.filter;
   return { filter, advanced };
 }
 
@@ -334,7 +466,8 @@ export function ticketListQuery({
     ...roleDefaultTicketQuery(me.role),
     ...(countryId !== undefined ? { countryId } : {}),
     ...advancedFilterQuery(advanced, allowed),
-    // After the five, so a named filter's `assignedToId` (My open, Unassigned) replaces a Technician filter's.
+    // After the sheet's filters, so a named filter's `assignedToId` (My open, Unassigned) replaces a Technician
+    // filter's, and its `status` a Status filter's (the stores never keep both; this is the request's own guard).
     ...ticketFilterQuery(filter, me),
     ...ticketSortQuery(sort),
     ...(search ? { search } : {}),
@@ -372,11 +505,12 @@ export function activeFilterLabels({
   if (filter !== 'ALL') labels.push(TICKET_FILTER_LABELS[filter]);
   if (search) labels.push(`“${search}”`);
   for (const key of activeAdvancedFilters(advanced, allowed)) {
-    if (key === 'priority' && advanced.priority) labels.push(`${PRIORITY_LABELS[advanced.priority]} priority`);
-    if (key === 'category' && advanced.category) labels.push(advanced.category.name);
+    if (key === 'status') labels.push(statusFilterSummary(advanced.status) ?? '');
+    if (key === 'priority') labels.push(`${priorityFilterSummary(advanced.priority) ?? ''} priority`);
+    if (key === 'category') labels.push(picksSummary(advanced.category) ?? '');
     if (key === 'date') labels.push(dateRangeLabel(advanced.fromDate, advanced.toDate) ?? '');
-    if (key === 'technician' && advanced.technician) labels.push(advanced.technician.name);
-    if (key === 'group' && advanced.group) labels.push(advanced.group.name);
+    if (key === 'technician') labels.push(picksSummary(advanced.technician) ?? '');
+    if (key === 'group') labels.push(picksSummary(advanced.group) ?? '');
   }
   return labels.filter(Boolean);
 }
@@ -384,7 +518,7 @@ export function activeFilterLabels({
 /** Category options, as the web lists them: active top-level categories (LKP-1 flat), sorted by name (:579-585). */
 export function categoryFilterOptions(categories: readonly Category[]): FilterPick[] {
   return categories
-    .filter((c) => !c.level || c.level === 'CATEGORY')
+    .filter((c) => (!c.level || c.level === 'CATEGORY') && isFilterId(c.id))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((c) => ({ id: c.id, name: c.name }));
@@ -392,7 +526,7 @@ export function categoryFilterOptions(categories: readonly Category[]): FilterPi
 
 /** Group options, as the web lists them: every team from LKP-2, inactive ones included, in the server's order (by name). */
 export function groupFilterOptions(teams: readonly Team[]): (FilterPick & { inactive: boolean })[] {
-  return teams.map((t) => ({ id: t.id, name: t.name, inactive: t.isActive === false }));
+  return teams.filter((t) => isFilterId(t.id)).map((t) => ({ id: t.id, name: t.name, inactive: t.isActive === false }));
 }
 
 /**
