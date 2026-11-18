@@ -4,10 +4,8 @@
 // src/hooks/useSavedViews.ts run by the app's own QueryClient, src/utils/saved-filters.ts, ui.store's apply,
 // ticketListFilters() (permissions.ts) and ticketListQuery(). Faked: the network (axios's transport, answering as
 // savedViews.controller.ts does) and the phone's Keystore. Nothing calls UAT or Production.
-// iOS (iOS-5i): Android's 723e2fc tests, with three iOS changes. (1) The query key and applying a view come from
-// useSavedViews.ts (Android: queryKeys.ts and ui.store), so a production bundle with SAVED_VIEWS_ENABLED off holds
-// nothing of saved views. (2) Android's versionCode-6 block is not on iOS (S3, docs/ios/ANDROID-DELTA.md §12.2).
-// (3) The wiring block (SavedFilters.tsx, the Filters sheet) arrives with the screens in step 6.
+// iOS (iOS-5i): Android's 723e2fc tests. Not on iOS: the versionCode-6 block (Android build 6's phone-only list, S3,
+// docs/ios/ANDROID-DELTA.md §12.2). The wiring block (SavedFilters.tsx, the Filters sheet) arrives with the screens (step 6).
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -21,8 +19,9 @@ import { apiClient } from '../../src/api/client.ts';
 import { ApiClientError, describeWriteError } from '../../src/api/errors.ts';
 import { queryClient } from '../../src/api/queryClient.ts';
 import { SAVED_VIEW_FILTER_KEYS } from '../../src/api/savedViews.api.ts';
+import { queryKeys } from '../../src/hooks/queryKeys.ts';
 import {
-  SAVED_VIEWS_QUERY_KEY, SAVED_VIEWS_STALE_TIME_MS, SAVED_VIEW_GONE, applySavedTicketFilter, savedViewMutations, savedViewsQuery,
+  SAVED_VIEWS_STALE_TIME_MS, SAVED_VIEW_GONE, savedViewMutations, savedViewsQuery,
 } from '../../src/hooks/useSavedViews.ts';
 import { useUiStore } from '../../src/store/ui.store.ts';
 import { ticketListFilters } from '../../src/utils/permissions.ts';
@@ -120,7 +119,7 @@ function serverLikeTheController() {
 
 const ops = () => savedViewMutations(queryClient);
 const run = (options, variables) => new MutationObserver(queryClient, options).mutate(variables);
-const cached = () => queryClient.getQueryData(SAVED_VIEWS_QUERY_KEY);
+const cached = () => queryClient.getQueryData(queryKeys.savedViews.tickets());
 
 beforeEach(() => {
   sent.length = 0;
@@ -134,7 +133,7 @@ afterEach(() => onlineManager.setOnline(true));
 describe('the contract round-trips: phone → Service Desk → web, and web → Service Desk → phone', () => {
   test('a phone save sends the web\'s eight keys only, in its order, and reads back as the same tickets', async () => {
     serverLikeTheController();
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, []);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), []);
     const capture = captureSavedView(EVERYTHING, admin);
     assert.equal(capture.refusal, null);
     const view = await run(ops().create, { name: '  Network   work ', filters: capture.filters, existing: [] });
@@ -162,7 +161,7 @@ describe('the contract round-trips: phone → Service Desk → web, and web → 
     assert.deepEqual(decoded.leftOut, []);
     useUiStore.getState().setTicketSearch('vpn');
     useUiStore.getState().setTicketCountryId('country-ke');
-    applySavedTicketFilter(decoded.content);
+    useUiStore.getState().applySavedTicketFilter(decoded.content);
     const ui = useUiStore.getState();
     assert.equal(ui.ticketSearch, undefined, 'the search is cleared, as the web clears it (TicketsListPage.tsx:235)');
     assert.equal(ui.ticketCountryId, 'country-ke', 'the country is kept, as on the web');
@@ -194,7 +193,7 @@ describe('the contract round-trips: phone → Service Desk → web, and web → 
       'Quick filter: All', 'Status: Pending with Partner', 'Priority: Urgent', 'Category: Hardware',
       'Created 01 Oct 2026 – 31 Oct 2026', 'Technician: John Tech', 'Group: Service Desk', 'Sort: Due date',
     ]);
-    applySavedTicketFilter(content);
+    useUiStore.getState().applySavedTicketFilter(content);
     assert.deepEqual(only(queryOf(useUiStore.getState(), admin), WEB_KEYS), webLoad(web.filters));
   });
 
@@ -272,7 +271,7 @@ describe('what a view cannot hold is refused or named, never dropped quietly', (
   test('rename sends the name ONLY: a filter the web saved (even one the app cannot show) is never rewritten', async () => {
     serverLikeTheController();
     const web = row({ id: 'view-web', name: 'Web view', filters: { teamId: 'team-1', categoryIds: ['a', 'b'] } });
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, [web]);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), [web]);
     await run(ops().rename, { id: 'view-web', name: '  Renamed ', existing: [web] });
     assert.deepEqual(sent.map((r) => [r.method, r.url, r.body]), [['put', '/saved-views/view-web', { name: 'Renamed' }]]);
     assert.deepEqual(cached().map((v) => [v.id, v.name]), [['view-web', 'Renamed']]);
@@ -314,26 +313,26 @@ describe('roles: a saved view only carries filters that role can send (permissio
 
 describe('failures: nothing looks saved that did not save', () => {
   test('a 500: the save rejects with the reason, the list is unchanged, and it is re-read', async () => {
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, []);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), []);
     answer = () => ({ status: 500, body: { error: 'Internal server error' } });
     await assert.rejects(run(ops().create, { name: 'Mine', filters: { status: 'OPEN' }, existing: [] }), (error) => {
       assert.match(describeWriteError(error), /The Service Desk reported an error\. It may have been saved — refresh before trying again\./);
       return true;
     });
     assert.deepEqual(cached(), []);
-    assert.equal(queryClient.getQueryState(SAVED_VIEWS_QUERY_KEY).isInvalidated, true, 're-read, so a view that did save appears');
+    assert.equal(queryClient.getQueryState(queryKeys.savedViews.tickets()).isInvalidated, true, 're-read, so a view that did save appears');
   });
 
   test('no connection: it rejects, says it may have been saved, and the list is re-read', async () => {
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, []);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), []);
     answer = () => 'network';
     await assert.rejects(run(ops().create, { name: 'Mine', filters: {}, existing: [] }), (error) => error instanceof ApiClientError && error.kind === 'network');
     assert.deepEqual(cached(), []);
-    assert.equal(queryClient.getQueryState(SAVED_VIEWS_QUERY_KEY).isInvalidated, true);
+    assert.equal(queryClient.getQueryState(queryKeys.savedViews.tickets()).isInvalidated, true);
   });
 
   test('offline: refused before anything is sent, for save, rename and delete', async () => {
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, [row({ id: 'a', name: 'A' })]);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), [row({ id: 'a', name: 'A' })]);
     onlineManager.setOnline(false);
     for (const [options, variables] of [
       [ops().create, { name: 'Mine', filters: {}, existing: [] }],
@@ -344,7 +343,7 @@ describe('failures: nothing looks saved that did not save', () => {
     }
     assert.deepEqual(sent, []);
     assert.deepEqual(cached().map((v) => v.id), ['a']);
-    assert.equal(queryClient.getQueryState(SAVED_VIEWS_QUERY_KEY).isInvalidated, false, 'nothing could have changed');
+    assert.equal(queryClient.getQueryState(queryKeys.savedViews.tickets()).isInvalidated, false, 'nothing could have changed');
   });
 
   test('names: required, trimmed, at most 40, not one already in the list (any case); refused before sending', async () => {
@@ -358,7 +357,7 @@ describe('failures: nothing looks saved that did not save', () => {
   });
 
   test('deleted elsewhere: a rename says so and the view leaves the list; a delete counts it as done', async () => {
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, [row({ id: 'a', name: 'A' }), row({ id: 'b', name: 'B' })]);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), [row({ id: 'a', name: 'A' }), row({ id: 'b', name: 'B' })]);
     answer = () => ({ status: 404, body: { error: 'View not found' } });
     await assert.rejects(run(ops().rename, { id: 'a', name: 'C', existing: [] }), (error) => error.message === SAVED_VIEW_GONE);
     assert.deepEqual(cached().map((v) => v.id), ['b']);
@@ -368,7 +367,7 @@ describe('failures: nothing looks saved that did not save', () => {
   });
 
   test('a delete removes the view only once the server said so', async () => {
-    queryClient.setQueryData(SAVED_VIEWS_QUERY_KEY, [row({ id: 'a', name: 'A' })]);
+    queryClient.setQueryData(queryKeys.savedViews.tickets(), [row({ id: 'a', name: 'A' })]);
     answer = () => ({ status: 403, body: { error: 'Not authorized' } });
     await assert.rejects(run(ops().remove, { id: 'a' }));
     assert.deepEqual(cached().map((v) => v.id), ['a']);

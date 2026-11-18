@@ -4,8 +4,13 @@
 //   (the Save sheet lists it), not only of what it sends.
 // - The five personas: what each one's saved view holds, and what each one is told was left out of a view that holds
 //   everything (one an ADMIN saved on the web).
+// - No build flag (Ronit, 2026-11-18, the simplified plan): saved views are in every build, preview and production, as
+//   on Android, and their pieces sit where Android keeps them. scripts/verify-release-bundle.js expects them in both.
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { AxiosHeaders } from 'axios';
 
@@ -13,6 +18,17 @@ import { apiClient } from '../../src/api/client.ts';
 import { createTicketView } from '../../src/api/savedViews.api.ts';
 import { captureSavedView, decodeSavedView, savedViewChips } from '../../src/utils/saved-filters.ts';
 import { NAMES, PERSONAS } from '../rbac/personas.mjs';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
+const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+function sourceFiles(dir) {
+  return readdirSync(path.join(REPO, dir)).flatMap((entry) => {
+    const rel = path.join(dir, entry);
+    if (statSync(path.join(REPO, rel)).isDirectory()) return sourceFiles(rel);
+    return /\.tsx?$/.test(entry) ? [rel.replace(/\\/g, '/')] : [];
+  });
+}
 
 const sent = [];
 apiClient.defaults.adapter = async (config) => {
@@ -105,4 +121,37 @@ describe('the five personas: what a saved view HOLDS (the Save sheet lists it) a
       assert.deepEqual(content.advanced.group.map((g) => g.id), staff ? ['team-1'] : []);
     });
   }
+});
+
+describe('no build flag: saved views in every build, where Android keeps them', () => {
+  test('no gate and no flag anywhere; only src/config/env.ts reads EXPO_PUBLIC_APP_ENV (the API URL, iOS-9b)', () => {
+    assert.equal(existsSync(path.join(REPO, 'src/screens/tickets/savedViewsGate.ts')), false);
+    const flagged = sourceFiles('src').filter((rel) => /SAVED_VIEWS_ENABLED|savedViewsGate/.test(code(read(rel))));
+    assert.deepEqual(flagged, []);
+    assert.deepEqual(sourceFiles('src').filter((rel) => /EXPO_PUBLIC_APP_ENV/.test(code(read(rel)))), ['src/config/env.ts']);
+  });
+
+  test('Android\'s placement: the query key, the field spec, the list store\'s action and both barrels', () => {
+    assert.match(read('src/hooks/queryKeys.ts'), /savedViews: \{\s*tickets: \(\) => \['saved-views', 'ticket'\] as const,\s*\}/);
+    assert.match(read('src/api/responseSpecs.ts'), /export const SAVED_VIEW_SPEC: readonly FieldSpec\[\] = \[/);
+    assert.match(read('src/store/ui.store.ts'), /applySavedTicketFilter: \(content\) => set\(savedFilterUiState\(content\)\),/);
+    assert.match(read('src/hooks/index.ts'), /useCreateSavedView, useDeleteSavedView, useRenameSavedView, useSavedTicketViews, useSavedViewNames,\s*\} from '\.\/useSavedViews';/);
+    assert.match(read('src/types/index.ts'), /^export \* from '\.\/savedView';\r?$/m);
+  });
+
+  test('SAVED_VIEW_SPEC is 03 §C\'s SavedView: its eight fields, and a row as SVW-1 returns it fits every one', async () => {
+    const { SAVED_VIEW_SPEC } = await import('../../src/api/responseSpecs.ts');
+    assert.deepEqual(SAVED_VIEW_SPEC.map((s) => s.path), ['id', 'name', 'entityType', 'filters', 'columns', 'userId', 'isDefault', 'createdAt']);
+    const row = { id: 'v1', name: 'Mine', entityType: 'ticket', filters: {}, columns: [], userId: 'u1', isDefault: false, createdAt: '2026-11-18T00:00:00.000Z' };
+    const kind = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
+    for (const spec of SAVED_VIEW_SPEC) assert.ok(spec.kinds.includes(kind(row[spec.path])), `${spec.path}: ${kind(row[spec.path])}`);
+    // A view's filters are never trusted to be an object (03 §C: Json), so every JSON kind is accepted there.
+    assert.deepEqual([...SAVED_VIEW_SPEC.find((s) => s.path === 'filters').kinds].sort(), ['array', 'boolean', 'null', 'number', 'object', 'string']);
+  });
+
+  test('S3 (Android build 6\'s phone-only list) is not on iOS: no legacy store, hook or key', () => {
+    assert.equal(existsSync(path.join(REPO, 'src/store/legacySavedFilters.ts')), false);
+    const legacy = sourceFiles('src').filter((rel) => /useLegacySavedFilters|LegacySavedFilter|mmg\.savedFilters/.test(code(read(rel))));
+    assert.deepEqual(legacy, []);
+  });
 });

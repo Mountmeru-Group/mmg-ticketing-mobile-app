@@ -1631,7 +1631,7 @@ Android's §17.2, §17.3 and §18.1 apply on iOS as written: the same rules, wor
 **Search on long lists (§17.3):** every `OptionSheet` gets it, as on Android: on iPhone that is every list §17.3 names (Filters, the three country lists, Create ticket, Assign, the ticket's editors, the service form). The keyboard behaves as above.
 
 **Saved filters (§17.2):**
-- **`preview` builds only** until the flip (`SAVED_VIEWS_ENABLED`; `docs/web-system/16-SAVED-VIEWS.md` §iOS-A). In a `production` build the block is absent and the Filters sheet starts with the filter card, as before iOS-5i.
+- **In every build**, `preview` and `production`, as on Android (`docs/web-system/16-SAVED-VIEWS.md` §iOS-A).
 - The chips are `FilterChip`s, with iOS-4's selection haptic.
 - **Save** and **Manage** are page sheets: ✕ or a swipe down closes them. The name field stays above the keyboard (`SheetKeyboardView`); Return saves.
 - **Delete** asks with an iOS alert, its button in red (`utils/dialogs.ts`).

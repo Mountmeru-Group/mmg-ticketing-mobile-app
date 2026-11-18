@@ -4,13 +4,9 @@
 // - Bodies are built from allow-lists: create sends name, entityType and the web's eight filter keys; rename sends the
 //   name ONLY, so a filter the web saved (one the app cannot show) is never rewritten. `columns` and `isDefault` are
 //   never sent.
-// iOS (iOS-5i): behind the build-time flag SAVED_VIEWS_ENABLED (src/screens/tickets/savedViewsGate.ts). Only the
-// saved-views modules import this file, so a production bundle with the flag off holds none of it. For the same reason
-// the types come from @/types/savedView (not the @/types barrel) and SAVED_VIEW_SPEC lives here (Android: responseSpecs.ts).
-import type { CreateSavedViewBody, RenameSavedViewBody, SavedView, SavedViewFilters } from '@/types/savedView';
+import type { CreateSavedViewBody, RenameSavedViewBody, SavedView, SavedViewFilters } from '@/types';
 import type { MessageResponse } from './client';
 import { apiClient } from './client';
-import type { FieldSpec } from './drift';
 import { seg } from './helpers';
 
 /** The entity type the web's ticket list writes and lists (TicketsListPage.tsx:183, :189). */
@@ -20,24 +16,6 @@ export const TICKET_VIEW_ENTITY = 'ticket';
 export const SAVED_VIEW_FILTER_KEYS = [
   'status', 'priority', 'sortBy', 'assignedToId', 'teamId', 'categoryId', 'fromDate', 'toDate',
 ] as const satisfies readonly (keyof SavedViewFilters)[];
-
-const S = ['string'] as const;
-const ARR = ['array'] as const;
-
-/**
- * `SavedView` (SVW-1 rows, SVW-2/3 bodies; 03 §C, 2026-11-17). `filters` is checked by the app when it is read.
- * Android keeps this in responseSpecs.ts; on iOS it lives here, with the rest of saved views (iOS-5i).
- */
-export const SAVED_VIEW_SPEC: readonly FieldSpec[] = [
-  { path: 'id', kinds: S },
-  { path: 'name', kinds: S },
-  { path: 'entityType', kinds: S },
-  { path: 'filters', kinds: ['object', 'array', 'string', 'number', 'boolean', 'null'] },
-  { path: 'columns', kinds: ARR },
-  { path: 'userId', kinds: S },
-  { path: 'isDefault', kinds: ['boolean'] },
-  { path: 'createdAt', kinds: S },
-];
 
 /** SVW-1 — GET /api/v1/saved-views?entityType=ticket. The caller's ticket views, newest first; a plain array. */
 export async function listTicketViews(): Promise<SavedView[]> {

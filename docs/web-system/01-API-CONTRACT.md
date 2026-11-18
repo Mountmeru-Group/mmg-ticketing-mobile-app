@@ -1424,10 +1424,9 @@ These routes exist but the mobile app **must not call them**. Adding any of them
   - **Assumed, not confirmed.** The format comes from a URL Ronit copied from the UAT portal's page, not from the API and not from source. The clone's controller reads `priority`, `categoryId`, `assignedToId` and `teamId` as one exact value (05 B.46). `status` as a comma list is in the source and is not assumed.
   - **No fallback.** Android has none to keep: there is no run-time switch back to single values. A single value is the same request as before the multi-select, byte for byte (tested).
   - What iOS waits for: 06 §iOS-A (the backend team to confirm that the deployed TKT-1 reads these comma lists, on UAT and on PROD).
-- **SVW-1..4 (§10.6) on iOS (iOS-5i, Ronit's decision 2): behind the build-time flag `SAVED_VIEWS_ENABLED`.**
-  - **ON in `preview` builds (UAT, TestFlight). OFF in `production` builds** until the backend team confirms SVW-1..4 are live on PROD (06 §iOS-A). The flag is one line in `src/screens/tickets/savedViewsGate.ts`; Metro folds it at build time.
-  - With the flag OFF, a production bundle holds **nothing of saved views**: no saved-views module, no SVW path, no query key, no field spec, no store setter and no saved-views text. `scripts/verify-release-bundle.js` proves it (`docs/ios/RELEASE-IOS.md` §3).
-  - With the flag ON, the calls, bodies and rules are §10.6's "Mobile" lines, exactly: `{ name, entityType: 'ticket', filters }` with the web's eight keys only; rename `{ name }` only; never `columns` or `isDefault`.
-  - The flip procedure: `docs/ios/RELEASE-IOS.md`. The flip ships in a new App Store version, never by EAS Update (Ronit, iOS-5i decision 5).
+- **SVW-1..4 (§10.6) on iOS (iOS-5i): exactly as Android, in every build, `preview` (UAT) and `production` (PROD).** Ronit's simplified plan (2026-11-18) dropped the build-time flag of the first plan (`SAVED_VIEWS_ENABLED`, built in step 3 and removed in step 4).
+  - The calls, bodies and rules are §10.6's "Mobile" lines, exactly: `{ name, entityType: 'ticket', filters }` with the web's eight keys only; rename `{ name }` only; never `columns` or `isDefault`.
+  - Production builds call SVW-1 when the Filters sheet opens. Whether SVW-1..4 and the `saved_views` table are live on PROD is still to be confirmed (06 §iOS-A, 05 B.45). If they are not, the block shows its error state ("Couldn't load your saved filters", with Retry) and the rest of the sheet works.
+  - `scripts/verify-release-bundle.js` expects saved views in both bundles.
 - **Android's runtime environment switch (2026-11-17/18) is not on iOS** (Ronit's iOS-5i decision 1). No endpoint changes with it. iOS sends every call to the one API URL its bundle was built with (CLAUDE.md I3; `02-AUTH.md` §iOS-C).
 - **No other endpoint, param or write** was added on iOS in iOS-5e, iOS-5f, iOS-5h or iOS-5i.

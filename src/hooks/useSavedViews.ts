@@ -2,41 +2,34 @@
 // Requests: src/api/savedViews.api.ts (SVW-1..4). Rules: src/utils/saved-filters.ts. Contract: 16-SAVED-VIEWS.md.
 // - SVW-1 loads while the Filters sheet is open. staleTime 60 s (UAT shares Production's hardware, 00 §3), and it is
 //   re-read when the sheet opens only once that has passed, so a view saved on the web shows up without a request per
-//   visit. The whole cache, these views included, is cleared on sign-out (iOS has no environment switch).
+//   visit. The whole cache, these views included, is cleared on sign-out and on the environment switch.
 // - Writes run only when tapped, never retried, refused offline before anything is sent (requireOnline). Never
 //   optimistic: the list changes only with the server's answer. After a failure that may have reached the server
 //   (network, timeout, 5xx), the list is re-read, so a view that did save appears and none is shown that did not.
 // - The options are plain objects built here (savedViewsQuery, savedViewMutations) so tests run them under Node with the
 //   real QueryClient; the hooks only bind them to React.
-// iOS (iOS-5i): behind the build-time flag SAVED_VIEWS_ENABLED (src/screens/tickets/savedViewsGate.ts). Only the saved-views
-// modules import this file, and the hooks barrel does not re-export it, so a production bundle with the flag off holds
-// none of it. Two pieces Android keeps elsewhere live here for that reason: the query key (Android: queryKeys.ts
-// `savedViews.tickets`) and applying a view to the list (Android: ui.store `applySavedTicketFilter`). Android's
-// useLegacySavedFilters (the versionCode-6 list) is not on iOS.
+// iOS (iOS-5i): Android's file without useLegacySavedFilters (Android build 6's phone-only list, S3). iOS has no
+// environment switch: the cache, these views included, is cleared on sign-out.
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { assertArray, assertObject, checkFields } from '@/api/drift';
 import { ApiClientError, isSessionEndedError } from '@/api/errors';
 import { MIN_STALE_TIME_MS } from '@/api/queryClient';
-import { SAVED_VIEW_SPEC, createTicketView, deleteSavedView, listTicketViews, renameSavedView } from '@/api/savedViews.api';
+import { SAVED_VIEW_SPEC } from '@/api/responseSpecs';
+import { createTicketView, deleteSavedView, listTicketViews, renameSavedView } from '@/api/savedViews.api';
 import { getUser } from '@/api/users.api';
 import { useAuthStore } from '@/store/auth.store';
-import { useUiStore } from '@/store/ui.store';
-import type { UserProfile } from '@/types';
-import type { SavedView, SavedViewFilters } from '@/types/savedView';
+import type { SavedView, SavedViewFilters, UserProfile } from '@/types';
 import { formatDisplayName } from '@/utils/format';
 import { ticketListFilters } from '@/utils/permissions';
 import {
-  cleanSavedFilterName, savedFilterNameProblem, savedFilterUiState, type SavedFilterContent, type SavedViewNames,
+  cleanSavedFilterName, savedFilterNameProblem, type SavedViewNames,
 } from '@/utils/saved-filters';
 import { isFilterId } from '@/utils/ticket-filters';
 import { useCategories, useTeams } from './useLookups';
 import { queryKeys } from './queryKeys';
 import { refuse, requireOnline, wasRefusedOnDevice } from './writeGuards';
-
-/** SVW-1's cache key, `['saved-views', 'ticket']`, as Android's queryKeys.ts `savedViews.tickets()` (kept here on iOS). */
-export const SAVED_VIEWS_QUERY_KEY = ['saved-views', 'ticket'] as const;
 
 /** At least the app-wide floor (60 s): never lower. */
 export const SAVED_VIEWS_STALE_TIME_MS = MIN_STALE_TIME_MS;
@@ -62,7 +55,7 @@ function checkedView(endpoint: string, value: unknown): SavedView {
 /** SVW-1's query: the signed-in person's ticket views, newest first, as the web lists them. */
 export function savedViewsQuery() {
   return {
-    queryKey: SAVED_VIEWS_QUERY_KEY,
+    queryKey: queryKeys.savedViews.tickets(),
     queryFn: async (): Promise<SavedView[]> => {
       const res = await listTicketViews();
       assertArray<SavedView>('SVW-1', res);
@@ -87,7 +80,7 @@ export interface DeleteSavedViewVariables { id: string }
 
 /** The three writes' options for this QueryClient. */
 export function savedViewMutations(queryClient: QueryClient) {
-  const key = SAVED_VIEWS_QUERY_KEY;
+  const key = queryKeys.savedViews.tickets();
   const setList = (update: (list: SavedView[]) => SavedView[]) =>
     queryClient.setQueryData<SavedView[]>(key, (list) => (list ? update(list) : list));
   /** Re-read after a write that may or may not have reached the server. Not after a refusal on the phone or a 401. */
@@ -211,13 +204,4 @@ export function useSavedViewNames(views: readonly SavedView[] | undefined): Save
     group: (id) => teams.data?.find((t) => t.id === id)?.name ?? null,
     technician: (id) => (id === user?.id ? formatDisplayName(user.displayName) || 'Me' : (byId.get(id) ?? null)),
   };
-}
-
-/**
- * A saved view's chip on the Filters sheet, as the web's loadView: its quick filter, sort and sheet filters at once; the
- * search and the Home period are cleared; the country is kept (a view holds none). Pass what decodeSavedView() gave for
- * the viewer (the Filters sheet does). Android: ui.store's `applySavedTicketFilter`, the same fields (savedFilterUiState).
- */
-export function applySavedTicketFilter(content: SavedFilterContent): void {
-  useUiStore.setState(savedFilterUiState(content));
 }

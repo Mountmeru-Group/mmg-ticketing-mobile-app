@@ -4,15 +4,14 @@
 // The Home period (G6) lives here too: kept while the app is open, back to the web's default ("This month") after a
 // restart or a sign-out. The web keeps it in component state, so it is back to "This Month" on every visit to its
 // dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
-// Saved filters are the Service Desk's saved views (2026-11-17); applying one only sets the fields below.
-// iOS (iOS-5i): the store has no saved-view action of its own. src/hooks/useSavedViews.ts sets these fields itself, so a
-// production bundle, where saved views are off (src/screens/tickets/savedViewsGate.ts), holds nothing of them. iOS has no
-// environment switch (docs/web-system/02-AUTH.md §iOS-C).
+// Saved filters are the Service Desk's saved views (2026-11-17, src/hooks/useSavedViews.ts); applying one only sets the
+// fields below. reset() also runs on the environment switch (src/api/environmentSwitch.ts).
 import { create } from 'zustand';
 
 import {
   DEFAULT_DASHBOARD_PERIOD, NO_CUSTOM_RANGE, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
+import { savedFilterUiState, type SavedFilterContent } from '@/utils/saved-filters';
 import {
   NO_ADVANCED_FILTERS, withAdvancedFilters, withNamedFilter,
   type TicketAdvancedFilters, type TicketListPeriod, type TicketNamedFilter, type TicketSortOption,
@@ -54,6 +53,12 @@ interface UiState {
   openTicketList: (filter: TicketNamedFilter, period?: TicketListPeriod | null) => void;
   /** The period chip's ✕ (G7): drops the created-date filter the tile set. Nothing else changes. */
   clearTicketPeriod: () => void;
+  /**
+   * A saved view's chip on the Filters sheet, as the web's loadView: its quick filter, sort and sheet filters at once; the
+   * search and the Home period are cleared; the country is kept (a view holds none). Pass what decodeSavedView() gave for
+   * the viewer (the Filters sheet does).
+   */
+  applySavedTicketFilter: (content: SavedFilterContent) => void;
   dismissAnnouncement: (id: string) => void;
   restoreAnnouncement: (id: string) => void;
   setHomePeriod: (period: DashboardPeriod) => void;
@@ -111,6 +116,7 @@ export const useUiStore = create<UiState>()((set) => ({
     }),
   clearTicketPeriod: () =>
     set((s) => ({ ticketAdvanced: { ...s.ticketAdvanced, fromDate: null, toDate: null }, ticketPeriod: null })),
+  applySavedTicketFilter: (content) => set(savedFilterUiState(content)),
   dismissAnnouncement: (id) =>
     set((s) => (s.dismissedAnnouncementIds.includes(id) ? s : { dismissedAnnouncementIds: [...s.dismissedAnnouncementIds, id] })),
   restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),
