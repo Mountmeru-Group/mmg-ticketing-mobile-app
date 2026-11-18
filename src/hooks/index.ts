@@ -46,6 +46,8 @@ export { useMarkAllNotificationsRead, useMarkNotificationRead } from './useNotif
 export { useDecideApproval, type ApprovalDecision } from './useApprovals';
 export { useKbHelpfulVote } from './useKnowledgeBase';
 export { useSignOut, useUpdateProfile } from './useProfile';
+// Saved filters = the Service Desk's saved views (Android 723e2fc re-exports ./useSavedViews here). iOS (iOS-5i): NOT
+// re-exported, so a production bundle with SAVED_VIEWS_ENABLED off holds none of it; import '@/hooks/useSavedViews'.
 export { useDeleteTask, useSaveTask, useToggleTask } from './useTasks';
 // Phase G3 writes
 export { useDeleteAttachment } from './useDeleteAttachment';
