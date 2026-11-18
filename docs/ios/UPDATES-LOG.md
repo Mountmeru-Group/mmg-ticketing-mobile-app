@@ -28,4 +28,7 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --clear-cache --m
   - An `ios-preview` update can never reach a production build, and the reverse, as long as the channels are never linked (no `eas channel:edit` or `eas channel:rollout` between them).
   - **Build 0.2.0 (2) stays runtime 0.2.0.** A fix for it is published from a commit **before iOS-9b** (`bafbb8c` or earlier, where `app.json` says 0.2.0). Published from iOS-9b on, it would be runtime 1.0.0 and would never reach build 2.
   - No update was published in iOS-9b.
+- **iOS-5i (2026-11-18) is not an update: version 1.1.0, runtime 1.1.0** (Ronit's iOS-5i decision 6). The multi-select filters, saved filters, the Alerts notice's iOS wording and the deleted developer-token screen reach testers and the App Store in new 1.1.0 builds only.
+  - An update published from iOS-5i step 7 on is runtime 1.1.0, so it never reaches a 1.0.0 build. A fix for a 1.0.0 build, if one is out, is published from `8b6a282` or earlier (`RELEASE-IOS.md` §6 rule 11).
+  - No update was published in iOS-5i.
 - **The next entry** names its channel and its runtime (0.2.0 for build 2; 1.0.0 for builds from iOS-9b) and follows rule 1 (fixes only).

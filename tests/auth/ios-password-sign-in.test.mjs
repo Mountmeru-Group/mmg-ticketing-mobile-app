@@ -123,7 +123,6 @@ describe('(b) one path: POST /auth/mobile/login, and never POST /auth/login', ()
       "src/api/auth.api.ts: '/auth/me'",
       "src/api/passwordSignIn.api.ts: '/auth/logout'",
       "src/api/passwordSignIn.api.ts: '/auth/me'",
-      "src/screens/auth/DevTokenScreen.tsx: '/auth/me'", // __DEV__ only (iOS-9 list); never in a release bundle
       "src/types/mobile-password-contract.ts: '/auth/mobile/login'",
       "src/types/mobile-sso-contract.ts: '/auth/microsoft/mobile'",
     ]);

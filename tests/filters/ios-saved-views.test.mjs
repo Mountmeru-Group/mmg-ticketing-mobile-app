@@ -124,6 +124,23 @@ describe('the five personas: what a saved view HOLDS (the Save sheet lists it) a
 });
 
 describe('no build flag: saved views in every build, where Android keeps them', () => {
+  // Built in iOS-5i step 7: the plan's "verify-release-bundle expects them in both" had no check until then.
+  test('the release check fails a preview OR production bundle that lacks a saved-views module or string', () => {
+    const check = read('scripts/verify-release-bundle.js');
+    const modules = check.match(/const SAVED_VIEWS_MODULES = \[([\s\S]*?)\];/)[1].match(/'[^']+'/g).map((s) => s.slice(1, -1));
+    assert.deepEqual(modules, ['src/api/savedViews.api.ts', 'src/hooks/useSavedViews.ts', 'src/utils/saved-filters.ts', 'src/screens/tickets/SavedFilters.tsx']);
+    for (const rel of modules) assert.ok(existsSync(path.join(REPO, rel)), rel);
+    const needles = check.match(/const SAVED_VIEWS_NEEDLES = \[([^\]]*)\];/)[1].match(/'[^']+'/g).map((s) => s.slice(1, -1));
+    assert.deepEqual(needles, ['/saved-views', 'Save these filters', 'Manage saved filters']);
+    // Each string is in the source of a module above, so a release bundle that has them has saved views.
+    const sources = modules.map((rel) => read(rel)).join('\n');
+    for (const n of needles) assert.ok(sources.includes(n), n);
+    // Required in both profiles: no profile condition around either rule.
+    assert.match(check, /if \(missingSavedViewModules\.length\) problems\.push\(/);
+    assert.match(check, /if \(absentSavedViewStrings\.length\) problems\.push\(/);
+    assert.doesNotMatch(check.slice(check.indexOf('// iOS-5i: saved views, whole'), check.indexOf('// The iOS redirect')), /profile ===|profile !==/);
+  });
+
   test('no gate and no flag anywhere; only src/config/env.ts reads EXPO_PUBLIC_APP_ENV (the API URL, iOS-9b)', () => {
     assert.equal(existsSync(path.join(REPO, 'src/screens/tickets/savedViewsGate.ts')), false);
     const flagged = sourceFiles('src').filter((rel) => /SAVED_VIEWS_ENABLED|savedViewsGate/.test(code(read(rel))));

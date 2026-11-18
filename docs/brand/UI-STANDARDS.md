@@ -1563,7 +1563,7 @@ Android's §11–§13 (G6–G8), on iOS. What is shown, counted and sent is Andr
 
 **The audit log (§13):** pushed in the More stack, under the solid bar titled "Audit log"; Android's toolbar under it (ticket-number search, the Ticket, entity-type and Person chips, the count, Clear all); the pills, cards and colours are Android's (`colors.auditAction`). The list ends 24 pt above the tab bar (`listBottomInset()`); pull-to-refresh is tinted brand red; the ticket lookup's result is announced to VoiceOver; the footer's retry has a label.
 
-**Push notice (§12, G7c):** not on iOS. Alerts keeps its notice that the Service Desk has no push yet, which stays true on iOS.
+**Push notice (§12, G7c):** not on iOS. Alerts keeps a fixed notice, since iOS-5i in iOS's own words (Ronit, 2026-11-18): "Live alerts aren't available on iPhone yet. Pull down to check for new ones." Android's notice is its own (`pushNotice`).
 
 **Pinned by:** `tests/home/ios-period.test.mjs`, `tests/rbac/audit-log.test.mjs` §6, and the all-of-`src/` scans in `tests/screens/hig-polish.test.mjs` (44 pt, labels) and `read-screens.test.mjs` (no Android-only API, no colour outside the theme).
 
@@ -1588,12 +1588,12 @@ Android's §14–§16 apply on iOS as written (the same tokens, `src/theme/color
 
 **Pinned by:** `tests/rbac/swipe-actions.test.mjs` (VoiceOver = swipe, per persona), `tests/polish/haptics-parity.test.mjs`, `tests/home/greeting-mark.test.mjs`, `tests/polish/people-row.test.mjs`, `tests/motion/polish.test.mjs`, `tests/rbac/audit-log.test.mjs` and the scans in `tests/screens/hig-polish.test.mjs`.
 
-### iOS-A.16 The email sign-in on iPhone (iOS-5g, 2026-11-06, UAT builds only)
+### iOS-A.16 The email sign-in on iPhone (iOS-5g, 2026-11-06; every build since iOS-9b)
 
 Android's §15.2 and §15.3 apply on iOS as written: the same tokens (`emailForm`, `loginType`, `emailReveal`), the OR divider, the form opened in place, the failure box, "Sign in" at 52 pt with the face drawn through the children function (never a function `style`), the keyboard rule (`revealScrollY`) and the motion. The sign-in calls only `POST /auth/mobile/login` (`docs/web-system/02-AUTH.md` §iOS-B). The iOS differences:
 
-**Only on UAT builds, twice over.** `EMAIL_SIGN_IN_ENABLED` hides it at run time, as Android did until `6b5e46c`. A build-time gate also keeps the form out of a `production` bundle altogether, so App Review's Login shows only "Sign in with Microsoft" (§iOS-A.12).
-- **iOS-5h (Ronit, 2026-11-08):** §15.2's heading and "every build, UAT and PROD" are Android's since `6b5e46c`. On iPhone the form stays on UAT builds only. Matching Android is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved (`docs/ios/ANDROID-DELTA.md` §5, item 7). The form itself, its tokens and its motion do not change.
+**On every build since iOS-9b (2026-11-11), as Android `6b5e46c`.** Until then it was on UAT builds only, twice over: `EMAIL_SIGN_IN_ENABLED` hid it at run time, as on Android until `6b5e46c`, and a build-time gate kept the form out of a `production` bundle. iOS-9b removed both: App Review's Login shows the email option under "Sign in with Microsoft", and App Review signs in with an email-and-password review account (compliance A4).
+- **iOS-5h (Ronit, 2026-11-08):** §15.2's heading and "every build, UAT and PROD" are Android's since `6b5e46c`. On iPhone the form stayed on UAT builds only; matching Android went on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved (`docs/ios/ANDROID-DELTA.md` §5, item 7). The form itself, its tokens and its motion do not change. **Matched in iOS-9b** (Ronit, 2026-11-11), before the `Set-Cookie` answer, which the R1 shield mitigates.
 
 **Keyboard and AutoFill (§15.2):**
 - Email: the email keyboard (`keyboardType`, `inputMode`), no capitals, corrections or spell check, focused when the form opens. `textContentType="username"` with `autoComplete="email"`, so iOS Password AutoFill pairs it with the password. Return key **next**.
@@ -1613,7 +1613,7 @@ Android's §15.2 and §15.3 apply on iOS as written: the same tokens (`emailForm
 
 **Pinned by:** `tests/auth/password-sign-in.test.mjs` (Android's, one path), `tests/auth/ios-password-sign-in.test.mjs` (iOS: gates, Keychain, password, keyboard, VoiceOver, Dynamic Type), `tests/login/sign-in-button.test.mjs`, and the scans in `tests/motion/start-up-and-login.test.mjs`, `tests/screens/read-screens.test.mjs` and `tests/screens/hig-polish.test.mjs`. Device checks: `docs/ios/UAT-TEST-PLAN-IOS.md` G20.
 
-### iOS-A.17 Multi-select filters, dropdown search and saved filters on iPhone (iOS-5i, 2026-11-18; being built)
+### iOS-A.17 Multi-select filters, dropdown search and saved filters on iPhone (iOS-5i, built 2026-11-18)
 
 Android's §17.2, §17.3 and §18.1 apply on iOS as written: the same rules, words, threshold (more than 10 options), counts ("1/38", "2 selected"), "All …" row, "Afrikomart +2", slots, technician search and saved-filter sheets. Only the interface below is iOS's (Ronit's iOS-5i decisions 2 and 4).
 

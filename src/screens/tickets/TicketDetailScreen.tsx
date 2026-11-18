@@ -13,7 +13,7 @@
 // WRITES (Phase 3b) — each an explicit action, confirmed where it emails people or can't be undone:
 //   Status bar: transitions from ticket-rules.ts only; RESOLVED/CLOSED/CANCELED open M6 for the closure fields.
 //     TKT-6 POST /tickets/:id/status — PUT /tickets/:id is never used for status (05 B.1).
-//   More options: Pick up (ADMIN/AGENT, not locked, not the dev placeholder user), Assign → M7, Close → M6.
+//   More options: Pick up (ADMIN/AGENT, not locked), Assign → M7, Close → M6.
 //   Conversation: Reply / Reply all (staff) / Note (ADMIN/AGENT) → M5.
 //   Attachments: images open inline via ATT-3 with the Bearer header; staged files upload via ATT-2 (unless locked).
 //   Tasks (Phase 4): every role taps a task to open task detail. Staff (ADMIN, AGENT, L2) also tick it done / not done

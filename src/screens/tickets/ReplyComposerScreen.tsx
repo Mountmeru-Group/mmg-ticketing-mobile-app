@@ -33,7 +33,6 @@ import { finalRecipients, isBlankBody, isValidEmail } from '@/utils/compose';
 import { confirmAction, notify } from '@/utils/dialogs';
 import { hapticOutcome, hapticSelection } from '@/utils/haptics';
 import { composerPermissions, navRole, type ComposerMode } from '@/utils/permissions';
-import { isPlaceholderUser } from '@/utils/session';
 import { insertTemplate, templateHasImages } from '@/utils/templates';
 
 /** The keyboard's Done bar on this form (iOS-4, components/KeyboardDoneBar.tsx). */
@@ -260,13 +259,6 @@ export function ReplyComposerScreen({ navigation, route }: SheetScreenProps<'Rep
             <Notice>
               Internal note: visible to Admins and Technicians only, and not emailed. Files can't be added to a note, because
               the requester can see a note's files; attach them to a reply instead.
-            </Notice>
-          ) : null}
-          {!isPublic && isPlaceholderUser(user) ? (
-            <Notice tone="warning">
-              This session was saved before the developer token was checked with the server, so the app can't confirm your
-              role. If the account is not an Admin or Technician, the server will send this note as a PUBLIC email. Sign out
-              and paste the token again to fix this.
             </Notice>
           ) : null}
         </View>

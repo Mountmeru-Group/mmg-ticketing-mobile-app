@@ -8,7 +8,6 @@ import { getTicket } from '@/api/tickets.api';
 import type { AuthUser, ChangeStatusBody, CreateServiceRequestBody, TicketStatus, UpdateTicketBody, UserRole } from '@/types';
 import { statusLabel } from '@/utils/format';
 import { canAssignTickets, canDeleteAttachments, canSubmitForApproval, fieldEditProblem, serviceRequestProblem } from '@/utils/permissions';
-import { isPlaceholderUser } from '@/utils/session';
 import { canChangeStatus, isResolvedLocked, isTransitionAllowed, requiresClosureForm } from '@/utils/ticket-rules';
 
 /** Errors created by refuse(): the request was never sent, so there is nothing to refresh afterwards. */
@@ -75,12 +74,9 @@ export async function assertStatusUnchanged(ticketId: string, expected: TicketSt
  * 05 §A.4 / §A.3: ADMIN and AGENT only (L2_MANAGER and END_USER get 403); AGENT locked on CLOSED/CANCELED. The same
  * rule (canAssignTickets) that offers Pick up, Assign, the Technician editor and bulk assign.
  */
-export function assertAssignment(role: UserRole, status: TicketStatus, assignedToId: string | null): void {
+export function assertAssignment(role: UserRole, status: TicketStatus, _assignedToId: string | null): void {
   if (!canAssignTickets(role)) throw refuse('Only Admins and Technicians can assign tickets.');
   if (isResolvedLocked(role, status)) throw refuse('Closed and canceled tickets are locked for technicians.');
-  if (assignedToId && isPlaceholderUser({ id: assignedToId })) {
-    throw refuse('This session has a placeholder user that cannot be assigned. Sign out and paste the developer token again.');
-  }
 }
 
 /**

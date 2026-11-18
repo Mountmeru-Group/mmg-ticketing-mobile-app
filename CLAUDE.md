@@ -8,8 +8,9 @@
 
 - This is the **iPhone app** for the Mount Meru Group Service Desk. Users see it as **Setu**. In-app text that says "the Service Desk" means the backend or the IT team, not the app.
 - It is the `ios-dev` branch of `Mountmeru-Group/mmg-ticketing-mobile-app`, ported from the Android app on `dev`.
-- **Port source:** `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed` (since iOS-5h, 2026-11-08; before it `d8626bc` in iOS-5f and iOS-5g, `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
-  - To bring later Android changes across, diff `6b5e46c..origin/dev` (empty on 2026-11-08).
+- **Port source:** `origin/dev` @ `723e2fc77931d1ada9ba02bce6d7916bd27a454d` (since iOS-5i, 2026-11-18; before it `6b5e46c` in iOS-5h, `d8626bc` in iOS-5f and iOS-5g, `8b522e3` in iOS-5e, `f4fad10` in iOS-5d, `c5c63ac` in iOS-5c, `4063df3` in iOS-5b; first port source `c84d53a`).
+  - To bring later Android changes across, diff `723e2fc..origin/dev` (on 2026-11-18: one commit, `3bc45c2`, Android's `versionCode` 8 only; nothing to port).
+  - **iOS-5i (2026-11-18):** multi-select on every ticket filter, dropdown search, and saved filters as the web's saved views (SVW-1..4, confirmed on PROD), in every build. Android's run-time PROD/UAT switch is **not** ported (rule I3, compliance K4). Version 1.1.0 (`docs/ios/ANDROID-DELTA.md` §12).
   - **G9 from `d8626bc`** (the email and password sign-in, `999943e`, `d8626bc`) was built in its own phase, **iOS-5g**, on UAT builds only, and opened to **every build, UAT and PROD, in iOS-9b** (2026-11-11). It makes one call, to the confirmed `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`docs/ios/ANDROID-DELTA.md` §10.8).
     - **Open, not blocking (R1, 2026-11-08):** the backend team has not yet confirmed that this endpoint sends no `Set-Cookie`. The R1 cookie shield (`src/api/cookieShield.ts`) mitigates it on the device: iOS's cookie store is emptied right after every sign-in answer (email and Microsoft, success or error, before the session is stored), at every cold start and at every sign-out. So it no longer blocks shipping G9 to testers in build 0.2.0 (2); the answer is still recorded when it comes (06 A32).
     - **Android `6b5e46c` opened G9 to production builds; iOS matched it in iOS-9b** (Ronit, 2026-11-11; `docs/ios/ANDROID-DELTA.md` §5, item 7), before the `Set-Cookie` answer, which stays open and mitigated by R1. App Review signs in with an email-and-password review account (compliance A4).
@@ -41,7 +42,7 @@
   - **Email and password sign-in** (G9, iOS-5g) is on **every build, UAT and PROD, since iOS-9b** (as Android `6b5e46c`; until then UAT only, behind a build-time and a run-time gate).
     - It makes one call, `POST /api/v1/auth/mobile/login`, and never calls `POST /auth/login` (`02-AUTH.md` §iOS-B). `verify-release-bundle` requires it in both profiles and fails any bundle that names `/auth/login`.
     - Whether that endpoint sends a `Set-Cookie` is still unconfirmed, but since R1 it no longer holds G9 back from testers: the cookie shield empties iOS's cookie store after each sign-in answer, at launch and at sign-out (`02-AUTH.md` §iOS-B).
-  - **The developer-token screen** is `__DEV__` only. It is compiled out of every release build, `preview` and `production`; `verify-release-bundle` proves it is absent.
+  - **The developer-token screen is deleted** (iOS-5i, 2026-11-18; the iOS-9 list's item 1, as Android `4063df3`), with its route, its Login button and the placeholder-user guards. `verify-release-bundle` still proves none of its strings is in any bundle, release or development.
   - The TestFlight test login (manifest §8) is a proposal and is **not approved**; nothing is built.
 
 ## iOS branch rules — NON-NEGOTIABLE
@@ -96,7 +97,7 @@ I7. **No new work outside the current phase's brief:** no `eas` commands, new de
    - no scraping of `Set-Cookie`;
    - no use of `/auth/test-login` and no `TEST_AUTH_SECRET`;
    - no embedding of the web SSO flow or lifting its cookie;
-   - no pasting of tokens, except on the `__DEV__`-only developer-token screen.
+   - no pasting of tokens (the one exception, the `__DEV__` developer-token screen, was deleted in iOS-5i).
 6. **Security holes.** Do not rely on, exploit, or try to patch the backend permission gaps in `05-RULES-AND-GAPS.md` §C.
    - The UI must offer only the actions the web UI offers for that role.
    - Fixing the gaps is the web team's job.

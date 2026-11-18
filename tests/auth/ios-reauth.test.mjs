@@ -274,14 +274,13 @@ describe('return from the background at day 15', () => {
 });
 
 describe('who writes the date', () => {
-  // Android's production-readiness.test.mjs checks the first two (f4fad10). That file is on the iOS-9 list
-  // (docs/ios/ANDROID-DELTA.md §5, item 5), so iOS checks them here, with the developer-token screen it still has.
-  test('signInAttempt only after a challenged sign-in; never the profile save; the __DEV__ developer-token screen always', () => {
+  // Android's production-readiness.test.mjs checks the first two (f4fad10); iOS's does too since iOS-5i (the iOS-9 list's
+  // items 1 and 5, docs/ios/ANDROID-DELTA.md §5). The developer-token screen, a third caller until then, is deleted.
+  test('signInAttempt only after a challenged sign-in; never the profile save; the email sign-in always', () => {
     const callers = sourceFiles().filter((rel) => /setSession\(\{/.test(read(rel)));
     // iOS-5g: + the email sign-in, which starts the 15 days as Android's does (999943e): a password is a full check.
     assert.deepEqual(callers.sort(), [
       'src/hooks/useProfile.ts',
-      'src/screens/auth/DevTokenScreen.tsx',
       'src/screens/auth/passwordSignInAttempt.ts',
       'src/screens/auth/signInAttempt.ts',
     ]);
@@ -293,13 +292,13 @@ describe('who writes the date', () => {
     assert.match(attempt, /const fullAuthAt = challenge \? Date\.now\(\) : undefined;/);
     assert.match(attempt, /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);
     assert.doesNotMatch(read('src/hooks/useProfile.ts'), /fullAuthAt/);
-    assert.match(read('src/screens/auth/DevTokenScreen.tsx'), /setSession\(\{ token, user, fullAuthAt: Date\.now\(\) \}\)/);
   });
 
-  test('a developer-token session (Q1) survives a return to the foreground, and ends at day 15 like any other', async () => {
+  // Until iOS-5i this case was the developer-token session (Q1), which set the date the same way.
+  test('an email sign-in session survives a return to the foreground, and ends at day 15 like any other', async () => {
     const now = Date.now();
     const user = { id: 'user-1', email: 'test.user@mountmerugroup.com', displayName: 'Test User', role: 'AGENT', ldapSamAccount: 'test.user', countryId: 'country-1' };
-    await useAuthStore.getState().setSession({ token: FAKE.token, user, fullAuthAt: now }); // as DevTokenScreen does
+    await useAuthStore.getState().setSession({ token: FAKE.token, user, fullAuthAt: now }); // as passwordSignInAttempt does
     assert.equal(endSessionIfReauthDue(now + 1000), false);
     assert.equal(useAuthStore.getState().isAuthenticated, true);
     assert.equal(endSessionIfReauthDue(now + REAUTH_INTERVAL_MS), true);

@@ -15,6 +15,8 @@
 // The tab badge is AppTabs' NTF-2 query, which this screen shares: no second query and no polling.
 // iOS-8a (device finding: "Mark all read" and "Earlier" overlapped the large title): a solid bar with a standard title,
 // so the screen starts below it; as on Android, the banners sit under the bar and the notice opens the list.
+// iOS-5i (Ronit, 2026-11-18): the notice's wording is iOS's own, "Live alerts aren't available on iPhone yet. Pull down
+// to check for new ones." Android's says the state of push on that phone (pushNotice, G7c); iOS has no push client.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { memo, useCallback, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
@@ -226,9 +228,7 @@ export function NotificationsScreen({ navigation }: AlertsStackScreenProps<'Noti
         maintainVisibleContentPosition={NO_SCROLL_ANCHOR}
         ListHeaderComponent={
           <View className="mx-4">
-            <Notice>
-              Alerts don't arrive live or while the app is closed — the Service Desk has no push yet. Pull down to check for new ones.
-            </Notice>
+            <Notice>Live alerts aren't available on iPhone yet. Pull down to check for new ones.</Notice>
           </View>
         }
         ListEmptyComponent={

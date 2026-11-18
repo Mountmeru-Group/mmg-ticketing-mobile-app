@@ -16,8 +16,8 @@
 //   the keyboard or the screen's foot (./emailFormLayout.ts revealScrollY). It does so when the button is laid out or
 //   moves (the form opens; an error appears above it), when the keyboard opens, and when the scroll view is resized
 //   (KeyboardAvoidingView's padding lands after the keyboard event). Events only, no timer.
-// - iOS (iOS-5c): Android's file with one difference: __DEV__ builds keep the developer-token button, because deleting
-//   that screen is on the iOS-9 list (docs/ios/ANDROID-DELTA.md §5, item 1). Release builds never contain it.
+// - These are the only ways into the app: the __DEV__ developer-token screen was deleted (Android 2026-10-29; iOS in
+//   iOS-5i, 2026-11-18: the iOS-9 list's item 1, docs/ios/ANDROID-DELTA.md §5).
 // - iOS (iOS-5g; ANDROID-DELTA.md §10.7): the email sign-in calls ONE path, the backend team's confirmed POST
 //   /auth/mobile/login (./passwordSignInAttempt.ts), never POST /auth/login. iOS-9b removed its two UAT-only gates (the
 //   run-time flag in src/config/env.ts and the build-time require here), as Android 6b5e46c removed its one: every bundle,
@@ -32,9 +32,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  AppState, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions,
-} from 'react-native';
+import { AppState, Keyboard, KeyboardAvoidingView, ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, OfflineBanner, OutlineButton } from '@/components';
@@ -61,7 +59,7 @@ function describeRedirectUri(): string {
   }
 }
 
-export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
+export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
   const signOutMessage = useAuthStore((s) => s.signOutMessage);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -280,21 +278,9 @@ export function LoginScreen({ navigation }: AuthStackScreenProps<'Login'>) {
                 ) : null}
                 {__DEV__ ? (
                   <View className="mt-4 self-stretch rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-                    <Text className="text-xs text-amber-900">
-                      Developer build: if Microsoft sign-in is not ready yet (AUTH-P2 not deployed), the developer token
-                      below is the fallback.
-                    </Text>
-                    <Text className="mt-2 font-mono text-xs text-amber-900">
+                    <Text className="font-mono text-xs text-amber-900">
                       Redirect URI sent to Microsoft: {describeRedirectUri()}
                     </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Developer: use a UAT session token"
-                      onPress={() => navigation.navigate('DevToken')}
-                      className="mt-3 min-h-11 justify-center rounded-lg border border-amber-500 bg-white px-4 py-2"
-                    >
-                      <Text className="text-center font-medium text-amber-900">Developer: use a UAT session token</Text>
-                    </Pressable>
                   </View>
                 ) : null}
               </View>

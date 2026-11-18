@@ -356,9 +356,9 @@ describe('iOS: no Android-only API, no colour outside the theme, the built scree
     assert.deepEqual(offenders, []);
   });
 
-  test('signed-in screens use the native navigation bar: only the developer-token placeholder draws its own', () => {
+  test('signed-in screens use the native navigation bar: none draws its own (the developer-token layout, the last, is deleted)', () => {
     const users = sourceFiles('src/screens').filter((rel) => /\bScreenHeader\b/.test(code(read(rel))));
-    assert.deepEqual(users, ['src/screens/PlaceholderScreen.tsx']);
+    assert.deepEqual(users, []);
   });
 
   test('every route renders its real screen: the screen tables are complete and nothing falls back (iOS-3c)', () => {

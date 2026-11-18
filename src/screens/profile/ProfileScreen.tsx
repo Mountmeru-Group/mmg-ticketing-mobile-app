@@ -32,7 +32,7 @@ import { useIsOffline } from '@/api/network';
 import { APP_VERSION, ENVIRONMENT_LABEL } from '@/config/env';
 import { PRIVACY_POLICY_URL } from '@/config/legal';
 import {
-  Card, ErrorState, FieldLabel, InlineError, KeyboardDoneBar, LoadingSkeleton, Notice, OfflineBanner, OptionSheet, QueryBanner,
+  Card, ErrorState, FieldLabel, InlineError, KeyboardDoneBar, LoadingSkeleton, OfflineBanner, OptionSheet, QueryBanner,
   SubmitButton, type SheetOption,
 } from '@/components';
 import {
@@ -49,7 +49,6 @@ import {
 import { confirmAction, notify } from '@/utils/dialogs';
 import { formatDateTime, formatDisplayName, initials } from '@/utils/format';
 import { ROLE_LABELS } from '@/utils/roles';
-import { isPlaceholderUser } from '@/utils/session';
 import { countrySelectorMode } from '@/utils/ticket-filters';
 
 const ALL_COUNTRIES = '__ALL__';
@@ -74,7 +73,6 @@ function deviceTimezone(): string | null {
 export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
   const offline = useIsOffline();
   const user = useAuthStore((s) => s.user);
-  const placeholder = isPlaceholderUser(user);
   const profile = useProfile();
   const update = useUpdateProfile();
   const { signOut, signingOut } = useSignOut();
@@ -139,8 +137,8 @@ export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
     });
 
   // ── Account: the privacy policy (iOS-4), and the deletion request through Create Ticket (iOS-9b) ──
-  // Every signed-in role (each can create tickets); never a placeholder session, which has no real account to delete.
-  const canRequestDeletion = !!user && !placeholder;
+  // Every signed-in role (each can create tickets).
+  const canRequestDeletion = !!user;
   const openPrivacyPolicy = () => {
     Linking.openURL(PRIVACY_POLICY_URL).catch(() => Alert.alert("Couldn't open the privacy policy", 'Try again.'));
   };
@@ -204,13 +202,7 @@ export function ProfileScreen({ navigation }: MoreStackScreenProps<'Profile'>) {
           ) : null}
         </Card>
 
-        {placeholder ? (
-          <View className="mx-4 mb-3">
-            <Notice tone="warning">
-              This session holds a placeholder account, so the profile can't be loaded or edited. Sign out and sign in again.
-            </Notice>
-          </View>
-        ) : !profile.data && profile.isError ? (
+        {!profile.data && profile.isError ? (
           <Card>
             <ErrorState error={profile.error} title="Couldn't load your profile" onRetry={() => void profile.refetch()} />
           </Card>
