@@ -9,12 +9,19 @@
 //   keyboard up picks it at once.
 // - The field clears whenever the sheet closes (a pick, back, a tap outside, or the caller hiding it).
 // - TalkBack: the field has a real label ("Search <title>"), and the number of matches is announced as it changes.
-// 2026-11-17 (second brief): `multiple` — the same sheet with checkboxes, for a filter the SERVER reads several values
-// for (only the ticket list's Status today; utils/multi-select.ts says why). One component, not a second.
-// - A "Select all" row pinned under the search, with the count as the web shows it ("1/12": chosen / all options). With
+// `multiple`: the same sheet with checkboxes. One component, not a second. Since 2026-11-18 every ticket-list filter
+// uses it (status, priority, category, technician, group; utils/multi-select.ts).
+// - A "Select all" row pinned under the search, with the count as the web shows it ("1/38": chosen / all options). With
 //   a search typed it applies to the options the search shows, and only to them.
+// - `allLabel` ("All categories") is the first row: it CLEARS the choice. It is not a value and is never sent.
 // - Ticks change a draft; the choice is handed to the caller once, when the sheet closes (Done, back, a tap outside), so
 //   the list behind makes one request, not one per tick. "Clear" unticks everything.
+// - `selectedOptions`: the names of chosen values the options may not hold (a saved view's category no longer listed, or
+//   a technician found by an earlier search). They keep their rows, so opening and closing never drops a choice, even
+//   while the options are still loading.
+// - `remoteSearch`: the options come from a SERVER search the caller runs (technicians, USR-3, which only answers a
+//   search). The field is always there; with it empty the sheet shows the choices; typed, it shows what the caller
+//   passes. The count reads "2 selected": a search has no known total.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, FlatList, Pressable, Text, View, type ListRenderItem } from 'react-native';
@@ -22,7 +29,10 @@ import { AccessibilityInfo, FlatList, Pressable, Text, View, type ListRenderItem
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useStableCallback } from '@/hooks/useStableCallback';
 import { colors } from '@/theme';
-import { inOptionOrder, sameChoices, selectAllState, selectionCount, toggleAllShown, toggleChoice } from '@/utils/multi-select';
+import {
+  byLabel, inOptionOrder, mergeOptions, sameChoices, selectAllState, selectionCount, selectionCountUnknownTotal, toggleAllShown,
+  toggleChoice,
+} from '@/utils/multi-select';
 import { filterOptionsByLabel, isSearchableList, noOptionMatchText, optionSearchAnnouncement } from '@/utils/option-search';
 import { OutlineButton, SubmitButton } from './Form';
 import { SearchField } from './Filters';
@@ -49,12 +59,26 @@ interface SingleProps<T extends string> extends CommonProps<T> {
   onSelect: (value: T) => void;
 }
 
+/** The field and its results belong to the caller, who runs the search (debounced) and passes the results as `options`. */
+export interface OptionSheetRemoteSearch {
+  query: string;
+  onQueryChange: (query: string) => void;
+  placeholder: string;
+  /** Under the rows: searching, "type 2 letters", a failed search, no match. Read aloud as it changes. */
+  footer?: ReactNode;
+}
+
 interface MultipleProps<T extends string> extends CommonProps<T> {
-  /** Checkboxes. Only for a filter the server reads several values for. */
+  /** Checkboxes. */
   multiple: true;
   selectedValues: readonly T[];
-  /** Called once, when the sheet closes, and only if the choice changed. */
-  onChange: (values: T[]) => void;
+  /** Names for chosen values that `options` may not hold. */
+  selectedOptions?: readonly SheetOption<T>[];
+  /** Called once, when the sheet closes, and only if the choice changed. `chosen`: the same values, with their names. */
+  onChange: (values: T[], chosen: SheetOption<T>[]) => void;
+  /** The first row, e.g. "All categories": clears the choice. Not a value. */
+  allLabel?: string;
+  remoteSearch?: OptionSheetRemoteSearch;
 }
 
 export type OptionSheetProps<T extends string> = SingleProps<T> | MultipleProps<T>;
@@ -63,37 +87,77 @@ export type OptionSheetProps<T extends string> = SingleProps<T> | MultipleProps<
 const FIRST_RENDER_ROWS = 20;
 /** How long the list must stay the same before TalkBack hears the count: not on every keystroke. */
 const ANNOUNCE_AFTER_MS = 500;
+const NONE: readonly SheetOption<string>[] = [];
 
 const optionKey = (option: SheetOption<string>) => option.value;
 
 export function OptionSheet<T extends string>(props: OptionSheetProps<T>) {
-  const { visible, title, options, onClose, children } = props;
-  const multiple = props.multiple === true;
-  const committed = props.multiple === true ? props.selectedValues : null;
-  const [query, setQuery] = useState('');
-  // A loading or error state replaces the list: no field above it.
-  const searchable = children === undefined && isSearchableList(options.length);
-  const shown = useMemo(
-    () => (searchable ? filterOptionsByLabel(options as readonly SheetOption<string>[], query) : (options as readonly SheetOption<string>[])),
-    [searchable, options, query],
-  );
+  const { visible, title, options: given, onClose, children } = props;
+  const options = given as readonly SheetOption<string>[];
+  const multi = props.multiple === true ? props : null;
+  const multiple = multi !== null;
+  const remote = multi?.remoteSearch ?? null;
+  const committed = multi ? (multi.selectedValues as readonly string[]) : null;
+  const named = (multi?.selectedOptions as readonly SheetOption<string>[] | undefined) ?? NONE;
+
+  const [ownQuery, setOwnQuery] = useState('');
+  const query = remote ? remote.query : ownQuery;
+  const setQuery = (text: string) => (remote ? remote.onQueryChange(text) : setOwnQuery(text));
 
   // Multiple: the ticks while the sheet is open, from the caller's choice each time it opens.
   const [draft, setDraft] = useState<string[]>([]);
+  // Server search: every option met while open (each search's results), and the rows shown with the field empty.
+  const [met, setMet] = useState<readonly SheetOption<string>[]>(NONE);
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(new Set());
+
+  /**
+   * Every option the sheet knows, in the order its ticks are kept. Local: the caller's order, then any chosen value the
+   * options lack. Server search: everyone met while open, by name (a search has no order of its own).
+   */
+  const known = useMemo(
+    () => (remote ? byLabel(mergeOptions(named, met, options)) : mergeOptions(options, named)),
+    [remote, named, met, options],
+  );
+
+  // A loading or error state replaces the list: no field above it (except a server search's, which IS the list).
+  const searchable = remote !== null || (children === undefined && isSearchableList(known.length));
+  const shown = useMemo<readonly SheetOption<string>[]>(() => {
+    if (remote) return query.trim() ? options : known.filter((o) => pinned.has(o.value));
+    return searchable ? filterOptionsByLabel(known, query) : known;
+  }, [remote, query, options, known, pinned, searchable]);
+
   useEffect(() => {
-    if (visible && committed) setDraft(inOptionOrder(options as readonly SheetOption<string>[], committed));
+    if (!visible || !committed) return;
+    setDraft(inOptionOrder(remote ? byLabel(mergeOptions(named, options)) : mergeOptions(options, named), committed));
+    setMet(NONE);
+    setPinned(new Set(committed));
     // Only when it opens: a re-render of the caller must not undo the ticks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // A server search's results stay known after the next search replaces them: a tick on one is never lost.
+  useEffect(() => {
+    if (!visible || !remote || options.length === 0) return;
+    // The same state when nothing is new, so a caller that rebuilds its results each render cannot loop.
+    setMet((now) => {
+      const merged = mergeOptions(now, options);
+      return merged.length === now.length ? now : merged;
+    });
+  }, [visible, remote, options]);
+
   // Cleared whenever the sheet closes, however it closed.
   useEffect(() => {
-    if (!visible) setQuery('');
+    if (!visible) setOwnQuery('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const close = useStableCallback(() => {
     setQuery('');
-    if (props.multiple === true && !sameChoices(draft, props.selectedValues)) props.onChange(draft as T[]);
+    if (multi && !sameChoices(draft, committed ?? [])) {
+      const byValue = new Map(known.map((o) => [o.value, o]));
+      const chosen = draft.map((value) => byValue.get(value) ?? { value, label: value });
+      multi.onChange(draft as T[], chosen as SheetOption<T>[]);
+    }
     onClose();
   });
   // One identity while the sheet is open (callers pass inline functions), so unchanged rows are not re-rendered.
@@ -103,14 +167,20 @@ export function OptionSheet<T extends string>(props: OptionSheetProps<T>) {
     onClose();
   });
   const toggle = useStableCallback((value: string) => {
-    setDraft((now) => toggleChoice(options as readonly SheetOption<string>[], now, value));
+    setDraft((now) => toggleChoice(known, now, value));
+    if (remote) setPinned((now) => new Set(now).add(value));
   });
+  const toggleAll = () => {
+    setDraft((now) => toggleAllShown(known, shown, now));
+    if (remote) setPinned((now) => new Set([...now, ...shown.map((o) => o.value)]));
+  };
 
-  // The count, once typing pauses. Nothing is said for an empty field: the whole list is back.
+  // The count, once typing pauses. Nothing is said for an empty field: the whole list is back. A server search's
+  // footer speaks for itself (a live region).
   const settled = useDebouncedValue(query, ANNOUNCE_AFTER_MS);
   const settledCount = useMemo(
-    () => (searchable && settled.trim() ? filterOptionsByLabel(options as readonly SheetOption<string>[], settled).length : null),
-    [searchable, options, settled],
+    () => (!remote && searchable && settled.trim() ? filterOptionsByLabel(known, settled).length : null),
+    [remote, searchable, known, settled],
   );
   useEffect(() => {
     if (visible && settledCount !== null) AccessibilityInfo.announceForAccessibility(optionSearchAnnouncement(settledCount));
@@ -128,7 +198,10 @@ export function OptionSheet<T extends string>(props: OptionSheetProps<T>) {
     [multiple, chosen, toggle, singleSelected, pick],
   );
 
+  const typed = query.trim() !== '';
   const allState = selectAllState(shown, draft);
+  const count = remote ? selectionCountUnknownTotal(draft.length) : selectionCount(draft.length, known.length);
+  const allLabel = multi?.allLabel;
   return (
     <Sheet visible={visible} title={title} onClose={close} avoidKeyboard={searchable}>
       {searchable ? (
@@ -137,27 +210,29 @@ export function OptionSheet<T extends string>(props: OptionSheetProps<T>) {
             value={query}
             onChangeText={setQuery}
             onClear={() => setQuery('')}
-            placeholder="Search…"
+            placeholder={remote?.placeholder ?? 'Search…'}
             accessibilityLabel={`Search ${title}`}
           />
         </View>
       ) : null}
-      {multiple && children === undefined ? (
+      {multiple && (children === undefined || remote) ? (
         // Pinned above the list, so it never scrolls away. Applies to what the search shows.
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: allState === 'all' ? true : allState === 'some' ? 'mixed' : false, disabled: shown.length === 0 }}
-          accessibilityLabel={`${query.trim() ? 'Select all shown' : 'Select all'}, ${draft.length} of ${options.length} selected`}
+          accessibilityLabel={`${typed ? 'Select all shown' : 'Select all'}, ${count}`}
           disabled={shown.length === 0}
-          onPress={() => setDraft((now) => toggleAllShown(options as readonly SheetOption<string>[], shown, now))}
+          onPress={toggleAll}
           className="min-h-12 flex-row items-center border-b border-gray-200 px-4 py-3 active:bg-gray-50"
         >
           <CheckIcon state={allState} />
-          <Text className="ml-3 flex-1 text-base font-medium text-gray-900">{query.trim() ? 'Select all shown' : 'Select all'}</Text>
-          <Text className="text-sm text-gray-600">{selectionCount(draft.length, options.length)}</Text>
+          <Text className="ml-3 flex-1 text-base font-medium text-gray-900">{typed ? 'Select all shown' : 'Select all'}</Text>
+          <Text className="text-sm text-gray-600">{count}</Text>
         </Pressable>
       ) : null}
-      {children ?? (
+      {children != null && !remote ? (
+        children
+      ) : (
         <FlatList
           data={shown}
           keyExtractor={optionKey}
@@ -166,11 +241,15 @@ export function OptionSheet<T extends string>(props: OptionSheetProps<T>) {
           initialNumToRender={FIRST_RENDER_ROWS}
           removeClippedSubviews={false}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            allLabel && !typed ? <AllRow label={allLabel} active={draft.length === 0} onPress={() => setDraft([])} /> : null
+          }
           ListEmptyComponent={
-            searchable && query.trim() ? (
+            !remote && searchable && typed ? (
               <Text className="px-4 py-6 text-center text-sm text-gray-500">{noOptionMatchText(query)}</Text>
             ) : null
           }
+          ListFooterComponent={remote ? <View accessibilityLiveRegion="polite">{remote.footer}</View> : null}
         />
       )}
       {multiple ? (
@@ -209,6 +288,22 @@ const OptionRow = memo(function OptionRow({
     </Pressable>
   );
 });
+
+/** "All categories": the choice when nothing is ticked. Tapping it unticks everything; it is never a value. */
+function AllRow({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={active ? `${label}, selected` : `${label}: clear the choice`}
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      className="min-h-12 flex-row items-center border-b border-gray-100 px-4 py-3 active:bg-gray-50"
+    >
+      <Text className={`flex-1 text-base ${active ? 'font-semibold text-primary' : 'text-gray-900'}`}>{label}</Text>
+      {active ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
+    </Pressable>
+  );
+}
 
 /** A checkbox: ticked (brand red), part-ticked ("Select all" with some chosen) or empty. */
 function CheckIcon({ state }: { state: 'all' | 'some' | 'none' }) {

@@ -5,9 +5,9 @@
 //   - any string of the deleted developer-token screen (removed 2026-10-29; kept as a regression check);
 //   - a forbidden auth marker or secret name (test-login, x-test-secret, client secret …) or a token-shaped value;
 //   - any mountmerugroup.com host other than the two in src/config/env.ts;
-//   - the environment switch password in plain text (2026-11-17, third brief). It is searched for by its hash
-//     (scripts/password-scan.js), so this script never holds the password; its hash must be in the bundle, the
-//     password must not.
+//   - any trace of the environment switch's password gate, removed 2026-11-18 (the switch is ADMIN only, no password):
+//     its hash, the password in plain text, or the gate's own names and words. Searched by a fingerprint of the hash
+//     (scripts/removed-gate-scan.js), so this script holds neither the hash nor the password.
 // Allowed, because they are not secrets (each one is explained in RELEASE.md §6):
 //   - `client_secret` / `clientSecret` (any case, `_`, `-` or nothing between) ONLY where the source map traces the
 //     occurrence to expo-auth-session's own files, and ONLY as a name: given a literal value anywhere, it fails;
@@ -27,7 +27,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { PASSWORD_LENGTH, countPasswordWindows, readPasswordHash } = require('./password-scan');
+const { OLD_PASSWORD_LENGTH, countHashCopies, countPasswordWindows, gateMarkersIn } = require('./removed-gate-scan');
 
 const root = path.join(__dirname, '..');
 const out = path.join(os.tmpdir(), 'mmg-release-check');
@@ -250,24 +250,27 @@ const unknownV4 = v4.length - knownV4.length;
 if (unknownV4) problems.push(`release JS contains ${unknownV4} UUID-v4 literal(s) — the shape of a session token (values not printed)`);
 if (/Bearer [0-9a-f]{8}-/i.test(js)) problems.push('release JS contains a literal "Bearer <uuid>"');
 
-// The switch password: never in plain text (any window that hashes to it), and its hash present (proves the search runs
-// against the bundle that holds the gate).
-const passwordHash = readPasswordHash(root);
-const passwordCounts = Object.entries(targets).map(([k, t]) => [k, countPasswordWindows(Buffer.from(t, 'latin1'), passwordHash)]);
-for (const [k, c] of passwordCounts) if (c > 0) problems.push(`${k} contains the environment switch password in plain text (${c}×)`);
-const hashCount = count(targets['release JS'], passwordHash);
-if (hashCount === 0) problems.push('release JS is missing the switch password hash — wrong bundle, or the gate is not bundled');
+// The removed password gate: no copy of its hash, no plain-text password, none of its names or words.
+const gateCounts = Object.entries(targets).map(([k, t]) => {
+  const buffer = Buffer.from(t, 'latin1');
+  return [k, { hash: countHashCopies(buffer), password: countPasswordWindows(buffer), markers: gateMarkersIn(t) }];
+});
+for (const [k, c] of gateCounts) {
+  if (c.hash > 0) problems.push(`${k} contains the removed switch password's hash (${c.hash}×)`);
+  if (c.password > 0) problems.push(`${k} contains the removed switch password in plain text (${c.password}×)`);
+  if (c.markers.length > 0) problems.push(`${k} contains the removed password gate: ${c.markers.join(', ')}`);
+}
 
 console.log(`\nClient-secret names in release JS: ${origins.length}, from expo-auth-session: ${origins.length - strangers.length}, given a literal value: ${valued}`);
 console.log(`Public UUIDs in release JS: ${[...new Set(knownV4.map((u) => PUBLIC_UUIDS[u.toLowerCase()]))].join('; ') || 'none'}; other UUID-v4 literals: ${unknownV4}${js.length < targets['release JS'].length ? ' (Metro debugId trailer set aside)' : ''}`);
 console.log(`mountmerugroup.com hosts in release JS: ${hosts.join(', ') || 'none'}`);
 console.log(`Example email addresses set aside before the host search: ${examples.map(([a, n]) => `${EXAMPLE_EMAILS[a]} ${n}×`).join('; ')}`);
 console.log(`Control (development bundle): __DEV__-only string found ${count(control, DEV_ONLY_NEEDLE)}×; dev-token strings ${DEV_TOKEN_NEEDLES.filter((n) => count(control, n) > 0).length}/${DEV_TOKEN_NEEDLES.length} (0 expected: the screen is deleted)`);
-console.log(`Switch password (searched by its hash, ${PASSWORD_LENGTH}-character windows): ${passwordCounts.map(([k, c]) => `${k}: ${c}`).join('  ')}; its hash in release JS: ${hashCount}×`);
+console.log(`Removed password gate (hash by fingerprint; ${OLD_PASSWORD_LENGTH}-character windows; its names): ${gateCounts.map(([k, c]) => `${k}: hash ${c.hash}, password ${c.password}, names ${c.markers.length}`).join('  ')}`);
 console.log(`Bundles kept for inspection in: ${out}\n`);
 
 if (problems.length) {
   console.error(`FAIL — ${problems.length} problem(s):\n${problems.map((p) => `  - ${p}`).join('\n')}`);
   process.exit(1);
 }
-console.log(`PASS — no dev-token screen, forbidden auth marker, secret value, token-shaped value, unapproved host or plain-text switch password in the release bundle.`);
+console.log(`PASS — no dev-token screen, forbidden auth marker, secret value, token-shaped value, unapproved host or trace of the removed password gate in the release bundle.`);

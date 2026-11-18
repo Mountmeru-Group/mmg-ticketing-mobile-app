@@ -55,7 +55,7 @@ describe('a development build never uses PROD (CLAUDE.md rule 4)', () => {
     assert.equal(CAN_SWITCH_ENVIRONMENT, false);
   });
 
-  test('any role signs in on UAT (no role rule since the third brief of 2026-11-17; a release build: switch-password.test)', async () => {
+  test('any role signs in on UAT (no role rule for USING an environment; a release build: admin-switch.test)', async () => {
     await useAuthStore.getState().setSession({ token: 'uat-agent-token', user: USER });
     assert.equal(useAuthStore.getState().isAuthenticated, true, 'an AGENT on UAT, in a development build');
     assert.equal(activeEnvironment(), 'UAT');
@@ -128,27 +128,26 @@ describe('wiring: nothing holds a URL from the environment the app started on', 
     assert.match(login, /<View style=\{styles\.topRow\}>\s*<View style=\{styles\.logoCard\}>[\s\S]*?<\/View>\s*<\/View>/);
   });
 
-  test('the sheet (now opened from the drawer): Production and UAT with their hosts, the one in use marked, DEFAULT on Production', () => {
+  test('the sheet (opened from the drawer, ADMIN only): every environment this build may use, the one in use marked', () => {
+    // Its approved layout, chip by chip: tests/environment/admin-switch.test.mjs.
     assert.equal(sourceFiles('src').filter((rel) => /EnvironmentSheet\.tsx$/.test(rel)).join(), 'src/navigation/EnvironmentSheet.tsx');
     const sheet = read('src/navigation/EnvironmentSheet.tsx');
     assert.match(sheet, /SELECTABLE_ENVIRONMENTS\.map\(/);
-    assert.match(sheet, /const host = apiHostFor\(env\);/);
-    assert.match(sheet, /const isDefault = env === DEFAULT_ENVIRONMENT;/);
-    assert.match(sheet, /\{isDefault \? <Badge label="DEFAULT"/);
-    assert.match(sheet, /\{inUse \? <Badge label="IN USE"/);
+    assert.match(sheet, /state=\{environmentRowState\(env, active\)\}/);
     assert.match(sheet, /export const SWITCH_LABEL = 'Switch and sign out';/);
     assert.match(sheet, /<SubmitButton label=\{SWITCH_LABEL\} onPress=\{apply\} disabled=\{chosen === active\} loading=\{switching\} \/>/);
-    // Since the third brief: with the single-use pass from a correct switch password (tests/environment/switch-password).
-    assert.match(sheet, /await switchEnvironment\(chosen, pass\);/);
+    assert.match(sheet, /await switchEnvironment\(chosen\);/);
   });
 
-  test('the More screen\'s "v1.0.0 · PROD" line and Profile follow the environment in use', () => {
+  test('the drawer\'s chip and Profile follow the environment in use; the version is on Profile (no line under the card)', () => {
     const drawer = read('src/navigation/DrawerContent.tsx');
     assert.match(drawer, /const environment = useEnvironmentStore\(\(s\) => s\.environment\);/);
-    assert.match(drawer, /v\{APP_VERSION\} · \{environment\}/);
+    assert.match(drawer, /<EnvironmentChip env=\{environment\} \/>/);
+    assert.doesNotMatch(drawer, /APP_VERSION/, 'the "v1.0.0 · PROD" line is gone (2026-11-18)');
     const profile = read('src/screens/profile/ProfileScreen.tsx');
     assert.match(profile, /const environment = useEnvironmentStore\(\(s\) => s\.environment\);/);
     assert.match(profile, /<ReadOnly label="Environment" value=\{environmentLabel\(environment\)\} \/>/);
+    assert.match(profile, /<ReadOnly label="Version" value=\{APP_VERSION\} \/>/);
   });
 
   test('restoreSession() reads the environment first, so Login and the session agree from the first frame', () => {

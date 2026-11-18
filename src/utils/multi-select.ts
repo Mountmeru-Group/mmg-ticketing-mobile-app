@@ -1,7 +1,9 @@
-// Multi-select dropdowns (2026-11-17): the rules OptionSheet's `multiple` mode follows (src/components/OptionSheet.tsx).
-// Pure. Built only for a filter the server reads several values for. Today that is the ticket list's Status, sent as one
-// comma-separated `status` (docs/web-system/16-SAVED-VIEWS.md §7). Priority, category, technician and group stay single.
-// - A "Select all" row with a count like the web's "1/38": the number chosen of all the options.
+// Multi-select dropdowns: the rules OptionSheet's `multiple` mode follows (src/components/OptionSheet.tsx). Pure.
+// 2026-11-17 built it for Status only. 2026-11-18 (Ronit's brief): every ticket-list filter, status, priority, category,
+// technician and group, each sent as ONE parameter holding comma-separated values, as the live web portal sends them
+// (docs/web-system/01-API-CONTRACT.md TKT-1).
+// - A "Select all" row with a count like the web's "1/38": the number chosen of all the options. A list that comes from a
+//   server search (technicians) has no known total, so its count reads "2 selected".
 // - With a search typed, "Select all" applies to the options the search shows, and only to them.
 // - The closed field reads "Afrikomart +2": the first chosen in option order, then how many more.
 
@@ -14,6 +16,11 @@ export function multiSelectSummary(labels: readonly string[]): string | null {
 /** The count beside "Select all", as the web shows it: chosen / all options ("1/38"). */
 export function selectionCount(chosen: number, total: number): string {
   return `${chosen}/${total}`;
+}
+
+/** The count for a list whose total is unknown (a server search): "2 selected". */
+export function selectionCountUnknownTotal(chosen: number): string {
+  return `${chosen} selected`;
 }
 
 /** The chosen values, each once, in the options' order. Values that are not options are dropped. */
@@ -61,4 +68,27 @@ export function sameChoices<T extends string>(a: readonly T[], b: readonly T[]):
   if (a.length !== b.length) return false;
   const set = new Set(a);
   return b.every((v) => set.has(v));
+}
+
+/**
+ * Every option the sheet knows, each value once: `first` in its order, then any of `more` not already there. A chosen
+ * value the options do not hold (a saved view's category that is no longer listed, an earlier search's technician)
+ * keeps its row and its name this way, so opening and closing the sheet never drops it.
+ */
+export function mergeOptions<T extends { value: string }>(first: readonly T[], ...more: readonly (readonly T[])[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const list of [first, ...more]) {
+    for (const option of list) {
+      if (seen.has(option.value)) continue;
+      seen.add(option.value);
+      out.push(option);
+    }
+  }
+  return out;
+}
+
+/** Sorted by label, as the web orders its technician list (by name): a fixed order for options that arrive by search. */
+export function byLabel<T extends { label: string }>(options: readonly T[]): T[] {
+  return options.slice().sort((a, b) => a.label.localeCompare(b.label));
 }

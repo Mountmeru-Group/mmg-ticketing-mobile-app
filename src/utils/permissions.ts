@@ -61,16 +61,18 @@ export function drawerRoutes(role: UserRole): DrawerRoute[] {
   return routes;
 }
 
-// ── The environment switch: every role, behind a password (2026-11-17, Ronit's third brief) ──
-// The second brief's ADMIN rule (only an ADMIN could switch, or stay on UAT) is gone. A password gates the switch
-// (utils/switch-password.ts); the role decides nothing. Any role may sign in on UAT and stay there across restarts.
+// ── The environment switch: ADMIN only, no password (2026-11-18, Ronit's decision) ──
+// The password gate of 2026-11-17 is removed. Only who may SWITCH is decided here; who may USE an environment is not
+// decided at all: any role signs in on UAT and keeps that session across restarts, and nothing sends anyone back to
+// Production by itself. A non-admin who somehow has a UAT session keeps it; they simply cannot change environment.
 
 /**
- * The drawer's "Service Desk environment" row, beside Sign out: every role. The role is deliberately not read: the
- * password decides who switches. (The row also needs a release build: a development build is UAT only.)
+ * The drawer's "Environment" row and the sheet behind it: ADMIN only. For every other role the row is ABSENT (not
+ * disabled) and the sheet is never mounted, so nothing can open it. switchEnvironment() asks this again before it moves
+ * anyone off Production. (The row also needs a release build: a development build is UAT only.)
  */
-export function offersEnvironmentSwitch(_role: UserRole): boolean {
-  return true;
+export function canSwitchEnvironment(role: UserRole | null | undefined): boolean {
+  return role === 'ADMIN';
 }
 
 // ── Audit log: ADMIN only (G8, docs/G8-WEB-AUDIT.md) ──────────

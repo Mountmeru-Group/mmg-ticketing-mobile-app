@@ -57,12 +57,13 @@ const EVERYTHING = {
   countryName: 'Kenya',
   ticketAdvanced: {
     status: ['OPEN', 'IN_PROGRESS'],
-    priority: 'HIGH',
-    category: { id: 'cat-network', name: 'Network' },
+    // One value each (lists since 2026-11-18): a view holds exactly what it held before. Several: multi-select.test.
+    priority: ['HIGH'],
+    category: [{ id: 'cat-network', name: 'Network' }],
     fromDate: '2026-11-01',
     toDate: '2026-11-30',
-    technician: { id: 'tech-1', name: 'Jane Tech' },
-    group: { id: 'team-1', name: 'Service Desk' },
+    technician: [{ id: 'tech-1', name: 'Jane Tech' }],
+    group: [{ id: 'team-1', name: 'Service Desk' }],
   },
 };
 
@@ -201,7 +202,7 @@ describe('the contract round-trips: phone → Service Desk → web, and web → 
     for (const [name, persona] of Object.entries(PERSONAS)) {
       const filters = [...availableTicketFilters(persona.role), ...HOME_TILE_FILTERS].filter((f) => isTicketFilterAllowed(persona.role, f));
       for (const filter of filters) {
-        const content = sanitizeSavedFilter({ filter, sort: 'DUE', advanced: { ...NO_ADVANCED_FILTERS, priority: 'LOW' } }, persona);
+        const content = sanitizeSavedFilter({ filter, sort: 'DUE', advanced: { ...NO_ADVANCED_FILTERS, priority: ['LOW'] } }, persona);
         const { filters: stored, sla } = savedViewFiltersFor(content, persona);
         if (sla) continue; // refused, below
         const back = decodeSavedView(JSON.parse(JSON.stringify(stored)), persona);
@@ -242,7 +243,8 @@ describe('what a view cannot hold is refused or named, never dropped quietly', (
   test('a view with what this role cannot send, or the app cannot read: not sent, and each part named', () => {
     const filters = {
       status: 'OPEN,NOT_A_STATUS', priority: 'SEVERE', sortBy: 'created', assignedToId: 'tech-2', teamId: 'team-1',
-      categoryId: 'cat-a,cat-b', fromDate: '2026-13-45', categoryIds: ['cat-a', 'cat-b'],
+      // An ARRAY is not guessed at (the web stores comma strings, 16-SAVED-VIEWS §7): named, never sent.
+      categoryId: ['cat-a', 'cat-b'], fromDate: '2026-13-45', categoryIds: ['cat-a', 'cat-b'],
     };
     for (const persona of [PERSONAS.END_USER, PERSONAS.L2_MANAGER]) {
       const { content, leftOut } = decodeSavedView(filters, persona);
@@ -251,7 +253,7 @@ describe('what a view cannot hold is refused or named, never dropped quietly', (
         'Status “OPEN,NOT_A_STATUS” (not a status the app knows)',
         'Technician (not available to your role)',
         'Priority “SEVERE” (not a priority the app knows)',
-        'Category “cat-a,cat-b” (not readable by the app)',
+        'Category “["cat-a","cat-b"]” (not readable by the app)',
         'Group (not available to your role)',
         'Created from “2026-13-45” (not a date the app can send)',
         'Sort “created” (not on the app)',

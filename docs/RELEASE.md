@@ -18,6 +18,9 @@ Updated 2026-11-17 (second and third briefs) for the sixth production build: ver
 web portal (the Service Desk's saved views), Status is a multi-select, and the environment switch moved into the drawer,
 for everyone, behind a password (the second brief's ADMIN-only rule was withdrawn by the third) (§5e). versionCode 6 is on
 Google Play. Not built.
+Updated 2026-11-18, still versionCode 7 (never uploaded): every ticket filter is a multi-select, sent as comma lists in
+the live portal's format; the environment switch is **ADMIN only, with no password** (the gate is removed); the drawer's
+account card and the switch sheet are redesigned (§5f). Not built.
 
 **Where things stand**
 
@@ -27,9 +30,9 @@ Google Play. Not built.
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29, 2026-11-03 and 2026-11-06). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
-| `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build. Since the third brief of that day testers switch in the drawer (beside Sign out), with the **switch password** Ronit gives them; any role may then use UAT (§5e) |
+| `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build. Since 2026-11-18 only an **ADMIN** can switch, from the drawer's Environment row (no password); any role may then sign in on UAT and stays there (§5f) |
 | Signing in | **Microsoft sign-in and email and password sign-in, on every build (UAT and PROD)** since 2026-11-06: the backend confirmed the email endpoint on PRODUCTION (⚠ contract still assumed, 02-AUTH §8). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5). AUTH-P2 is live on UAT (02-AUTH §7); production is still unconfirmed (§5) |
-| `production` AAB | **versionCode 7: ready to build, not built** (§5e). versionCode 6 is already on Google Play. It starts on **PRODUCTION**; anyone with the switch password can switch to UAT from the drawer (§5e). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
+| `production` AAB | **versionCode 7: ready to build, not built** (§5f; kept at 7 on 2026-11-18, as it was never uploaded). versionCode 6 is already on Google Play. It starts on **PRODUCTION**; an ADMIN can switch to UAT from the drawer (§5f). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
 
 ---
 
@@ -712,6 +715,10 @@ eas build --platform android --profile production
 Not built. Ronit's written briefs of 2026-11-17 (the second and third of the day). R4 and R5 relaxed for this repo for
 that work. No EAS build was run, nothing was committed, the live UAT and PROD APIs were not called.
 
+> **Superseded in part on 2026-11-18 (§5f):** the password gate and the every-role row below are **removed** (the switch
+> is ADMIN only, no password), and every ticket filter is now a multi-select. versionCode 7 was never uploaded, so the
+> next build is still versionCode 7, as §5f describes. This section is kept as the record of what was committed.
+
 **Done in this repo**
 - [x] **Saved filters sync with the web portal.** They are the Service Desk's saved views (SVW-1..4,
   `docs/web-system/16-SAVED-VIEWS.md`, UI-STANDARDS §17.2): listed, created, renamed and deleted through the API, never
@@ -788,6 +795,93 @@ that work. No EAS build was run, nothing was committed, the live UAT and PROD AP
 
 **For Ronit to decide**
 - The web's multi-category source: ask the web team to push it before the app sends several categories (16 §7).
+  (Answered 2026-11-18: build to the live format, §5f.)
+
+**Build command (Ronit runs it, from the repo root, after review and commit):**
+```
+npm run verify:release-bundle
+eas build --platform android --profile production
+```
+
+## 5f. versionCode 7, still not built (2026-11-18): every filter a multi-select; the switch ADMIN only, no password
+
+Not built. Ronit's written brief of 2026-11-18. R4 and R5 relaxed for this repo; R1, R2, R3 and R6 not. No EAS build was
+run, nothing was committed, the live UAT and PROD APIs were not called, the web clone was only read (its content
+fingerprint was the same before and after).
+
+**versionCode: kept at 7.** Play has 6 (`tests/release/production-readiness.test.mjs` pins "above 6"). 7 was never
+uploaded, so there is no reason to skip a number. `version` stays `1.0.0`.
+
+**Done in this repo**
+- [x] **Multi-select on every ticket filter**: status, priority, category, technician, group (UI-STANDARDS §18.1).
+  - Each sends ONE parameter, its values joined by commas (`categoryId=a,b,c`), as the live UAT portal does. One value
+    is sent exactly as before; none, not at all; never an empty value or a trailing comma. axios encodes the query.
+  - The format is from a URL Ronit copied from the UAT portal, **not from source**: the web clone still reads priority,
+    category, technician and group as one value on all 16 refs, so the deployed server differs from the source
+    (01-API-CONTRACT TKT-1). If several-value lists come back empty on UAT, check that first.
+  - One `OptionSheet`, extended: checkboxes, "Select all" with the web's count ("1/38"), applying to what the search
+    shows, a "Clear", the "All categories" row that clears, the closed field "Afrikomart +2".
+  - Technician is searched (USR-3), because the web's full list comes from `GET /users`, which is not in the mobile
+    contract. Its count reads "2 selected".
+  - Saved views carry several values per filter as one comma string per key, and restore them (16 §7a).
+- [x] **The environment switch is ADMIN only, with no password** (UI-STANDARDS §18.2–18.4, 02-AUTH §9.6).
+  - `canSwitchEnvironment` (`permissions.ts`), true for ADMIN only. For every other role the drawer row is absent and
+    the sheet is not mounted; it is not a route, and no navigation state is saved, so nothing reaches it.
+    `switchEnvironment()` also refuses a move off Production for anyone but a signed-in ADMIN.
+  - The drawer's account card: Environment (a circle icon, "Environment", a PRODUCTION / UAT chip, a chevron), the
+    account, Sign out. The "v1.0.0 · PROD" line under it is gone; the version was already on Profile ("Version").
+  - The sheet: "Environment", two one-line rows with IN USE / TESTING chips, one foot line, "Switch and sign out" and
+    Cancel. Switching does exactly what it did.
+  - Chip colours in `src/theme/colors.ts` (`colors.environment`): PRODUCTION brand red on its tint (5.0:1), UAT
+    amber-950 on amber-400 (9.0:1); fills 16 L* apart, words 29 L* apart. `amber-950` added to the palette.
+- [x] **Removed** (the password gate of §5e):
+  - `src/utils/switch-password.ts` (the SHA-256 hash, the 5-try / 60-second lockout, the single-use pass);
+  - `src/navigation/EnvironmentPasswordSheet.tsx` (the prompt);
+  - `offersEnvironmentSwitch` (`permissions.ts`), `PASSWORD_REQUIRED` and the pass parameter of `switchEnvironment()`;
+  - `scripts/password-scan.js`, replaced by `scripts/removed-gate-scan.js`, which holds only a fingerprint of the old
+    hash (SHA-256 of it) and proves the gate is gone;
+  - `tests/environment/switch-password.test.mjs`, `tests/support/stubs/expo-crypto.mjs` and its loader entry.
+  - **`expo-crypto` stays in `package.json`:** it predates the gate (Phase 2 SSO, 2026-10-19) and `expo-auth-session`
+    depends on it. No app file imports it now.
+- [x] **Not brought back** (the second brief's UAT rules): no sign-in refusal on UAT for a non-ADMIN, no end of a stored
+  UAT session at cold start, no return of a signed-out cold start on UAT to Production. A non-ADMIN with a UAT session
+  keeps it and simply cannot switch. Login's one-way "Use Production" link on UAT is kept, for anyone signed out.
+- [x] No library added or installed.
+
+**What a tester sees after updating from versionCode 6**
+
+| Before the update | After |
+|---|---|
+| Switched to UAT and signed in (any role) | Still on UAT, still signed in. Only an ADMIN sees the Environment row |
+| On UAT's Login | Still on UAT; "Use Production" under the chip |
+| On Production, not an ADMIN | No Environment row: the switch is not offered |
+
+**Tests** (1407, was 1380)
+- New: `tests/environment/admin-switch.test.mjs` (a release build): the row for ADMIN and for none of the other four;
+  no route, link or saved state reaches the sheet; `switchEnvironment()` refuses every non-ADMIN; the UAT rules are not
+  back; the gate is gone from `src/` (no hash, no password, none of its names), and the hash from the whole tree; the
+  approved card and sheet; the chip contrast and lightness.
+- Rewritten: `tests/filters/multi-select.test.mjs` (each of the five: comma-joined for several, unchanged for one, no
+  key for none, read back from the URL axios builds and compared with Ronit's portal URL; no trailing comma or empty
+  value; saved views round-trip several values per filter; the OptionSheet rules).
+- Updated to the list shape, with one value each so their exact parameters prove the single-value form is unchanged:
+  `tests/rbac/list-filters.test.mjs`, `tests/filters/saved-views.test.mjs`, `tests/home/period-list.test.mjs`.
+- Updated: `tests/environment/switch-release.test.mjs` (an ADMIN signs in before each switch to UAT),
+  `dev-build.test.mjs`, `tests/components/dropdown-search.test.mjs`.
+- Removed: `tests/environment/switch-password.test.mjs`.
+
+**Checks (2026-11-18)**
+- `npx tsc --noEmit`: clean.
+- `npm test`: **1407 pass, 0 fail**.
+- `npm run verify:release-bundle`: **PASS**. The removed gate in release JS and Hermes: hash 0, password 0, names 0.
+- Local Metro bundling only: no EAS build.
+
+**For Ronit to decide or confirm**
+- On UAT, before release: tick two categories on the phone and check the list is not empty. The clone's code would
+  return an empty list for a comma list; the live portal's URL says the deployed server reads it.
+- On UAT: save a web view with two categories and look at its `filters.categoryId` (16 §7a): a string means the web and
+  the app agree; an array means the app's reader needs a change.
+- Technicians: the sheet searches (2+ letters). A full list like the web's needs `GET /users` added to 01 first.
 
 **Build command (Ronit runs it, from the repo root, after review and commit):**
 ```
@@ -816,6 +910,9 @@ Until 2026-10-29 this section was "Proof the developer-token screen is not in a 
    - a UUID-v4 literal (the shape of a session token) that is not allowed below;
    - a `Bearer <uuid>` literal;
    - a `mountmerugroup.com` host other than the two in `src/config/env.ts`;
+   - any trace of the environment switch's **removed password gate** (2026-11-18): its hash (found by a fingerprint of
+     it), the password in plain text (every 12-character window, hashed twice), or its names and words
+     (`scripts/removed-gate-scan.js`). Neither the script nor the tests hold the hash or the password;
    - a missing control string (wrong file searched), or `__DEV__`-only code in release.
 5. Prints counts and file names only, never a matched value. Bundles go to the OS temp folder, never the repo.
 
@@ -893,6 +990,8 @@ History:
 - 2026-11-03: PASS, both modes (versionCode 3).
 - 2026-11-05 to 2026-11-06: FAIL, both modes, on the G9 example email address (above).
 - 2026-11-06: PASS, both modes (versionCode 4), with that one address set aside.
+- 2026-11-17: PASS (versionCode 7, with the password gate: its plain text 0, its hash present).
+- 2026-11-18: PASS (versionCode 7, the gate removed: hash 0, password 0, names 0 in release JS and Hermes).
 
 ## 7. App identity assets (`assets/`)
 

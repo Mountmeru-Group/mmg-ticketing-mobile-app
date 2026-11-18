@@ -8,6 +8,7 @@
 > - File references are relative to `backend/src/` unless prefixed.
 > - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
 > - **2026-11-17 (Ronit's written brief):** SVW-1..4, the saved views, added from the source at `7df97c8` (§10.6; full contract with sources: `16-SAVED-VIEWS.md`). TKT-1's Status filter (several values) added to the mobile filters.
+> - **2026-11-18 (Ronit's written brief):** TKT-1's `priority`, `categoryId`, `assignedToId` and `teamId` take several values as ONE comma-separated parameter. **Read from a live URL, not from source:** Ronit copied it from the UAT portal. The clone's controller (`7df97c8`, and all 16 refs) still reads each as one value, so the deployed server differs from the source, as with AUD-1 (§10.5) and NTF-5/6.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
 
@@ -282,9 +283,10 @@ export const assignTicketSchema = z.object({
 |---|---|
 | `page`, `limit` | Shape (a): default 1 / **25**, limit max **100**. **`pageSize` is ignored.** |
 | `status` | Single value, or comma list (`OPEN,IN_PROGRESS`) → `in`. Not validated: an unknown value gives 500 |
-| `priority`, `impact`, `urgency` | Single enum value, exact match |
-| `assignedToId` | A user UUID, or the literal `unassigned` (→ `assignedToId = null`) |
-| `teamId`, `categoryId` | Exact UUID match. `categoryId` does not include children |
+| `priority` | Single enum value, exact match, in the source. **Live (2026-11-18): one value or a comma list** (§TKT-1 "Several values") |
+| `impact`, `urgency` | Single enum value, exact match |
+| `assignedToId` | A user UUID, or the literal `unassigned` (→ `assignedToId = null`), in the source. **Live: also a comma list of user UUIDs** |
+| `teamId`, `categoryId` | Exact UUID match in the source. `categoryId` does not include children. **Live: also a comma list of UUIDs** |
 | `requesterId` | Exact match; ignored for END_USER |
 | `sla` | `WITHIN_SLA` \| `DUE_SOON` \| `BREACHED` |
 | `fromDate`, `toDate` | `YYYY-MM-DD` only, interpreted as **UTC** day bounds on `createdAt`. Any other format gives 500 |
@@ -308,17 +310,25 @@ export const assignTicketSchema = z.object({
 
 | Filter | Parameter and value | Who | Options from |
 |---|---|---|---|
-| Status (2026-11-17) | `status=OPEN,IN_PROGRESS`: **one** comma-separated value, any number of 03 statuses, in the web's order. **The only filter TKT-1 reads several values for** (ctrl:114-116). Repeated keys arrive as an array and give a 500 (`16-SAVED-VIEWS.md` §7) | every role | the 03 enum, in the web's order (`TicketsListPage.tsx:28`); multi-select (`OptionSheet multiple`) |
-| Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, **one** value. A list is not read: a comma value is not an enum value (500) | every role | the 03 enum, in that order |
-| Category | `categoryId=<top-level category id>`. **Exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name |
+| Status | `status=OPEN,IN_PROGRESS`: **one** comma-separated value, any number of 03 statuses, in the web's order (ctrl:114-116, in the source). Repeated keys arrive as an array and give a 500 (`16-SAVED-VIEWS.md` §7) | every role | the 03 enum, in the web's order (`TicketsListPage.tsx:28`); multi-select |
+| Priority | `priority=HIGH` or `priority=HIGH,URGENT` (2026-11-18, live format): 03 priorities only, in the 03 order | every role | the 03 enum, in that order; multi-select |
+| Category | `categoryId=<id>` or `categoryId=<id>,<id>,…` (2026-11-18, live format): top-level categories. **Each is an exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name; multi-select |
 | Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500). **G7:** a Home tile also sets both, from the Home period, as the web's dashboard links do: UTC days of the device clock (`FE:pages/dashboard/DashboardPage.tsx:72-86`; `src/utils/dashboard-period.ts` `periodListDates`; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1) | every role | the system date picker, or a Home tile |
-| Technician | `assignedToId=<user id>` | ADMIN, AGENT | USR-3 `role=AGENT` (the web lists active AGENTs) |
-| Group | `teamId=<team id>` | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web) |
+| Technician | `assignedToId=<user id>` or `assignedToId=<id>,<id>,…` (2026-11-18, live format) | ADMIN, AGENT | USR-3 `role=AGENT`, searched (the web lists active AGENTs from `GET /users`, not in this contract); multi-select |
+| Group | `teamId=<team id>` or `teamId=<id>,<id>,…` (2026-11-18, live format) | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web); multi-select |
 
   - Technician and group are never sent for END_USER or L2_MANAGER, even if set: their lookups are 403 for those roles (`permissions.ts` `ticketListFilters`).
-  - One `assignedToId`: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other, as the web's single select does.
-  - One `status` (2026-11-17): a named filter that sends a status (Open, My open, Pending, Resolved, Closed, the Home tiles) and the Status filter replace each other, the last choice winning. Overdue and Due soon send `sla` and combine with it.
-  - **Category, technician and group stay single.** `categoryId`, `assignedToId` and `teamId` are exact matches (ctrl:120-122). A comma list matches nothing, so it gives an empty list with no error; repeated keys give a 500. The web portal's multi-select category control ("Select All 1/38") is in no branch of the clone (`16-SAVED-VIEWS.md` §7). Ask the web team for that source before the app sends more than one.
+  - One `assignedToId` key: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other (however many technicians it held). `unassigned` is never sent inside a list.
+  - One `status` key (2026-11-17): a named filter that sends a status (Open, My open, Pending, Resolved, Closed, the Home tiles) and the Status filter replace each other, the last choice winning. Overdue and Due soon send `sla` and combine with it.
+  - **Several values (2026-11-18), how the app sends them** (`utils/ticket-filters.ts` `advancedFilterQuery`):
+    - **ONE parameter, its values joined by commas.** Never repeated keys (`?x=a&x=b`, an array to Express: a 500 in the source), never `x[]=`.
+    - One value: exactly as before, no comma. None: the key is not sent at all. Never an empty value, an empty part or a trailing comma; each value once. Ids are UUID characters only (`isFilterId`), so a list always splits back into the same ids.
+    - The app hands axios plain strings as `params`; axios encodes them. It writes the comma as `,` (its `buildURL` turns `%2C` back into `,`, as it already did for `status`); the browser's URL has `%2C`. Both decode to the same value on the server.
+  - **Source of the format: a live URL, not source.** Ronit copied this from the UAT portal's ticket list with three categories and two technicians ticked (2026-11-18), decoded:
+    `/tickets?categoryId=416f882d-…,4f72a6ef-…,17715eba-…&assignedToId=f29cdb1e-…,11e436d3-…`
+    - It is the portal's page URL. On `master` the page's URL parameters, its filter state and its TKT-1 parameters are one `TicketFilters` object of strings (`TLP:243-250`, `16-SAVED-VIEWS.md` §6), so the API request is taken to carry the same values. The request itself was not observed: no live API is called from the analysis machine.
+    - The URL shows `categoryId` and `assignedToId`. `priority` and `teamId` are built the same way on Ronit's instruction; the URL does not show them.
+  - **The clone does not agree.** `tickets.controller.ts` at `7df97c8` (`:117`, `:120-122`), and on all 16 refs, reads `priority`, `assignedToId`, `teamId` and `categoryId` as one exact value: by that code, a comma list matches nothing (an empty list) and a comma `priority` is a 500. The deployed server is newer than the clone (`09-API-DRIFT.md`). If the app's multi-value lists come back empty on UAT, that is the first thing to check.
 
 ### TKT-2 `POST /api/v1/tickets` — MVP
 - **Purpose:** raise a ticket.

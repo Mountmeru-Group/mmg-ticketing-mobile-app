@@ -6,6 +6,11 @@
 //   `sortBy`, `assignedToId`, `teamId`, `categoryId`, `fromDate`, `toDate`, each a string (TicketsListPage.tsx:190-199).
 //   The app writes exactly those, with the meanings TKT-1 gives them, so the web reads a phone's view back as the same
 //   tickets. It writes no key of its own: the web would ignore it and show other tickets under the same name.
+// - Several values (2026-11-18): a key holds them as ONE comma-separated string, `"categoryId": "a,b,c"`, exactly what
+//   TKT-1 is sent. That is the web's own form for `status` in the source (a comma list kept as a string,
+//   16-SAVED-VIEWS.md §6) and the live portal's form in its URL. The deployed web's code for multi-value views is not in
+//   the clone, so it cannot be read; an ARRAY in a view is not guessed at: it is listed as left out, like any value the
+//   app cannot read.
 // - On the phone a view is a quick filter, a sort and the Filters sheet's filters (SavedFilterContent). The quick filter
 //   is written as what TKT-1 sends for it (`status`, `assignedToId`). The ones that send `sla` (Overdue, Due soon, the
 //   Home tiles' "SLA breached") cannot be held: saving them is REFUSED, never quietly dropped.
@@ -20,10 +25,10 @@ import { TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type SavedViewFilter
 import { PRIORITY_LABELS, statusLabel } from './format';
 import { ticketListFilters } from './permissions';
 import {
-  NO_ADVANCED_FILTERS, TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, cleanStatusList,
-  countrySelectorMode, dateRangeLabel, isFilterDay, isTicketFilterAllowed, namedFilterSetsStatus, namedFilterSetsTechnician,
-  ticketFilterQuery, ticketListQuery, type FilterPick, type TicketAdvancedFilters, type TicketListPeriod,
-  type TicketNamedFilter, type TicketSortOption,
+  NO_ADVANCED_FILTERS, TICKET_FILTER_LABELS, TICKET_SORT_LABELS, availableTicketFilters, cleanPicks, cleanPriorityList,
+  cleanStatusList, countrySelectorMode, dateRangeLabel, isFilterDay, isFilterId, isTicketFilterAllowed, namedFilterSetsStatus,
+  namedFilterSetsTechnician, ticketFilterQuery, ticketListQuery, type FilterPick, type TicketAdvancedFilters,
+  type TicketListPeriod, type TicketNamedFilter, type TicketSortOption,
 } from './ticket-filters';
 
 /** A name's length cap for the names the app writes, after trimming. The server has none (05 B.42). */
@@ -60,13 +65,22 @@ export class SavedFilterError extends Error {}
 
 // ── Small checks ─────────────────────────────────────────────
 
-/** A server id as the app sends it: UUID characters only (never a comma, so never a list). */
-const ID = /^[A-Za-z0-9-]{1,64}$/;
-
 function isPick(value: unknown): value is FilterPick {
   if (typeof value !== 'object' || value === null) return false;
   const pick = value as Partial<FilterPick>;
-  return typeof pick.id === 'string' && ID.test(pick.id) && typeof pick.name === 'string';
+  return isFilterId(pick.id) && typeof pick.name === 'string';
+}
+
+/** The parts of a comma-separated value, trimmed, empty parts dropped. Null when it is not a string. */
+function commaParts(value: unknown): string[] | null {
+  return typeof value === 'string' ? value.split(',').map((s) => s.trim()).filter(Boolean) : null;
+}
+
+/** One id or a comma list of ids, each once, in the order stored. Null when any part is not an id the app can send. */
+function idList(value: unknown): string[] | null {
+  const parts = commaParts(value);
+  if (!parts || parts.length === 0 || !parts.every(isFilterId)) return null;
+  return [...new Set(parts)];
 }
 
 const asPick = (value: unknown): FilterPick | null => (isPick(value) ? { id: value.id, name: value.name } : null);
@@ -111,12 +125,12 @@ export function sanitizeSavedFilter(content: Partial<SavedFilterContent> | null 
   const dateAllowed = allowed.includes('date');
   const advanced: TicketAdvancedFilters = {
     status: allowed.includes('status') && !namedFilterSetsStatus(filter) ? cleanStatusList(raw.status) : [],
-    priority: allowed.includes('priority') && isPriority(raw.priority) ? raw.priority : null,
-    category: allowed.includes('category') ? asPick(raw.category) : null,
+    priority: allowed.includes('priority') ? cleanPriorityList(raw.priority) : [],
+    category: allowed.includes('category') ? cleanPicks(raw.category) : [],
     fromDate: dateAllowed && isFilterDay(raw.fromDate as string) ? (raw.fromDate as string) : null,
     toDate: dateAllowed && isFilterDay(raw.toDate as string) ? (raw.toDate as string) : null,
-    technician: allowed.includes('technician') && !namedFilterSetsTechnician(filter) ? asPick(raw.technician) : null,
-    group: allowed.includes('group') ? asPick(raw.group) : null,
+    technician: allowed.includes('technician') && !namedFilterSetsTechnician(filter) ? cleanPicks(raw.technician) : [],
+    group: allowed.includes('group') ? cleanPicks(raw.group) : [],
   };
   return { filter, sort, advanced };
 }
@@ -225,22 +239,28 @@ export function decodeSavedView(filters: unknown, viewer: SavedFilterViewer, nam
   // Status: one value or a comma list of 03 statuses, nothing else (an unknown value is a 500, 01 TKT-1).
   let statuses: TicketStatus[] | null = null;
   if (isSet(raw.status)) {
-    const parts = typeof raw.status === 'string' ? raw.status.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const parts = commaParts(raw.status) ?? [];
     if (parts.length > 0 && parts.every(isStatus)) statuses = cleanStatusList(parts);
     else leftOut.push(`Status ${quoted(raw.status)} (not a status the app knows)`);
   }
 
-  // Technician: one user id, or the web's `unassigned`.
+  // Technician: one user id, a comma list of them, or the web's `unassigned` on its own. `unassigned` inside a list is
+  // not something the app can send: Unassigned is a quick filter, and it and technicians replace each other.
   let assignee: string | null = null;
+  let technicianIds: string[] | null = null;
   if (isSet(raw.assignedToId)) {
-    if (typeof raw.assignedToId === 'string' && ID.test(raw.assignedToId)) assignee = raw.assignedToId;
-    else leftOut.push(`Technician ${quoted(raw.assignedToId)} (not readable by the app)`);
+    const ids = idList(raw.assignedToId);
+    if (ids && ids.length === 1 && ids[0] === 'unassigned') assignee = 'unassigned';
+    else if (ids && !ids.includes('unassigned')) {
+      technicianIds = ids;
+      assignee = ids.join(',');
+    } else leftOut.push(`Technician ${quoted(raw.assignedToId)} (not readable by the app)`);
   }
 
   // The quick filter, when the view is exactly one of this role's.
   let filter: TicketNamedFilter = 'ALL';
   let status: TicketStatus[] = [];
-  let technician: FilterPick | null = null;
+  let technician: FilterPick[] = [];
   const named = availableTicketFilters(viewer.role).find((f) => f !== 'ALL' && matchesNamedFilter(f, viewer, statuses, assignee));
   if (named) {
     filter = named;
@@ -248,9 +268,10 @@ export function decodeSavedView(filters: unknown, viewer: SavedFilterViewer, nam
     if (assignee === 'unassigned') {
       if (isTicketFilterAllowed(viewer.role, 'UNASSIGNED')) filter = 'UNASSIGNED';
       else leftOut.push('Unassigned tickets only (not available to your role)');
-    } else if (assignee !== null) {
-      if (allowed.includes('technician')) technician = { id: assignee, name: names.technician(assignee) ?? 'Unknown technician' };
-      else leftOut.push('Technician (not available to your role)');
+    } else if (technicianIds !== null) {
+      if (allowed.includes('technician')) {
+        technician = technicianIds.map((id) => ({ id, name: names.technician(id) ?? 'Unknown technician' }));
+      } else leftOut.push('Technician (not available to your role)');
     }
     if (statuses !== null) {
       if (allowed.includes('status')) status = statuses;
@@ -258,25 +279,28 @@ export function decodeSavedView(filters: unknown, viewer: SavedFilterViewer, nam
     }
   }
 
-  let priority: TicketPriority | null = null;
+  // Priority: one value or a comma list of 03 priorities (an unknown value is a 500, 01 TKT-1).
+  let priority: TicketPriority[] = [];
   if (isSet(raw.priority)) {
-    if (!isPriority(raw.priority)) leftOut.push(`Priority ${quoted(raw.priority)} (not a priority the app knows)`);
-    else if (allowed.includes('priority')) priority = raw.priority;
+    const parts = commaParts(raw.priority) ?? [];
+    if (parts.length === 0 || !parts.every(isPriority)) leftOut.push(`Priority ${quoted(raw.priority)} (not a priority the app knows)`);
+    else if (allowed.includes('priority')) priority = cleanPriorityList(parts);
     else leftOut.push('Priority (not available to your role)');
   }
 
   const pick = (key: 'categoryId' | 'teamId', filterKey: 'category' | 'group', word: string, name: (id: string) => string | null) => {
     const value = raw[key];
-    if (!isSet(value)) return null;
-    if (typeof value !== 'string' || !ID.test(value)) {
+    if (!isSet(value)) return [];
+    const ids = idList(value);
+    if (!ids) {
       leftOut.push(`${word} ${quoted(value)} (not readable by the app)`);
-      return null;
+      return [];
     }
     if (!allowed.includes(filterKey)) {
       leftOut.push(`${word} (not available to your role)`);
-      return null;
+      return [];
     }
-    return { id: value, name: name(value) ?? `Unknown ${word.toLowerCase()}` };
+    return ids.map((id) => ({ id, name: name(id) ?? `Unknown ${word.toLowerCase()}` }));
   };
   const category = pick('categoryId', 'category', 'Category', names.category);
   const group = pick('teamId', 'group', 'Group', names.group);
@@ -311,9 +335,13 @@ export function decodeSavedView(filters: unknown, viewer: SavedFilterViewer, nam
 
 // ── Comparing ────────────────────────────────────────────────
 
+/** The comma-list keys whose order does not change the tickets: compared as sorted sets. */
+const ID_LIST_KEYS: ReadonlySet<string> = new Set(['assignedToId', 'teamId', 'categoryId']);
+
 /**
- * A view's `filters` reduced to what decides the tickets: each set key as a trimmed string, a status list in option
- * order. Keys outside the web's eight are kept (so a view holding one never equals a phone's). Null when unreadable.
+ * A view's `filters` reduced to what decides the tickets: each set key as a trimmed string; a status or priority list in
+ * option order; a list of ids sorted (the web and the phone may tick them in another order). Keys outside the web's
+ * eight are kept (so a view holding one never equals a phone's). Null when unreadable.
  */
 export function savedViewKey(filters: unknown): string | null {
   if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) return null;
@@ -322,9 +350,13 @@ export function savedViewKey(filters: unknown): string | null {
   for (const key of Object.keys(raw).sort()) {
     const value = raw[key];
     if (!isSet(value)) continue;
-    if (key === 'status' && typeof value === 'string') {
-      const parts = value.split(',').map((s) => s.trim()).filter(Boolean);
+    const parts = commaParts(value);
+    if (key === 'status' && parts) {
       out.push([key, parts.every(isStatus) ? cleanStatusList(parts).join(',') : value]);
+    } else if (key === 'priority' && parts) {
+      out.push([key, parts.every(isPriority) ? cleanPriorityList(parts).join(',') : value]);
+    } else if (ID_LIST_KEYS.has(key) && idList(value)) {
+      out.push([key, (idList(value) ?? []).slice().sort().join(',')]);
     } else if (key === 'sortBy' && value === 'updated') {
       continue; // the same order as no sortBy
     } else {
@@ -346,14 +378,16 @@ export function sameSavedViewFilters(a: unknown, b: unknown): boolean {
 export function savedViewChips(content: SavedFilterContent): string[] {
   const { advanced: a } = content;
   const chips = [`Quick filter: ${TICKET_FILTER_LABELS[content.filter]}`];
+  const names = (picks: readonly FilterPick[]) => cleanPicks(picks).map((p) => p.name).join(', ');
   const statuses = cleanStatusList(a.status);
   if (statuses.length > 0) chips.push(`Status: ${statuses.map(statusLabel).join(', ')}`);
-  if (a.priority) chips.push(`Priority: ${PRIORITY_LABELS[a.priority]}`);
-  if (a.category) chips.push(`Category: ${a.category.name}`);
+  const priorities = cleanPriorityList(a.priority);
+  if (priorities.length > 0) chips.push(`Priority: ${priorities.map((p) => PRIORITY_LABELS[p]).join(', ')}`);
+  if (cleanPicks(a.category).length > 0) chips.push(`Category: ${names(a.category)}`);
   const dates = dateRangeLabel(a.fromDate, a.toDate);
   if (dates) chips.push(dates);
-  if (a.technician) chips.push(`Technician: ${a.technician.name}`);
-  if (a.group) chips.push(`Group: ${a.group.name}`);
+  if (cleanPicks(a.technician).length > 0) chips.push(`Technician: ${names(a.technician)}`);
+  if (cleanPicks(a.group).length > 0) chips.push(`Group: ${names(a.group)}`);
   chips.push(`Sort: ${TICKET_SORT_LABELS[content.sort]}`);
   return chips;
 }
@@ -415,6 +449,8 @@ export function savedViewSaveProblem(
 }
 
 // ── The phone-only list of versionCode 6 (not uploaded: 16-SAVED-VIEWS.md §9) ──
+
+// versionCode 6 kept ONE category, technician and group per filter (`asPick`); its entries are read as it wrote them.
 
 /** SecureStore allows letters, digits, `.`, `-` and `_` in a key; user ids are UUIDs. */
 const KEY_PART = /^[A-Za-z0-9_-]{1,64}$/;

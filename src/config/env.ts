@@ -2,9 +2,9 @@
 // Since 2026-11-17 (Ronit's written brief) the environment is a RUNTIME choice, no longer fixed by the EAS profile. Which
 // one is in use, and storing it: src/store/environment.store.ts.
 // - A release build (any EAS profile) offers Production and UAT. A fresh install is on Production, always.
-// - Since the third brief of 2026-11-17: the switch is the drawer's "Service Desk environment" row, beside Sign out,
-//   for everyone, behind a password (src/utils/switch-password.ts). Any role may then use UAT, and the choice persists
-//   across restarts. Login has no switch, only a "Use Production" link while on UAT.
+// - Since 2026-11-18: the switch is the drawer's "Environment" row, in the account card, for ADMIN only and with no
+//   password (permissions.ts canSwitchEnvironment). Any role may USE UAT: a UAT session is kept across restarts for
+//   anyone, and the choice persists. Login has no switch, only a "Use Production" link while on UAT.
 // - A development build (__DEV__) is UAT only, whatever is stored, and has no switch: PROD is refused here
 //   (CLAUDE.md rule 4). This file never reads EXPO_PUBLIC_APP_ENV any more; scripts/eas-build-guard.js refuses a build
 //   that still sets it, so nobody thinks it pins the URL.
@@ -31,7 +31,7 @@ export const SELECTABLE_ENVIRONMENTS: readonly AppEnvironment[] = DEVELOPMENT_BU
 /** A fresh install's environment: Production in every release build, UAT in a development build. */
 export const DEFAULT_ENVIRONMENT: AppEnvironment = DEVELOPMENT_BUILD ? 'UAT' : 'PROD';
 
-/** Whether this build can switch at all: a release build only. Anyone may open the switch; the password gates it. */
+/** Whether this build can switch at all: a release build only. Who may switch: permissions.ts canSwitchEnvironment. */
 export const CAN_SWITCH_ENVIRONMENT: boolean = SELECTABLE_ENVIRONMENTS.length > 1;
 
 /** The names the switch sheet and the drawer show. */
@@ -90,6 +90,18 @@ export function environmentLabel(env: AppEnvironment): string {
  */
 export function showEnvironmentChip(env: AppEnvironment): boolean {
   return env === 'UAT';
+}
+
+/** The environment chip's word (the drawer's Environment row and header; src/navigation/EnvironmentChip.tsx). */
+export const ENVIRONMENT_CHIP_LABELS: Record<AppEnvironment, string> = { PROD: 'PRODUCTION', UAT: 'UAT' };
+
+/**
+ * The state chip on a row of the switch sheet (2026-11-18): IN USE on the environment in use; TESTING on UAT otherwise;
+ * none on Production otherwise.
+ */
+export function environmentRowState(env: AppEnvironment, active: AppEnvironment): 'IN USE' | 'TESTING' | null {
+  if (env === active) return 'IN USE';
+  return env === 'UAT' ? 'TESTING' : null;
 }
 
 export const APP_VERSION: string = appJson.expo.version;

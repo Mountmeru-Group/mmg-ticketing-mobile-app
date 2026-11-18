@@ -4,14 +4,17 @@
 // - WHICH filters: ticketListFilters() (utils/permissions.ts) alone. Status, priority, category and created date for
 //   everyone; technician and group for ADMIN and AGENT (their lookups, USR-3 and LKP-2, are 403 for END_USER and
 //   L2_MANAGER).
-// - STATUS (2026-11-17) is the one multi-select (OptionSheet `multiple`): TKT-1 reads several statuses as one comma list
-//   (16-SAVED-VIEWS.md §7). Priority, category, technician and group stay single: the server reads one value each.
-//   Picking statuses replaces a quick filter that sends a status, as a technician replaces "My open".
-// - Every pick applies at once, as each web select does on change; the list behind refetches. Status's ticks apply once,
-//   when its sheet closes (one request, not one per tick). Nothing is written to the server: these are TKT-1 query
-//   params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
+// - MULTI-SELECT on every filter (2026-11-18, Ronit's brief): status, priority, category, technician and group are one
+//   OptionSheet `multiple` each (checkboxes, Select all with its count, Clear, the search). Each sends ONE parameter with
+//   its values joined by commas, as the live web portal does (01-API-CONTRACT.md TKT-1); one value is sent as before.
+//   The "All categories" row clears the choice; it is not a value. Picking statuses replaces a quick filter that sends a
+//   status, and picking technicians replaces "My open" or "Unassigned" (one slot each, last choice wins).
+// - Ticks apply once, when a sheet closes (one request, not one per tick); the list behind refetches. Nothing is written
+//   to the server: these are TKT-1 query params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
 // - Options as on the web: priorities in its order; active top-level categories by name (LKP-1); every group, inactive
-//   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`).
+//   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`). The web
+//   lists its technicians from `GET /users`, which is not in the mobile contract (01), so the technician sheet searches:
+//   it shows the chosen ones, and up to 20 matches for what is typed.
 // - "Clear all" is the web's Clear: named filter, search, the sheet's filters and the sort. The country stays.
 // - SAVED FILTERS at the top (./SavedFilters.tsx): the Service Desk's saved views, the same list as the web portal's
 //   (2026-11-17). A chip applies the view at once, cut to this role (decodeSavedView).
@@ -22,10 +25,10 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, PersonPickerSheet, ScreenHeader, SelectField,
-  SubmitButton, type SheetOption,
+  ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, ScreenHeader, SelectField, SubmitButton,
+  type SheetOption,
 } from '@/components';
-import { countryName, useCategories, useCountryOptions, useTeams, useTickets } from '@/hooks';
+import { countryName, useCategories, useCountryOptions, useDebouncedValue, useTeams, useTickets, useUserSearch } from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
@@ -37,17 +40,24 @@ import type { SavedFilterContent, TicketListFilterState } from '@/utils/saved-fi
 import { DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 import {
   PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels,
-  categoryFilterOptions, countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed,
-  listCountryParam, namedFilterSetsStatus, namedFilterSetsTechnician, statusFilterSummary, type TicketNamedFilter,
+  categoryFilterOptions, countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isFilterId,
+  isTicketFilterAllowed, listCountryParam, namedFilterSetsStatus, namedFilterSetsTechnician, picksSummary,
+  priorityFilterSummary, statusFilterSummary, type FilterPick, type TicketNamedFilter,
 } from '@/utils/ticket-filters';
 import { SavedFiltersBlock } from './SavedFilters';
-
-const ALL = '__ALL__';
 
 type Picker = 'status' | 'priority' | 'category' | 'technician' | 'group';
 
 /** The Status filter's options, in the web's order (TicketsListPage.tsx:28). */
 const STATUS_OPTIONS: readonly SheetOption<TicketStatus>[] = STATUS_FILTER_OPTIONS.map((s) => ({ value: s, label: statusLabel(s) }));
+/** The Priority filter's options, in the web's order (TicketsListPage.tsx:58). */
+const PRIORITY_OPTIONS: readonly SheetOption<TicketPriority>[] = PRIORITY_FILTER_OPTIONS.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }));
+/** USR-3 answers only a search of 2 or more characters (01 USR-3). */
+const TECHNICIAN_SEARCH_MIN = 2;
+
+/** Picks as sheet options (value = id, label = name), and back. */
+const pickOptions = (picks: readonly FilterPick[]): SheetOption<string>[] => picks.map((p) => ({ value: p.id, label: p.name }));
+const picksFrom = (chosen: readonly SheetOption<string>[]): FilterPick[] => chosen.map((o) => ({ id: o.value, name: o.label }));
 
 export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'TicketFilters'>) {
   const user = useAuthStore((s) => s.user);
@@ -57,6 +67,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
     applySavedTicketFilter,
   } = useUiStore();
   const [picker, setPicker] = useState<Picker | null>(null);
+  const [technicianQuery, setTechnicianQuery] = useState('');
 
   const allowed = ticketListFilters(user);
   const role = user?.role ?? 'END_USER';
@@ -71,12 +82,35 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
   const categories = useCategories({ enabled: picker === 'category' && allowed.includes('category') });
   const teams = useTeams({ enabled: picker === 'group' && allowed.includes('group'), includeInactive: true });
 
-  const priorityOptions = useMemo<SheetOption<TicketPriority | typeof ALL>[]>(
-    () => [{ value: ALL, label: 'All priorities' }, ...PRIORITY_FILTER_OPTIONS.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))],
-    [],
+  const categoryOptions = useMemo<SheetOption<string>[]>(
+    () => categoryFilterOptions(categories.data ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [categories.data],
   );
-  const categoryOptions = useMemo(() => categoryFilterOptions(categories.data ?? []), [categories.data]);
-  const groupOptions = useMemo(() => groupFilterOptions(teams.data ?? []), [teams.data]);
+  const groupOptions = useMemo<SheetOption<string>[]>(
+    () =>
+      groupFilterOptions(teams.data ?? []).map((g) => ({
+        value: g.id, label: g.name, description: g.inactive ? 'Inactive group' : undefined,
+      })),
+    [teams.data],
+  );
+
+  // Technicians come from a server search (USR-3, active AGENTs, up to 20), only while their sheet is open.
+  const technicianTerm = useDebouncedValue(technicianQuery, 350);
+  const technicianSearch = useUserSearch(technicianTerm, {
+    roles: TECHNICIAN_FILTER_ROLES, enabled: picker === 'technician' && allowed.includes('technician'),
+  });
+  const technicianTyped = technicianQuery.trim().length >= TECHNICIAN_SEARCH_MIN;
+  const technicianOptions = useMemo<SheetOption<string>[]>(
+    () =>
+      (technicianTyped ? (technicianSearch.data ?? []) : [])
+        .filter((u) => isFilterId(u.id))
+        .map((u) => ({ value: u.id, label: formatDisplayName(u.displayName) || u.email, description: u.email })),
+    [technicianTyped, technicianSearch.data],
+  );
+  const closePicker = () => {
+    setPicker(null);
+    setTechnicianQuery('');
+  };
 
   /** System date dialog (Android). The device's calendar day is sent, as the web's date input sends the browser's. */
   const pickDay = (current: string | null, apply: (day: string) => void) => {
@@ -142,7 +176,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
               hint={
                 statusSlotTaken
                   ? `Picking statuses replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
-                  : 'Pick as many as you need.'
+                  : undefined
               }
               value={statusFilterSummary(advanced.status)}
               placeholder="All statuses"
@@ -153,7 +187,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
           {allowed.includes('priority') ? (
             <SelectField
               label="Priority"
-              value={advanced.priority ? PRIORITY_LABELS[advanced.priority] : null}
+              value={priorityFilterSummary(advanced.priority)}
               placeholder="All priorities"
               onPress={() => setPicker('priority')}
             />
@@ -162,8 +196,8 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
           {allowed.includes('category') ? (
             <SelectField
               label="Category"
-              hint="Top-level categories. Tickets filed under a sub-category or item of it are not included."
-              value={advanced.category?.name ?? null}
+              hint="Top-level categories. Tickets filed under a sub-category or item of one are not included."
+              value={picksSummary(advanced.category)}
               placeholder="All categories"
               onPress={() => setPicker('category')}
             />
@@ -195,10 +229,10 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
               label="Technician"
               hint={
                 technicianSlotTaken
-                  ? `Picking a technician replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
+                  ? `Picking technicians replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
                   : undefined
               }
-              value={advanced.technician?.name ?? null}
+              value={picksSummary(advanced.technician)}
               placeholder="All technicians"
               onPress={() => setPicker('technician')}
             />
@@ -207,7 +241,7 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
           {allowed.includes('group') ? (
             <SelectField
               label="Group"
-              value={advanced.group?.name ?? null}
+              value={picksSummary(advanced.group)}
               placeholder="All groups"
               onPress={() => setPicker('group')}
             />
@@ -219,82 +253,119 @@ export function TicketFiltersScreen({ navigation }: TicketStackScreenProps<'Tick
         <SubmitButton label={showLabel} onPress={() => navigation.goBack()} />
       </View>
 
+      {/* Five multi-selects, one component (OptionSheet `multiple`). Each hands its choice over once, when it closes. */}
       {allowed.includes('status') ? (
         <OptionSheet
           multiple
           visible={picker === 'status'}
           title="Status"
+          allLabel="All statuses"
           options={STATUS_OPTIONS}
           selectedValues={advanced.status}
           onChange={(values) => setTicketAdvanced({ status: values })}
-          onClose={() => setPicker(null)}
+          onClose={closePicker}
         />
       ) : null}
 
-      <OptionSheet
-        visible={picker === 'priority'}
-        title="Priority"
-        options={priorityOptions}
-        selected={advanced.priority ?? ALL}
-        onSelect={(value) => setTicketAdvanced({ priority: value === ALL ? null : value })}
-        onClose={() => setPicker(null)}
-      />
+      {allowed.includes('priority') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'priority'}
+          title="Priority"
+          allLabel="All priorities"
+          options={PRIORITY_OPTIONS}
+          selectedValues={advanced.priority}
+          onChange={(values) => setTicketAdvanced({ priority: values })}
+          onClose={closePicker}
+        />
+      ) : null}
 
-      <OptionSheet
-        visible={picker === 'category'}
-        title="Category"
-        options={[{ value: ALL, label: 'All categories' }, ...categoryOptions.map((c) => ({ value: c.id, label: c.name }))]}
-        selected={advanced.category?.id ?? ALL}
-        onSelect={(value) => {
-          const choice = categoryOptions.find((c) => c.id === value);
-          setTicketAdvanced({ category: value === ALL || !choice ? null : choice });
-        }}
-        onClose={() => setPicker(null)}
-      >
-        {lookupState(categories, 'categories')}
-      </OptionSheet>
+      {allowed.includes('category') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'category'}
+          title="Category"
+          allLabel="All categories"
+          options={categoryOptions}
+          selectedValues={advanced.category.map((c) => c.id)}
+          selectedOptions={pickOptions(advanced.category)}
+          onChange={(_values, chosen) => setTicketAdvanced({ category: picksFrom(chosen) })}
+          onClose={closePicker}
+        >
+          {lookupState(categories, 'categories')}
+        </OptionSheet>
+      ) : null}
 
-      <OptionSheet
-        visible={picker === 'group'}
-        title="Group"
-        options={[
-          { value: ALL, label: 'All groups' },
-          ...groupOptions.map((g) => ({ value: g.id, label: g.name, description: g.inactive ? 'Inactive group' : undefined })),
-        ]}
-        selected={advanced.group?.id ?? ALL}
-        onSelect={(value) => {
-          const choice = groupOptions.find((g) => g.id === value);
-          setTicketAdvanced({ group: value === ALL || !choice ? null : { id: choice.id, name: choice.name } });
-        }}
-        onClose={() => setPicker(null)}
-      >
-        {lookupState(teams, 'groups')}
-      </OptionSheet>
+      {allowed.includes('group') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'group'}
+          title="Group"
+          allLabel="All groups"
+          options={groupOptions}
+          selectedValues={advanced.group.map((g) => g.id)}
+          selectedOptions={pickOptions(advanced.group)}
+          onChange={(_values, chosen) => setTicketAdvanced({ group: picksFrom(chosen) })}
+          onClose={closePicker}
+        >
+          {lookupState(teams, 'groups')}
+        </OptionSheet>
+      ) : null}
 
       {allowed.includes('technician') ? (
-        <PersonPickerSheet
+        <OptionSheet
+          multiple
           visible={picker === 'technician'}
           title="Technician"
-          searchRoles={TECHNICIAN_FILTER_ROLES}
-          extraOptions={[
-            {
-              key: 'all',
-              label: 'All technicians',
-              onPress: () => {
-                setTicketAdvanced({ technician: null });
-                setPicker(null);
-              },
-            },
-          ]}
-          onPick={(person) => {
-            setTicketAdvanced({ technician: { id: person.id, name: formatDisplayName(person.displayName) || person.email } });
-            setPicker(null);
+          allLabel="All technicians"
+          options={technicianOptions}
+          selectedValues={advanced.technician.map((t) => t.id)}
+          selectedOptions={pickOptions(advanced.technician)}
+          onChange={(_values, chosen) => setTicketAdvanced({ technician: picksFrom(chosen) })}
+          onClose={closePicker}
+          remoteSearch={{
+            query: technicianQuery,
+            onQueryChange: setTechnicianQuery,
+            placeholder: 'Name or email (2+ letters)',
+            footer: (
+              <TechnicianSearchState
+                query={technicianQuery}
+                settled={technicianTerm}
+                search={technicianSearch}
+                found={technicianOptions.length}
+              />
+            ),
           }}
-          onClose={() => setPicker(null)}
         />
       ) : null}
     </View>
   );
+}
+
+/** Under the technician sheet's rows: what the search is doing, in words. Nothing once there are matches. */
+function TechnicianSearchState({
+  query, settled, search, found,
+}: {
+  query: string;
+  settled: string;
+  search: { isFetching: boolean; isError: boolean; error: unknown; data: unknown; fetchStatus: string; refetch: () => Promise<unknown> };
+  found: number;
+}) {
+  const q = query.trim();
+  const line = (text: string) => <Text className="px-4 py-6 text-center text-sm text-gray-500">{text}</Text>;
+  if (q.length < TECHNICIAN_SEARCH_MIN) return line('Type at least 2 letters of a name or email to find technicians.');
+  if (search.fetchStatus === 'paused') return line('Searching needs a connection. It runs when you reconnect.');
+  if (search.isFetching || settled.trim() !== q) {
+    return (
+      <View className="items-center py-6">
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+  if (search.isError && search.data === undefined) {
+    return <ErrorState error={search.error} title="Couldn't search technicians" onRetry={() => void search.refetch()} />;
+  }
+  return found === 0 ? line(`No technician matches “${q}”.`) : null;
 }
 
 /** One end of the date range: opens the system date picker; ✕ clears it (the web's emptied date input). */
