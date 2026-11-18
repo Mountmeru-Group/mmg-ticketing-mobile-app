@@ -262,7 +262,7 @@ describe('the list shows the period and lets you clear it', () => {
 
   test('other filters combine with it: a priority, a quick filter, a search — the period stays', async () => {
     tapTile('RESOLVED', true);
-    store().setTicketAdvanced({ priority: 'HIGH' });
+    store().setTicketAdvanced({ priority: ['HIGH'] });
     store().setTicketFilter('CLOSED');
     store().setTicketSearch('printer');
     assert.notEqual(chip(), null);

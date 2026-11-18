@@ -720,16 +720,16 @@ Ronit's written briefs, 2026-11-17. Until then the API environment was fixed per
 - **First brief:** anyone chose it, on Login's gear.
 - **Second brief, the same day:** only an ADMIN could switch, from the drawer, and only an ADMIN could stay on UAT.
   **Withdrawn by the third brief.**
-- **Third brief, the same day (in force):** the switch is in the drawer, for everyone, behind a **password** (§9.6). Any
-  role may sign in on UAT and stay there.
+- **Third brief, the same day:** the switch in the drawer, for everyone, behind a **password**. **Removed on 2026-11-18.**
+- **2026-11-18 (in force):** the switch is in the drawer for **ADMIN only, with no password** (§9.6). Any role may sign
+  in on UAT and stay there.
 
 Code:
 - `src/config/env.ts`: the build's rules;
-- `src/utils/switch-password.ts`: the password gate (a hash, the lockout, the single-use pass);
+- `src/utils/permissions.ts` `canSwitchEnvironment`: who may switch (ADMIN);
 - `src/store/environment.store.ts`: the choice;
 - `src/api/environmentSwitch.ts`: the switch;
-- `src/navigation/EnvironmentPasswordSheet.tsx`: the password prompt;
-- `src/navigation/EnvironmentSheet.tsx`: the sheet.
+- `src/navigation/EnvironmentSheet.tsx`: the sheet (`EnvironmentChip.tsx`: its chips and the drawer's).
 
 ### 9.1 Which environment is in use
 - **Release build** (any EAS profile): Production and UAT are offered. A **fresh install is on Production, always**.
@@ -752,11 +752,10 @@ Code:
    (`16-SAVED-VIEWS.md`); they lived in the query cache, emptied in step 3.
 5. The new environment is stored. Login shows (RootNavigator follows the auth store).
 
-Who can switch (third brief): anyone who knows the switch password (§9.6). The drawer's "Service Desk environment"
-row, beside Sign out, is shown to every role in a release build. `switchEnvironment()` refuses any environment but
-Production without the pass a correct password gives (`PASSWORD_REQUIRED`). Login's only control is the "Use Production"
-link, shown on UAT only. It goes nowhere else, so it needs no password; it is locked while a sign-in runs. From Login
-nobody is signed in, so steps 1 and 2 send nothing.
+Who can switch (2026-11-18): a signed-in **ADMIN** (§9.6). The drawer's "Environment" row, in the account card, is shown
+to ADMIN only, in a release build. `switchEnvironment()` refuses any environment but Production for anyone else
+(`ADMIN_ONLY_SWITCH`). Login's only control is the "Use Production" link, shown on UAT only. It goes nowhere else, so
+anyone may use it; it is locked while a sign-in runs. From Login nobody is signed in, so steps 1 and 2 send nothing.
 
 ### 9.3 A token never crosses environments
 - `setSession()` stores the environment the session was created on (SecureStore key `mmg.session.environment`, one of
@@ -780,38 +779,23 @@ switches to UAT once. Without this, a UAT session from a `preview` APK would be 
 re-authentication itself. The Microsoft app registration is the same for both environments; only the Service Desk host
 the token exchange goes to follows the choice.
 
-### 9.6 The switch password (2026-11-17, third brief)
-Ronit's decision, in writing: the second brief's ADMIN rule is **replaced by a password**. Anyone may open the switch;
-only someone with the password can change environment. The password is not written in this repository, in any file.
+### 9.6 ADMIN only, no password (2026-11-18)
+Ronit's decision, in writing: the switch is for **ADMIN only**, and the **password is removed**.
 
-**Removed with the ADMIN rule** (all of it):
-- the drawer row for ADMIN only;
-- a non-ADMIN's UAT sign-in refused and ended;
-- a non-ADMIN's stored UAT session ended at a cold start;
-- a cold start with nobody signed in on UAT going to Production;
-- the "Setu is on Production" notice;
-- the role rules `canSwitchEnvironment` and `canUseEnvironment`, and `src/api/environmentPolicy.ts`.
+**Removed: the password gate of the third brief** (all of it): the prompt (`EnvironmentPasswordSheet.tsx`), the SHA-256
+hash and the 5-try / 60-second lockout (`src/utils/switch-password.ts`), the single-use pass and `PASSWORD_REQUIRED`,
+the every-role rule `offersEnvironmentSwitch`, `scripts/password-scan.js` and the gate's tests. `expo-crypto` stays: it
+was added for the Microsoft sign-in (Phase 2) and `expo-auth-session` depends on it. `tests/environment/
+admin-switch.test.mjs` proves the gate is gone from `src/`, and `npm run verify:release-bundle` from the release bundle,
+by a fingerprint of the old hash (`scripts/removed-gate-scan.js`), so neither holds the hash or the password.
 
 **Now:**
-- **Who:** every role sees the row (`permissions.ts` `offersEnvironmentSwitch`, which reads no role), in release builds.
-  Any role may sign in on UAT, and a UAT session survives a restart like any other. The chosen environment persists.
-- **Order:** the row asks for the password FIRST (`EnvironmentPasswordSheet`). Only a correct one opens the environment
-  sheet. Switching then runs exactly as §9.2.
-- **Stored as a hash:** `SWITCH_PASSWORD_SHA256` in `src/utils/switch-password.ts`, a SHA-256 hash as lowercase hex.
-  - What is typed is hashed on the phone with `expo-crypto` (`digestStringAsync`, already a dependency: nothing was
-    installed), and only the hashes are compared.
-  - The plaintext is in no source file, test or doc. `tests/environment/switch-password.test.mjs` scans every file in
-    the repository, and `npm run verify:release-bundle` scans the release JavaScript and Hermes bytecode. Both search by
-    the hash (`scripts/password-scan.js`, every 12-character window), so neither holds the password.
-- **Honest limits:** this stops a curious employee, not a determined one. The app ships the hash, so anyone can
-  decompile it and patch the check out, or test guesses against the hash offline. It is a speed bump. **The real
-  control is that both environments need a Mount Meru work account.**
-- **Lockout:** after **5** wrong tries in a row, every try is refused for **60 seconds**, and the prompt says how long
-  is left. The count is in memory only: it resets on a correct entry and when the app restarts.
-- **Never remembered:** a correct entry gives a single-use pass. `switchEnvironment()` uses it up, and the drawer revokes
-  it when the sheet closes. Every switch asks again.
-- **Never logged, stored or sent:** what is typed stays in the prompt's field until the check, then the field is
-  cleared, right or wrong. There is no console call in the gate or the prompt, in any build. Nothing goes to SecureStore
-  or the network.
+- **Who switches:** ADMIN (`permissions.ts` `canSwitchEnvironment`), in release builds. For every other role the drawer
+  row is absent and the sheet is not mounted. The sheet is not a route and no navigation state is saved, so no link
+  or restored state reaches it. `switchEnvironment()` checks the same rule for any move off Production.
+- **Who uses UAT:** anyone. **Not brought back** from the second brief: a non-ADMIN's UAT sign-in is not refused, a
+  stored UAT session is not ended at a cold start, and a signed-out cold start on UAT is not sent to Production. A
+  non-ADMIN who has a UAT session keeps it; they simply cannot switch. The chosen environment persists.
+- **Switching** runs exactly as §9.2.
 - **The UAT chip** shows whenever UAT is in use, for anyone: on Login, and in the drawer's header. Production stays the
   default on a fresh install, and development builds stay UAT-only.

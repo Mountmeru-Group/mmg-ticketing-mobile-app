@@ -8,9 +8,9 @@
 //   are ./SignInButton.tsx; this file only lays out.
 // - The environment chip shows whenever UAT is in use, in any build, for anyone; never on Production (showEnvironmentChip,
 //   src/config/env.ts).
-// - NO environment switch here (2026-11-17): it is the drawer's "Service Desk environment" row, behind the switch
-//   password. On UAT the chip carries a "Use Production" link, which only ever goes to Production (the default, no
-//   password), and is locked while a sign-in runs. Any role may sign in on UAT.
+// - NO environment switch here: it is the drawer's "Environment" row, ADMIN only (2026-11-18, no password). On UAT the
+//   chip carries a "Use Production" link, which only ever goes to Production (the default; anyone, signed out), and is
+//   locked while a sign-in runs. Any role may sign in on UAT and is never refused or sent back for its role.
 // - The footer's year is the device's (src/utils/copyright.ts), read as the Home greeting reads the time: never written.
 // - Below the pill, on every build, UAT and PROD alike: email and password sign-in, ./EmailSignInForm.tsx
 //   (2026-11-05; opened to PROD 2026-11-06, 02-AUTH.md §8). Microsoft stays the primary action. The two sign-ins share one
@@ -292,7 +292,7 @@ export function LoginScreen(_props: AuthStackScreenProps<'Login'>) {
                     <Text className="text-xs font-semibold text-amber-800">{environmentLabel(environment)}</Text>
                   </View>
                 ) : null}
-                {/* One way only: back to Production. Never a way to UAT (the drawer's switch, behind the password, is that). */}
+                {/* One way only: back to Production. Never a way to UAT (the drawer's switch, ADMIN only, is that). */}
                 {offersProduction ? (
                   <Pressable
                     accessibilityRole="button"

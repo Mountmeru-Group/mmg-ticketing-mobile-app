@@ -167,9 +167,30 @@ const saveViewMutation = useMutation({
     - `b7048ed`: row selection on the list.
   - On every branch the ticket list's category, technician, group, priority and status filters are single `<select>`s (`TLP:484-586` on `master`).
   - So whatever UAT or Production serves was deployed from source that has not been pushed. Its backend may read several categories, but nothing the app can read says so, or in what form.
-- **What the app does:**
-  - **Status** is the only multi-select, sent as one comma-separated `status`.
-  - Priority, category, technician and group stay single. Sending two of those would return a wrong list, or a 500.
+- **What the app did on 2026-11-17:** Status was the only multi-select. **Superseded on 2026-11-18** (next).
+
+### 7a. 2026-11-18: every filter takes several values (Ronit's brief; read from a live URL)
+
+- Ronit copied a URL from the **UAT portal's** ticket list with three categories and two technicians ticked:
+  `categoryId=<a>%2C<b>%2C<c>&assignedToId=<x>%2C<y>`. So the live format is **ONE parameter holding comma-separated
+  ids**: not repeated keys, not an array. The clone (above, re-read 2026-11-18 at `7df97c8` on all 16 refs) still reads
+  one value for each: **the deployed server differs from the source**, as with the audit log and push.
+- The app now sends status, priority, category, technician and group that way (`01-API-CONTRACT.md` TKT-1).
+- **How the web stores several values in a view: a comma STRING, by every sign the clone gives; not confirmed.**
+  - In the source, every value in the blob is a string (`TicketFilters`, §6), and a status list that came from a URL is
+    stored as the same comma string the URL holds (`TLP:97`, `:124-132`, `:186-200`).
+  - The live portal keeps its multi-value filters in the URL as one comma string (Ronit's URL). On `master` the URL, the
+    filter state and the saved blob are one object of strings, so its views most likely hold `"categoryId": "a,b,c"`.
+  - The deployed web's save code is **not in the clone**, so this is not read from code. Nothing suggests arrays.
+  - **The app writes comma strings**, one per key, the same eight keys. It reads comma strings. An ARRAY in a view is
+    not guessed at: it is named as left out ("Category “[…]” (not readable by the app)") and not sent, so if the web
+    does store arrays, the app says so on the first such view rather than applying something else.
+  - **To confirm (Ronit, on UAT, no code):** save a view on the web portal with two categories ticked, then open the
+    browser's network tab on the Views list (`GET /api/v1/saved-views?entityType=ticket`) and look at that view's
+    `filters.categoryId`: a string `"a,b"` means the two clients agree; an array means they do not, and the app's
+    reader needs a change.
+- Comparing a view with the list ignores the order inside a list (`savedViewKey` sorts ids; status and priority in the
+  03 order), since the web and the phone may tick in another order.
 
 ## 8. Can the stored shape hold what the mobile Filters sheet holds?
 
@@ -181,8 +202,9 @@ const saveViewMutation = useMutation({
 |---|---|---|
 | Quick filter **Open, My open, Unassigned, Pending, Resolved, Closed** | `status` and/or `assignedToId`: what TKT-1 sends for it (`utils/ticket-filters.ts` `ticketFilterQuery`) | Yes. Read back as the same quick filter when it matches one exactly, otherwise as the Status filter (same tickets) |
 | Quick filter **Overdue, Due soon** (TKT-1 `sla`), and the Home tile filters that send `sla` | **nothing can hold `sla`** | **No. The app refuses to save** and says why (UI-STANDARDS §17.2) |
-| Status (new, multi-select) | `status`, comma list | Yes |
-| Priority, category, created From/To, technician, group | `priority`, `categoryId`, `fromDate`/`toDate`, `assignedToId`, `teamId` | Yes, by id. The names are not stored (§9) |
+| Status (multi-select) | `status`, comma list | Yes |
+| Priority, category, technician, group (multi-select since 2026-11-18) | `priority`, `categoryId`, `assignedToId`, `teamId`: each one value, or a comma list (§7a) | Yes, by id. The names are not stored (§9) |
+| Created From/To | `fromDate`/`toDate` | Yes |
 | Sort: Last updated / Priority / Due date | no key / `sortBy=priority` / `sortBy=sla` | Yes |
 | **Search** | not held (the web clears it on load, `TLP:235`) | No. The save sheet lists it under "Not kept in a saved view" |
 | **Country** (ADMIN, triage AGENT) | not held (the web keeps the navbar's, `TLP:161-164`) | No. Listed the same way. Applying a view keeps the country on screen, as the web does |
@@ -198,7 +220,7 @@ The first two are not part of a view on the web either. The SLA filters are refu
 
 **From a view to the phone.** The app may meet things it cannot show:
 - a key it does not know (from a newer web, for example a multi-category key);
-- a value it cannot read (a status or priority outside the 03 enum, a comma in an id, a date in another form, a newer `sortBy`);
+- a value it cannot read (a status or priority outside the 03 enum, an id with characters other than UUID ones, an array, `unassigned` inside a technician list, a date in another form, a newer `sortBy`). A comma list of ids is read since 2026-11-18 (§7a);
 - a filter this role cannot send (technician or group for END_USER and L2_MANAGER, "Unassigned" for them too, or a technician id for L2_MANAGER).
 
 For each of these the app:
@@ -222,7 +244,7 @@ For each of these the app:
   - The same rules cut a view down when it is read (§8).
 - **Names.**
   - Views hold ids only. The app names them from the lookups it already uses: categories (LKP-1), groups (LKP-2, ADMIN and AGENT), and technicians (USR-1 by id, ADMIN and AGENT).
-  - Each is loaded only while a view needs it, and cached for 10 minutes.
+  - Each is loaded only while a view needs it, and cached for 10 minutes. Every id in a comma list is named (2026-11-18).
   - A name that cannot be found reads "Unknown category", "Unknown group" or "Unknown technician".
 - **Names the app writes:** trimmed, at most 40 characters, and not a name already in the list (any case). The server checks none of these.
 - **No cap.** The phone-only list had a cap of 20. With the server as the source, the app shows every view the web saved.

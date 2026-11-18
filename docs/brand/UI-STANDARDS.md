@@ -1200,33 +1200,16 @@ Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11
 ## 17. Environment switch, saved filters, dropdown search (2026-11-17)
 
 Ronit's written briefs (three on 2026-11-17): the second replaced 17.2 and added 17.4; the third replaced 17.1 (the
-second brief's ADMIN-only switch is gone). Not yet seen on a device: no build was made. The layout notes below are what
+second brief's ADMIN-only switch is gone). On 2026-11-18, §18 replaced 17.1 and 17.4. Not yet seen on a device: no build was made. The layout notes below are what
 to check on the next build (360 dp, 100 / 130 / 200 % text).
 
-### 17.1 The environment switch (the drawer, every role, behind a password)
-- **Login has no switch.** The gear on the red panel is gone; the logo is alone in the panel's top row.
-- **Drawer row**, in the account card, between the profile row and **Sign out**, with the same hairline separators:
-  - `swap-horizontal-outline`, 24 dp, idle grey (`colors.nav.idleFg`);
-  - "Service Desk environment" (base, medium, gray-700);
-  - the environment in use on the right ("Production" / "UAT", sm, gray-500), then a chevron;
-  - 48 dp tall. TalkBack: "Service Desk environment: Production", hint "Asks for the switch password. Switching signs you out".
-- **Who sees it:** **every role** (`permissions.ts` `offersEnvironmentSwitch`, which reads no role), in release builds only (`CAN_SWITCH_ENVIRONMENT`). The password decides who switches.
-- **Password prompt first** (`src/navigation/EnvironmentPasswordSheet.tsx`), title "Switch password". It rises above the keyboard.
-  - One line, sm gray-600: "For testing only. Most people never need this: Setu stays on Production."
-  - **Password** (required): a masked field, autofocused. No autofill, autocorrect, capitals or spell check, so no password manager offers to save it.
-  - At the field's right, a 44 dp eye button (`eye-outline` / `eye-off-outline`) that shows or hides what was typed, with `aria-label` "Show password" / "Hide password".
-  - Wrong: the field turns red-600 and is emptied. Under it, in red-700: "That password is wrong. 4 tries left before a 60-second wait."
-  - The 5th wrong try: "That password is wrong. Too many wrong tries: try again in 60 seconds."
-  - Any try during the lock is refused without checking: "Too many wrong tries. Try again in 42 seconds." The prompt opens with that line if the lock is still running. There is no countdown timer.
-  - **Continue** (filled, disabled while the field is empty, a spinner while checking), then **Cancel** (outline). Cancel, back and a tap outside all close it and change nothing.
-  - Only a correct password opens the sheet. **It is asked again for every switch.**
-- **Sheet** (`src/navigation/EnvironmentSheet.tsx`), title "Service Desk environment":
-  - one line of help: switching signs you out and clears everything Setu has loaded;
-  - a radio row per environment, Production first: the name, the host name under it (`text-xs`, gray-600), a **DEFAULT** badge on Production (gray-100 / gray-700) and **IN USE** on the active one (green-50 / green-800);
-  - one filled button, **"Switch and sign out"**, disabled until another environment is picked, with a spinner while it runs. A failure says "Couldn't switch. Close this and enter the password again." in red-700 above it.
-- **After a switch:** signed out, Login on the new environment, the email form empty (keyed by environment). Any role may sign in there and stays signed in across restarts. The choice persists.
-- **On UAT's Login:** under the UAT chip, a text button **"Use Production"** (sm, medium, blue-700, 44 dp). It goes to Production only, needs no password, and is locked (half opacity) while a sign-in runs.
-- **The UAT chip** (amber-100 / amber-800, `text-xs` semibold) shows whenever UAT is in use, **for anyone**: on Login (with the host, as before) and in the drawer's header band, right of "Setu" (just "UAT"). Never on Production.
+### 17.1 The environment switch: replaced on 2026-11-18 by §18.2–18.4
+The password gate of the third brief (a "Switch password" prompt, a hash, a 5-try lockout, a single-use pass) and its
+every-role row are **removed**. The switch is now ADMIN only, with no password, in a redesigned card and sheet: §18.
+Unchanged from this section: Login has no switch; after a switch the person is signed out on the new environment; on
+UAT's Login a **"Use Production"** text button (sm, medium, blue-700, 44 dp) goes back to Production only, for anyone,
+locked while a sign-in runs; the UAT chip shows whenever UAT is in use, for anyone (in the drawer, now in the §18.4
+colours).
 
 ### 17.2 Saved filters (Tickets › Filters): the Service Desk's saved views
 **Synced with the web portal (2026-11-17, second brief).** They are the web's "Views", stored on the Service Desk per person and per environment. Contract: `docs/web-system/16-SAVED-VIEWS.md`. They are no longer kept on the phone.
@@ -1269,7 +1252,8 @@ to check on the next build (360 dp, 100 / 130 / 200 % text).
   About ten 48 dp rows fit a sheet on a typical phone; past that the list must be scrolled. None of the app's fixed lists
   reaches it (priority 5, impact and urgency 5, closure code 7, change status at most 9, audit action 10, audit entity 4,
   audit dates 7): a field over a short list is noise.
-- Which dropdowns get it when long: **Filters** › Category, Group; **Tickets** › Country; **Create ticket** › Category,
+- Which dropdowns get it when long: **Filters** › Status, Category, Group (Technician always has one: it is a server
+  search, §18.1); **Tickets** › Country; **Create ticket** › Category,
   Subcategory, Item, Group; **Ticket detail** editors › Category, Subcategory, Item, Country; **Assign** › Group;
   **Profile** › Country; **Service request** form › every select field from the catalogue.
 - **The field**: the app's `SearchField` (44 dp, search icon, clear button), pinned above the list (outside it, so it
@@ -1283,16 +1267,102 @@ to check on the next build (360 dp, 100 / 130 / 200 % text).
 - Device checks (next build): a 38-category list on a 360 × 640 phone with the keyboard up (the field and at least two
   rows visible); 200 % text; TalkBack hears the count.
 
-### 17.4 Multi-select dropdowns (2026-11-17, second brief)
-- **Only where the server reads several values: Status.** TKT-1 reads one comma-separated `status` (`16-SAVED-VIEWS.md` §7). Priority, category, technician and group stay single-choice: the server reads one value each.
+### 17.4 Multi-select dropdowns: replaced on 2026-11-18 by §18.1
+Built for Status only on 2026-11-17. Since 2026-11-18 every ticket-list filter is a multi-select: §18.1.
+
+## 18. Multi-select on every filter; the environment switch for ADMIN (2026-11-18)
+
+Ronit's written brief of 2026-11-18. Not yet seen on a device: no build was made. Check on the next build (360 dp,
+100 / 130 / 200 % text).
+
+### 18.1 Multi-select on every ticket filter
+- **All five** in Tickets › Filters are multi-selects: **Status, Priority, Category, Technician, Group** (the created
+  dates stay a From / To pair). Each sends ONE parameter with its values joined by commas, as the live web portal does
+  (`01-API-CONTRACT.md` TKT-1). One value is sent exactly as before.
 - **One component:** `OptionSheet` with `multiple` (`src/components/OptionSheet.tsx`). No second dropdown exists.
-- **The field (closed):** "Status" first in the Filters card, placeholder "All statuses". With some chosen: the first in option order, then "+n" ("Open +2"). Hint: "Pick as many as you need.", or, while a quick filter that sends a status is on, "Picking statuses replaces the “Open” quick filter."
-- **The sheet:**
-  - the search field as in 17.3. Status has 12 options, so it has one;
-  - then a pinned **"Select all"** row (48 dp, base medium): a checkbox (`checkbox` brand red / `remove-circle` brand red when some are chosen / `square-outline` grey), the label, and the web's count on the right ("1/12", sm gray-600). With a search typed it reads "Select all shown", and it ticks or unticks only the options the search shows;
-  - then the options with checkboxes (`accessibilityRole="checkbox"`, ticked in brand red);
+- **The field (closed):** placeholder "All statuses", "All priorities", "All categories", "All technicians", "All groups".
+  With some chosen: the first in option order, then "+n": **"Afrikomart +2"**, never a list of names. One chosen reads
+  exactly as before ("High", "Network"). Hints: Category keeps "Top-level categories…"; Status and Technician say what
+  they replace while a quick filter holds that slot ("Picking statuses replaces the “Open” quick filter.", "Picking
+  technicians replaces the “My open” quick filter.").
+- **The sheet**, top to bottom:
+  - the search field as in 17.3, when the list is long (Status has 12; categories, groups) and always for Technician;
+  - a pinned **"Select all"** row (48 dp, base medium): a checkbox (`checkbox` brand red / `remove-circle` brand red when
+    some are chosen / `square-outline` grey), the label, and the web's count on the right ("1/38", sm gray-600). With a
+    search typed it reads **"Select all shown"** and ticks or unticks only what the search shows;
+  - the list. Its first row is **"All categories"** (or "All statuses", …), shown while no search is typed: it is the
+    choice when nothing is ticked (brand red, semibold, a check mark) and tapping it **clears** the ticks. It is never a
+    value and is never sent;
+  - the options with checkboxes (`accessibilityRole="checkbox"`, ticked in brand red). Inactive groups keep their
+    "Inactive group" line;
   - a footer with **Clear** (outline, disabled when nothing is ticked) and **Done** (filled), side by side, 12 dp apart.
-- **When it applies:** ticks change a draft. The choice reaches the list **once, when the sheet closes**: Done, back, or a tap outside. So the list makes one request, not one per tick.
-- **TalkBack:** each row is a checkbox with its state; "Select all" says "Select all, 1 of 12 selected" and is "mixed" when some are chosen.
-- **Saved views** carry several statuses ("Status: Open, In Progress") and restore them.
-- Device checks (next build): the Status sheet on a 360 × 640 phone with the keyboard up (the field, "Select all" and two rows visible); 200 % text; the footer clear of the gesture bar.
+- **When it applies:** ticks change a draft. The choice reaches the list **once, when the sheet closes**: Done, back, or a
+  tap outside. One request, not one per tick.
+- **A choice outside the list keeps its row:** a saved view's category that is no longer listed, or a technician found by
+  an earlier search, stays ticked with its name. Opening a sheet while its list is still loading and closing it changes
+  nothing.
+- **Technician** is the one list that comes from a **server search** (USR-3: active AGENTs, 2+ letters, up to 20). The
+  web lists every technician from `GET /users`, which is not in the mobile contract, so the sheet searches instead:
+  - field placeholder "Name or email (2+ letters)";
+  - with the field empty it shows the technicians already chosen, ticked (and any ticked during this visit);
+  - typed, it shows the matches, each with its email under the name;
+  - under the rows, one line: "Type at least 2 letters of a name or email to find technicians.", a spinner while
+    searching, "No technician matches “…”.", or the error with Retry. Read aloud as it changes;
+  - the count reads **"2 selected"**: a search has no total to count against.
+- **Slots, as before:** picking statuses replaces a quick filter that sends a status; picking technicians replaces
+  "My open" or "Unassigned"; choosing one of those clears them.
+- **The line under the quick filters** names each filter as its field does: "Open +1 · High +1 priority · Afrikomart +2".
+- **Saved views** carry several values per filter ("Category: Afrikomart, Hardware, Network") and restore them.
+- **TalkBack:** each row is a checkbox with its state; "Select all" says "Select all, 1/38" ("2 selected" for
+  technicians) and is "mixed" when some are chosen; "All categories" is a button, "selected" when nothing is ticked.
+- Device checks (next build): the Category sheet with 38 categories on a 360 × 640 phone with the keyboard up (the field,
+  "Select all" and two rows visible); the Technician sheet's empty, typing and no-match states; 200 % text; the footer
+  clear of the gesture bar.
+
+### 18.2 The drawer: the Environment row (ADMIN only) and one account card
+- **Who sees it: ADMIN only** (`permissions.ts` `canSwitchEnvironment`), in release builds (`CAN_SWITCH_ENVIRONMENT`).
+  For every other role the row is **absent**: not disabled, not greyed. Its sheet is not mounted for them and is not a
+  route, so no link or saved navigation state reaches it. No password.
+- **The card** (pinned to the bottom, 8 dp from the edges, rounded-xl, `border-border`): three rows, a gray-100 hairline
+  between each, inset 12 dp:
+  1. **Environment** (ADMIN only): a 40 dp **circle** (gray-100) with `server-outline` 20 dp in idle grey; "Environment"
+     (base, medium, gray-900); the **status chip** (§18.4), PRODUCTION or UAT; a chevron (gray-400). 56 dp tall.
+     TalkBack: "Environment: Production", hint "Opens the environment switch. Switching signs you out".
+  2. **The account**: the avatar (initials on `bg-primary/10`), name, role, and the country lock chip for a country
+     AGENT; a chevron. Opens the profile.
+  3. **Sign out**, in the web's red.
+  For any role but ADMIN the card is rows 2 and 3, as before.
+- **No version line** under the card any more ("v1.0.0 · PROD" is gone): the chip says the environment. The version is
+  on the **Profile** screen (the Settings row), "Version", where it already was.
+- **The header band's UAT chip** (right of "Setu", whenever UAT is in use, for anyone) is the same chip in the same
+  colours, reading "UAT".
+
+### 18.3 The environment sheet
+- **Heading "Environment"**, and nothing else above the options.
+- **Two rows**, Production first, each **one line**, 56 dp: a radio on the left (brand red when chosen), the name (base,
+  medium, gray-900), and a **state chip** on the right, in that environment's colours (§18.4):
+  - **IN USE** on the environment in use;
+  - **TESTING** on UAT when it is not in use;
+  - none on Production when it is not in use.
+  No host names, no captions, no DEFAULT badge, no warning box.
+- **One line at the foot** (sm, gray-600): "Switching signs you out and clears everything loaded."
+- **"Switch and sign out"** (filled, full width; disabled until the other environment is picked; a spinner while it
+  runs), then **Cancel** (outline, full width) under it, 8 dp apart. Stacked, as the app's other confirm sheets are, so
+  "Switch and sign out" never wraps at 200 % text. A failure says "Couldn't switch. Try again." in red-700 above the
+  foot line.
+- **Switching does what it did:** the device token is removed from the environment being left, sign-out, the query cache
+  cleared, the filters and the period cleared, then Login on the new environment.
+
+### 18.4 The environment chip colours
+`colors.environment` in `src/theme/colors.ts`, used only through `src/navigation/EnvironmentChip.tsx` (11 dp bold,
+wide tracking, pill):
+
+| Chip | Text | Fill | Contrast | L* text / fill |
+|---|---|---|---|---|
+| **PRODUCTION** | brand red `#d21121` | its light tint `#fff3f4` (`BRAND_RED_TINT`) | 5.0:1 | 44.5 / 96.8 |
+| **UAT** | amber-950 `#451a03` (added to the palette) | amber-400 `#fbbf24` | 9.0:1 | 15.5 / 80.7 |
+
+- Both pass **WCAG AA** for small text (4.5:1).
+- Told apart by **lightness**, not hue alone: the fills are 16 L* apart and the words 29 L* apart (the app's rule is at
+  least 15, as for the audit and SLA colours). The word (PRODUCTION, UAT, IN USE, TESTING) carries the meaning (1.4.1).
+- `tests/environment/admin-switch.test.mjs` pins all four numbers.

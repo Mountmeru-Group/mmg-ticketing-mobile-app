@@ -20,7 +20,9 @@ export const palette = {
   zinc: { 600: '#52525b', 700: '#3f3f46' },
   red: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 900: '#7f1d1d' },
   orange: { 100: '#ffedd5', 500: '#f97316', 700: '#c2410c' },
-  amber: { 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+  amber: {
+    100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f', 950: '#451a03',
+  },
   yellow: { 100: '#fef9c3', 500: '#eab308', 600: '#ca8a04', 700: '#a16207' },
   lime: { 500: '#84cc16' },
   green: { 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
@@ -294,6 +296,19 @@ export const colors = {
   swipe: {
     assign: tone(palette.slate[700], palette.white),
     resolve: tone(palette.green[700], palette.white),
+  },
+
+  /**
+   * The environment chip (2026-11-18, UI-STANDARDS.md §18): the drawer's Environment row, the UAT chip in the drawer's
+   * header, and the switch sheet's state chips. Each environment's colour on its own light tint, told apart by
+   * LIGHTNESS, not hue alone: the fills are 16 CIELAB L* apart and the words 29 (tests/environment/admin-switch.test.mjs).
+   *   PROD  brand red (L* 44.5) on BRAND_RED_TINT (L* 96.8)   5.0:1
+   *   UAT   amber-950 (L* 15.5) on amber-400 (L* 80.7)       9.0:1
+   * Both pass WCAG AA for the chip's 11 dp bold text (4.5:1). The word (PRODUCTION, UAT) carries the meaning (1.4.1).
+   */
+  environment: {
+    PROD: tone(BRAND_RED_TINT, BRAND_RED),
+    UAT: tone(palette.amber[400], palette.amber[950]),
   },
 
   /** Microsoft's four-square logo, in Microsoft's own colours (the sign-in button only). */

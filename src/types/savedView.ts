@@ -14,9 +14,9 @@ export interface SavedView {
 /** The keys the web's ticket list writes into `filters` and reads back (TicketsListPage.tsx:190-199, :223-232). */
 export interface SavedViewFilters {
   status?: string;                              // one TicketStatus, or a comma list
-  priority?: string; sortBy?: string;           // sortBy: 'priority' | 'sla' (left out = updated)
-  assignedToId?: string;                        // a user id, or 'unassigned'
-  teamId?: string; categoryId?: string;
+  priority?: string; sortBy?: string;           // priority: one or a comma list; sortBy: 'priority' | 'sla'
+  assignedToId?: string;                        // a user id, 'unassigned', or a comma list of user ids
+  teamId?: string; categoryId?: string;         // an id, or a comma list of ids (as TKT-1 takes them, 2026-11-18)
   fromDate?: string; toDate?: string;           // 'YYYY-MM-DD'
 }
 /** SVW-2 POST /saved-views as the app sends it: never `columns`, never `isDefault`. */

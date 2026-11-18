@@ -1,31 +1,32 @@
-// The environment switch sheet (2026-11-17), opened by the drawer's "Service Desk environment" row beside Sign out
-// (./DrawerContent.tsx), for every role in a release build (CAN_SWITCH_ENVIRONMENT, src/config/env.ts), and only after
-// a correct switch password (./EnvironmentPasswordSheet.tsx). It gets that entry's single-use pass and hands it to
-// switchEnvironment(), which refuses to leave Production without one. Login has no switch.
-// - Lists Production and UAT with their host names. The one in use says so; Production carries the DEFAULT badge.
-// - "Switch and sign out" runs switchEnvironment() (src/api/environmentSwitch.ts): push token off the current
-//   environment, sign-out, the whole query cache and the filter state cleared, then the new environment stored. Login
-//   then shows on the new environment, where any role may sign in.
+// The environment switch sheet, opened by the drawer's "Environment" row (./DrawerContent.tsx). ADMIN only since
+// 2026-11-18 (permissions.ts canSwitchEnvironment): the drawer mounts this sheet only for a person who may switch, in a
+// release build (CAN_SWITCH_ENVIRONMENT, src/config/env.ts). No password: the gate of 2026-11-17 is removed. It is not a
+// route, so no link, back history or saved navigation state can open it. Login has no switch.
+// Layout as approved (UI-STANDARDS.md §18):
+// - The heading "Environment", and nothing else above the options.
+// - Two rows, one line each: a radio, the name, and a state chip on the right (IN USE on the one in use, TESTING on UAT
+//   otherwise), in that environment's colours. No host names, no captions.
+// - One line at the foot: switching signs you out and clears everything loaded. Then "Switch and sign out" and Cancel.
+// "Switch and sign out" runs switchEnvironment() (src/api/environmentSwitch.ts), unchanged: the device token off the
+// environment being left, sign-out, the whole query cache and the filter and period state cleared, then the new
+// environment stored. Login then shows on the new environment.
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { switchEnvironment } from '@/api/environmentSwitch';
-import { Sheet, SubmitButton } from '@/components';
-import {
-  DEFAULT_ENVIRONMENT, ENVIRONMENT_NAMES, SELECTABLE_ENVIRONMENTS, apiHostFor, type AppEnvironment,
-} from '@/config/env';
+import { OutlineButton, Sheet, SubmitButton } from '@/components';
+import { ENVIRONMENT_NAMES, SELECTABLE_ENVIRONMENTS, environmentRowState, type AppEnvironment } from '@/config/env';
 import { useSingleFlight } from '@/hooks';
 import { useEnvironmentStore } from '@/store/environment.store';
-import type { SwitchPass } from '@/utils/switch-password';
+import { EnvironmentChip } from './EnvironmentChip';
 
 export const SWITCH_LABEL = 'Switch and sign out';
+export const SWITCH_FOOTNOTE = 'Switching signs you out and clears everything loaded.';
 
 export function EnvironmentSheet({
-  visible, pass, onClose, onSwitched,
+  visible, onClose, onSwitched,
 }: {
   visible: boolean;
-  /** From a correct switch password, good for one switch (utils/switch-password.ts). */
-  pass: SwitchPass | null;
   onClose: () => void;
   onSwitched?: () => void;
 }) {
@@ -51,29 +52,25 @@ export function EnvironmentSheet({
       setSwitching(true);
       setError(null);
       try {
-        await switchEnvironment(chosen, pass);
+        await switchEnvironment(chosen);
         onSwitched?.();
         onClose();
       } catch {
-        // The pass is used up by then: another try needs the password again.
-        setError("Couldn't switch. Close this and enter the password again.");
+        setError("Couldn't switch. Try again.");
       } finally {
         setSwitching(false);
       }
     });
 
   return (
-    <Sheet visible={visible} title="Service Desk environment" onClose={close}>
-      <Text className="mx-4 mb-3 text-sm text-gray-600">
-        Choose which Service Desk Setu connects to. Switching signs you out and clears everything Setu has loaded.
-      </Text>
+    <Sheet visible={visible} title="Environment" onClose={close}>
       <View accessibilityRole="radiogroup">
         {SELECTABLE_ENVIRONMENTS.map((env) => (
           <EnvironmentRow
             key={env}
             env={env}
             chosen={env === chosen}
-            inUse={env === active}
+            state={environmentRowState(env, active)}
             disabled={switching}
             onPress={() => setChosen(env)}
           />
@@ -84,29 +81,30 @@ export function EnvironmentSheet({
           {error}
         </Text>
       ) : null}
-      <View className="mx-4 mt-4">
+      <Text className="mx-4 mt-3 text-sm text-gray-600">{SWITCH_FOOTNOTE}</Text>
+      <View className="mx-4 mt-3">
         <SubmitButton label={SWITCH_LABEL} onPress={apply} disabled={chosen === active} loading={switching} />
+      </View>
+      <View className="mx-4 mt-2">
+        <OutlineButton label="Cancel" onPress={close} disabled={switching} />
       </View>
     </Sheet>
   );
 }
 
 function EnvironmentRow({
-  env, chosen, inUse, disabled, onPress,
+  env, chosen, state, disabled, onPress,
 }: {
   env: AppEnvironment;
   chosen: boolean;
-  inUse: boolean;
+  state: 'IN USE' | 'TESTING' | null;
   disabled: boolean;
   onPress: () => void;
 }) {
-  const host = apiHostFor(env);
-  const isDefault = env === DEFAULT_ENVIRONMENT;
-  const spoken = [ENVIRONMENT_NAMES[env], host, isDefault ? 'default' : null, inUse ? 'in use' : null].filter(Boolean).join(', ');
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityLabel={spoken}
+      accessibilityLabel={state ? `${ENVIRONMENT_NAMES[env]}, ${state.toLowerCase()}` : ENVIRONMENT_NAMES[env]}
       accessibilityState={{ selected: chosen, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -115,22 +113,10 @@ function EnvironmentRow({
       <View className={`h-5 w-5 items-center justify-center rounded-full border-2 ${chosen ? 'border-primary' : 'border-gray-400'}`}>
         {chosen ? <View className="h-2.5 w-2.5 rounded-full bg-primary" /> : null}
       </View>
-      <View className="ml-3 flex-1">
-        <View className="flex-row flex-wrap items-center">
-          <Text className="text-base font-medium text-gray-900">{ENVIRONMENT_NAMES[env]}</Text>
-          {isDefault ? <Badge label="DEFAULT" tone="neutral" /> : null}
-          {inUse ? <Badge label="IN USE" tone="active" /> : null}
-        </View>
-        <Text className="text-xs text-gray-600">{host}</Text>
-      </View>
+      <Text className="ml-3 flex-1 text-base font-medium text-gray-900" numberOfLines={1}>
+        {ENVIRONMENT_NAMES[env]}
+      </Text>
+      {state ? <EnvironmentChip env={env} label={state} /> : null}
     </Pressable>
-  );
-}
-
-function Badge({ label, tone }: { label: string; tone: 'neutral' | 'active' }) {
-  return (
-    <View className={`ml-2 rounded px-1.5 py-0.5 ${tone === 'active' ? 'bg-green-50' : 'bg-gray-100'}`}>
-      <Text className={`text-[10px] font-semibold tracking-wide ${tone === 'active' ? 'text-green-800' : 'text-gray-700'}`}>{label}</Text>
-    </View>
   );
 }

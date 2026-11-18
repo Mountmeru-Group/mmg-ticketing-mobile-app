@@ -26,6 +26,7 @@ import { ticketListFilters } from '@/utils/permissions';
 import {
   cleanSavedFilterName, savedFilterNameProblem, type LegacySavedFilter, type SavedFilterViewer, type SavedViewNames,
 } from '@/utils/saved-filters';
+import { isFilterId } from '@/utils/ticket-filters';
 import { useCategories, useTeams } from './useLookups';
 import { queryKeys } from './queryKeys';
 import { refuse, requireOnline, wasRefusedOnDevice } from './writeGuards';
@@ -160,13 +161,19 @@ export function useSavedViewNames(views: readonly SavedView[] | undefined): Save
   const allowed = useMemo(() => (user ? ticketListFilters(user) : []), [user]);
   const ids = useMemo(() => {
     const out = { category: new Set<string>(), group: new Set<string>(), technician: new Set<string>() };
+    // A key may hold one id or a comma list of them (2026-11-18): every id in it needs its name.
+    const each = (value: unknown, add: (id: string) => void) => {
+      if (typeof value !== 'string') return;
+      for (const id of value.split(',').map((s) => s.trim())) if (isFilterId(id)) add(id);
+    };
     for (const view of views ?? []) {
       const f = (typeof view.filters === 'object' && view.filters !== null ? view.filters : {}) as SavedViewFilters;
-      if (allowed.includes('category') && typeof f.categoryId === 'string' && f.categoryId) out.category.add(f.categoryId);
-      if (allowed.includes('group') && typeof f.teamId === 'string' && f.teamId) out.group.add(f.teamId);
-      const who = f.assignedToId;
-      if (allowed.includes('technician') && typeof who === 'string' && who && who !== 'unassigned' && who !== user?.id) {
-        out.technician.add(who);
+      if (allowed.includes('category')) each(f.categoryId, (id) => out.category.add(id));
+      if (allowed.includes('group')) each(f.teamId, (id) => out.group.add(id));
+      if (allowed.includes('technician')) {
+        each(f.assignedToId, (id) => {
+          if (id !== 'unassigned' && id !== user?.id) out.technician.add(id);
+        });
       }
     }
     return { category: [...out.category], group: [...out.group], technician: [...out.technician].sort() };

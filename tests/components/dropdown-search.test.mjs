@@ -87,15 +87,18 @@ describe('OptionSheet: the one shared dropdown, and the only place its search li
   const sheet = read('src/components/OptionSheet.tsx');
 
   test('the field shows only for a long list with its options loaded, pinned above the list', () => {
-    assert.match(sheet, /const searchable = children === undefined && isSearchableList\(options\.length\);/);
+    // 2026-11-18: `known` is the options plus any chosen value they lack (a multi-select's), so it counts as the list. A
+    // server search (`remote`, the technician filter) always has its field: the field IS how its list is filled.
+    assert.match(sheet, /const searchable = remote !== null \|\| \(children === undefined && isSearchableList\(known\.length\)\);/);
     assert.match(sheet, /\{searchable \? \(\s*<View className="mx-4 mb-2">\s*<SearchField/);
     // Above the FlatList, outside it: it stays put while the list scrolls.
     assert.ok(sheet.indexOf('<SearchField') < sheet.indexOf('<FlatList'));
-    assert.match(sheet, /searchable \? filterOptionsByLabel\(options as readonly SheetOption<string>\[\], query\)/);
+    assert.match(sheet, /return searchable \? filterOptionsByLabel\(known, query\) : known;/);
   });
 
   test('no match: a plain line, not an empty sheet', () => {
-    assert.match(sheet, /ListEmptyComponent=\{\s*searchable && query\.trim\(\) \? \(\s*<Text[^>]*>\{noOptionMatchText\(query\)\}<\/Text>/);
+    assert.match(sheet, /ListEmptyComponent=\{\s*!remote && searchable && typed \? \(\s*<Text[^>]*>\{noOptionMatchText\(query\)\}<\/Text>/);
+    assert.match(sheet, /const typed = query\.trim\(\) !== '';/);
   });
 
   test('the keyboard never covers the list, and a tap on an option with it up picks at once', () => {
@@ -108,9 +111,11 @@ describe('OptionSheet: the one shared dropdown, and the only place its search li
   });
 
   test('the field clears when the sheet closes, however it closes', () => {
-    assert.match(sheet, /useEffect\(\(\) => \{\s*if \(!visible\) setQuery\(''\);\s*\}, \[visible\]\);/);
-    // 2026-11-17: closing also hands a multi-select's ticks to the caller, once, before onClose (tests/filters/multi-select).
-    assert.match(sheet, /const close = useStableCallback\(\(\) => \{\s*setQuery\(''\);\s*if \(props\.multiple === true && !sameChoices\(draft, props\.selectedValues\)\) props\.onChange\(draft as T\[\]\);\s*onClose\(\);/);
+    assert.match(sheet, /useEffect\(\(\) => \{\s*if \(!visible\) setOwnQuery\(''\);/);
+    // A server search's field belongs to the caller: closing empties it through the caller (setQuery → onQueryChange).
+    assert.match(sheet, /const setQuery = \(text: string\) => \(remote \? remote\.onQueryChange\(text\) : setOwnQuery\(text\)\);/);
+    // Closing also hands a multi-select's ticks to the caller, once, before onClose (tests/filters/multi-select).
+    assert.match(sheet, /const close = useStableCallback\(\(\) => \{\s*setQuery\(''\);\s*if \(multi && !sameChoices\(draft, committed \?\? \[\]\)\) \{[\s\S]*?multi\.onChange\(draft as T\[\], chosen as SheetOption<T>\[\]\);\s*\}\s*onClose\(\);/);
     assert.match(sheet, /const pick = useStableCallback\(\(value: string\) => \{\s*setQuery\(''\);/);
   });
 
