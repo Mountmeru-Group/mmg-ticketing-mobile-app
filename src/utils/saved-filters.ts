@@ -21,11 +21,9 @@
 //   (utils/permissions.ts, utils/ticket-filters.ts). Reading a view applies the same rules: anything this role cannot
 //   send, or the app cannot read (a key from a newer web, a value outside the 03 enums), is NOT sent and is listed as
 //   left out. The app never writes a view's filters back (rename sends the name only), so nothing the web saved is lost.
-// iOS (iOS-5i): behind the build-time flag SAVED_VIEWS_ENABLED (src/screens/tickets/savedViewsGate.ts); only the
-// saved-views modules import this file at run time (others use `import type`), so a production bundle with the flag off
-// holds none of it. Android's versionCode-6 section (the phone-only list) is not on iOS: no iOS build ever kept one.
-import { TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type TicketPriority, type TicketStatus } from '@/types';
-import type { SavedViewFilters } from '@/types/savedView';
+// iOS (iOS-5i): Android's file without its versionCode-6 section (the phone-only list of Android build 6, S3): no iOS
+// build ever kept one (docs/ios/ANDROID-DELTA.md §12.2).
+import { TICKET_PRIORITIES, TICKET_STATUSES, type AuthUser, type SavedViewFilters, type TicketPriority, type TicketStatus } from '@/types';
 import { PRIORITY_LABELS, statusLabel } from './format';
 import { ticketListFilters } from './permissions';
 import {

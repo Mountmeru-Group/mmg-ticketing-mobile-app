@@ -16,9 +16,7 @@
 //   ['lookups', 'canned-responses']                   LKP-7   reply templates (M5 Templates sheet; every role)
 //   ['users', 'search', term, roles]                  USR-3   typeahead (≥ 2 characters)
 //   ['users', 'profile', id]                          USR-1   own profile (M10); a saved view's technician's name
-//   ['saved-views', 'ticket']                         SVW-1   the person's saved ticket views (2026-11-17). iOS: the key
-//                                                             lives in hooks/useSavedViews.ts (SAVED_VIEWS_QUERY_KEY), so a
-//                                                             production bundle without saved views holds none of it (iOS-5i)
+//   ['saved-views', 'ticket']                         SVW-1   the person's saved ticket views (2026-11-17)
 //   ['dashboard', period, countryId]                  DSH-1   Home KPIs (never for L2_MANAGER); period = the range or
 //                                                             `custom:<from>:<to>` (utils/dashboard-period.ts)
 //   ['notifications', 'list']                         NTF-1   infinite, 20 per page
@@ -72,6 +70,10 @@ export const queryKeys = {
   users: {
     search: (term: string, roles: readonly string[]) => ['users', 'search', term, roles.join(',')] as const,
     profile: (id: string) => ['users', 'profile', id] as const,
+  },
+
+  savedViews: {
+    tickets: () => ['saved-views', 'ticket'] as const,
   },
 
   dashboard: {

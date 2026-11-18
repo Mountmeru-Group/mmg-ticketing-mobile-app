@@ -281,10 +281,7 @@ For each of these the app:
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `723e2fc`.
 
 - **The behaviour is §9's, exactly** (Ronit's iOS-5i decision 2): the same SVW-1..4 calls and bodies, the same eight keys, the same name rules, the same role cut (§8), the same "left out" note, never optimistic, the re-read after a failure that may have reached the server. Only the interface is iOS's (`docs/brand/UI-STANDARDS.md` §iOS-A.17).
-- **Behind a build-time flag, `SAVED_VIEWS_ENABLED`** (`src/screens/tickets/savedViewsGate.ts`, one line):
-  - **ON in `preview` builds** (UAT, TestFlight);
-  - **OFF in `production` builds** until the backend team confirms SVW-1..4 are live on PROD (`06` §iOS-A). Then a production bundle holds nothing of saved views: no module, no SVW path, no query key, no field spec, no store setter and no saved-views text (`scripts/verify-release-bundle.js`).
-  - The flip ships in a new App Store version, never by EAS Update (`docs/ios/RELEASE-IOS.md`).
+- **In every build, `preview` (UAT) and `production` (PROD), as on Android.** Ronit's simplified plan (2026-11-18) dropped the first plan's build-time flag. Whether SVW-1..4 and the `saved_views` table are live on PROD is still to be confirmed (`06` §iOS-A).
 - **§9's last bullet (the phone-only filters of versionCode 6) is not on iOS.** No iOS build ever kept saved filters on the phone, so there is nothing to list or dismiss.
 - **§9's first bullet:** on iOS the views leave with the cache on sign-out. "And on the environment switch" does not apply: iOS has no switch (`02-AUTH.md` §iOS-C).
 - **§7a's "To confirm"** applies to iOS unchanged: iOS reads and writes the same comma strings.
