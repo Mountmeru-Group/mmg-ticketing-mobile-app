@@ -1,4 +1,4 @@
-# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g, iOS-5h)
+# Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g, iOS-5h, iOS-5i)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
 > **Port source since iOS-5h: `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed`** (§11). To sync later Android work, diff `6b5e46c..origin/dev`. Android's opening of the email sign-in to PROD (`6b5e46c`) was on the iOS-9 list (§5, item 7) and is done in iOS-9b (2026-11-11).
@@ -516,3 +516,97 @@ Together they changed 15 files and added or deleted none (293 files, as at `d862
 | `git log 6b5e46c..origin/dev` | empty (fetched 2026-11-08) |
 
 **Build 0.2.0 (2):** iOS-5h changes no app code, so it joins that build as it is. The build still waits for the backend team's `Set-Cookie` answer (`RELEASE-IOS.md` §6, rule 10).
+
+## 12. iOS-5i: the sync to `723e2fc` (2026-11-18)
+
+### 12.1 What came across
+
+At planning (`git fetch origin` in this clone, 2026-11-18), `6b5e46c..origin/dev` was **three commits**, 72 files (+5,788 / −437):
+
+| Commit | Date (+0530) | What |
+|---|---|---|
+| `7d0a19d` | 2026-11-17 | A run-time environment switch (Login's gear), saved filters kept on the phone, search on long dropdowns; `versionCode` 6 |
+| `4d0e51e` | 2026-11-17 | Saved filters become the web's saved views (SVW-1..4), Status multi-select, the switch moved to the drawer behind a password; `versionCode` 7 |
+| `723e2fc` | 2026-11-18 | Every ticket filter multi-select (TKT-1 comma lists); the switch ADMIN only, the password removed |
+
+The Android folder was **not opened**; Android was read only through git in this clone (`git show 723e2fc:<path>`, `git diff 6b5e46c 723e2fc`). The morning's diagnosis table did not survive a `/clear`, so this table was rebuilt from the diff. No package changed on Android (`package.json` and the lock file are not in the diff); `app.json` changes only `versionCode`.
+
+### 12.2 The rows
+
+IDs: **M** multi-select and TKT-1, **D** dropdown search, **S** saved filters, **V** the environment switch, **O** other.
+
+| ID | Change | Commit | What it does for the user | iOS | Step |
+|---|---|---|---|---|---|
+| M1 | **Status filter**, multi-select, every role (`ticketListFilters` + `status`; one status slot shared with the quick filters) | `4d0e51e` | Pick several statuses at once | **Port** | 2, 6 |
+| M2 | **Every filter multi-select**: status, priority, category, technician, group. TKT-1 gets ONE parameter per key, values joined by commas | `723e2fc` | Several categories, technicians … at once | **Port**, ⚠ ASSUMED (portal URL) in 01 §iOS-A (decision 3). No run-time fallback exists on Android; one value is sent as before | 2, 6 |
+| M3 | One `OptionSheet` `multiple`: checkboxes, "Select all n/N", "All …" clears, Clear, applied once on close, "Afrikomart +2" | `4d0e51e`, `723e2fc` | One way to pick several | **Port**, iOS page sheet; Clear and Done in the sheet's bar (plan decision 4) | 5, 6 |
+| M4 | Technician filter: a USR-3 search inside that sheet (`PersonPickerSheet` no longer used on Filters) | `723e2fc` | Find and tick several technicians | **Port**; the search line announced to VoiceOver | 5, 6 |
+| D1 | **Search** on any `OptionSheet` list of more than 10 options (`option-search.ts`) | `7d0a19d` | Find a category, group or country by typing | **Port**: every list Android names is an `OptionSheet` on iOS | 4, 5 |
+| S1 | Saved filters kept on the phone, per user and environment, at most 20 | `7d0a19d` | — | n/a: replaced on Android by S2 the same day | — |
+| S2 | **Saved filters = the web's saved views** (SVW-1..4): chips, Save (an SLA quick filter or duplicate filters refused), Manage (rename sends the name only; delete asks), each role's cut, the "applied without" note | `4d0e51e`, `723e2fc` | The same saved filters on the phone and on the web portal | **Port behind the build-time flag `SAVED_VIEWS_ENABLED`**: ON in `preview`, OFF in `production` until SVW-1..4 are confirmed on PROD (decision 2) | 3, 6 |
+| S3 | The versionCode-6 notice: lists the phone-only filters of S1 once, Dismiss deletes them | `4d0e51e` | Android testers who used build 6 see what was not uploaded | **Not ported: Android-only.** It reads data only Android `versionCode` 6 wrote (SecureStore `mmg.savedFilters.<env>.<userId>`, keyed by the environment switch); no iOS build ever wrote it (Ronit's condition, §12.3) | — |
+| V1 | **Run-time environment switch**: environment store, base URL per request, sessions tagged with their environment, a token never sent to the other, `appOrigin()` read per call | `7d0a19d` | Testers move a release build between PROD and UAT | **Not ported** (decision 1): CLAUDE.md I3, one URL per bundle | — |
+| V2 | Login: the gear (`7d0a19d`), then a "Use Production" link; the chip follows the environment in use; the email form keyed by environment | all three | — | **Not ported.** iOS's chip keeps its build-time rule | — |
+| V3 | A password gate on the switch (`4d0e51e`), removed with `removed-gate-scan.js` (`723e2fc`) | `4d0e51e`, `723e2fc` | — | **Not ported**: never on iOS | — |
+| V4 | ADMIN-only switch (`canSwitchEnvironment`), the drawer's Environment row and one account card, `EnvironmentSheet`, `EnvironmentChip`, `colors.environment` (+ amber-950); the drawer's version line removed | `723e2fc` | ADMINs switch from the drawer | **Not ported** (no switch; iOS has no drawer; More and Profile unchanged) | — |
+| V5 | Build tooling: no `EXPO_PUBLIC_APP_ENV` in `eas.json`, the build guard refuses it, one release bundle, `.env.example`, `app.config.js` comment | `7d0a19d` | — | **Not ported**: iOS keeps one environment per profile (iOS-9b) | — |
+| V6 | Push: the deep-link origin read at call time (`push.ts`) | `7d0a19d` | — | **Docs only** (decision 4): iOS has no push until iOS-6b | 1 |
+| O1 | `Sheet.tsx`, the bottom-sheet frame | `7d0a19d` | — | **Not ported**: iOS's `PageSheet` is the frame (recorded interface difference) | — |
+| O2 | `versionCode` 5 → 6 → 7 | all | — | Android only. iOS: `version` **1.1.0** (decision 6) | 7 |
+| O3 | `docs/RELEASE.md` (+299: the switch, builds 6 and 7) | all | — | Not on iOS (manifest §4.7); `RELEASE-IOS.md` gets 1.1.0 and the flip procedure | 7 |
+| O4 | Shared docs: 01 (TKT-1, §10.6 SVW-1..4), 02 (§5.1, §9), 03, 04, 05 (B.42–B.46), **16-SAVED-VIEWS (new)**, G2, ROLE-MATRIX (L11), WEB-VS-MOBILE-ROLES, UI-STANDARDS (§10.6, §17, §18) | all | Docs | **Merged** (§12.4) | 1 |
+
+**Files (72).**
+- **Ported:**
+  - verbatim: `ticket-filters.ts`, `multi-select.ts`, `option-search.ts`, `types/ticket.ts`, `types/savedView.ts`;
+  - adapted: `permissions.ts` (status only), `ui.store.ts`, `savedViews.api.ts`, `useSavedViews.ts`, `saved-filters.ts`, `OptionSheet.tsx`, `TicketFiltersScreen.tsx`, `SavedFilters.tsx`.
+  - tests: `list-filters` (verbatim), `period-list` (one line), `dropdown-search`, `multi-select`, `saved-views` (adapted).
+- **Kept off the production bundle** (the flag, plan decision 1): the query key, the field spec, the store setter, the types and hooks barrel exports. On Android they live in `queryKeys.ts`, `responseSpecs.ts`, `ui.store.ts` and the barrels; on iOS they live in the saved-views modules.
+- **Not ported:**
+  - **V:** `env.ts`, `environment.store.ts`, `environmentSwitch.ts`, `client.ts` (beyond a comment), `auth.store.ts`, `auth.api.ts`, `attachments.api.ts`, `auditLog.api.ts` (a comment), `audit-log.ts`, `deep-links.ts`, `push.ts`, `LoginScreen`, `ProfileScreen`, `TicketLinkScreen`, `DrawerContent`, `EnvironmentChip`, `EnvironmentSheet`, `colors.ts`, `eas.json`, `eas-build-guard.js`, `removed-gate-scan.js`, `verify-release-bundle.js` (Android's changes), `.env.example`, `app.config.js`;
+  - **S3:** `legacySavedFilters.ts`, the legacy half of `saved-filters.ts`, `useSavedViews.ts` and `SavedFilters.tsx`;
+  - **O1:** `Sheet.tsx` and its `components/index.ts` line; `hooks/index.ts`'s and `types/index.ts`'s new lines (kept off production);
+  - **tests:** `tests/environment/*` (3); the switch-only edits to `audit-details`, `password-sign-in`, `reauth`, `audit-log`, `kb-announcements`, `start-up-and-login`, `production-readiness` and `push`.
+
+### 12.3 Ronit's decisions (iOS-5i brief and plan, 2026-11-18)
+
+The brief:
+1. **The environment switch is not ported.** iOS keeps I3: one API URL per bundle, chosen at build time. Shared pieces only if a ported feature needs them, and none does. Never a switch in any release build. Recorded as an iOS **build and release** difference, not a product difference: App Review 2.3.1 (hidden features) and data (`02-AUTH.md` §iOS-C).
+2. **Saved views ported exactly as Android, behind `SAVED_VIEWS_ENABLED`:** ON for `preview` (UAT), OFF for `production` until the backend confirms SVW-1..4 on PROD (a one-line flip later); with it OFF, the production bundle holds none of the saved-views UI or calls, which `verify-release-bundle` proves.
+3. **TKT-1's multi-value format ported as Android**, marked "ASSUMED (portal URL), confirm with the backend" in 01 §iOS-A; single-value behaviour kept as the fallback if Android has one (it has none: a single value is sent as before).
+4. **The push deep-link origin change: docs only** (no push until iOS-6b).
+5. **Everything else user-facing ported with Android's behaviour**; only the interface is iOS's. The 17 SAFER divergences and every recorded iOS interface difference kept. Android-native rows: n/a.
+6. **Version 1.1.0** in the final step (a new App Store version; runtime 1.1.0).
+
+The plan (Ronit's OK, 2026-11-18):
+1. **Production holds nothing of saved views**: no module, no SVW path, no query key, no field spec, no store setter, no saved-views text.
+2. **The list type change lands in step 2** with the permissions, and `TicketFiltersScreen` stays single-select (storing one-element lists, so it sends what it sent) until step 6.
+3. **S3 not ported only if it belongs to the switch or is Android-only.** It is Android-only (§12.2).
+4. **Clear and Done in the sheet's bar; the success notice shown inside Filters and Manage** (iOS interface differences, UI-STANDARDS §iOS-A.17).
+5. **The saved-views flip ships in a new App Store version, never by EAS Update.**
+6. **Compliance rows:** A5, E3, E5, E6, E9, H5, B1, and a new **K4** (no environment switch in any release build).
+
+### 12.4 Docs (step 1)
+
+- **Verbatim from `723e2fc`:** `03-DATA-MODEL.md`, `04-SCREEN-MAP.md`, `docs/G2-WEB-FILTERS.md` (iOS had each at `6b5e46c`), and the new `16-SAVED-VIEWS.md`, with a §iOS-A (the flag, S3, no switch).
+- **Merged three-way** (base `6b5e46c`, ours `ios-dev`, theirs `723e2fc`), every line Android added present (checked by script):
+  - `01-API-CONTRACT.md`: §iOS-A gains TKT-1 ⚠ ASSUMED and the SVW flag;
+  - `02-AUTH.md`: §9 after §iOS-B, an iOS line under §5.1's new bullet and under §9's heading, a new **§iOS-C**;
+  - `05-RULES-AND-GAPS.md`: §iOS-A on B.42–B.46;
+  - `ROLE-MATRIX.md`: L11, a clean merge;
+  - `WEB-VS-MOBILE-ROLES.md`: Android's two rows, by hand, with iOS cells ("being built" until step 7);
+  - `docs/brand/UI-STANDARDS.md`: §17 and §18 before §iOS-A, iOS lines at §10.6, §17.1, §17.2 and §18.2–18.4, and a new **§iOS-A.17**.
+- **`06-BACKEND-ASKS.md` §iOS-A:** the two confirmations iOS waits on (SVW on PROD; TKT-1 comma lists).
+- **Not on iOS:** `docs/RELEASE.md` (O3).
+- **Step 7:** this file's results (§12.6), the manifest, `CLAUDE.md`, `UAT-TEST-PLAN-IOS.md`, `APP-STORE-COMPLIANCE.md`, `RELEASE-IOS.md` and `UPDATES-LOG.md`.
+
+### 12.5 Section numbers
+
+No clash. Android's new numbered sections were free on iOS:
+- 01 §10.6;
+- 02 §9, after §iOS-B, as §8 came after §iOS-A;
+- 05 B.42–B.46;
+- UI-STANDARDS §17 and §18, before §iOS-A;
+- the new file `16-SAVED-VIEWS.md`.
+
+New iOS sections take letters: 02 **§iOS-C**, UI-STANDARDS **§iOS-A.17**, 16 **§iOS-A**.

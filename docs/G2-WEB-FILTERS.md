@@ -29,7 +29,7 @@ Every statement cites the source. Where the source does not settle something, th
 | **Category** | `<select>` "All Categories" + **top-level categories only**, sorted by name | `categoryId=<category UUID>` | `categoryId` **exact**: a ticket filed under a sub-category or item of that category does **not** match | `TLP:573-586`; `TC:122` |
 | Country | The navbar country selector, not this panel | `countryId` (see 05 §A.12) | | `TLP:81-86, :161-164` |
 | Requester | No control; only from a URL (`?requesterId=`, e.g. "Previous requests") | `requesterId=<UUID>` | Ignored for END_USER | `TLP:103, :123-134`; `TC:123` |
-| Saved views, CSV export | Out of scope for mobile (WEB-VS-MOBILE-ROLES §6) | | | `TLP:181-254, :297-393` |
+| Saved views, CSV export | CSV export: out of scope for mobile (WEB-VS-MOBILE-ROLES §6). Saved views: built 2026-11-17 (`docs/web-system/16-SAVED-VIEWS.md`) | | | `TLP:181-254, :297-393` |
 
 - **No preset date ranges** ("today", "this week") exist anywhere on the page. The two date inputs are free.
 - **No validation:** a From after To is sent as is and returns an empty list (`TLP:531-546`; `TC:125-130`).

@@ -7,6 +7,8 @@
 > - **Not** from Swagger: `/api/docs` covers about 95 of 300 paths and has known errors.
 > - File references are relative to `backend/src/` unless prefixed.
 > - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
+> - **2026-11-17 (Ronit's written brief):** SVW-1..4, the saved views, added from the source at `7df97c8` (§10.6; full contract with sources: `16-SAVED-VIEWS.md`). TKT-1's Status filter (several values) added to the mobile filters.
+> - **2026-11-18 (Ronit's written brief):** TKT-1's `priority`, `categoryId`, `assignedToId` and `teamId` take several values as ONE comma-separated parameter. **Read from a live URL, not from source:** Ronit copied it from the UAT portal. The clone's controller (`7df97c8`, and all 16 refs) still reads each as one value, so the deployed server differs from the source, as with AUD-1 (§10.5) and NTF-5/6.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
 
@@ -281,9 +283,10 @@ export const assignTicketSchema = z.object({
 |---|---|
 | `page`, `limit` | Shape (a): default 1 / **25**, limit max **100**. **`pageSize` is ignored.** |
 | `status` | Single value, or comma list (`OPEN,IN_PROGRESS`) → `in`. Not validated: an unknown value gives 500 |
-| `priority`, `impact`, `urgency` | Single enum value, exact match |
-| `assignedToId` | A user UUID, or the literal `unassigned` (→ `assignedToId = null`) |
-| `teamId`, `categoryId` | Exact UUID match. `categoryId` does not include children |
+| `priority` | Single enum value, exact match, in the source. **Live (2026-11-18): one value or a comma list** (§TKT-1 "Several values") |
+| `impact`, `urgency` | Single enum value, exact match |
+| `assignedToId` | A user UUID, or the literal `unassigned` (→ `assignedToId = null`), in the source. **Live: also a comma list of user UUIDs** |
+| `teamId`, `categoryId` | Exact UUID match in the source. `categoryId` does not include children. **Live: also a comma list of UUIDs** |
 | `requesterId` | Exact match; ignored for END_USER |
 | `sla` | `WITHIN_SLA` \| `DUE_SOON` \| `BREACHED` |
 | `fromDate`, `toDate` | `YYYY-MM-DD` only, interpreted as **UTC** day bounds on `createdAt`. Any other format gives 500 |
@@ -307,14 +310,25 @@ export const assignTicketSchema = z.object({
 
 | Filter | Parameter and value | Who | Options from |
 |---|---|---|---|
-| Priority | `priority=LOW\|MEDIUM\|HIGH\|URGENT`, one value | every role | the 03 enum, in that order |
-| Category | `categoryId=<top-level category id>`. **Exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name |
+| Status | `status=OPEN,IN_PROGRESS`: **one** comma-separated value, any number of 03 statuses, in the web's order (ctrl:114-116, in the source). Repeated keys arrive as an array and give a 500 (`16-SAVED-VIEWS.md` §7) | every role | the 03 enum, in the web's order (`TicketsListPage.tsx:28`); multi-select |
+| Priority | `priority=HIGH` or `priority=HIGH,URGENT` (2026-11-18, live format): 03 priorities only, in the 03 order | every role | the 03 enum, in that order; multi-select |
+| Category | `categoryId=<id>` or `categoryId=<id>,<id>,…` (2026-11-18, live format): top-level categories. **Each is an exact match: tickets filed under its sub-categories or items do not match**, as on the web (web defect W-G2-1) | every role | LKP-1 `flat=true`, `level` CATEGORY (or none), sorted by name; multi-select |
 | Created date | `fromDate=YYYY-MM-DD` and/or `toDate=YYYY-MM-DD`: the device's calendar day, read by the server as a UTC day on `createdAt`, both ends inclusive. Nothing else is ever sent (any other format is a 500). **G7:** a Home tile also sets both, from the Home period, as the web's dashboard links do: UTC days of the device clock (`FE:pages/dashboard/DashboardPage.tsx:72-86`; `src/utils/dashboard-period.ts` `periodListDates`; `docs/G7-PERIOD-APPROVALS-PUSH.md` §1) | every role | the system date picker, or a Home tile |
-| Technician | `assignedToId=<user id>` | ADMIN, AGENT | USR-3 `role=AGENT` (the web lists active AGENTs) |
-| Group | `teamId=<team id>` | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web) |
+| Technician | `assignedToId=<user id>` or `assignedToId=<id>,<id>,…` (2026-11-18, live format) | ADMIN, AGENT | USR-3 `role=AGENT`, searched (the web lists active AGENTs from `GET /users`, not in this contract); multi-select |
+| Group | `teamId=<team id>` or `teamId=<id>,<id>,…` (2026-11-18, live format) | ADMIN, AGENT | LKP-2 with no `countryId`, inactive groups included (as on the web); multi-select |
 
   - Technician and group are never sent for END_USER or L2_MANAGER, even if set: their lookups are 403 for those roles (`permissions.ts` `ticketListFilters`).
-  - One `assignedToId`: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other, as the web's single select does.
+  - One `assignedToId` key: the named filters My open (`<me>`) and Unassigned (`unassigned`) win over the Technician filter, and choosing one clears the other (however many technicians it held). `unassigned` is never sent inside a list.
+  - One `status` key (2026-11-17): a named filter that sends a status (Open, My open, Pending, Resolved, Closed, the Home tiles) and the Status filter replace each other, the last choice winning. Overdue and Due soon send `sla` and combine with it.
+  - **Several values (2026-11-18), how the app sends them** (`utils/ticket-filters.ts` `advancedFilterQuery`):
+    - **ONE parameter, its values joined by commas.** Never repeated keys (`?x=a&x=b`, an array to Express: a 500 in the source), never `x[]=`.
+    - One value: exactly as before, no comma. None: the key is not sent at all. Never an empty value, an empty part or a trailing comma; each value once. Ids are UUID characters only (`isFilterId`), so a list always splits back into the same ids.
+    - The app hands axios plain strings as `params`; axios encodes them. It writes the comma as `,` (its `buildURL` turns `%2C` back into `,`, as it already did for `status`); the browser's URL has `%2C`. Both decode to the same value on the server.
+  - **Source of the format: a live URL, not source.** Ronit copied this from the UAT portal's ticket list with three categories and two technicians ticked (2026-11-18), decoded:
+    `/tickets?categoryId=416f882d-…,4f72a6ef-…,17715eba-…&assignedToId=f29cdb1e-…,11e436d3-…`
+    - It is the portal's page URL. On `master` the page's URL parameters, its filter state and its TKT-1 parameters are one `TicketFilters` object of strings (`TLP:243-250`, `16-SAVED-VIEWS.md` §6), so the API request is taken to carry the same values. The request itself was not observed: no live API is called from the analysis machine.
+    - The URL shows `categoryId` and `assignedToId`. `priority` and `teamId` are built the same way on Ronit's instruction; the URL does not show them.
+  - **The clone does not agree.** `tickets.controller.ts` at `7df97c8` (`:117`, `:120-122`), and on all 16 refs, reads `priority`, `assignedToId`, `teamId` and `categoryId` as one exact value: by that code, a comma list matches nothing (an empty list) and a comma `priority` is a 500. The deployed server is newer than the clone (`09-API-DRIFT.md`). If the app's multi-value lists come back empty on UAT, that is the first thing to check.
 
 ### TKT-2 `POST /api/v1/tickets` — MVP
 - **Purpose:** raise a ticket.
@@ -1224,6 +1238,45 @@ Out of scope until G8 (Appendix A). Evidence for the G8 build, and what the web 
   - Tests: `tests/rbac/audit-log.test.mjs` (every param, the path fallback, the unknown-number check).
 - **Source:** `app.ts:30, :137`; `modules/auditLog/auditLog.router.ts:8`; `auditLog.controller.ts:5-67`; `utils/pagination.ts:16-44`; `schema.prisma:558-577` (all at `7df97c8`).
 
+### 10.6 Saved views (`/api/v1/saved-views`, `app.ts:160`): 2026-11-17
+
+Out of scope until 2026-11-17 (Appendix A). Since then the app's "Saved filters" are these views, the same list as the web portal's "Views". **Full contract, with a source line for every statement: `16-SAVED-VIEWS.md`.**
+
+- **Auth:** `requireAuth` only (`savedViews.router.ts:7-10`): every role, each person their own views. There is no role guard, no country, and nothing is shared.
+- **Shape:** `SavedView` (03 §C). Each view holds:
+  - `filters`: **one JSON object**, stored as the client sent it (`savedViews.controller.ts:9`, `z.any()`);
+  - `columns`;
+  - `isDefault`;
+  - `entityType`.
+- **The web's `filters`:** up to eight string keys, `status`, `priority`, `sortBy`, `assignedToId`, `teamId`, `categoryId`, `fromDate`, `toDate` (`FE:pages/tickets/TicketsListPage.tsx:190-199`). The web reads back only those (`:223-232`). The app writes exactly these keys and no others.
+
+#### SVW-1 `GET /api/v1/saved-views?entityType=ticket` — 2026-11-17
+- **Query:** `entityType`, exact; the app always sends `ticket`.
+- **200:** a plain array (shape (d)) of the caller's views, `createdAt desc` (`savedViews.controller.ts:14-24`).
+- **Mobile:** loaded while the Filters sheet is open. staleTime 60 s; re-read when the sheet opens only once that has passed (`src/hooks/useSavedViews.ts`).
+
+#### SVW-2 `POST /api/v1/saved-views` — 2026-11-17
+- **Body (zod, `savedViews.controller.ts:6-12`):**
+  - `name`, at least 1 character;
+  - `entityType`, at least 1 character;
+  - `filters`, anything (**a missing or null `filters` is a 500**, `05` B.43);
+  - `columns`, string[], default `[]`;
+  - `isDefault`, default `false`.
+- **201:** the new row. With `isDefault: true`, every other default of that user and entity type is cleared first (`:31-36`).
+- **Mobile sends only** `{ name, entityType: 'ticket', filters }`:
+  - `filters` carries only the eight keys above, only those set, every value a string;
+  - the name is trimmed, at most 40 characters, and not a name already in the list;
+  - never `columns`, never `isDefault`.
+
+#### SVW-3 `PUT /api/v1/saved-views/:id` — 2026-11-17
+- **Body:** `savedViewSchema.partial()` (`:49`). A key left out stays as stored.
+- **200:** the row. **404** "View not found"; **403** "Not authorized" for anyone but the owner (`:45-47`).
+- **Mobile sends `{ name }` only (rename).** So a view's filters, including any the app cannot show, are never rewritten. The app never updates a view's filters.
+
+#### SVW-4 `DELETE /api/v1/saved-views/:id` — 2026-11-17
+- **200:** `{ "message": "View deleted" }`. 404 and 403 as SVW-3 (`:65-71`).
+- **Mobile:** after a confirmation. A 404 counts as already deleted: the view leaves the list.
+
 ---
 
 ## Appendix A — Out of scope for mobile (names only)
@@ -1264,7 +1317,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | closure-rules (`/closure-rules`) | all (ADMIN-only and never enforced; see ask A10) |
 | user-groups (`/user-groups`) | all |
 | query-builder (`/query-builder`) | all (⚠ injection, `05` §C.14) |
-| saved-views (`/saved-views`) | all |
+| saved-views (`/saved-views`) | none since 2026-11-17: SVW-1..4 (§10.6). Never sent: `columns`, `isDefault`, an `entityType` other than `ticket` |
 | surveys (`/surveys`) | all (incl. `POST /:id/responses`; surveys are never triggered automatically) |
 | sites (`/sites`), departments (`/departments`), operational-hours (`/operational-hours`), holidays (`/holidays`) | all |
 | email (`/email`) | all (`/settings`, `/settings/test-imap`, `/settings/test-smtp`, `/poll`) |
@@ -1273,7 +1326,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 
 ## Appendix B — Endpoint index
 
-**60 documented endpoints:** 33 MVP and 27 Phase 2 (APR-4 added in G3, AUD-1 in G8). Also:
+**64 documented endpoints:** 33 MVP and 31 Phase 2 (APR-4 added in G3, AUD-1 in G8, SVW-1..4 on 2026-11-17). Also:
 - AUTH-P1, P2, P3 and P5 (§1.4), PENDING backend asks;
 - NTF-5 and NTF-6 (§9), confirmed in writing by the backend team on 2026-11-05 and in the source at `7df97c8`. They replace AUTH-P4.
 
@@ -1343,10 +1396,14 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SCR-5 | POST | `/service-catalog/requests` | any | P2 (G4) |
 | SCR-6 | GET | `/service-catalog/requests/:id` | any (ctrl) ⚠ (mobile: own request only) | P2 (G4) |
 | AUD-1 | GET | `/audit-logs`, else `/audit-log` (§10.5) | ADMIN | P2 (G8; confirmed 2026-11-05) |
+| SVW-1 | GET | `/saved-views?entityType=ticket` | any (own) | 2026-11-17 |
+| SVW-2 | POST | `/saved-views` `{ name, entityType, filters }` | any | 2026-11-17 |
+| SVW-3 | PUT | `/saved-views/:id` `{ name }` | owner | 2026-11-17 |
+| SVW-4 | DELETE | `/saved-views/:id` | owner | 2026-11-17 |
 
-## iOS-A. The iOS app and this contract (iOS-5e, 2026-11-03; iOS-5f, 2026-11-06; iOS-5h, 2026-11-08)
+## iOS-A. The iOS app and this contract (iOS-5e, 2026-11-03; iOS-5f, 2026-11-06; iOS-5h, 2026-11-08; iOS-5i, 2026-11-18)
 
-> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`, iOS-5f; `8b522e3`).
+> A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `723e2fc` (iOS-5i; before it `6b5e46c`, iOS-5h; `d8626bc`, iOS-5f; `8b522e3`).
 
 - **NTF-5 and NTF-6 (§9) describe the Android app only.** G7's push client (G7c) is **not ported** to iOS: `ios-dev` has no `expo-notifications`, no `src/push/`, and calls neither endpoint. The lines that say "Mobile (G7): … called from `src/push/registration.ts`" or "from `useSignOut` … NTF-6" are Android's; on iOS sign-out sends AUTH-3 only, as before. Pinned by `tests/rbac/approvals-visibility.test.mjs` ("G7c (push) is not in the iOS app").
   - **iOS-5f:** the 2026-11-05 confirmation of NTF-5/NTF-6, NTF-6's new `{ token, platform }` body and the `google-services.json` lines (NTF-2, NTF-5) change nothing on iOS. Push stays out (ANDROID-DELTA §10, decision 4, E2).
@@ -1362,4 +1419,15 @@ These routes exist but the mobile app **must not call them**. Adding any of them
   - **iOS-5h (Ronit, 2026-11-08):** the AUTH-P1 row and the "Builds" line above are Android's since `6b5e46c`: Android calls it on every build, UAT and PROD. **iOS does not:** it stays on UAT builds only, with both gates. Matching Android `6b5e46c` is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved (`docs/ios/ANDROID-DELTA.md` §5, item 7). The backend team's 2026-11-06 word that the endpoint is also on PROD is recorded; iOS has no PROD build to call it from (CLAUDE.md I3).
   - **`Set-Cookie`: ⏳ NOT CONFIRMED** (06 A32). It blocks shipping the email sign-in to testers. Recorded in `02-AUTH.md` §iOS-B and `docs/G9-PASSWORD-LOGIN.md` §iOS-A.
   - §1.5's cookie line names Android's mechanism (`CookieJar.NO_COOKIES`). The iOS counterpart is **half proven** (iOS-5f): `withCredentials: false` sets `HTTPShouldHandleCookies = NO` (`node_modules/react-native/Libraries/Network/RCTNetworking.mm:319`), so no jar cookie is sent; that a response `Set-Cookie` is never stored rests on iOS and on the endpoint sending none. A React Native redirect re-attaches jar cookies and drops `Authorization` (`RCTHTTPRequestHandler.mm:149-159`). Both are in `docs/ios/APP-STORE-COMPLIANCE.md` (G9 section) and `ANDROID-DELTA.md` §10.7.
-- **No other endpoint, param or write** was added on iOS in iOS-5e, iOS-5f or iOS-5h.
+- **TKT-1 with several values (iOS-5i, Ronit's decision 3, 2026-11-18): ⚠ ASSUMED (portal URL), confirm with the backend.**
+  - iOS sends exactly what Android `723e2fc` sends (§TKT-1 above): status, priority, category, technician and group each as **ONE** parameter, its values joined by commas (`categoryId=a,b,c`). Never repeated keys, never `x[]=`. One value is sent exactly as before; none, no key. The same code: `src/utils/ticket-filters.ts` `advancedFilterQuery`, verbatim.
+  - **Assumed, not confirmed.** The format comes from a URL Ronit copied from the UAT portal's page, not from the API and not from source. The clone's controller reads `priority`, `categoryId`, `assignedToId` and `teamId` as one exact value (05 B.46). `status` as a comma list is in the source and is not assumed.
+  - **No fallback.** Android has none to keep: there is no run-time switch back to single values. A single value is the same request as before the multi-select, byte for byte (tested).
+  - What iOS waits for: 06 §iOS-A (the backend team to confirm that the deployed TKT-1 reads these comma lists, on UAT and on PROD).
+- **SVW-1..4 (§10.6) on iOS (iOS-5i, Ronit's decision 2): behind the build-time flag `SAVED_VIEWS_ENABLED`.**
+  - **ON in `preview` builds (UAT, TestFlight). OFF in `production` builds** until the backend team confirms SVW-1..4 are live on PROD (06 §iOS-A). The flag is one line in `src/screens/tickets/savedViewsGate.ts`; Metro folds it at build time.
+  - With the flag OFF, a production bundle holds **nothing of saved views**: no saved-views module, no SVW path, no query key, no field spec, no store setter and no saved-views text. `scripts/verify-release-bundle.js` proves it (`docs/ios/RELEASE-IOS.md` §3).
+  - With the flag ON, the calls, bodies and rules are §10.6's "Mobile" lines, exactly: `{ name, entityType: 'ticket', filters }` with the web's eight keys only; rename `{ name }` only; never `columns` or `isDefault`.
+  - The flip procedure: `docs/ios/RELEASE-IOS.md`. The flip ships in a new App Store version, never by EAS Update (Ronit, iOS-5i decision 5).
+- **Android's runtime environment switch (2026-11-17/18) is not on iOS** (Ronit's iOS-5i decision 1). No endpoint changes with it. iOS sends every call to the one API URL its bundle was built with (CLAUDE.md I3; `02-AUTH.md` §iOS-C).
+- **No other endpoint, param or write** was added on iOS in iOS-5e, iOS-5f, iOS-5h or iOS-5i.

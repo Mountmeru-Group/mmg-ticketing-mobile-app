@@ -672,7 +672,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
 - Confirm whether PROD, UAT and QA share one Redis/Memurai database. If they do, a session token minted in one environment may be accepted by the others through the Redis fast path.
 - The deployment guide's smoke test `GET /api/health` hits no route. The health route is `GET /health`.
 
-## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08)
+## iOS-A. The iOS app and these asks (iOS-5f, 2026-11-06; iOS-5h, 2026-11-08; R1, 2026-11-08; iOS-5i, 2026-11-18)
 
 > A lettered section, so no Android section number can clash with it (`docs/ios/ANDROID-DELTA.md` §1, decision 6). Everything above is Android's text, verbatim at `6b5e46c` (iOS-5h; before it `d8626bc`).
 
@@ -684,3 +684,7 @@ Keep the same login rate limiter (20 per 15 min per IP).
   - **iOS-5h (Ronit, 2026-11-08):** A32's "Mobile" block above is Android's since `6b5e46c`: the backend team confirmed the endpoint on PRODUCTION (2026-11-06) and Android removed its gate. **On iOS the gate stays:** UAT builds only, at run time and at build time. Matching Android `6b5e46c` is on the iOS-9 list, after the backend team confirms no `Set-Cookie` and PROD is approved, together with the demo-login decision above (`docs/ios/ANDROID-DELTA.md` §5, item 7). The PROD confirmation does not answer the `Set-Cookie` question, which stays open.
 - **A5 and NTF-5/NTF-6 (confirmed 2026-11-05):** Android only. iOS has no push client (G7c not ported; decision 4). iOS push would also need APNs, the `aps-environment` entitlement and compliance C4; that is its own future decision.
 - **A31 (business time left on the SLA):** applies to iOS unchanged. Until it ships, iOS shows the deadline, as Android does (UI-STANDARDS §14.6, built in iOS-5f).
+- **iOS-5i (2026-11-18): two confirmations iOS waits on.** Not new asks to the web team's backlog: questions about what is already deployed. Ronit carries them to the backend team.
+  1. **Saved views on PROD: are SVW-1..4 (`01` §10.6) live on the production server, and does its database have the `saved_views` table** (05 B.45: no migration creates it)? Until the answer is yes, iOS **production** builds hold no saved views (the build-time flag `SAVED_VIEWS_ENABLED`, `01` §iOS-A); `preview` builds (UAT) have them. The flip, when confirmed: `docs/ios/RELEASE-IOS.md`, in a new App Store version.
+  2. **TKT-1 with several values: does the deployed server read `priority`, `categoryId`, `assignedToId` and `teamId` as one comma-separated parameter** (`categoryId=a,b,c`), on UAT and on PROD? iOS sends it that way, as Android does, **marked ⚠ ASSUMED (portal URL)** (`01` §iOS-A, 05 B.46). If the answer is no, the lists come back empty and the filter code must change on both apps.
+  - Also asked on Android's side (`16-SAVED-VIEWS.md` §7a): how the deployed web stores several values in a view (a comma string, as the app writes and reads, or an array). Ronit can check that on UAT without code (§7a's "To confirm").

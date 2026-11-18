@@ -565,15 +565,20 @@ caption "Opening Microsoft…" says what is happening (and TalkBack announces it
 
 ### 10.6 The environment chip
 
-- Shown on every build **except production**: `SHOW_ENVIRONMENT_CHIP` in `src/config/env.ts` is `APP_ENV !== 'PROD'`.
-  `APP_ENV` is PROD only in a release build of the `production` EAS profile: development builds refuse PROD, and
-  `scripts/eas-build-guard.js` refuses PROD on every other profile.
-- Login renders it inside `{SHOW_ENVIRONMENT_CHIP ? (…) : null}`, so on production it is not in the tree at all, not
-  just hidden.
-- Profile (M10) still shows the environment line on every build; only Login's chip changed.
-- Tests: `tests/motion/start-up-and-login.test.mjs` evaluates `env.ts` as a production release build (false), a
-  preview release build, a build with nothing set and a development build (true), and checks the label is rendered
-  nowhere else on Login.
+> **iOS:** the "Since 2026-11-17" rule below is Android's (`723e2fc`). On iPhone the chip keeps the build-time rule of the paragraph "Before 2026-11-17": `SHOW_ENVIRONMENT_CHIP`, on every build except `production`; Profile shows the build's environment line. Not on iOS: iOS has no environment switch (`docs/web-system/02-AUTH.md` §iOS-C; §iOS-A.17).
+
+**Since 2026-11-17** the chip follows the environment **in use**, not the build (the environment is the person's choice,
+§17.1):
+- Shown whenever **UAT** is in use, in **any** build, so a person on UAT always knows. Never on Production:
+  `showEnvironmentChip(environment)` in `src/config/env.ts` is `environment === 'UAT'`.
+- Login renders it inside `{showEnvironmentChip(environment) ? (…) : null}`, with `environment` from
+  `useEnvironmentStore`, so on Production it is not in the tree at all, and it appears or goes the moment the person
+  switches.
+- Profile (M10) shows the environment line on every build, and the drawer's "v1.0.0 · PROD" line names the environment
+  in use (both follow the store).
+- Tests: `tests/motion/start-up-and-login.test.mjs` (UAT shows in a release and a development build; PROD never, whatever
+  a stray `EXPO_PUBLIC_APP_ENV` says; the label rendered nowhere else on Login).
+- Before 2026-11-17: shown on every build except a production release (`SHOW_ENVIRONMENT_CHIP = APP_ENV !== 'PROD'`).
 
 ### 10.7 Layout checks (arithmetic, not run on a device)
 
@@ -1199,6 +1204,185 @@ Not built on 2026-11-04, because no endpoint was in the source. Built on 2026-11
 3. A ticket on hold: "Paused while on hold", no time. A resolved one: no line, no gap.
 4. First load: the skeleton and the cards line up; no jump.
 
+## 17. Environment switch, saved filters, dropdown search (2026-11-17)
+
+Ronit's written briefs (three on 2026-11-17): the second replaced 17.2 and added 17.4; the third replaced 17.1 (the
+second brief's ADMIN-only switch is gone). On 2026-11-18, §18 replaced 17.1 and 17.4. Not yet seen on a device: no build was made. The layout notes below are what
+to check on the next build (360 dp, 100 / 130 / 200 % text).
+
+### 17.1 The environment switch: replaced on 2026-11-18 by §18.2–18.4
+> **iOS:** this section is Android's. Not on iOS: iOS has no environment switch (`docs/web-system/02-AUTH.md` §iOS-C; §iOS-A.17).
+
+The password gate of the third brief (a "Switch password" prompt, a hash, a 5-try lockout, a single-use pass) and its
+every-role row are **removed**. The switch is now ADMIN only, with no password, in a redesigned card and sheet: §18.
+Unchanged from this section: Login has no switch; after a switch the person is signed out on the new environment; on
+UAT's Login a **"Use Production"** text button (sm, medium, blue-700, 44 dp) goes back to Production only, for anyone,
+locked while a sign-in runs; the UAT chip shows whenever UAT is in use, for anyone (in the drawer, now in the §18.4
+colours).
+
+### 17.2 Saved filters (Tickets › Filters): the Service Desk's saved views
+**Synced with the web portal (2026-11-17, second brief).** They are the web's "Views", stored on the Service Desk per person and per environment. Contract: `docs/web-system/16-SAVED-VIEWS.md`. They are no longer kept on the phone.
+- **Where**: a SAVED FILTERS block at the top of the Filters sheet, above the filter card.
+  - Header: "SAVED FILTERS" (xs, semibold, uppercase, gray-500) and, when any exist, a **Manage** link (blue-700, 44 dp).
+  - **The chips:**
+    - the views as `FilterChip`s (role button), **newest first** (the web's order), wrapping, 8 dp apart;
+    - the chip whose filters are exactly what is on the list right now (and no search typed) is **filled brand red**;
+    - a view holding something the app cannot apply carries an `alert-circle-outline` icon in its chip.
+  - **While loading:** one xs gray-500 line ("Loading your saved filters…", or "…load when you're back online"). A failure says so in red-700, with a **Retry** link. It is never an empty list.
+  - With none saved: "Save the filters you use often, then tap one to apply it. They are on the web portal's Views too."
+  - Under them, the **dashed** "Save these filters" button (44 dp, bookmark icon). It is disabled until the list has loaded, or with the reason under it (xs, gray-600):
+    - an SLA quick filter is on: "“Overdue” can't be saved: the web portal's views have no SLA filter. Pick another quick filter first.";
+    - these exact filters are saved already: "…already saved as “Name”".
+  - There is **no cap of 20** any more: the server and the web have none.
+- **Tapping a chip** applies the view at once, as the web's "load view" does:
+  - the quick filter, the sort and the sheet's filters are set;
+  - the search and the Home period are cleared;
+  - **the country is kept**.
+  - When the app left something out, an amber note (amber-50, xs amber-900, `alert-circle`) appears under the chips until the next tap: "“Name” is applied without: Group (not available to your role); Sort “created” (not on the app)."
+- **Save sheet**, "Save these filters":
+  - "What this filter holds" as grey pills: "Quick filter: Open", "Status: Open, In Progress", "Priority: High", "Category: Network", "Created …", "Technician: …", "Group: …", "Sort: Priority". Hint: "Saved on the Service Desk: it is on the web portal's Views too."
+  - "**Not kept in a saved filter**", as pills: "Search “vpn”", "Country: Kenya". Hint: "As on the web portal: applying one clears the search and keeps the country."
+  - Then the **Name** field: required, trimmed, at most 40 characters, not a name already in the list (any case). Then "Save filter" and "Cancel".
+  - A failure is said under the field in red-700, in the write-error words ("…It may have been saved — refresh before trying again." for a network error or a 5xx). The list is then re-read.
+  - Success: the sheet closes; toast "Saved “X”. It's on the web portal too."
+- **Manage** ("Saved filters (n)"): one row per view, with:
+  - its name, and a two-line summary of the same pills;
+  - for a view with parts the app cannot apply, a third line in amber-800: "Not on the app: …";
+  - a pencil, **Rename**: the name only, so the filters stay exactly as saved;
+  - a red bin, **Delete**. It asks first: "Delete “X”? It is deleted from the Service Desk, so it goes from the web portal too. Your tickets are not changed." A view already deleted elsewhere counts as deleted and leaves the list.
+- **The phone-only filters of versionCode 6:** an amber card under the button, "Saved on this phone by the previous version". It lists each by name with what it held, and says they were never uploaded. **Dismiss** asks first, then removes them from the phone. They are never applied or uploaded.
+  - **iOS:** not on iOS. No iOS build kept saved filters on the phone, so there is nothing to list (§iOS-A.17).
+- **Role:** a view only holds what that role may send (`ticketListFilters()`, `isTicketFilterAllowed()`). Reading a view applies the same rules.
+
+### 17.3 Search on long dropdowns
+- **One component**: `OptionSheet` (`src/components/OptionSheet.tsx`). Every dropdown in the app is one, so each gets
+  the search the moment its list is long; no screen adds its own. `PersonPickerSheet` and `TemplatePickerSheet` keep
+  their own searches, unchanged.
+- **Threshold: more than 10 options**, the "All …" row included (`OPTION_SEARCH_THRESHOLD`, `utils/option-search.ts`).
+  About ten 48 dp rows fit a sheet on a typical phone; past that the list must be scrolled. None of the app's fixed lists
+  reaches it (priority 5, impact and urgency 5, closure code 7, change status at most 9, audit action 10, audit entity 4,
+  audit dates 7): a field over a short list is noise.
+- Which dropdowns get it when long: **Filters** › Status, Category, Group (Technician always has one: it is a server
+  search, §18.1); **Tickets** › Country; **Create ticket** › Category,
+  Subcategory, Item, Group; **Ticket detail** editors › Category, Subcategory, Item, Country; **Assign** › Group;
+  **Profile** › Country; **Service request** form › every select field from the catalogue.
+- **The field**: the app's `SearchField` (44 dp, search icon, clear button), pinned above the list (outside it, so it
+  never scrolls away), placeholder "Search…", label **"Search <title>"** (e.g. "Search Category").
+- Case-insensitive, matching **anywhere** in the label ("twor" finds Network). No match: one plain line, "Nothing matches
+  “…”." (sm, gray-500, centred), never an empty sheet.
+- **Keyboard**: the sheet rises above it (`KeyboardAvoidingView` inside the modal) and shrinks to the room left, so the
+  list still scrolls; a tap on an option with the keyboard up picks it at once (`keyboardShouldPersistTaps`).
+- **Clears** whenever the sheet closes: a pick, back, a tap outside, or the screen hiding it.
+- **TalkBack**: once typing pauses (0.5 s), the number of matches is announced ("3 matches", "1 match", "No matches").
+- Device checks (next build): a 38-category list on a 360 × 640 phone with the keyboard up (the field and at least two
+  rows visible); 200 % text; TalkBack hears the count.
+
+### 17.4 Multi-select dropdowns: replaced on 2026-11-18 by §18.1
+Built for Status only on 2026-11-17. Since 2026-11-18 every ticket-list filter is a multi-select: §18.1.
+
+## 18. Multi-select on every filter; the environment switch for ADMIN (2026-11-18)
+
+Ronit's written brief of 2026-11-18. Not yet seen on a device: no build was made. Check on the next build (360 dp,
+100 / 130 / 200 % text).
+
+### 18.1 Multi-select on every ticket filter
+- **All five** in Tickets › Filters are multi-selects: **Status, Priority, Category, Technician, Group** (the created
+  dates stay a From / To pair). Each sends ONE parameter with its values joined by commas, as the live web portal does
+  (`01-API-CONTRACT.md` TKT-1). One value is sent exactly as before.
+- **One component:** `OptionSheet` with `multiple` (`src/components/OptionSheet.tsx`). No second dropdown exists.
+- **The field (closed):** placeholder "All statuses", "All priorities", "All categories", "All technicians", "All groups".
+  With some chosen: the first in option order, then "+n": **"Afrikomart +2"**, never a list of names. One chosen reads
+  exactly as before ("High", "Network"). Hints: Category keeps "Top-level categories…"; Status and Technician say what
+  they replace while a quick filter holds that slot ("Picking statuses replaces the “Open” quick filter.", "Picking
+  technicians replaces the “My open” quick filter.").
+- **The sheet**, top to bottom:
+  - the search field as in 17.3, when the list is long (Status has 12; categories, groups) and always for Technician;
+  - a pinned **"Select all"** row (48 dp, base medium): a checkbox (`checkbox` brand red / `remove-circle` brand red when
+    some are chosen / `square-outline` grey), the label, and the web's count on the right ("1/38", sm gray-600). With a
+    search typed it reads **"Select all shown"** and ticks or unticks only what the search shows;
+  - the list. Its first row is **"All categories"** (or "All statuses", …), shown while no search is typed: it is the
+    choice when nothing is ticked (brand red, semibold, a check mark) and tapping it **clears** the ticks. It is never a
+    value and is never sent;
+  - the options with checkboxes (`accessibilityRole="checkbox"`, ticked in brand red). Inactive groups keep their
+    "Inactive group" line;
+  - a footer with **Clear** (outline, disabled when nothing is ticked) and **Done** (filled), side by side, 12 dp apart.
+- **When it applies:** ticks change a draft. The choice reaches the list **once, when the sheet closes**: Done, back, or a
+  tap outside. One request, not one per tick.
+- **A choice outside the list keeps its row:** a saved view's category that is no longer listed, or a technician found by
+  an earlier search, stays ticked with its name. Opening a sheet while its list is still loading and closing it changes
+  nothing.
+- **Technician** is the one list that comes from a **server search** (USR-3: active AGENTs, 2+ letters, up to 20). The
+  web lists every technician from `GET /users`, which is not in the mobile contract, so the sheet searches instead:
+  - field placeholder "Name or email (2+ letters)";
+  - with the field empty it shows the technicians already chosen, ticked (and any ticked during this visit);
+  - typed, it shows the matches, each with its email under the name;
+  - under the rows, one line: "Type at least 2 letters of a name or email to find technicians.", a spinner while
+    searching, "No technician matches “…”.", or the error with Retry. Read aloud as it changes;
+  - the count reads **"2 selected"**: a search has no total to count against.
+- **Slots, as before:** picking statuses replaces a quick filter that sends a status; picking technicians replaces
+  "My open" or "Unassigned"; choosing one of those clears them.
+- **The line under the quick filters** names each filter as its field does: "Open +1 · High +1 priority · Afrikomart +2".
+- **Saved views** carry several values per filter ("Category: Afrikomart, Hardware, Network") and restore them.
+- **TalkBack:** each row is a checkbox with its state; "Select all" says "Select all, 1/38" ("2 selected" for
+  technicians) and is "mixed" when some are chosen; "All categories" is a button, "selected" when nothing is ticked.
+- Device checks (next build): the Category sheet with 38 categories on a 360 × 640 phone with the keyboard up (the field,
+  "Select all" and two rows visible); the Technician sheet's empty, typing and no-match states; 200 % text; the footer
+  clear of the gesture bar.
+
+### 18.2 The drawer: the Environment row (ADMIN only) and one account card
+> **iOS:** this section is Android's; iOS also has no drawer. Not on iOS: iOS has no environment switch (`docs/web-system/02-AUTH.md` §iOS-C; §iOS-A.17).
+
+- **Who sees it: ADMIN only** (`permissions.ts` `canSwitchEnvironment`), in release builds (`CAN_SWITCH_ENVIRONMENT`).
+  For every other role the row is **absent**: not disabled, not greyed. Its sheet is not mounted for them and is not a
+  route, so no link or saved navigation state reaches it. No password.
+- **The card** (pinned to the bottom, 8 dp from the edges, rounded-xl, `border-border`): three rows, a gray-100 hairline
+  between each, inset 12 dp:
+  1. **Environment** (ADMIN only): a 40 dp **circle** (gray-100) with `server-outline` 20 dp in idle grey; "Environment"
+     (base, medium, gray-900); the **status chip** (§18.4), PRODUCTION or UAT; a chevron (gray-400). 56 dp tall.
+     TalkBack: "Environment: Production", hint "Opens the environment switch. Switching signs you out".
+  2. **The account**: the avatar (initials on `bg-primary/10`), name, role, and the country lock chip for a country
+     AGENT; a chevron. Opens the profile.
+  3. **Sign out**, in the web's red.
+  For any role but ADMIN the card is rows 2 and 3, as before.
+- **No version line** under the card any more ("v1.0.0 · PROD" is gone): the chip says the environment. The version is
+  on the **Profile** screen (the Settings row), "Version", where it already was.
+- **The header band's UAT chip** (right of "Setu", whenever UAT is in use, for anyone) is the same chip in the same
+  colours, reading "UAT".
+
+### 18.3 The environment sheet
+> **iOS:** this section is Android's; iOS also has no drawer. Not on iOS: iOS has no environment switch (`docs/web-system/02-AUTH.md` §iOS-C; §iOS-A.17).
+
+- **Heading "Environment"**, and nothing else above the options.
+- **Two rows**, Production first, each **one line**, 56 dp: a radio on the left (brand red when chosen), the name (base,
+  medium, gray-900), and a **state chip** on the right, in that environment's colours (§18.4):
+  - **IN USE** on the environment in use;
+  - **TESTING** on UAT when it is not in use;
+  - none on Production when it is not in use.
+  No host names, no captions, no DEFAULT badge, no warning box.
+- **One line at the foot** (sm, gray-600): "Switching signs you out and clears everything loaded."
+- **"Switch and sign out"** (filled, full width; disabled until the other environment is picked; a spinner while it
+  runs), then **Cancel** (outline, full width) under it, 8 dp apart. Stacked, as the app's other confirm sheets are, so
+  "Switch and sign out" never wraps at 200 % text. A failure says "Couldn't switch. Try again." in red-700 above the
+  foot line.
+- **Switching does what it did:** the device token is removed from the environment being left, sign-out, the query cache
+  cleared, the filters and the period cleared, then Login on the new environment.
+
+### 18.4 The environment chip colours
+> **iOS:** this section is Android's; iOS also has no drawer. Not on iOS: iOS has no environment switch (`docs/web-system/02-AUTH.md` §iOS-C; §iOS-A.17).
+
+`colors.environment` in `src/theme/colors.ts`, used only through `src/navigation/EnvironmentChip.tsx` (11 dp bold,
+wide tracking, pill):
+
+| Chip | Text | Fill | Contrast | L* text / fill |
+|---|---|---|---|---|
+| **PRODUCTION** | brand red `#d21121` | its light tint `#fff3f4` (`BRAND_RED_TINT`) | 5.0:1 | 44.5 / 96.8 |
+| **UAT** | amber-950 `#451a03` (added to the palette) | amber-400 `#fbbf24` | 9.0:1 | 15.5 / 80.7 |
+
+- Both pass **WCAG AA** for small text (4.5:1).
+- Told apart by **lightness**, not hue alone: the fills are 16 L* apart and the words 29 L* apart (the app's rule is at
+  least 15, as for the audit and SLA colours). The word (PRODUCTION, UAT, IN USE, TESTING) carries the meaning (1.4.1).
+- `tests/environment/admin-switch.test.mjs` pins all four numbers.
+
 ## iOS-A. iOS (Phase iOS-4, 2026-10-29)
 
 > Numbered iOS-A, not 9, since iOS-5b (Ronit, 2026-10-30): Android's sections keep Android's numbers (Android's §9 is
@@ -1428,3 +1612,28 @@ Android's §15.2 and §15.3 apply on iOS as written: the same tokens (`emailForm
 **Light only** (§iOS-A.10), as Login.
 
 **Pinned by:** `tests/auth/password-sign-in.test.mjs` (Android's, one path), `tests/auth/ios-password-sign-in.test.mjs` (iOS: gates, Keychain, password, keyboard, VoiceOver, Dynamic Type), `tests/login/sign-in-button.test.mjs`, and the scans in `tests/motion/start-up-and-login.test.mjs`, `tests/screens/read-screens.test.mjs` and `tests/screens/hig-polish.test.mjs`. Device checks: `docs/ios/UAT-TEST-PLAN-IOS.md` G20.
+
+### iOS-A.17 Multi-select filters, dropdown search and saved filters on iPhone (iOS-5i, 2026-11-18; being built)
+
+Android's §17.2, §17.3 and §18.1 apply on iOS as written: the same rules, words, threshold (more than 10 options), counts ("1/38", "2 selected"), "All …" row, "Afrikomart +2", slots, technician search and saved-filter sheets. Only the interface below is iOS's (Ronit's iOS-5i decisions 2 and 4).
+
+**Not on iOS:** §10.6's "Since 2026-11-17" rule, §17.1 and §18.2–§18.4: the environment switch, Login's "Use Production" link, the drawer's Environment row and card, the environment sheet and its chip colours (`colors.environment`, amber-950). iOS has no switch (`02-AUTH.md` §iOS-C) and no drawer; More and Profile are unchanged.
+
+**Multi-select (§18.1) in an iOS page sheet** (`OptionSheet` `multiple` on `PageSheet`, §iOS-A.2):
+- **The bar:** **Clear** on the left, in place of ✕ (dimmed and disabled while nothing is ticked); the title; **Done** on the right, bold. No footer. Android puts Clear and Done side by side at the bottom (Ronit, decision 4).
+- **Closing applies the ticks, however it closes:** Done or a swipe down, as Android's Done, back and tap outside. One request.
+- Under the bar, pinned: the search field (when the list is long, and always for Technician), then "Select all". The list scrolls beneath them.
+- **Keyboard:** the list's insets follow the keyboard (`automaticallyAdjustKeyboardInsets`), so every row can still be reached; a drag on the list puts the keyboard away; a tap on a row with the keyboard up ticks it at once.
+- **VoiceOver:** each row is a checkbox with its state; "Select all, 1/38" is a checkbox, mixed when some are ticked; "All categories" is a button. The match count is announced once typing pauses, as on Android. The technician search's line ("Type at least 2 letters…", "No technician matches…", a failure) is **announced** when it changes: iOS has no live region.
+- **Dynamic Type:** the rows, "Select all" and the search field grow with the text (`min-h-*`).
+- **Haptics:** none on a tick, as for a pick in the single-choice sheet.
+
+**Search on long lists (§17.3):** every `OptionSheet` gets it, as on Android: on iPhone that is every list §17.3 names (Filters, the three country lists, Create ticket, Assign, the ticket's editors, the service form). The keyboard behaves as above.
+
+**Saved filters (§17.2):**
+- **`preview` builds only** until the flip (`SAVED_VIEWS_ENABLED`; `docs/web-system/16-SAVED-VIEWS.md` §iOS-A). In a `production` build the block is absent and the Filters sheet starts with the filter card, as before iOS-5i.
+- The chips are `FilterChip`s, with iOS-4's selection haptic.
+- **Save** and **Manage** are page sheets: ✕ or a swipe down closes them. The name field stays above the keyboard (`SheetKeyboardView`); Return saves.
+- **Delete** asks with an iOS alert, its button in red (`utils/dialogs.ts`).
+- **The success notices** ("Saved “X”. It's on the web portal too.", "Deleted “X”.") show **inside the Filters sheet and inside Manage**: the app's one notice host sits under any open sheet (Ronit, decision 4). VoiceOver hears them as before.
+- **VoiceOver:** the "applied without" note, a load failure and a name error are announced when they appear (iOS has no live region). A name error also plays the error haptic, as the app's other inline form errors (iOS-4, iOS-5f).
