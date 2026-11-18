@@ -54,8 +54,11 @@ export interface EmailRecipients { to: string[]; cc: string[]; from: string; }
 export interface TicketListQuery {
   page?: number; limit?: number;                 // NEVER `pageSize`
   status?: string;                               // single or comma list of TicketStatus
-  priority?: TicketPriority; impact?: TicketImpact; urgency?: TicketUrgency;
-  assignedToId?: UUID | 'unassigned'; teamId?: UUID; categoryId?: UUID; requesterId?: UUID;
+  priority?: string;                             // one TicketPriority or a comma list (live web, 2026-11-18)
+  impact?: TicketImpact; urgency?: TicketUrgency;
+  assignedToId?: string;                         // a user UUID, 'unassigned', or a comma list of user UUIDs
+  teamId?: string; categoryId?: string;          // a UUID or a comma list of UUIDs (live web, 2026-11-18)
+  requesterId?: UUID;
   sla?: SLAStatus; fromDate?: string; toDate?: string;   // 'YYYY-MM-DD' (UTC days)
   search?: string; countryId?: string;           // '' = all countries (key present)
   sortBy?: 'priority' | 'sla';                   // omit = updatedAt desc

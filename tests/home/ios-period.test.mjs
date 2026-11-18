@@ -336,7 +336,7 @@ describe('iOS: a tile opens Tickets with the matching period chip, and ✕ clear
     tapTile(PERSONAS.ADMIN, 'BREACHED_KPI', true, 'quarter');
     const s = useUiStore.getState();
     s.setTicketSort('PRIORITY');
-    s.setTicketAdvanced({ ...s.ticketAdvanced, priority: 'HIGH' });
+    s.setTicketAdvanced({ ...s.ticketAdvanced, priority: ['HIGH'] }); // iOS-5i: a list since Android 723e2fc
     s.setTicketSearchText('vpn');
     s.setTicketSearch('vpn');
     const before = useUiStore.getState();
@@ -349,7 +349,7 @@ describe('iOS: a tile opens Tickets with the matching period chip, and ✕ clear
       ticketPeriod: null,
     });
     assert.equal(after.ticketFilter, 'BREACHED_KPI', 'the tile\'s filter stays');
-    assert.equal(after.ticketAdvanced.priority, 'HIGH', 'the other Filters-sheet choices stay');
+    assert.deepEqual(after.ticketAdvanced.priority, ['HIGH'], 'the other Filters-sheet choices stay');
     assert.equal(after.ticketCountryId, 'country-tz', 'the country stays');
     assert.equal(after.homePeriod, 'quarter', 'Home\'s own period is not touched');
   });
