@@ -2,11 +2,12 @@
 // on iOS: PROD is reachable only from a release build of the `production` EAS profile, each bundle holds ONE API URL
 // (src/config/env.ts picks it at build time), the preview (TestFlight, UAT) profile is exactly as before, and the version,
 // runtime and update channels keep a TestFlight update away from an App Store build. docs/ios/RELEASE-IOS.md.
-// Not ported: Android's developer-token deletion (on the iOS-9 list, docs/ios/ANDROID-DELTA.md §5 item 1) and its
-// Google Play items. The bundles themselves are checked by scripts/verify-release-bundle.js (both profiles).
+// iOS-5i: Android's sign-in cases too, now that the developer-token screen is deleted (the iOS-9 list's items 1 and 5,
+// docs/ios/ANDROID-DELTA.md §5). Not ported: Android's Google Play items. The bundles themselves are checked by
+// scripts/verify-release-bundle.js (both profiles).
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,54 @@ function sourceFiles(dir) {
     return /\.tsx?$/.test(entry) ? [rel.replace(/\\/g, '/')] : [];
   });
 }
+
+// Android's block (4063df3, c5c63ac, f4fad10, 999943e), on iOS since iOS-5i. iOS difference: the email sign-in's session
+// is stored by its own file, passwordSignInAttempt.ts (iOS-5g), not by signInAttempt.ts; the assertions are the same.
+describe('sign-in: Microsoft, and email on UAT and PROD, are the only ways into the app', () => {
+  test('the auth stack registers one screen, Login, and its param list has nothing else', () => {
+    const stack = read('src/navigation/AuthStack.tsx');
+    assert.equal(stack.split('<Stack.Screen').length - 1, 1);
+    assert.match(stack, /<Stack\.Screen name="Login" component=\{LoginScreen\} \/>/);
+    assert.match(read('src/types/navigation.ts'), /export type AuthStackParamList = \{\s*Login: undefined;\s*\};/);
+  });
+
+  test('the developer-token screen, its layout and its placeholder-user guards are deleted', () => {
+    for (const rel of ['src/screens/auth/DevTokenScreen.tsx', 'src/screens/PlaceholderScreen.tsx', 'src/utils/session.ts']) {
+      assert.equal(existsSync(path.join(REPO, rel)), false, rel);
+    }
+    const leftovers = sourceFiles('src').filter((rel) =>
+      /DevToken|PlaceholderScreen|isPlaceholderUser|canAssignToSelf|developer token/i.test(read(rel)),
+    );
+    assert.deepEqual(leftovers, []);
+  });
+
+  test('only the two sign-in flows create a session; the profile save re-stores the same token', () => {
+    const callers = sourceFiles('src').filter((rel) => /\.setSession\(\{/.test(read(rel)));
+    assert.deepEqual(callers.sort(), ['src/hooks/useProfile.ts', 'src/screens/auth/passwordSignInAttempt.ts', 'src/screens/auth/signInAttempt.ts']);
+    const attempt = read('src/screens/auth/signInAttempt.ts');
+    const password = read('src/screens/auth/passwordSignInAttempt.ts');
+    assert.equal(attempt.split('.setSession({').length - 1 + password.split('.setSession({').length - 1, 2, 'one call per sign-in flow');
+    // fullAuthAt (02 §5.8) is set only after a challenged sign-in; the profile save never passes it, so it keeps the date.
+    assert.match(attempt, /setSession\(\{ token: result\.session\.token, user: result\.session\.user, fullAuthAt \}\)/);
+    // A password is a full credential check, so an email sign-in always starts a new 15 days.
+    assert.match(password, /setSession\(\{ token: session\.token, user: session\.user, fullAuthAt: Date\.now\(\) \}\)/);
+    assert.match(read('src/hooks/useProfile.ts'), /const \{ token, issuedAt, user: current \} = useAuthStore\.getState\(\);/);
+    assert.doesNotMatch(read('src/hooks/useProfile.ts'), /fullAuthAt/);
+  });
+
+  test('the Login screen navigates nowhere: its primary action is "Sign in with Microsoft"', () => {
+    const login = read('src/screens/auth/LoginScreen.tsx');
+    const button = read('src/screens/auth/SignInButton.tsx');
+    const email = read('src/screens/auth/EmailSignInForm.tsx');
+    for (const source of [login, button, email]) assert.doesNotMatch(source, /navigation\.|navigate\(/);
+    assert.equal(login.split('<EmailSignInForm').length - 1, 1);
+    assert.ok(login.indexOf('<EmailSignInForm') > login.indexOf('<SignInButton'), 'the email option sits below the pill');
+    assert.equal(login.split('<SignInButton').length - 1, 1);
+    assert.match(login, /<SignInButton busy=\{signingIn\} onPress=\{startSignIn\} \/>/);
+    assert.match(button, /const LABEL = 'Sign in with Microsoft';/);
+    assert.match(button, /accessibilityLabel=\{LABEL\}/);
+  });
+});
 
 describe('environment: PROD only from a release build', () => {
   let copy = 0;
@@ -166,8 +215,8 @@ describe('build profiles, submit and store identity', () => {
     assert.doesNotMatch(text, /ascApiKey|appleId"|password|\.p8|\.p12|mobileprovision/i);
   });
 
-  test('version 1.0.0, so the runtime is 1.0.0 (policy appVersion) for every build from here', () => {
-    assert.equal(app.version, '1.0.0');
+  test('version 1.1.0 (iOS-5i, a new App Store version), so the runtime is 1.1.0 (policy appVersion) for every build from here', () => {
+    assert.equal(app.version, '1.1.0');
     assert.deepEqual(app.runtimeVersion, { policy: 'appVersion' });
     assert.equal(app.ios.buildNumber, '1', 'only seeds the EAS counter (appVersionSource remote)');
   });

@@ -421,8 +421,6 @@ describe('wiring: the list and the Filters sheet take every filter decision from
     assert.ok(src.includes('activeAdvancedFilters(ticketAdvanced, allowedMore)'));
   });
 
-  // iOS-5i step 2, INTERIM: the 6b5e46c form of this test (single-select sheets), until step 6 restores Android's
-  // 723e2fc form verbatim with the multi-select sheets. ALL_FIVE meant these five then.
   test('the Filters sheet renders each filter only when ticketListFilters() lists it', () => {
     const src = read('src/screens/tickets/TicketFiltersScreen.tsx');
     assert.ok(src.includes('ticketListFilters(user)'));
@@ -435,18 +433,22 @@ describe('wiring: the list and the Filters sheet take every filter decision from
       group: /allowed\.includes\('group'\) \? \(\s*<SelectField\s+label="Group"/,
     };
     for (const key of SINGLE_FIVE) assert.match(src, GUARDED[key], key);
-    for (const label of ['label="Priority"', 'label="Category"', 'label="Created"', 'label="Technician"', 'label="Group"']) {
+    assert.match(src, /allowed\.includes\('status'\) \? \(\s*<SelectField\s+label="Status"/, 'status');
+    for (const key of ['status', 'priority', 'category', 'technician', 'group']) {
+      assert.match(src, new RegExp(`allowed\\.includes\\('${key}'\\) \\? \\(\\s*<OptionSheet\\s+multiple\\s+visible=\\{picker === '${key}'\\}`), `${key} sheet`);
+    }
+    for (const label of ['label="Status"', 'label="Priority"', 'label="Category"', 'label="Created"', 'label="Technician"', 'label="Group"']) {
       assert.equal(src.split(label).length - 1, 1, label);
     }
-    assert.match(src, /allowed\.includes\('technician'\) \? \(\s*<PersonPickerSheet/);
-    assert.equal(src.split('<PersonPickerSheet').length - 1, 1);
+    assert.equal(src.split('<OptionSheet').length - 1, 5, 'one sheet per filter, every one guarded');
+    assert.doesNotMatch(src, /PersonPickerSheet/);
     // Lookups are requested only for a filter the person has, and the technician search only through the AGENT role list.
     assert.match(src, /useTeams\(\{ enabled: [^}]*allowed\.includes\('group'\)/);
     assert.match(src, /useCategories\(\{ enabled: [^}]*allowed\.includes\('category'\)/);
-    assert.ok(src.includes('searchRoles={TECHNICIAN_FILTER_ROLES}'));
+    assert.match(src, /useUserSearch\(technicianTerm, \{\s*roles: TECHNICIAN_FILTER_ROLES, enabled: picker === 'technician' && allowed\.includes\('technician'\),/);
     // No role decisions of its own: no low-level gate, no role comparison, no hard-coded role list.
     assert.doesNotMatch(src, /\b(isStaff|isAgentOrAdmin|isTriageAgent|isCountryLockedAgent|canSeePrivateNotes)\(/);
     assert.doesNotMatch(src, /\brole\s*[!=]==?\s*['"]|['"](ADMIN|AGENT|END_USER|L2_MANAGER)['"]\s*[!=]==?/);
-    assert.doesNotMatch(src, /searchRoles=\{\[/);
+    assert.doesNotMatch(src, /roles: \[/);
   });
 });

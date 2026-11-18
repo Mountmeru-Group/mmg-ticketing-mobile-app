@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | Bundle ID | `com.mountmeru.servicedesk` (iPhone only, `supportsTablet: false`) |
-| Version | `app.json` `expo.version`: **1.0.0** since iOS-9b (2026-11-11), for both profiles. The build number comes from EAS (`appVersionSource: "remote"`, `autoIncrement` on both profiles); `app.json`'s `ios.buildNumber` (`"1"`) only seeded EAS's counter |
+| Version | `app.json` `expo.version`: **1.1.0** since iOS-5i (2026-11-18; 1.0.0 from iOS-9b), for both profiles: a new App Store version. The build number comes from EAS (`appVersionSource: "remote"`, `autoIncrement` on both profiles); `app.json`'s `ios.buildNumber` (`"1"`) only seeded EAS's counter |
 | Profiles | `preview` (TestFlight, UAT) · `production` (App Store, PROD, since iOS-9b) |
 | EAS project | `setu-ios`, `projectId` `f7e5b2ae-0785-414d-b9c9-9e3e59b21be3` (iOS-7), in `app.json` `extra.eas`; the release check reads it from there |
 | Apple records | App Store Connect app `ascAppId` 6827931735, team `ZNPR2MFW76`, in `eas.json` `submit` for both profiles. One app record: TestFlight (UAT) and App Store (PROD) builds share it and its version train |
@@ -51,7 +51,7 @@ Stop at the first failure.
 | 4 | `npx expo-doctor` | Every check passes except `react-native-render-html` "Unmaintained" (known since iOS-1b) |
 | 5 | `npm ci --dry-run` | "up to date": the lockfile installs as it is |
 | 6 | `npm run verify:release-bundle` **and** `npm run verify:release-bundle -- --profile production` | **PASS** for both (§3), whichever profile is being built: each proves its bundle holds its own API URL and never the other's |
-| 7 | `app.json` `version` | The version this upload should carry (1.0.0 since iOS-9b). The build number is EAS's, never typed by hand |
+| 7 | `app.json` `version` | The version this upload should carry (1.1.0 since iOS-5i; 1.0.0 from iOS-9b). The build number is EAS's, never typed by hand |
 
 ## 3. The release-bundle check (`scripts/verify-release-bundle.js`)
 
@@ -63,7 +63,7 @@ Stop at the first failure.
 `--profile preview` (the default) bundles with `EXPO_PUBLIC_APP_ENV=UAT`; `--profile production` with `PROD`. Everything goes to the OS temp folder and is deleted afterwards (`--keep` keeps it). It prints counts only, never a matched value.
 
 **It FAILS (exit 1) when the release bundle:**
-- contains any of the 12 strings of the `__DEV__`-only developer-token screen, or a "DEV PLACEHOLDER" string;
+- contains any of the 12 strings of the developer-token screen, or a "DEV PLACEHOLDER" string. **(iOS-5i)** The screen is deleted, so the development **control** fails on any of them too (until then it had to hold all 12, proving the strings were the right ones);
 - contains a test-login marker (`x-test-secret`, `TEST_AUTH_SECRET`, `/auth/test-login`, `sd_session=`) or a backend secret name (`AZURE_AD`);
 - contains a **client-secret value**: an Entra secret (`…NQ~…`), a literal assigned to the client-secret option, or `client_secret=<value>` inside a string;
 - names the client-secret option outside `expo-auth-session`'s own modules;
@@ -71,7 +71,8 @@ Stop at the first failure.
 - **(iOS-9b) lacks its own profile's API URL** (`preview`: UAT; `production`: PROD, which must be set) **or holds the other profile's**, in the JS or in Hermes: one API URL per bundle;
 - names any `mountmerugroup.com` host but its own API host. Set aside first, each only as its exact, whole value: the email form's example address (iOS-5h) and the two `legal.ts` links (iOS-9b);
 - **(iOS-9b) lacks any email sign-in module or string** (G9: 4 modules, 7 strings), in `preview` **and** `production`; contains the web login path `/auth/login` (iOS never calls it);
-- contains a UUID-v4 literal that is not a known public ID, or a literal "Bearer <uuid>";
+- **(iOS-5i) lacks any saved-views module or string** (SVW-1..4: 4 modules, 3 strings), in `preview` **and** `production`: saved views are in every build, as on Android;
+- contains a UUID-v4 literal that is not a known public ID, or a literal "Bearer <uuid>" (since iOS-5i the old placeholder user's ID is no longer allowed: `utils/session.ts` is deleted);
 - reaches an Android-only API from app code: `ToastAndroid`, `BackHandler`, `PermissionsAndroid`, `DateTimePickerAndroid`, `DrawerLayoutAndroid`, `TouchableNativeFeedback` or `android_ripple`. App code is read from the bundle's source map, with comments removed; library code doesn't count;
 - contains `@react-navigation/drawer`;
 - lacks its control strings (the non-JSON guard, the error screen, "Sign in with Microsoft"), which would mean the wrong file was searched.
@@ -87,7 +88,7 @@ It reports, but does not fail on, the Android-only props that iOS ignores (`stat
 | The EAS `projectId` from `app.json` | Public | Read from `app.json` once it exists, and allowed |
 | UUIDs it couldn't attribute | — | Allowed only when library code defines them, or when the UUID is the build's own `//# debugId=` line and equals the source map's `debugId` (Metro stamps one per build) |
 
-**Result on 2026-10-29:** see §8.
+**Result on 2026-10-29:** see §8. **iOS-9b:** §9. **iOS-5i (version 1.1.0):** §10.
 
 ## 4. Build and submit (from iOS-7)
 
@@ -117,7 +118,7 @@ npx eas-cli@24.8.0 build --platform ios --profile production --auto-submit
 - The guard (§1) refuses it unless it is PROD with the PROD URL and both `legal.ts` links.
 - `--auto-submit` uploads that build with `submit.production` (same `ascAppId` and `appleTeamId` as preview). Or submit it later by ID: `npx eas-cli@24.8.0 submit --platform ios --profile production --id <build id>`.
 - The upload also appears in TestFlight, as every upload does. **Before the first production upload, turn off automatic distribution** to the UAT internal group (App Store Connect › TestFlight › the group), or testers get a PROD build (compliance K2). Who may install a production build before release, to check it on PROD (compliance A1), is Ronit's decision.
-- In App Store Connect, choose this build (version 1.0.0, its build number) for the 1.0.0 version, and check it is the `production` build: a UAT build of 1.0.0 has a different build number.
+- In App Store Connect, choose this build (version 1.1.0 since iOS-5i, its build number) for the 1.1.0 version, and check it is the `production` build: a UAT build of the same version has a different build number.
 - Check the build log: Xcode 26 or later with the iOS 26 SDK (J1); record the deployment target (J2). Check the IPA's `Info.plist`: `NSAllowsArbitraryLoads` false, no exception domains (compliance I-row ATS check).
 
 **First build only (iOS-7):**
@@ -183,7 +184,8 @@ npx eas-cli@24.8.0 update --channel ios-preview --platform ios --clear-cache --m
       - **Build 1 is retired once 0.2.0 is on TestFlight:** expire it in App Store Connect, so every tester moves to build 2. After that, nothing more is published for runtime 0.1.0.
       - The build number still comes from EAS (`appVersionSource: remote`, `autoIncrement`); `app.json`'s `ios.buildNumber` only seeded it.
     - Superseded: the first draft of this rule (iOS-5f STEP 1) kept 0.1.0 for build 2, so builds 1 and 2 would have shared runtime 0.1.0. Ronit chose the version bump instead.
-11. **Version 1.0.0, runtime 1.0.0, two channels** (iOS-9b, 2026-11-11):
+11. **Version 1.1.0, runtime 1.1.0, two channels** (iOS-9b, 2026-11-11, at 1.0.0; 1.1.0 since iOS-5i, 2026-11-18):
+    - **iOS-5i:** `version` **1.1.0**, a new App Store version (Ronit's iOS-5i decision 6), so every build from iOS-5i step 7 on is runtime **1.1.0**. A 1.0.0 build, if one is out, keeps runtime 1.0.0: a fix for it is published **from a commit before iOS-5i step 7** (`8b6a282` or earlier, where `app.json` says 1.0.0). iOS-5i itself ships in new builds, never by update.
     - `app.json` `version` is **1.0.0** for both profiles, so every build from iOS-9b on, TestFlight and App Store alike, has runtime **1.0.0**. The runtime no longer separates them: **the channel does.**
     - The channel is written into each binary by EAS from its profile (`preview` → `ios-preview`, `production` → `production`) and sent with every update check. The app cannot change it at run time: nothing in `src/` imports `expo-updates`' JavaScript API (`tests/release/production-readiness.test.mjs`).
     - **Never link the channels:** no `eas channel:edit production --branch ios-preview`, no `eas channel:rollout` between them, and no `eas update --branch` aimed at the other profile's branch. Any of these would send a UAT update (UAT URL) to App Store users, or the reverse.
@@ -214,7 +216,7 @@ The build guard refuses `production` unless all of these are set (§1). All are 
 | Ticket links the app accepts (deep-link origin) | `https://uat-servicedesk.mountmerugroup.com/…`; a PROD link is "another environment" | `https://servicedesk.mountmerugroup.com/…`; a UAT link is "another environment" | `APP_ORIGIN` (`src/utils/deep-links.ts`), from the build's one URL |
 | Update channel | `ios-preview` | `production` | §6 rule 11 |
 | Where it goes | TestFlight internal group | App Review, then the App Store | §4, §5 |
-| Same in both | Version 1.0.0 and runtime 1.0.0; Microsoft sign-in; the email sign-in (G9, since iOS-9b); the privacy link and the deletion request; no developer-token screen (`__DEV__` only) | | |
+| Same in both | Version 1.1.0 and runtime 1.1.0 (iOS-5i); Microsoft sign-in; the email sign-in (G9, since iOS-9b); the privacy link and the deletion request; the multi-select filters and saved filters (iOS-5i); no developer-token screen (deleted in iOS-5i); no environment switch (K4) | | |
 
 ## 8. Results on 2026-10-29 (Phase iOS-5)
 
@@ -301,3 +303,38 @@ The copy was then restored and verified byte for byte.
   - deletion: Create Ticket opened before the confirmation, the row gated on a role, a category in the pre-fill, a time in the confirmation, the pre-fill ignored by Create Ticket;
   - the release check: the other URL no longer forbidden, G9 exempt in production; the guard: the support URL no longer required.
 
+## 10. Results on 2026-11-18 (Phase iOS-5i, step 7: version 1.1.0)
+
+**The §2 checks**, on `ios-dev` (`8b6a282` plus step 7):
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `git status` | The step-7 changes only. `package.json` and `package-lock.json` unchanged |
+| 2 | `npx tsc --noEmit` | 0 errors |
+| 3 | `npm test` | **1954 / 1954** (287 suites; 1793 before iOS-5i, 1946 after step 6) |
+| 4 | `npx expo-doctor` | **19/21.** `react-native-render-html` "Unmaintained" (known), and **new:** four Expo SDK 57 patch releases published after R1b: `expo` 57.0.33 (installed .32), `expo-auth-session` .17 (.16), `expo-sharing` .26 (.25), `expo-updates` .28 (.27). Not changed here (no package change in iOS-5i, CLAUDE.md I7): an R1b-style alignment is Ronit's decision, before the 1.1.0 builds |
+| 5 | `npm ci --dry-run` | up to date |
+| 6 | `npm run verify:release-bundle` | **PASS** (`preview`) and **PASS** (`--profile production`) |
+| — | `npx expo export --platform ios --clear` | `EXPO_PUBLIC_APP_ENV=UAT`: the UAT URL once, the PROD URL 0. `PROD`: the PROD URL once, the UAT URL 0. Both: 2,322 modules (Hermes, 5,692,089 and 5,692,266 bytes); the Alerts notice's iOS wording 1, the old one 0; saved views ("Save these filters", `/saved-views`) and the email sign-in present; `/auth/login`, the developer-token strings and the placeholder UUID 0. Written to the session's scratch folder, outside the repo |
+
+**The release check, both profiles.** Two changes in iOS-5i: the developer-token rule also fails the development control (the screen is deleted), and saved views are required in both profiles, as the email sign-in is:
+
+| Check | `preview` | `production` |
+|---|---|---|
+| Modules | 2,329, 219 of them app code (iOS-9b: 2,323, 213) | the same |
+| API URL | UAT present; PROD **0** in JS and in Hermes | PROD present; UAT **0** in JS and in Hermes |
+| Hosts | `uat-servicedesk.mountmerugroup.com` only | `servicedesk.mountmerugroup.com` only |
+| Email sign-in (G9) | 4/4 modules; 7/7 strings in JS and Hermes | the same |
+| Saved views (SVW-1..4, new rule) | 4/4 modules; 3/3 strings in JS and Hermes | the same |
+| `/auth/login` | 0 | 0 |
+| Developer-token strings (of 12) | **0 in release, 0 in the development control** (the screen is deleted; until iOS-5i the control found 12) | the same |
+| UUID-v4 literals | 4: 3 public IDs, 1 build debug ID, 0 unexplained (the placeholder user's ID is no longer allowed) | the same |
+
+**Mutation checks: each change must make something fail.**
+- **Step 7, unit level: 18 of 18 caught**, each alone against the full suite, every file restored SHA-1 identical:
+  - **First run, 13 of 15.** Caught: the Alerts notice (2: "on iPhone" dropped; the old sentence back); the release check (4: the control rule removed, the release rule loosened, a string dropped, the placeholder UUID allowed again); a second Login screen, the `DevToken` type back, the Login hint with a "Developer" word; "Assign to me" hidden (AssignPicker, TaskEditor); the deletion row gated; `version` back to 1.0.0.
+  - **P5, survived, then caught:** `useProfile` never enabled. No test held the profile query's `enabled`; one now pins the hook, the update guard and `assertAssignment` (`ios-sso.test.mjs`).
+  - **P1, equivalent, dropped:** Pick up without `viewer &&`. A `null` viewer is `END_USER`, for whom `canAssignTickets` is false, so the line is never reached; Android's code is the same.
+  - **The new saved-views rule: 4 of 4 caught** (each rule switched off; a module or a string dropped from its list).
+- **Bundle level:** 3 of 3 caught, each by `verify-release-bundle` on a real `preview` bundle, files restored SHA-1 identical: a developer-token string planted in `__DEV__`-only app code (the development control fails it), and a saved-views string and a saved-views module the bundle lacks.
+- **Earlier steps:** 15/15 (step 2), 23/23 (step 3), 9/9 (step 4), 14/14 (step 5), 17/17 (step 6: four survived the first run, a test each).

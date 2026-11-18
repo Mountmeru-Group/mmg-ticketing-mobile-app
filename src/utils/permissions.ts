@@ -10,7 +10,6 @@ import type { AuthUser, CreateServiceRequestBody, TicketStatus, UpdateTicketBody
 import { TICKET_PRIORITIES } from '@/types';
 import { canSeePrivateNotes } from './activity';
 import { isAgentOrAdmin, isStaff, isTriageAgent } from './roles';
-import { canAssignToSelf } from './session';
 import { countrySelectorMode } from './ticket-filters';
 import { canChangeStatus, getAvailableTransitions, isResolvedLocked, type StatusTransition } from './ticket-rules';
 import type { TicketListFilterKey } from './ticket-filters';
@@ -369,7 +368,7 @@ export function ticketDetailPermissions(
 
   const moreActions: MoreAction[] = [];
   if (canAssignTickets(role) && !locked) {
-    if (canAssignToSelf(viewer) && ticket.assignedToId !== viewer?.id) moreActions.push('pickup');
+    if (viewer && ticket.assignedToId !== viewer.id) moreActions.push('pickup');
     moreActions.push('assign');
   }
   if (transitions.some((t) => t.target === 'CLOSED')) moreActions.push('close');
@@ -549,7 +548,7 @@ export function bulkActions(viewer: Pick<AuthUser, 'id' | 'role'> | null): BulkA
   if (!isStaff(role)) return [];
   const actions: BulkAction[] = [];
   if (canAssignTickets(role)) {
-    if (canAssignToSelf(viewer)) actions.push('pickup');
+    if (viewer) actions.push('pickup');
     actions.push('assign');
   }
   if (canChangeStatus(role)) actions.push('close');

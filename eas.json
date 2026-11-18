@@ -21,7 +21,7 @@
       "ios": { "autoIncrement": true }
     },
     // The App Store build (iOS-9b), pointed at PROD: approved by Ronit's manager on 2026-11-11, for this profile only.
-    // Version 1.0.0 (app.json); EAS gives each build the next build number. Its channel is `production` and never
+    // Version 1.1.0 (app.json; iOS-5i); EAS gives each build the next build number. Its channel is `production` and never
     // ios-preview, so a TestFlight (UAT) update can't reach it. Build, submit and update rules: docs/ios/RELEASE-IOS.md.
     "production": {
       "node": "24.18.0",

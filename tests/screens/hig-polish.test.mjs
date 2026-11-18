@@ -551,8 +551,8 @@ describe('account deletion: a confirmation, then Create Ticket filled in; the pe
   });
 
   test('every role that can create tickets gets it, and TKT-2 sends the person\'s category with the text', async () => {
-    // The row is not role-gated (only a real signed-in account), as Create Ticket is open to every role.
-    assert.match(profile, /const canRequestDeletion = !!user && !placeholder;/);
+    // The row is not role-gated (only a signed-in account), as Create Ticket is open to every role.
+    assert.match(profile, /const canRequestDeletion = !!user;/);
     assert.doesNotMatch(flow, /role|isStaff|isAgentOrAdmin|createTicketPermissions/);
     assert.doesNotMatch(read('src/screens/tickets/TicketListScreen.tsx').match(/\/\/ "\+" FAB[\s\S]*?<\/Pressable>/)[0], /role|isStaff/);
     const prefill = accountDeletionPrefill(user);

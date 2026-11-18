@@ -4,7 +4,9 @@
 // into main.jsbundle, with its source map), compiles it to Hermes bytecode, and builds a development bundle as a
 // CONTROL. Everything goes to the OS temp folder, never the repo, and is deleted afterwards (--keep keeps it).
 // Fails (exit 1) when the release bundle:
-//   - contains a string of the __DEV__-only developer-token screen, or a "DEV PLACEHOLDER" string;
+//   - contains a string of the deleted developer-token screen, or a "DEV PLACEHOLDER" string. iOS-5i (the iOS-9 list's
+//     item 1, as Android 4063df3): the screen is deleted, so the development CONTROL must hold none of its strings either
+//     (until then it held all 12, proving the strings were the right ones);
 //   - contains a test-login marker, a backend secret name, a client-secret VALUE, a token-shaped UUID or "Bearer <uuid>";
 //   - names the client-secret option outside expo-auth-session's own modules;
 //   - lacks the iOS redirect msauth.com.mountmeru.servicedesk://auth, or contains the Android form (msauth://);
@@ -14,7 +16,9 @@
 //   - reaches an Android-only API from app code (comments do not count), or bundles the drawer navigator;
 //   - (iOS-5g) holds the web login path "/auth/login" (iOS never calls it, 01 §iOS-A);
 //   - (iOS-5g; iOS-9b) lacks any email sign-in module or string, in preview AND production: G9 is on both since iOS-9b,
-//     as on Android 6b5e46c (until then production had to hold none of them).
+//     as on Android 6b5e46c (until then production had to hold none of them);
+//   - (iOS-5i) lacks any saved-views module or string (SVW-1..4), in preview AND production: in every build, as on Android
+//     (Ronit's simplified plan, 2026-11-18).
 // Android's false positives, fixed here (02-AUTH.md §7.6 item 8; PERFORMANCE.md §9.3):
 //   - `client_secret` / `clientSecret` are expo-auth-session's own option names. The names are now allowed only inside
 //     node_modules/expo-auth-session, and secret VALUES are searched instead (manifest §4.10, approved 2026-10-28);
@@ -76,7 +80,6 @@ const PUBLIC_UUIDS = new Set(
     (authConfig.match(/EXPO_PUBLIC_AZURE_CLIENT_ID \|\| '([0-9a-f-]{36})'/i) ?? [])[1], // Entra client ID (public)
     (authConfig.match(/EXPO_PUBLIC_AZURE_TENANT_ID \|\| '([0-9a-f-]{36})'/i) ?? [])[1], // Entra tenant ID (public)
     JSON.parse(readRepo('app.json')).expo?.extra?.eas?.projectId, // EAS project (iOS-7), public
-    '00000000-0000-4000-8000-0000000000ff', // utils/session.ts — an old dev-session placeholder id, not a secret
   ]
     .filter(Boolean)
     .map((u) => u.toLowerCase()),
@@ -114,6 +117,14 @@ const EMAIL_SIGN_IN_MODULES = [
   'src/screens/auth/EmailSignInForm.tsx', 'src/screens/auth/passwordSignInAttempt.ts', 'src/api/passwordSignIn.api.ts',
   'src/types/mobile-password-contract.ts',
 ];
+/**
+ * iOS-5i: saved views (the web's Views, SVW-1..4), in every bundle, preview and production, as on Android (Ronit's
+ * simplified plan, 2026-11-18). Their modules, and strings only they hold.
+ */
+const SAVED_VIEWS_MODULES = [
+  'src/api/savedViews.api.ts', 'src/hooks/useSavedViews.ts', 'src/utils/saved-filters.ts', 'src/screens/tickets/SavedFilters.tsx',
+];
+const SAVED_VIEWS_NEEDLES = ['/saved-views', 'Save these filters', 'Manage saved filters'];
 const EMAIL_SIGN_IN_NEEDLES = [
   'Sign in with email instead', "Email sign-in isn't available", 'PasswordSignInError', '/auth/mobile/login', 'email sign-in:',
   'Enter your password.', 'Hide password',
@@ -209,10 +220,11 @@ const appModules = modules.filter((m) => !m.library && !m.rel.startsWith('..'));
 console.log(`\nSearched: ${Object.keys(targets).join(' + ')}${releaseHbc ? '' : ' (hermesc not found: bytecode skipped)'}; control: development bundle.`);
 console.log(`Release bundle: ${modules.length} modules, ${appModules.length} of them app code.\n`);
 
-console.log('Developer-token screen strings (release must be 0):');
+console.log('Developer-token screen strings (deleted in iOS-5i: release and control must be 0):');
 for (const n of DEV_TOKEN_NEEDLES) {
   const counts = Object.entries(targets).map(([k, t]) => [k, count(t, n)]);
   for (const [k, c] of counts) if (c > 0) problems.push(`${k} contains dev-token string ${JSON.stringify(n)} (${c}×)`);
+  if (count(control, n) > 0) problems.push(`the development bundle contains dev-token string ${JSON.stringify(n)}: the screen is deleted`);
   console.log(`  ${JSON.stringify(n).padEnd(46)} ${counts.map(([k, c]) => `${k}: ${c}`).join('  ')}  | control: ${count(control, n)}`);
 }
 for (const n of PLACEHOLDER_NEEDLES) {
@@ -241,6 +253,14 @@ const missingEmailModules = EMAIL_SIGN_IN_MODULES.filter((rel) => !emailModules.
 if (missingEmailModules.length) problems.push(`the ${profile} bundle lacks email sign-in module(s): ${missingEmailModules.join(', ')}`);
 const absentEmailStrings = EMAIL_SIGN_IN_NEEDLES.filter((n) => count(js, n) === 0);
 if (absentEmailStrings.length) problems.push(`release JS (${profile}) lacks email sign-in string(s): ${absentEmailStrings.map((n) => JSON.stringify(n)).join(', ')}`);
+
+// iOS-5i: saved views, whole, in every bundle.
+const savedViewModules = SAVED_VIEWS_MODULES.filter((rel) => modules.some((m) => m.rel === rel));
+const missingSavedViewModules = SAVED_VIEWS_MODULES.filter((rel) => !savedViewModules.includes(rel));
+if (missingSavedViewModules.length) problems.push(`the ${profile} bundle lacks saved-views module(s): ${missingSavedViewModules.join(', ')}`);
+const savedViewStrings = Object.fromEntries(Object.entries(targets).map(([k, t]) => [k, SAVED_VIEWS_NEEDLES.filter((n) => count(t, n) > 0).length]));
+const absentSavedViewStrings = SAVED_VIEWS_NEEDLES.filter((n) => count(js, n) === 0);
+if (absentSavedViewStrings.length) problems.push(`release JS (${profile}) lacks saved-views string(s): ${absentSavedViewStrings.map((n) => JSON.stringify(n)).join(', ')}`);
 
 // The iOS redirect, and never the Android one.
 if (!IOS_REDIRECT || count(js, IOS_REDIRECT) === 0) problems.push('release JS lacks the iOS redirect (src/config/auth.config.ts IOS_AUTH_REDIRECT_URI)');
@@ -292,6 +312,7 @@ if (drawer.length) problems.push(`the release bundle contains @react-navigation/
 console.log(`\nPlaceholder strings: ${PLACEHOLDER_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)} · forbidden markers: ${FORBIDDEN_NEEDLES.map((n) => count(js, n)).reduce((a, b) => a + b, 0)}`);
 console.log(`Client-secret option names: ${nameCount} in release JS, defined by ${nameOwners.length} module(s), ${strayOwners.length} outside expo-auth-session · secret-value matches: ${SECRET_VALUE_PATTERNS.filter((re) => re.test(js)).length}`);
 console.log(`Email sign-in (G9, every build): ${emailModules.length}/${EMAIL_SIGN_IN_MODULES.length} modules · strings ${Object.entries(emailStrings).map(([k, c]) => `${k}: ${c}/${EMAIL_SIGN_IN_NEEDLES.length}`).join('  ')} (JS must be all) · "/auth/login": ${count(js, '/auth/login')}`);
+console.log(`Saved views (SVW-1..4, every build): ${savedViewModules.length}/${SAVED_VIEWS_MODULES.length} modules · strings ${Object.entries(savedViewStrings).map(([k, c]) => `${k}: ${c}/${SAVED_VIEWS_NEEDLES.length}`).join('  ')} (JS must be all)`);
 console.log(`iOS redirect: ${IOS_REDIRECT && count(js, IOS_REDIRECT) > 0 ? 'present' : 'MISSING'} · Android "msauth://": ${count(js, 'msauth://')}`);
 console.log(`mountmerugroup.com hosts: ${hosts.join(', ') || 'none'} (allowed: ${ALLOWED_HOSTS.join(', ') || 'none'})`);
 console.log(`API URLs: ${ownName} ${OWN_API_URL && count(js, OWN_API_URL) > 0 ? 'present' : 'ABSENT'} (required) · ${otherName} ${Object.entries(targets).map(([k, t]) => `${k}: ${OTHER_API_URL ? count(t, OTHER_API_URL) : '?'}`).join('  ')} (must be 0)`);
@@ -300,7 +321,7 @@ console.log(`Example email addresses set aside before the host search: ${example
 console.log(`UUID-v4 literals: ${v4.length} (${v4.filter((u) => PUBLIC_UUIDS.has(u)).length} public IDs, ${v4.filter((u) => !PUBLIC_UUIDS.has(u) && libraryUuid(u)).length} library constants, ${v4.filter((u) => debugIds.has(u)).length} build debug id, ${unexplained.length} unexplained)`);
 console.log(`Android-only APIs reached from app code: ${androidApis.length} · drawer modules: ${drawer.length}`);
 console.log(`Android-only props in app code (ignored on iOS, not a failure): ${androidProps.length ? androidProps.join('; ') : 'none'}`);
-console.log(`Control (development bundle) dev-token strings found: ${DEV_TOKEN_NEEDLES.filter((n) => count(control, n) > 0).length}/${DEV_TOKEN_NEEDLES.length}`);
+console.log(`Control (development bundle) dev-token strings found: ${DEV_TOKEN_NEEDLES.filter((n) => count(control, n) > 0).length}/${DEV_TOKEN_NEEDLES.length} (must be 0: the screen is deleted)`);
 
 if (keep) console.log(`\nBundles kept for inspection in: ${out}\n`);
 else {
@@ -313,4 +334,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`PASS (${profile}) — no dev-token or placeholder string, test-login marker, client-secret value, token-shaped value,`);
-console.log(`unapproved host, ${otherName} API URL or reachable Android-only API; the iOS redirect, the email sign-in and the ${ownName} API URL are present.`);
+console.log(`unapproved host, ${otherName} API URL or reachable Android-only API; the iOS redirect, the email sign-in, saved views and the ${ownName} API URL are present.`);

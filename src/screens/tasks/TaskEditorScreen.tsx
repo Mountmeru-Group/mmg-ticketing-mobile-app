@@ -34,7 +34,6 @@ import { TASK_ASSIGNEE_ROLES } from '@/utils/assignment';
 import { notify } from '@/utils/dialogs';
 import { TASK_STATUS_LABELS, formatDisplayName } from '@/utils/format';
 import { taskPermissions } from '@/utils/permissions';
-import { canAssignToSelf } from '@/utils/session';
 import {
   DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate, dayFromToday, dayToDueDate, dueDateToDay, formatDueDay,
 } from '@/utils/tasks';
@@ -275,7 +274,7 @@ export function TaskEditorScreen({ navigation, route }: SheetScreenProps<'TaskEd
         title="Technician"
         searchRoles={TASK_ASSIGNEE_ROLES}
         extraOptions={[
-          ...(canAssignToSelf(user) && user
+          ...(user
             ? [{ key: 'me', label: 'Assign to me', onPress: () => { update({ assignee: { id: user.id, displayName: user.displayName, email: user.email } }); setTechnicianSheet(false); } }]
             : []),
           { key: 'none', label: 'Unassigned', onPress: () => { update({ assignee: null }); setTechnicianSheet(false); } },

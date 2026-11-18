@@ -621,7 +621,7 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     },
     {
       // iOS-3b (not in Android's list): who may assign only from canAssignTickets(); one ticket only through
-      // useAssignTicket. Its one other gate, canAssignToSelf (the developer-token placeholder), is checked below.
+      // useAssignTicket. Its one other gate, canAssignToSelf, went with the developer-token screen (iOS-5i).
       file: 'src/screens/tickets/AssignPickerScreen.tsx',
       uses: ['canAssignTickets(', 'useAssignTicket('],
       forbid: /updateTicket\(|apiClient|sendAssignment\(/,
@@ -675,7 +675,7 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     },
     {
       // iOS-3c (not in Android's list): editing and the technician picker only from taskPermissions(); the save only
-      // through useSaveTask. Its one other gate, canAssignToSelf (the developer-token placeholder), is checked below.
+      // through useSaveTask. Its one other gate, canAssignToSelf, went with the developer-token screen (iOS-5i).
       file: 'src/screens/tasks/TaskEditorScreen.tsx',
       uses: ['taskPermissions(', 'can.edit', 'can.pickTechnician', 'useSaveTask(', 'TASK_ASSIGNEE_ROLES'],
       forbid: /\bcreateTask\(|\bupdateTask\(|apiClient/,
@@ -713,13 +713,15 @@ describe('wiring: screens take role decisions from utils/permissions.ts', () => 
     assert.doesNotMatch(src, RAW_GATE);
   });
 
-  test('AssignPickerScreen calls no role gate except canAssignToSelf, for "Assign to me" (iOS-3b)', () => {
-    const src = read('src/screens/tickets/AssignPickerScreen.tsx').replace(/canAssignToSelf\(/g, '');
+  test('AssignPickerScreen calls no role gate; "Assign to me" needs only a signed-in user (iOS-3b; iOS-5i)', () => {
+    const src = read('src/screens/tickets/AssignPickerScreen.tsx');
     assert.doesNotMatch(src, RAW_GATE);
+    assert.match(src, /\{user \? \(\s*<ActionRow\s+label="Assign to me"/);
   });
 
-  test('TaskEditorScreen calls no role gate except canAssignToSelf, for "Assign to me" (iOS-3c, as Android)', () => {
-    const src = read('src/screens/tasks/TaskEditorScreen.tsx').replace(/canAssignToSelf\(/g, '');
+  test('TaskEditorScreen calls no role gate; "Assign to me" needs only a signed-in user (iOS-3c, as Android; iOS-5i)', () => {
+    const src = read('src/screens/tasks/TaskEditorScreen.tsx');
     assert.doesNotMatch(src, RAW_GATE);
+    assert.match(src, /\.\.\.\(user\s*\?\s*\[\{ key: 'me', label: 'Assign to me'/);
   });
 });

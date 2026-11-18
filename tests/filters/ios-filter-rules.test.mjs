@@ -9,10 +9,7 @@
 //   src/utils/ticket-filters.ts at 6b5e46c (the pre-iOS-5i rules, one value each), through this client, on 2026-11-18.
 // Android's own tests for these rules (tests/rbac/list-filters, tests/filters/multi-select) run alongside.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { beforeEach, describe, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { AxiosHeaders } from 'axios';
 
@@ -24,9 +21,6 @@ import {
   NO_ADVANCED_FILTERS, availableTicketFilters, namedFilterSetsStatus, ticketListQuery, withAdvancedFilters, withNamedFilter,
 } from '../../src/utils/ticket-filters.ts';
 import { NAMES, PERSONAS, forEachPersona } from '../rbac/personas.mjs';
-
-const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 
 const sent = [];
 apiClient.defaults.adapter = async (config) => {
@@ -157,20 +151,4 @@ describe('the status slot (Android 4d0e51e), for every persona\'s own quick filt
       assert.notEqual(query().get('status'), 'CLOSED');
     });
   }
-});
-
-describe('iOS-5i step 2, interim: the Filters sheet stays single-select until step 6', () => {
-  // Replaced in step 6 by Android's multi-select sheets (tests/rbac/list-filters, tests/filters/multi-select).
-  test('each pick is stored as a one-element list, "All …" as an empty one: never more than one value', () => {
-    const src = read('src/screens/tickets/TicketFiltersScreen.tsx');
-    for (const key of ['priority', 'category', 'group', 'technician']) {
-      const writes = src
-        .split('\n')
-        .map((line) => new RegExp(`setTicketAdvanced\\(\\{ ${key}: (.*?) \\}\\)`).exec(line)?.[1])
-        .filter(Boolean);
-      assert.ok(writes.length > 0, key);
-      for (const w of writes) assert.match(w, /^(\[\]|value === ALL \|\| !choice \? \[\] : \[(choice|\{ id: choice\.id, name: choice\.name)|value === ALL \? \[\] : \[value\]|\[\{ id: person\.id)/, `${key}: ${w}`);
-    }
-    assert.doesNotMatch(src, /label="Status"/, 'the Status field arrives in step 6');
-  });
 });

@@ -1,47 +1,69 @@
-// M3 Filters sheet (Phase G2): the web ticket list's "More Filters" row plus its priority select, on a phone.
+// M3 Filters sheet (Phase G2): the web ticket list's "More Filters" row plus its status and priority selects, on a phone.
 // The web's behaviour, filter by filter with sources: docs/G2-WEB-FILTERS.md.
 //
-// - WHICH filters: ticketListFilters() (utils/permissions.ts) alone. Priority, category and created date for everyone;
-//   technician and group for ADMIN and AGENT (their lookups, USR-3 and LKP-2, are 403 for END_USER and L2_MANAGER).
-// - Every pick applies at once, as each web select does on change; the list behind refetches. Nothing is written to the
-//   server: these are TKT-1 query params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
+// - WHICH filters: ticketListFilters() (utils/permissions.ts) alone. Status, priority, category and created date for
+//   everyone; technician and group for ADMIN and AGENT (their lookups, USR-3 and LKP-2, are 403 for END_USER and
+//   L2_MANAGER).
+// - MULTI-SELECT on every filter (2026-11-18, Ronit's brief): status, priority, category, technician and group are one
+//   OptionSheet `multiple` each (checkboxes, Select all with its count, Clear, the search). Each sends ONE parameter with
+//   its values joined by commas, as the live web portal does (01-API-CONTRACT.md TKT-1); one value is sent as before.
+//   The "All categories" row clears the choice; it is not a value. Picking statuses replaces a quick filter that sends a
+//   status, and picking technicians replaces "My open" or "Unassigned" (one slot each, last choice wins).
+// - Ticks apply once, when a sheet closes (one request, not one per tick); the list behind refetches. Nothing is written
+//   to the server: these are TKT-1 query params (ticketListQuery in utils/ticket-filters.ts), never filtered on the device.
 // - Options as on the web: priorities in its order; active top-level categories by name (LKP-1); every group, inactive
-//   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`).
-// - "Clear all" is the web's Clear: named filter, search, the five filters and the sort. The country stays.
+//   ones marked (LKP-2, no country); technicians = active AGENTs, searched by name or email (USR-3 `role=AGENT`). The web
+//   lists its technicians from `GET /users`, which is not in the mobile contract (01), so the technician sheet searches:
+//   it shows the chosen ones, and up to 20 matches for what is typed.
+// - "Clear all" is the web's Clear: named filter, search, the sheet's filters and the sort. The country stays.
+// - SAVED FILTERS at the top (./SavedFilters.tsx): the Service Desk's saved views, the same list as the web portal's
+//   (2026-11-17). A chip applies the view at once, cut to this role (decodeSavedView).
 //
-// iOS (docs/ios/00-PORT-MANIFEST.md §6 #3): a page sheet over the whole app, closed with the bar's ✕ or a swipe down;
-// "Clear all" sits on the right of the navigation bar. The dates use the iOS calendar in a sheet (DatePickerSheet)
-// instead of Android's system date dialog, and still send the device's calendar day.
-//
-// iOS-5i step 2 (interim, until step 6): the filters are LISTS now (utils/ticket-filters.ts, Android 723e2fc), but this
-// sheet still picks one value each, as before: a pick is stored as a one-element list and "All …" as an empty one, so
-// TKT-1 is sent exactly as before (one value, no comma). The multi-select sheets come in step 6.
+// iOS (docs/ios/00-PORT-MANIFEST.md §6 #3; iOS-5i, Android 723e2fc): a page sheet over the whole app, closed with the
+// bar's ✕ or a swipe down; "Clear all" sits on the right of the navigation bar. The dates use the iOS calendar in a sheet
+// (DatePickerSheet) instead of Android's system date dialog, and still send the device's calendar day. The five filter
+// sheets have Clear and Done in their bar (components/OptionSheet.tsx). This sheet stays open after a saved filter is
+// saved, so it shows the success notice itself (Ronit, iOS-5i decision 4); VoiceOver hears the technician search's line.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  DatePickerSheet, ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, PersonPickerSheet, SelectField,
-  SubmitButton, type SheetOption,
+  DatePickerSheet, ErrorState, FieldLabel, FormCard, Notice, OfflineBanner, OptionSheet, SelectField, SubmitButton,
+  SuccessNoticeHost, type SheetOption,
 } from '@/components';
-import { useAccessibilityTextSize, useCategories, useTeams, useTickets } from '@/hooks';
+import {
+  countryName, useAccessibilityTextSize, useCategories, useCountryOptions, useDebouncedValue, useTeams, useTickets, useUserSearch,
+} from '@/hooks';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { colors } from '@/theme';
-import type { SheetScreenProps, TicketPriority } from '@/types';
-import { PRIORITY_LABELS, formatDisplayName } from '@/utils/format';
+import type { SheetScreenProps, TicketPriority, TicketStatus } from '@/types';
+import { PRIORITY_LABELS, formatDisplayName, statusLabel } from '@/utils/format';
 import { navRole, ticketListFilters } from '@/utils/permissions';
+import type { SavedFilterContent, TicketListFilterState } from '@/utils/saved-filters';
 import { DUE_DATE_MAX, DUE_DATE_MIN, dateFromDay, dayFromDate } from '@/utils/tasks';
 import {
-  PRIORITY_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels, categoryFilterOptions,
-  formatFilterDay, groupFilterOptions, isFilterDay, isTicketFilterAllowed, listCountryParam, namedFilterSetsTechnician,
-  picksSummary, priorityFilterSummary, type TicketNamedFilter,
+  PRIORITY_FILTER_OPTIONS, STATUS_FILTER_OPTIONS, TECHNICIAN_FILTER_ROLES, TICKET_FILTER_LABELS, activeFilterLabels,
+  categoryFilterOptions, countrySelectorMode, formatFilterDay, groupFilterOptions, isFilterDay, isFilterId,
+  isTicketFilterAllowed, listCountryParam, namedFilterSetsStatus, namedFilterSetsTechnician, picksSummary,
+  priorityFilterSummary, statusFilterSummary, type FilterPick, type TicketNamedFilter,
 } from '@/utils/ticket-filters';
+import { SavedFiltersBlock } from './SavedFilters';
 
-const ALL = '__ALL__';
+type Picker = 'status' | 'priority' | 'category' | 'technician' | 'group';
 
-type Picker = 'priority' | 'category' | 'technician' | 'group';
+/** The Status filter's options, in the web's order (TicketsListPage.tsx:28). */
+const STATUS_OPTIONS: readonly SheetOption<TicketStatus>[] = STATUS_FILTER_OPTIONS.map((s) => ({ value: s, label: statusLabel(s) }));
+/** The Priority filter's options, in the web's order (TicketsListPage.tsx:58). */
+const PRIORITY_OPTIONS: readonly SheetOption<TicketPriority>[] = PRIORITY_FILTER_OPTIONS.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }));
+/** USR-3 answers only a search of 2 or more characters (01 USR-3). */
+const TECHNICIAN_SEARCH_MIN = 2;
+
+/** Picks as sheet options (value = id, label = name), and back. */
+const pickOptions = (picks: readonly FilterPick[]): SheetOption<string>[] => picks.map((p) => ({ value: p.id, label: p.name }));
+const picksFrom = (chosen: readonly SheetOption<string>[]): FilterPick[] => chosen.map((o) => ({ id: o.value, name: o.label }));
 
 /** The open date picker: its title, the day it starts on, and where the chosen day goes. */
 interface DayPicker {
@@ -55,8 +77,10 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
   const insets = useSafeAreaInsets();
   const {
     ticketFilter, ticketSort, ticketCountryId, ticketSearch, ticketAdvanced: advanced, setTicketAdvanced, clearTicketFilters,
+    applySavedTicketFilter,
   } = useUiStore();
   const [picker, setPicker] = useState<Picker | null>(null);
+  const [technicianQuery, setTechnicianQuery] = useState('');
   const [dayPicker, setDayPicker] = useState<DayPicker | null>(null);
 
   const allowed = ticketListFilters(user);
@@ -72,12 +96,35 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
   const categories = useCategories({ enabled: picker === 'category' && allowed.includes('category') });
   const teams = useTeams({ enabled: picker === 'group' && allowed.includes('group'), includeInactive: true });
 
-  const priorityOptions = useMemo<SheetOption<TicketPriority | typeof ALL>[]>(
-    () => [{ value: ALL, label: 'All priorities' }, ...PRIORITY_FILTER_OPTIONS.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))],
-    [],
+  const categoryOptions = useMemo<SheetOption<string>[]>(
+    () => categoryFilterOptions(categories.data ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [categories.data],
   );
-  const categoryOptions = useMemo(() => categoryFilterOptions(categories.data ?? []), [categories.data]);
-  const groupOptions = useMemo(() => groupFilterOptions(teams.data ?? []), [teams.data]);
+  const groupOptions = useMemo<SheetOption<string>[]>(
+    () =>
+      groupFilterOptions(teams.data ?? []).map((g) => ({
+        value: g.id, label: g.name, description: g.inactive ? 'Inactive group' : undefined,
+      })),
+    [teams.data],
+  );
+
+  // Technicians come from a server search (USR-3, active AGENTs, up to 20), only while their sheet is open.
+  const technicianTerm = useDebouncedValue(technicianQuery, 350);
+  const technicianSearch = useUserSearch(technicianTerm, {
+    roles: TECHNICIAN_FILTER_ROLES, enabled: picker === 'technician' && allowed.includes('technician'),
+  });
+  const technicianTyped = technicianQuery.trim().length >= TECHNICIAN_SEARCH_MIN;
+  const technicianOptions = useMemo<SheetOption<string>[]>(
+    () =>
+      (technicianTyped ? (technicianSearch.data ?? []) : [])
+        .filter((u) => isFilterId(u.id))
+        .map((u) => ({ value: u.id, label: formatDisplayName(u.displayName) || u.email, description: u.email })),
+    [technicianTyped, technicianSearch.data],
+  );
+  const closePicker = () => {
+    setPicker(null);
+    setTechnicianQuery('');
+  };
 
   /** The iOS calendar in a sheet. The device's calendar day is sent, as the web's date input sends the browser's. */
   const pickDay = (title: string, current: string | null, apply: (day: string) => void) => {
@@ -107,6 +154,18 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
   const fromDay = isFilterDay(advanced.fromDate) ? advanced.fromDate : null;
   const toDay = isFilterDay(advanced.toDate) ? advanced.toDate : null;
   const technicianSlotTaken = namedFilterSetsTechnician(activeFilter);
+  const statusSlotTaken = namedFilterSetsStatus(activeFilter);
+
+  // Saved filters: the list's state, for "Save these filters" and for the chip that matches. The country's name, for the
+  // "not kept" note, comes from the same lookup the list's country selector already loaded (same key: no extra request).
+  const countryMode = user ? countrySelectorMode(user) : 'hidden';
+  const countries = useCountryOptions({ enabled: countryMode === 'switch' && ticketCountryId !== null });
+  const listState: TicketListFilterState = {
+    ticketFilter: activeFilter, ticketSort, ticketSearch, ticketCountryId, ticketAdvanced: advanced,
+    countryName: countryName(countries.data?.find((c) => c.id === ticketCountryId)),
+  };
+  // Already cut to this role by decodeSavedView(); the store sets exactly these fields.
+  const applySaved = (content: SavedFilterContent) => applySavedTicketFilter(content);
 
   const total = list.total;
   const showLabel = total === undefined ? 'Show tickets' : `Show ${total} ${total === 1 ? 'ticket' : 'tickets'}`;
@@ -115,11 +174,27 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
     <View className="flex-1 bg-gray-50">
       <OfflineBanner />
       <ScrollView contentContainerStyle={{ paddingTop: 12, paddingBottom: 12 }} keyboardShouldPersistTaps="handled">
+        {user ? <SavedFiltersBlock list={listState} onApply={applySaved} /> : null}
+
         <Text className="mx-4 mb-2 text-xs text-gray-500">
           Every filter applies at once, together with the quick filter{activeFilter !== 'ALL' ? ` (${TICKET_FILTER_LABELS[activeFilter]})` : ''}, the search and the sort.
         </Text>
 
         <FormCard>
+          {allowed.includes('status') ? (
+            <SelectField
+              label="Status"
+              hint={
+                statusSlotTaken
+                  ? `Picking statuses replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
+                  : undefined
+              }
+              value={statusFilterSummary(advanced.status)}
+              placeholder="All statuses"
+              onPress={() => setPicker('status')}
+            />
+          ) : null}
+
           {allowed.includes('priority') ? (
             <SelectField
               label="Priority"
@@ -132,7 +207,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
           {allowed.includes('category') ? (
             <SelectField
               label="Category"
-              hint="Top-level categories. Tickets filed under a sub-category or item of it are not included."
+              hint="Top-level categories. Tickets filed under a sub-category or item of one are not included."
               value={picksSummary(advanced.category)}
               placeholder="All categories"
               onPress={() => setPicker('category')}
@@ -165,7 +240,7 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
               label="Technician"
               hint={
                 technicianSlotTaken
-                  ? `Picking a technician replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
+                  ? `Picking technicians replaces the “${TICKET_FILTER_LABELS[activeFilter]}” quick filter.`
                   : undefined
               }
               value={picksSummary(advanced.technician)}
@@ -189,66 +264,90 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
         <SubmitButton label={showLabel} onPress={() => navigation.goBack()} />
       </View>
 
-      <OptionSheet
-        visible={picker === 'priority'}
-        title="Priority"
-        options={priorityOptions}
-        selected={advanced.priority[0] ?? ALL}
-        onSelect={(value) => setTicketAdvanced({ priority: value === ALL ? [] : [value] })}
-        onClose={() => setPicker(null)}
-      />
+      {/* Five multi-selects, one component (OptionSheet `multiple`). Each hands its choice over once, when it closes. */}
+      {allowed.includes('status') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'status'}
+          title="Status"
+          allLabel="All statuses"
+          options={STATUS_OPTIONS}
+          selectedValues={advanced.status}
+          onChange={(values) => setTicketAdvanced({ status: values })}
+          onClose={closePicker}
+        />
+      ) : null}
 
-      <OptionSheet
-        visible={picker === 'category'}
-        title="Category"
-        options={[{ value: ALL, label: 'All categories' }, ...categoryOptions.map((c) => ({ value: c.id, label: c.name }))]}
-        selected={advanced.category[0]?.id ?? ALL}
-        onSelect={(value) => {
-          const choice = categoryOptions.find((c) => c.id === value);
-          setTicketAdvanced({ category: value === ALL || !choice ? [] : [choice] });
-        }}
-        onClose={() => setPicker(null)}
-      >
-        {lookupState(categories, 'categories')}
-      </OptionSheet>
+      {allowed.includes('priority') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'priority'}
+          title="Priority"
+          allLabel="All priorities"
+          options={PRIORITY_OPTIONS}
+          selectedValues={advanced.priority}
+          onChange={(values) => setTicketAdvanced({ priority: values })}
+          onClose={closePicker}
+        />
+      ) : null}
 
-      <OptionSheet
-        visible={picker === 'group'}
-        title="Group"
-        options={[
-          { value: ALL, label: 'All groups' },
-          ...groupOptions.map((g) => ({ value: g.id, label: g.name, description: g.inactive ? 'Inactive group' : undefined })),
-        ]}
-        selected={advanced.group[0]?.id ?? ALL}
-        onSelect={(value) => {
-          const choice = groupOptions.find((g) => g.id === value);
-          setTicketAdvanced({ group: value === ALL || !choice ? [] : [{ id: choice.id, name: choice.name }] });
-        }}
-        onClose={() => setPicker(null)}
-      >
-        {lookupState(teams, 'groups')}
-      </OptionSheet>
+      {allowed.includes('category') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'category'}
+          title="Category"
+          allLabel="All categories"
+          options={categoryOptions}
+          selectedValues={advanced.category.map((c) => c.id)}
+          selectedOptions={pickOptions(advanced.category)}
+          onChange={(_values, chosen) => setTicketAdvanced({ category: picksFrom(chosen) })}
+          onClose={closePicker}
+        >
+          {lookupState(categories, 'categories')}
+        </OptionSheet>
+      ) : null}
+
+      {allowed.includes('group') ? (
+        <OptionSheet
+          multiple
+          visible={picker === 'group'}
+          title="Group"
+          allLabel="All groups"
+          options={groupOptions}
+          selectedValues={advanced.group.map((g) => g.id)}
+          selectedOptions={pickOptions(advanced.group)}
+          onChange={(_values, chosen) => setTicketAdvanced({ group: picksFrom(chosen) })}
+          onClose={closePicker}
+        >
+          {lookupState(teams, 'groups')}
+        </OptionSheet>
+      ) : null}
 
       {allowed.includes('technician') ? (
-        <PersonPickerSheet
+        <OptionSheet
+          multiple
           visible={picker === 'technician'}
           title="Technician"
-          searchRoles={TECHNICIAN_FILTER_ROLES}
-          extraOptions={[
-            {
-              key: 'all',
-              label: 'All technicians',
-              onPress: () => {
-                setTicketAdvanced({ technician: [] });
-                setPicker(null);
-              },
-            },
-          ]}
-          onPick={(person) => {
-            setTicketAdvanced({ technician: [{ id: person.id, name: formatDisplayName(person.displayName) || person.email }] });
-            setPicker(null);
+          allLabel="All technicians"
+          options={technicianOptions}
+          selectedValues={advanced.technician.map((t) => t.id)}
+          selectedOptions={pickOptions(advanced.technician)}
+          onChange={(_values, chosen) => setTicketAdvanced({ technician: picksFrom(chosen) })}
+          onClose={closePicker}
+          remoteSearch={{
+            query: technicianQuery,
+            onQueryChange: setTechnicianQuery,
+            placeholder: 'Name or email (2+ letters)',
+            footer: (
+              <TechnicianSearchState
+                query={technicianQuery}
+                settled={technicianTerm}
+                search={technicianSearch}
+                found={technicianOptions.length}
+              />
+            ),
+            announcement: technicianSearchLine(technicianQuery, technicianTerm, technicianSearch, technicianOptions.length),
           }}
-          onClose={() => setPicker(null)}
         />
       ) : null}
 
@@ -261,8 +360,59 @@ export function TicketFiltersScreen({ navigation }: SheetScreenProps<'TicketFilt
         onDone={(date) => dayPicker?.apply(dayFromDate(date))}
         onClose={() => setDayPicker(null)}
       />
+
+      {/* iOS (Ronit, iOS-5i decision 4): this page sheet covers the app's notice host, so "Saved …" shows here. */}
+      <SuccessNoticeHost top={8} />
     </View>
   );
+}
+
+interface TechnicianSearch {
+  isFetching: boolean;
+  isError: boolean;
+  error: unknown;
+  data: unknown;
+  fetchStatus: string;
+  refetch: () => Promise<unknown>;
+}
+
+/**
+ * What the technician search is doing, in words, or null while it has matches or is still searching. The footer below
+ * shows it; on iOS VoiceOver also hears it (OptionSheet `announcement`; Android: a live region).
+ */
+function technicianSearchLine(query: string, settled: string, search: TechnicianSearch, found: number): string | null {
+  const q = query.trim();
+  if (q.length < TECHNICIAN_SEARCH_MIN) return 'Type at least 2 letters of a name or email to find technicians.';
+  if (search.fetchStatus === 'paused') return 'Searching needs a connection. It runs when you reconnect.';
+  if (search.isFetching || settled.trim() !== q) return null;
+  if (search.isError && search.data === undefined) return "Couldn't search technicians.";
+  return found === 0 ? `No technician matches “${q}”.` : null;
+}
+
+/** Under the technician sheet's rows: what the search is doing, in words. Nothing once there are matches. */
+function TechnicianSearchState({
+  query, settled, search, found,
+}: {
+  query: string;
+  settled: string;
+  search: TechnicianSearch;
+  found: number;
+}) {
+  const q = query.trim();
+  const line = (text: string) => <Text className="px-4 py-6 text-center text-sm text-gray-500">{text}</Text>;
+  if (q.length < TECHNICIAN_SEARCH_MIN) return line('Type at least 2 letters of a name or email to find technicians.');
+  if (search.fetchStatus === 'paused') return line('Searching needs a connection. It runs when you reconnect.');
+  if (search.isFetching || settled.trim() !== q) {
+    return (
+      <View className="items-center py-6">
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+  if (search.isError && search.data === undefined) {
+    return <ErrorState error={search.error} title="Couldn't search technicians" onRetry={() => void search.refetch()} />;
+  }
+  return found === 0 ? line(`No technician matches “${q}”.`) : null;
 }
 
 /**

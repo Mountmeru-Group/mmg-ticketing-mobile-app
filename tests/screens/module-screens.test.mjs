@@ -143,10 +143,9 @@ describe('no placeholder remains (iOS-3c; compliance 2.1, A2)', () => {
     assert.ok(sourceFiles('src').length > 150, 'the scan read the source tree');
   });
 
-  test('the one file named PlaceholderScreen is the __DEV__ developer-token layout, loaded only by that screen', () => {
-    const users = sourceFiles('src').filter((rel) => /from ['"][^'"]*PlaceholderScreen['"]/.test(read(rel)));
-    assert.deepEqual(users, ['src/screens/auth/DevTokenScreen.tsx']);
-    assert.ok(read('src/navigation/AuthStack.tsx').includes('__DEV__'), 'the developer-token screen stays behind __DEV__');
+  test('PlaceholderScreen, the developer-token layout, is deleted with that screen (iOS-5i, as Android 4063df3)', () => {
+    assert.equal(existsSync(path.join(REPO, 'src/screens/PlaceholderScreen.tsx')), false);
+    assert.deepEqual(sourceFiles('src').filter((rel) => /PlaceholderScreen/.test(read(rel))), []);
   });
 
   test('the 13 routes that were placeholders each render their real screen', () => {
@@ -240,6 +239,13 @@ describe('notifications (M9): the tap, the badge, the bar', () => {
     assert.match(src, /<FlashList[\s\S]*?contentContainerStyle=\{LIST_PADDING\}/);
     assert.match(src, /<ScrollView contentContainerStyle=\{LIST_PADDING\}/, 'loading, offline and error states too');
     assert.match(src, /const LIST_PADDING = \{ paddingTop: LIST_TOP_GAP, paddingBottom: listBottomInset\(\), flexGrow: 1 \};/);
+  });
+
+  test('iOS-5i: the notice that opens the list is iOS\'s own wording (no push client on iOS; Android shows pushNotice)', () => {
+    const src = code(read(NOTIFICATIONS));
+    assert.match(src, /ListHeaderComponent=\{\s*<View className="mx-4">\s*<Notice>Live alerts aren't available on iPhone yet\. Pull down to check for new ones\.<\/Notice>\s*<\/View>/);
+    assert.equal(src.split('<Notice').length - 1, 1, 'one notice');
+    assert.doesNotMatch(src, /no push yet|arrive live|pushNotice/);
   });
 });
 

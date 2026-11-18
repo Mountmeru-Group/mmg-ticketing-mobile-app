@@ -7,7 +7,8 @@
 > - **The contract is CONFIRMED, not assumed.** The backend team gave the real shape on **2026-10-19**; recorded here 2026-10-20 (§7.5).
 >   - Its `user` has **`name`**, not `displayName`, plus `department` and `phone`. It is **not** the `GET /auth/me` user shape (§7.5).
 > - **iOS (`ios-dev`, iOS-6, 2026-10-28):** redirect `msauth.com.mountmeru.servicedesk://auth` through Apple's sign-in sheet, PKCE S256, Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` (§7.7). Code complete and tested with mocks; **not yet verified on a device** (iOS-7).
-> - `__DEV__` builds keep the developer-token screen as the fallback until SSO works end to end. It is removed in Phase 8.
+> - The `__DEV__` developer-token screen was **deleted on 2026-10-29**, before the first production build (`docs/RELEASE.md` §5). Microsoft sign-in is the only way into a production build.
+>   - **iOS (`ios-dev`):** deleted in **iOS-5i (2026-11-18)**, the iOS-9 list's item 1 (`docs/ios/ANDROID-DELTA.md` §5). Until then it was `__DEV__` only and in no release bundle. Microsoft and email sign-in are the only ways into every iOS build.
 > - **15-day forced re-authentication** (2026-10-30): every 15 days the user is signed out, and Microsoft is told to challenge the next sign-in (`prompt=login`). It is a client-side layer on top of the unchanged 8-hour session. See §5.8.
 >   - **iOS (`ios-dev`, iOS-5d, 2026-11-01):** ported from Android `f4fad10`, with the same behaviour. The iOS differences (Keychain class, reinstall, the private sheet) are in §iOS-A.
 > - Do **not** work around this: no cookie scraping, no `/auth/test-login`, no WebView that lifts the web session. See §6.
@@ -407,7 +408,8 @@ request  → if token: headers.Authorization = `Bearer ${token}`   // capital B,
 - Parsing `Set-Cookie` from `/auth/login`.
 - Shipping the existing web app registration's client secret, or any secret.
 - Asking users to paste a token.
-  - One documented exception: the `__DEV__`-only developer-token screen (`src/screens/auth/DevTokenScreen.tsx`). It is absent from release bundles (`docs/RELEASE.md` §6) and is deleted in Phase 8, once SSO works end to end.
+  - There is no exception. The one there was, the `__DEV__`-only developer-token screen (`src/screens/auth/DevTokenScreen.tsx`), was deleted on 2026-10-29 (`docs/RELEASE.md` §5).
+    - **iOS:** deleted in iOS-5i (2026-11-18). `scripts/verify-release-bundle.js` still fails any bundle, release or development, that holds one of its 12 strings (`docs/ios/RELEASE-IOS.md` §3).
 
 ---
 
@@ -692,7 +694,7 @@ Ported from Android `dev` @ `f4fad10`. iOS keeps **the same behaviour** as §5.8
 - It matters on a phone with Microsoft's Enterprise SSO plug-in (Authenticator or Company Portal under device management), which can otherwise sign in from the device's own Microsoft session. It also matters if D5 is ever reversed.
 - Kept for parity (Ronit, iOS-5d brief). **Not seen on a device.**
 
-**The `__DEV__` developer-token screen** (iOS only until iOS-9). Its `setSession` passes `fullAuthAt: Date.now()` (Ronit, iOS-5d Q1). The pasted token comes from a fresh UAT web sign-in. Without a date, every developer session would count as due and end at the first return to the foreground. Release builds don't contain the screen.
+**The `__DEV__` developer-token screen** (iOS only until iOS-9; **deleted in iOS-5i, 2026-11-18**, so the only `setSession` callers are the two sign-ins and the profile save). Its `setSession` passes `fullAuthAt: Date.now()` (Ronit, iOS-5d Q1). The pasted token comes from a fresh UAT web sign-in. Without a date, every developer session would count as due and end at the first return to the foreground. Release builds don't contain the screen.
 
 **How to test on an iPhone** (a TestFlight build; `UAT-TEST-PLAN-IOS.md` G15). Turn off Settings › General › Date & Time › **Set Automatically**, so you don't have to wait 15 days.
 - Steps 1, 2, 3 and 5 of §5.8 apply as written.

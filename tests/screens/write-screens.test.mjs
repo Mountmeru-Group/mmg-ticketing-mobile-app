@@ -352,12 +352,15 @@ describe('a success notice is the non-modal SuccessNotice, read out by VoiceOver
     assert.match(host, /accessibilityElementsHidden/);
     assert.match(host, /}, visible\);/, 'it goes by itself');
     // iOS-5i (Ronit, decision 4): a page sheet that stays open after a write covers the root host, so it mounts its own.
-    // Only PageSheet (behind `notices`, the saved filters' Manage sheet) does so here; the Filters sheet joins in step 6.
+    // Exactly two do: PageSheet behind `notices` (the saved filters' Manage sheet), and the Filters sheet ("Saved …").
     assert.deepEqual(sourceFiles('src').filter((rel) => code(read(rel)).includes('<SuccessNoticeHost')).sort(), [
       'src/components/PageSheet.tsx',
       'src/navigation/RootNavigator.tsx',
+      'src/screens/tickets/TicketFiltersScreen.tsx',
     ]);
     assert.match(code(read('src/components/PageSheet.tsx')), /\{notices \? <SuccessNoticeHost top=\{NOTICE_TOP\} \/> : null\}/);
+    assert.match(code(read('src/screens/tickets/TicketFiltersScreen.tsx')), /<SuccessNoticeHost top=\{8\} \/>\s*<\/View>\s*\);\s*\}/, 'last, over the sheet');
+    assert.match(code(read('src/screens/tickets/SavedFilters.tsx')), /onClose=\{onClose\}\s*notices\s*>/, 'the Manage sheet');
   });
 });
 

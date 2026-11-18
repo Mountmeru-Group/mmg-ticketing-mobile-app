@@ -449,24 +449,40 @@ describe('Android lessons kept', () => {
   });
 });
 
-describe('the developer-token screen stays out of release builds', () => {
-  test('only AuthStack loads DevTokenScreen, through a `require` inside a __DEV__ branch', () => {
-    const loaders = sourceFiles().filter(
-      ([file, text]) => file !== 'src/screens/auth/DevTokenScreen.tsx' && /['"]@\/screens\/auth\/DevTokenScreen['"]/.test(text),
-    );
-    assert.deepEqual(loaders.map(([file]) => file), ['src/navigation/AuthStack.tsx']);
-    const authStack = loaders[0][1];
-    assert.match(authStack, /= __DEV__\s*\?\s*\(require\('@\/screens\/auth\/DevTokenScreen'\)/);
-    assert.equal(/^import[^\n]*DevTokenScreen/m.test(authStack), false, 'no static import');
+// iOS-5i (the iOS-9 list's item 1, as Android 4063df3): the developer-token screen is deleted. Until then these tests
+// held it behind __DEV__ (one `require` in AuthStack, the Login button in a __DEV__ block).
+describe('the developer-token screen is deleted: Microsoft and email are the only ways in, in every build', () => {
+  test('no source file loads, routes to or names the developer-token screen', () => {
+    assert.equal(sourceFiles().some(([file]) => file === 'src/screens/auth/DevTokenScreen.tsx'), false);
+    assert.deepEqual(sourceFiles().filter(([, text]) => /DevToken|developer token/i.test(text)).map(([file]) => file), []);
   });
 
-  test("the Login screen's developer button sits inside a {__DEV__ ? (…) : null} block", () => {
+  test("the Login screen's __DEV__ block shows the redirect hint only: no button, nothing to navigate to", () => {
     const login = source('src/screens/auth/LoginScreen.tsx');
     const devBlocks = login.match(/\{__DEV__ \? \([\s\S]*?\) : null\}/g) ?? [];
-    assert.ok(devBlocks.some((block) => block.includes("navigate('DevToken')")));
-    const releaseOnly = login.replace(/\{__DEV__ \? \([\s\S]*?\) : null\}/g, '');
-    assert.equal(releaseOnly.includes('DevToken'), false);
-    assert.equal(releaseOnly.includes('Developer'), false);
+    const hint = devBlocks.filter((block) => block.includes('Redirect URI sent to Microsoft'));
+    assert.equal(hint.length, 1);
+    assert.doesNotMatch(hint[0], /Pressable|onPress|navigate|Developer/);
+    assert.doesNotMatch(login, /navigation\.|navigate\(/);
+  });
+
+  test('its placeholder-user guards went with it: the profile loads and saves for any signed-in user (as Android 4063df3)', () => {
+    const profile = source('src/hooks/useProfile.ts');
+    assert.match(profile, /checkFields\('USR-1', res, USER_PROFILE_SPEC\);\s*return res;\s*\},\s*enabled: !!id,\s*\}\);/);
+    assert.match(profile, /if \(!user\) throw refuse\('You are not signed in to a real account\.'\);/);
+    assert.match(profile, /message: 'You will need to sign in again\.',/);
+    assert.match(
+      source('src/hooks/writeGuards.ts'),
+      /export function assertAssignment\(role: UserRole, status: TicketStatus, _assignedToId: string \| null\): void \{\s*if \(!canAssignTickets\(role\)\) throw refuse\([^;]*;\s*if \(isResolvedLocked\(role, status\)\) throw refuse\([^;]*;\s*\}/,
+    );
+  });
+
+  test('the release check still fails any bundle, release or development, that holds one of its 12 strings', () => {
+    const check = source('scripts/verify-release-bundle.js');
+    assert.equal((check.match(/const DEV_TOKEN_NEEDLES = \[([\s\S]*?)\];/)[1].match(/'[^']+'|"[^"]+"/g) ?? []).length, 12);
+    assert.match(check, /for \(const \[k, c\] of counts\) if \(c > 0\) problems\.push\(`\$\{k\} contains dev-token string/);
+    assert.match(check, /if \(count\(control, n\) > 0\) problems\.push\(`the development bundle contains dev-token string/);
+    assert.doesNotMatch(check, /0000000000ff/, 'the placeholder user id is no longer an allowed UUID (src/utils/session.ts is deleted)');
   });
 });
 

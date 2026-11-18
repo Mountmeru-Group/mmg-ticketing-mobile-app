@@ -1,7 +1,7 @@
 # Android → iOS delta (iOS-5b, iOS-5c, iOS-5d, iOS-5e, iOS-5f, iOS-5g, iOS-5h, iOS-5i)
 
 > Written 2026-10-30 on `ios-dev`. It lists every Android change since the first port source, `c84d53a`, on Android `dev` and on every unmerged Android branch, and what iOS did with each.
-> **Port source since iOS-5h: `origin/dev` @ `6b5e46c74d9eb16229d83049e8f1505b19fe12ed`** (§11). To sync later Android work, diff `6b5e46c..origin/dev`. Android's opening of the email sign-in to PROD (`6b5e46c`) was on the iOS-9 list (§5, item 7) and is done in iOS-9b (2026-11-11).
+> **Port source since iOS-5i: `origin/dev` @ `723e2fc77931d1ada9ba02bce6d7916bd27a454d`** (§12). To sync later Android work, diff `723e2fc..origin/dev` (on 2026-11-18: `3bc45c2`, Android's `versionCode` 8, nothing to port). iOS-5h's port source was `6b5e46c74d9eb16229d83049e8f1505b19fe12ed` (§11). Android's opening of the email sign-in to PROD (`6b5e46c`) was on the iOS-9 list (§5, item 7) and is done in iOS-9b (2026-11-11).
 > iOS-5f's and iOS-5g's port source was `d8626bc4180c8fd5b1f4814c9a0aabfe091d89a7` (§10); G9 (email sign-in) from `d8626bc` came across in iOS-5g, UAT builds only, to the one confirmed path (§10.8).
 > iOS-5e's port source was `8b522e3bf063b26a808efee9d65776c3c6bbef3c` (§9). iOS-5d's port source was `f4fad10a1bd1aac9658f4c4be151b0172f683898` (§8). iOS-5c's port source was `c5c63acff8d7296244876020069884364864a99b` (§7). iOS-5b's was `4063df30421407e040a7dccc9399bb38557dd702` (§1–§6).
 > The builds are in `00-PORT-MANIFEST.md` §4.15–§4.21. The parity proof and figures are in `WEB-VS-MOBILE-ROLES.md` §iOS-A.5; the tests and the mutation check in `ROLE-MATRIX.md` §iOS-A.6 and §7.
@@ -62,8 +62,8 @@ Types: feature · bug fix · release (setup, tooling, tests) · docs · refactor
 | D1 | Knowledge base ADMIN only | dev | `ef0cf5d` | `permissions.ts` (`canUseKnowledgeBase`, `drawerItems`, `drawerRoutes`), AppDrawer, DrawerContent, KnowledgeBaseScreen | Other roles lose the KB row, and the KB and article screens can't be reached at all | No | feature (Ronit's product decision) | M | No endpoint. iOS needed its own per-role route registration (the iOS form of `drawerRoutes`) | **Ported in iOS-5b** |
 | D2 | Announcements and the Home banner ADMIN only | dev | `ef0cf5d` | `permissions.ts` (`canReadAnnouncements`, `showAnnouncementBanner`), useAnnouncements, HomeScreen, AnnouncementsScreen | Other roles get no banner, no row and no screen, and ANN-1 is never requested for them | No | feature (Ronit's product decision) | M | ANN-1 only. Pull-to-refresh must skip ANN-1 (`refetch()` runs on a disabled query) | **Ported in iOS-5b** |
 | D3 | Time-of-day greeting | dev | `ef0cf5d` | `utils/greeting.ts` (new), HomeScreen | "Good morning/afternoon/evening, <first name>" by the phone's clock, re-read on focus and on return to the app | No ("Hello, …") | feature | S | No endpoint, no timer | **Ported in iOS-5b** |
-| D4 | Delete the `__DEV__` developer-token screen | dev | `4063df3` | DevTokenScreen, PlaceholderScreen, AuthStack, LoginScreen, navigation types | Developer builds: Microsoft becomes the only way in. Release and TestFlight: no change (already left out) | No | release | S–M | Touches `ios-sso` tests, the release check's 12 control strings, 02-AUTH §6, CLAUDE.md rule 5, manifest §8 | **iOS-9 list** |
-| D5 | Remove the placeholder-user guards | dev | `4063df3` | `session.ts` (deleted) and its uses in **7 files**: `permissions.ts` (Pick up), writeGuards, useProfile, ProfileScreen, AssignPicker, TaskEditor, ReplyComposer | No change for a real account | No | release (cleanup) | S | Only safe together with D4. The one answer that differs from Android is Pick up for the placeholder session, which no release build can hold | **iOS-9 list** |
+| D4 | Delete the `__DEV__` developer-token screen | dev | `4063df3` | DevTokenScreen, PlaceholderScreen, AuthStack, LoginScreen, navigation types | Developer builds: Microsoft becomes the only way in. Release and TestFlight: no change (already left out) | No | release | S–M | Touches `ios-sso` tests, the release check's 12 control strings, 02-AUTH §6, CLAUDE.md rule 5, manifest §8 | **iOS-9 list; done in iOS-5i** (2026-11-18, §5 item 1) |
+| D5 | Remove the placeholder-user guards | dev | `4063df3` | `session.ts` (deleted) and its uses in **7 files**: `permissions.ts` (Pick up), writeGuards, useProfile, ProfileScreen, AssignPicker, TaskEditor, ReplyComposer | No change for a real account | No | release (cleanup) | S | Only safe together with D4. The one answer that differs from Android is Pick up for the placeholder session, which no release build can hold | **iOS-9 list; done in iOS-5i** (2026-11-18, §5 item 1) |
 | D6 | The PROD API URL | dev | `4063df3` | `env.ts`, `eas.json` | Android's production build talks to PROD | No (PROD empty) | release | S | Needs Ronit's written sign-off (CLAUDE.md I3). Compliance A3 | **iOS-9 list** |
 | D7 | Version 1.0.0 | dev | `4063df3` | `app.json` | Store version | No (0.1.0, build 1) | release | S | `versionCode` is Android only | **iOS-9 list** |
 | D8 | Release-bundle check fixes | dev | `4063df3` | `scripts/verify-release-bundle.js` | Tooling only | Partial (iOS-5 built its own equivalents; only the PROD-host allowance is missing) | release | S | Goes with D6 | **iOS-9 list** |
@@ -159,16 +159,16 @@ Details are in manifest §4.15. In short:
 | 7 | **Match Android `6b5e46c` at iOS-9: the email sign-in on production builds** (H4, §11). Android deleted `EMAIL_SIGN_IN_ENABLED` and renders the form unconditionally; the backend team reports the endpoint on PROD, in sync with UAT (2026-11-06). **Also the App Review demo-login route** (compliance A4): whether the email sign-in, with a reviewer account on PROD, becomes App Review's demo login | `6b5e46c` | Remove the run-time gate (`src/config/env.ts`) and the build-time gate (`LoginScreen.tsx`); flip the release check's production rule (G9 modules and strings required, not forbidden); port Android's three test changes (`password-sign-in`, `start-up-and-login`, `production-readiness`); update compliance K1, K2, A4, A5 and the G9 section. Keep the one path and never `/auth/login` | **The backend team confirms the endpoint sends no `Set-Cookie`, and PROD is approved** (Ronit's written sign-off, CLAUDE.md I3; item 2). Ronit, iOS-5h (2026-11-08) |
 | 8 | Android's release guide: what a production build does differently from the tested UAT build, and "production = UAT except where a difference is required", with its table of every remaining difference (H3, H8, §11) | `f67265c`, `6b5e46c` (`docs/RELEASE.md` §5b, §5c) | Write the iOS table in `RELEASE-IOS.md` when the `production` profile becomes runnable: API URL, profile and artifact, `EXPO_PUBLIC_APP_ENV`, the Login chip, the environment label, deep-link origins, and (until item 7) the email sign-in | Items 2, 7 |
 
-**Status after iOS-9b (Ronit, 2026-11-11):**
+**Status after iOS-9b (Ronit, 2026-11-11), and after iOS-5i (2026-11-18) for items 1, 5 and 6:**
 
 | # | Status |
 |---|---|
-| 1 | **Open.** Not in the iOS-9b brief. The screen is `__DEV__` only and in no release bundle (`verify-release-bundle`: 0 of 12 strings, both profiles) |
+| 1 | **Done in iOS-5i (2026-11-18)**, as Android `4063df3` (D4, D5): `DevTokenScreen.tsx`, `PlaceholderScreen.tsx` and `utils/session.ts` deleted; the `DevToken` route, its type and the Login button removed; the placeholder guards removed from `permissions.ts`, `writeGuards.ts`, `useProfile.ts` (and its `__DEV__` sign-out line), `ProfileScreen`, `AssignPickerScreen`, `TaskEditorScreen` and `ReplyComposerScreen`. The release check keeps its 12 strings, fails the development control too if one is found, and no longer allows the placeholder UUID. Tests updated: `ios-sso`, `ios-reauth`, `ios-password-sign-in`, `module-screens`, `read-screens`, `role-gating`, `hig-polish` (§12.6). Until then: `__DEV__` only, in no release bundle |
 | 2 | **Done.** PROD URL `https://servicedesk.mountmerugroup.com/api/v1`, approved by Ronit's manager on 2026-11-11 for the `production` profile only; the `eas.json` comment rewritten; Android's chip assertion restored (`start-up-and-login.test.mjs`). **iOS difference:** `env.ts` picks the URL at build time, so each bundle holds one URL; Android's holds both |
 | 3 | **Done.** `app.json` `version` 1.0.0 (both profiles; runtime 1.0.0). The build number stays EAS's (`autoIncrement`, now on `production` too) |
 | 4 | **Done, stricter than planned.** Each run allows its own profile's host only: `production` the PROD host, `preview` the UAT host; and each fails on the other profile's URL, in JS and Hermes |
-| 5 | **Done for items 2, 3 and 7:** `tests/release/production-readiness.test.mjs` (environment, guard, profiles, submit, version, runtime, channels, ATS). Android's sign-in cases wait for item 1 |
-| 6 | **Partly.** `RELEASE-IOS.md` has the production build, submit and channel rules (§4, §6 rule 11, §7). Android's text about the deleted screen waits for item 1 |
+| 5 | **Done for items 2, 3 and 7:** `tests/release/production-readiness.test.mjs` (environment, guard, profiles, submit, version, runtime, channels, ATS). **iOS-5i:** Android's four sign-in cases ported now that item 1 is done (one Login screen; the screen and guards deleted; only the two sign-ins and the profile save call `setSession`, the email one from `passwordSignInAttempt.ts` on iOS; Login navigates nowhere) |
+| 6 | **Partly.** `RELEASE-IOS.md` has the production build, submit and channel rules (§4, §6 rule 11, §7). **Done in iOS-5i:** 02-AUTH's header and §6 have Android's text about the deleted screen, each with an iOS line; `RELEASE-IOS.md` §7 says no developer-token screen in either profile |
 | 7 | **Done** (Ronit opened it before the `Set-Cookie` answer, which stays pending, mitigated by R1): no `EMAIL_SIGN_IN_ENABLED`, no build-time gate, the release check requires G9 in `production`; Android's three test changes ported; compliance A4, A5, G1, H5, K1 and the G9 section updated. App Review's demo login is an email-and-password review account |
 | 8 | **Done.** `RELEASE-IOS.md` §7, the `preview` vs `production` table |
 
@@ -616,3 +616,29 @@ No clash. Android's new numbered sections were free on iOS:
 - the new file `16-SAVED-VIEWS.md`.
 
 New iOS sections take letters: 02 **§iOS-C**, UI-STANDARDS **§iOS-A.17**, 16 **§iOS-A**.
+
+### 12.6 Results (step 7, 2026-11-18)
+
+**Built, in seven steps, each committed and pushed to `ios-dev`:** docs (1); the filter rules (2); saved views' data and API (3); no flag (4); `OptionSheet` search and multi-select (5); the Filters sheet and saved filters (6); the final step (7).
+
+**Step 7:**
+- **The iOS-9 list's item 1** (§5): the developer-token screen, `PlaceholderScreen`, the route and its type, the Login button and the placeholder guards (`utils/session.ts` and its seven users), as Android `4063df3`. Items 5 and 6 done with it.
+- **The Alerts notice** (Ronit, 2026-11-18): "Live alerts aren't available on iPhone yet. Pull down to check for new ones." iOS only; Android keeps `pushNotice` (G7c).
+- **Version 1.1.0** (decision 6; runtime 1.1.0).
+- **Saved views on PROD: confirmed** (Ronit, 2026-11-18): `06` §iOS-A item 1, `01` §iOS-A, `16` §iOS-A.
+- **The stale G9 docs** (the email sign-in has been on every build since iOS-9b, and R1 lifted the tester block): `01` §iOS-A, `06` §iOS-A (A32), UI-STANDARDS §iOS-A.16, the UAT plan's G20 heading.
+- **The release check** requires saved views in both profiles. It was in the simplified plan but not built until now.
+- **Docs:** the manifest (port source, §3.21, §4.25, the D4/D5 rows), `CLAUDE.md`, `02-AUTH.md` (header, §6, §iOS-A), `UAT-TEST-PLAN-IOS.md` (G21, 12 checks), `APP-STORE-COMPLIANCE.md` (A5, B1, E3, E5, E6, E9, H5, K1, new K4), `RELEASE-IOS.md` (1.1.0, §10), `UPDATES-LOG.md`, `WEB-VS-MOBILE-ROLES.md` and UI-STANDARDS §iOS-A.17 ("built").
+- **Android after the plan:** `3bc45c2` (2026-11-18 11:20, `versionCode` 8) only. Nothing to port (O2).
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 errors |
+| `npm test` | **1954 / 1954** (1793 before iOS-5i) |
+| `npx expo-doctor` | 19/21: the known `react-native-render-html` notice, and four Expo patch releases after R1b (Ronit's decision, `RELEASE-IOS.md` §10) |
+| `npm ci --dry-run` | up to date |
+| `verify-release-bundle` | **PASS** `preview`, **PASS** `production`: 0 of 12 developer-token strings in release and control; saved views 4/4 and 3/3; G9 4/4 and 7/7; one API URL each |
+| `expo export --platform ios` | UAT and PROD: 2,322 modules, one API URL each, the new Alerts wording |
+| Mutations | Step 7: 18 of 18 unit (P1 equivalent, dropped), 3 of 3 bundle level; the phase: 15, 23, 9, 14, 17 (steps 2–6) |
+
+**Still open:** TKT-1's comma lists (⚠ ASSUMED, `06` §iOS-A item 2); the `Set-Cookie` answer (A32, mitigated by R1); the Expo patch alignment (Ronit).
