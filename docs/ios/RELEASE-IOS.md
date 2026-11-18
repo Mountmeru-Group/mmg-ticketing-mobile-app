@@ -312,7 +312,7 @@ The copy was then restored and verified byte for byte.
 | 1 | `git status` | The step-7 changes only. `package.json` and `package-lock.json` unchanged |
 | 2 | `npx tsc --noEmit` | 0 errors |
 | 3 | `npm test` | **1954 / 1954** (287 suites; 1793 before iOS-5i, 1946 after step 6) |
-| 4 | `npx expo-doctor` | **19/21.** `react-native-render-html` "Unmaintained" (known), and **new:** four Expo SDK 57 patch releases published after R1b: `expo` 57.0.33 (installed .32), `expo-auth-session` .17 (.16), `expo-sharing` .26 (.25), `expo-updates` .28 (.27). Not changed here (no package change in iOS-5i, CLAUDE.md I7): an R1b-style alignment is Ronit's decision, before the 1.1.0 builds |
+| 4 | `npx expo-doctor` | **19/21.** `react-native-render-html` "Unmaintained" (known), and **new:** four Expo SDK 57 patch releases published after R1b: `expo` 57.0.33 (installed .32), `expo-auth-session` .17 (.16), `expo-sharing` .26 (.25), `expo-updates` .28 (.27). Not changed in iOS-5i (CLAUDE.md I7). **Aligned in R1c** (Ronit, 2026-11-18; manifest §4.26): 20/21, the render-html notice only |
 | 5 | `npm ci --dry-run` | up to date |
 | 6 | `npm run verify:release-bundle` | **PASS** (`preview`) and **PASS** (`--profile production`) |
 | — | `npx expo export --platform ios --clear` | `EXPO_PUBLIC_APP_ENV=UAT`: the UAT URL once, the PROD URL 0. `PROD`: the PROD URL once, the UAT URL 0. Both: 2,322 modules (Hermes, 5,692,089 and 5,692,266 bytes); the Alerts notice's iOS wording 1, the old one 0; saved views ("Save these filters", `/saved-views`) and the email sign-in present; `/auth/login`, the developer-token strings and the placeholder UUID 0. Written to the session's scratch folder, outside the repo |
