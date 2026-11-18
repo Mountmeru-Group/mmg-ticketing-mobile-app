@@ -97,7 +97,7 @@ export function SheetTextButton({
       onPress={onPress}
       className="min-h-11 min-w-11 justify-center px-2 active:opacity-60"
     >
-      <Text className={`text-base ${disabled ? 'text-gray-400' : 'text-primary'} ${bold ? 'font-semibold' : ''}`}>{label}</Text>
+      <Text className={`text-base ${disabled ? 'text-gray-500' : 'text-primary'} ${bold ? 'font-semibold' : ''}`}>{label}</Text>
     </Pressable>
   );
 }

@@ -389,3 +389,26 @@ describe('failures: nothing looks saved that did not save', () => {
     assert.equal('refetchInterval' in options, false);
   });
 });
+
+// iOS (step 6): Android's wiring block. "And the environment switch" is not on iOS (02-AUTH §iOS-C): sign-out alone clears
+// the cache. The "only SVW-2 caller" check is Android's, from its versionCode-6 block, without the S3 lines.
+describe('wiring', () => {
+  test('the Filters sheet applies a view as decoded for the viewer; a chip is active only when the list is exactly it', () => {
+    const block = read('src/screens/tickets/SavedFilters.tsx');
+    assert.match(block, /decodeSavedView\(view\.filters, user, names\)/);
+    assert.match(block, /onApply\(d\.content\);/);
+    assert.match(block, /!list\.ticketSearch && !capture\.refusal && d\.leftOut\.length === 0 && sameSavedViewFilters\(d\.view\.filters, capture\.filters\)/);
+    assert.match(block, /`“\$\{name\}” is applied without: \$\{d\.leftOut\.join\('; '\)\}\.`/);
+    assert.match(read('src/screens/tickets/TicketFiltersScreen.tsx'), /<SavedFiltersBlock list=\{listState\} onApply=\{applySaved\} \/>/);
+  });
+
+  test('sign-out clears the views with the whole cache; nothing else holds them', () => {
+    assert.match(read('src/api/client.ts'), /export async function endSession[\s\S]*?queryClient\.clear\(\);/);
+    assert.deepEqual(sourceFiles('src').filter((rel) => /useSavedFiltersStore|savedFilters\.store/.test(read(rel))), []);
+  });
+
+  test('the only SVW-2 caller is the "Save these filters" sheet', () => {
+    const creators = sourceFiles('src').filter((rel) => /(?<!function )(createTicketView|useCreateSavedView)\(/.test(read(rel)));
+    assert.deepEqual(creators.sort(), ['src/hooks/useSavedViews.ts', 'src/screens/tickets/SavedFilters.tsx']);
+  });
+});
