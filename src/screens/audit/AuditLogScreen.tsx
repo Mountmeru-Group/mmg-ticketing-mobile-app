@@ -5,6 +5,7 @@
 // - Layout: a heading per day ("Today", "Yesterday", "Mon 02 Nov 2026"), then one card per entry: the action pill, the
 //   entity and time, the ticket number (a link, through the deep-link resolver), the person and their email, and the
 //   details in a tinted box (utils/audit-log.ts formatAuditDetails). Never the IP address the row carries.
+//   The card is components/AuditEntryCard.tsx since 2026-11-26, shared with the Analytics person screen's timeline.
 // - Filters: every one is a server-side AUD-1 param (the backend team's written contract, 2026-11-05), and they combine
 //   in one request (auditLog.controller.ts:7-49):
 //     Ticket      → ticketNumber=<n>, typed in the search box; the server finds the ticket. A number with no ticket
@@ -19,25 +20,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { FlashList } from '@shopify/flash-list';
-import { memo, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsOffline } from '@/api/network';
 import {
-  EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR, OfflineBanner,
-  OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, ScreenHeader, SearchField, type Person, type SheetOption,
+  AuditEntryCard, EmptyState, ErrorState, FilterChip, ListEntry, ListEntryScope, LoadingSkeleton, NO_SCROLL_ANCHOR,
+  OfflineBanner, OfflineState, OptionSheet, PersonPickerSheet, QueryBanner, ScreenHeader, SearchField, type Person,
+  type SheetOption,
 } from '@/components';
 import { useAuditLog } from '@/hooks';
 import { openTicketLinkInApp } from '@/navigation/navigationRef';
 import { useAuthStore } from '@/store/auth.store';
-import { colors, palette, type AuditActionTone } from '@/theme';
-import type { AppDrawerScreenProps, AuditAction, AuditLogEntry, UserRole } from '@/types';
+import { colors, palette } from '@/theme';
+import type { AppDrawerScreenProps, AuditAction, UserRole } from '@/types';
 import {
   AUDIT_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_DATE_PRESETS, AUDIT_ENTITY_TYPES, NO_AUDIT_FILTERS, activeAuditFilterCount,
-  auditActionLabel, auditDatesLabel, auditListRows, auditPresetDays, auditPresetOf, auditTicketLink, auditTime,
-  formatAuditDetails, isKnownAuditAction, parseAuditTicketNumber, withAuditDay, type AuditDatePreset, type AuditEntityType,
-  type AuditListRow, type AuditLogFilters,
+  auditDatesLabel, auditListRows, auditPresetDays, auditPresetOf, parseAuditTicketNumber, withAuditDay,
+  type AuditDatePreset, type AuditEntityType, type AuditListRow, type AuditLogFilters,
 } from '@/utils/audit-log';
 import { notify } from '@/utils/dialogs';
 import { formatDisplayName } from '@/utils/format';
@@ -72,19 +73,6 @@ const ACTION_OPTIONS: readonly SheetOption<string>[] = [
 
 /** Dates: the quick spans, then a day picked by hand for either end. */
 type DatesChoice = AuditDatePreset | 'pick-from' | 'pick-to';
-
-/** One icon per action, so a pill never relies on its colour (docs/brand/UI-STANDARDS.md §13). */
-const ACTION_ICONS: Record<AuditAction, keyof typeof Ionicons.glyphMap> = {
-  CREATED: 'add-circle-outline',
-  UPDATED: 'create-outline',
-  DELETED: 'trash-outline',
-  STATUS_CHANGED: 'swap-horizontal-outline',
-  ASSIGNED: 'person-add-outline',
-  COMMENTED: 'chatbubble-outline',
-  ATTACHMENT_ADDED: 'attach-outline',
-  SLA_BREACHED: 'alarm-outline',
-  ESCALATED: 'trending-up-outline',
-};
 
 const rowKey = (row: AuditListRow) => row.key;
 const rowType = (row: AuditListRow) => row.kind;
@@ -202,7 +190,7 @@ export function AuditLogScreen(_props: AppDrawerScreenProps<'AuditLog'>) {
         </Text>
       ) : (
         <ListEntry index={index}>
-          <AuditCard entry={item.entry} onOpenTicket={openTicket} />
+          <AuditEntryCard entry={item.entry} onOpenTicket={openTicket} />
         </ListEntry>
       ),
     [openTicket],
@@ -424,94 +412,6 @@ function SearchLine({ invalid, missingTicket }: { invalid: boolean; missingTicke
     </View>
   );
 }
-
-/** The action as a pill: label, icon and the action's tone (theme/colors.ts auditAction). */
-function ActionPill({ action }: { action: string }) {
-  const known = isKnownAuditAction(action);
-  const tone: AuditActionTone = known ? colors.auditAction[action] : colors.badgeFallback;
-  // Every pill has a 1 dp border, in its own fill colour unless the tone names one, so all pills are the same height.
-  const border = tone.border ?? tone.bg;
-  return (
-    <View
-      className="flex-row items-center rounded-full border px-2.5 py-0.5"
-      style={{ backgroundColor: tone.bg, borderColor: border }}
-    >
-      <Ionicons name={known ? ACTION_ICONS[action] : 'ellipse-outline'} size={12} color={tone.fg} />
-      <Text className="ml-1 text-xs font-medium" style={{ color: tone.fg }}>
-        {auditActionLabel(action)}
-      </Text>
-    </View>
-  );
-}
-
-/** The entity in words; the auto-close job's lowercase `ticket` reads as "Ticket" (05 B.38). */
-function entityLabel(entityType: string): string {
-  return entityType ? entityType.charAt(0).toUpperCase() + entityType.slice(1) : '';
-}
-
-const AuditCard = memo(function AuditCard({ entry, onOpenTicket }: { entry: AuditLogEntry; onOpenTicket: (link: string) => void }) {
-  const details = useMemo(() => formatAuditDetails(entry), [entry]);
-  const link = auditTicketLink(entry.ticket);
-  const ticket = entry.ticket;
-  // A null actor is a job (auto-close) or a deleted user (onDelete: SetNull, schema.prisma:571); the web says "System".
-  const actor = formatDisplayName(entry.actor?.displayName) || 'System';
-  const email = entry.actor?.email;
-
-  return (
-    <View className="mx-4 mb-3 rounded-xl border border-border bg-white p-4">
-      <View className="flex-row items-center">
-        <ActionPill action={entry.action} />
-        <Text className="ml-2 flex-1 text-xs text-gray-500" numberOfLines={1}>
-          {entityLabel(entry.entityType)}
-        </Text>
-        <Text className="text-xs text-gray-500">{auditTime(entry.createdAt)}</Text>
-      </View>
-
-      {ticket && link ? (
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={`Open ticket ${ticket.ticketNumber}: ${ticket.title}`}
-          onPress={() => onOpenTicket(link)}
-          className="mt-1 min-h-11 flex-row items-center active:opacity-60"
-        >
-          <Text className="text-sm font-semibold text-blue-700">#{ticket.ticketNumber}</Text>
-          <Text className="ml-2 flex-1 text-sm text-gray-700" numberOfLines={1}>
-            {ticket.title}
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.text.muted} />
-        </Pressable>
-      ) : (
-        <Text className="mt-2 text-sm text-gray-500">No ticket linked</Text>
-      )}
-
-      <View className={ticket && link ? '' : 'mt-2'}>
-        <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
-          {actor}
-        </Text>
-        {email ? (
-          <Text className="text-xs text-gray-500" numberOfLines={1}>
-            {email}
-          </Text>
-        ) : null}
-      </View>
-
-      {details.lines.length > 0 || details.raw ? (
-        <View className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-          {details.lines.map((line, i) => (
-            <Text key={i} className={`text-sm text-gray-700 ${i > 0 ? 'mt-1' : ''}`}>
-              {line}
-            </Text>
-          ))}
-          {details.raw ? (
-            <Text selectable className={`font-mono text-xs text-gray-700 ${details.lines.length > 0 ? 'mt-2' : ''}`}>
-              {details.raw}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-    </View>
-  );
-});
 
 function AuditListFooter({
   count, total, capped, loading, failed, hasMore, offline, onRetry,

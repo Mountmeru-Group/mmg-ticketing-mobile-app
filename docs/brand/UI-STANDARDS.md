@@ -1366,3 +1366,87 @@ wide tracking, pill):
 - Told apart by **lightness**, not hue alone: the fills are 16 L* apart and the words 29 L* apart (the app's rule is at
   least 15, as for the audit and SLA colours). The word (PRODUCTION, UAT, IN USE, TESTING) carries the meaning (1.4.1).
 - `tests/environment/admin-switch.test.mjs` pins all four numbers.
+
+## 19. Analytics, ADMIN only (2026-11-26)
+
+Ronit's written brief of 2026-11-26. Built against `docs/ANALYTICS-BACKEND.md` ("18"), which the backend has **not
+deployed**. Not yet seen on a device: no build was made. Check on the next build (360 dp, 100 / 130 / 200 % text), once
+on a server without the routes and once with them.
+
+### 19.1 Where it is, and who sees it
+- Drawer row **"Analytics"** (`bar-chart-outline`), directly **below "Audit log"**, in the same administrators' group
+  (no second divider). **ADMIN only** (`canViewAnalytics`, `permissions.ts`). For every other role the row is absent and
+  the route, a stack of all three screens, is not registered: nothing reaches them.
+- Three screens: **Analytics** → **Who is using Setu** → **one person**. Back arrow on each (the drawer modules' rule).
+
+### 19.2 The rules every figure follows
+- **A missing number leaves its tile OUT.** Never a zero, never a dash: a zero looks like an answer. A zero the server
+  sent shows as "0". A missing section is not rendered at all.
+- **A route the server does not have** (an HTML answer): one plain grey line with an info icon. **Not** an error box,
+  **no** Retry, no retry loop. Wording: "Analytics isn't available yet. The Service Desk hasn't switched it on." (both
+  ANL-1 and ANL-4 missing), "Service Desk figures aren't available yet." (ANL-1 only), "The list of people isn't
+  available yet. …", "This person's activity isn't available yet. …".
+- **A JSON error** is a real failure: the error state with Retry, as on the audit log; a failed refresh with figures on
+  screen is the "Couldn't refresh" banner.
+- **Action names are the audit log's labels** ("Status Changed", "Commented", …, `auditActionLabel`). A value the audit
+  log does not know (a sign-in, a newer server) is shown in words, as the audit log shows it.
+- Numbers: thousands separators ("1,631"); percentages keep the server's decimals ("0.42%", "8.4%"); growth is signed
+  ("+8.4%", "−3.1%").
+
+### 19.3 Screen one: Analytics
+- **Period**, a row of radio chips under the header: **Today, Last 7 days, Last 30 days, Last 90 days** (the dashboard's
+  words for the three it shares). Default **Last 30 days**. Memory only (`ui.store`), back to the default after a
+  restart, a sign-out or an environment switch. Screens two and three use the same period.
+- Sections, each the standard card with an uppercase caption, in this order:
+  1. **The app** (ANL-4). Under the caption: **"Google Play · as at 17 Nov 2026"**, or "Google Play" alone when
+     `dataThrough` is missing. This line is on every Play figure's section, always: Google's figures lag a day or two.
+     Then the **dark banner** (gray-900): current installs large (30 dp bold, white), active devices beside it (18 dp,
+     white), each with a gray-300 caption. Then four tiles: **Installs** (growth beside it, 12 dp medium),
+     **Uninstalls**, **Audience**, **Crash rate**. Growth shows only beside an installs number. ANL-4 not deployed, or
+     no Play figure in its answer: **the whole section is absent**; the rest of the screen still works.
+  2. **People** (ANL-1). Four tiles: **Active today, Active this month, Logins on Setu, New this period**. Then one
+     line: **"Of 1,631 people with access, 13% used Setu this month"** (activeThisMonth / totalWithAccess, rounded to a
+     whole percent). Left out if either number is missing, or nobody has access.
+  3. **Where** (devices per country). A bar per country, widest first, the count at the right.
+  4. **What they did.** "**8,740** actions in all", then a bar per action type, widest first.
+  - Then a row **"Who is using Setu"** with the number of people with access ("1,631 people"; no number when not sent).
+  - Footnote (12 dp, gray-500), when the Play section shows: "Google Play figures settle a day or two late. Service Desk
+    figures are current."
+- **Tiles:** two per row, gray-50 with a gray-100 border, 8 dp radius; label 12 dp gray-500, number 20 dp bold gray-900.
+- **Bars** (drawn with Views, no chart library): the name (14 dp gray-700) and the count (14 dp semibold gray-900) on one
+  line, the bar under them: an 8 dp track (gray-100, full width), the bar blue-600, its width relative to the largest.
+  One series and the count in words beside every bar, so colour carries nothing alone.
+- Pull-to-refresh asks both endpoints again. Nothing else does: no polling, no refetch on returning to the screen.
+
+### 19.4 Screen two: Who is using Setu
+- Under the header: the period and the count ("Last 30 days · 1,631 people"), then three sort chips: **Last seen**
+  (default), **Most actions**, **Name**. The server sorts (`sortBy`); the app never re-sorts loaded rows.
+- **No search field.** The brief asked for one (name or email), but ANL-2 has no search parameter, and filtering only
+  the loaded pages would read as the whole answer. Waiting on Ronit: add `search` to 18 §4b, then build it.
+- A row per person (the standard card, press feedback): initials (40 dp, the requester avatar's red-on-pale), the name
+  (16 dp semibold), a 14 dp **phone icon** when they have the app; then what they last did and when, **"Status Changed
+  on #10482 · 2h ago"** (14 dp gray-700; the action label alone without a ticket; "Last seen 2h ago" without an action);
+  then **"184 actions · 17 days active"** (12 dp gray-500), each part only when sent.
+- **Nothing in the period** (zero days active, or zero actions and zero logins): the row is muted: gray initials on
+  gray-100, the name gray-500, **"Nothing in this period"**, then **"Last seen 12 Oct 2026"** as a date. Still listed.
+  A person with none of the counts is not called inactive: a missing number is not a zero.
+- Infinite scroll, 50 a page, capped at 500, with the audit log's footer ("Showing the first 500 of 1,631").
+
+### 19.5 Screen three: one person
+- The header card: 56 dp initials, the name (18 dp semibold), role and country ("Technician · Zambia"), chips **"Has the
+  app"** (only when the server says so; `false` means no device token, not "no app") and **"Active 2h ago"**. Then the
+  period and three tiles: **Actions, Logins, Days active**, each left out when not sent. All of it is the tapped row's:
+  ANL-3's shape is not specified.
+- Below: their activity, newest first, under the audit log's day headings ("Today", "Yesterday", "Mon 02 Nov 2026").
+  Each entry is **the audit log's own card** (`src/components/AuditEntryCard.tsx`, shared since this change), without
+  the person's name (it is theirs), beside a timeline rail: a 10 dp blue-600 dot and a 2 dp line in the border grey.
+- Empty: "Nothing in this period." Not deployed: the plain line under the header, which still shows.
+
+### 19.6 Colours (`colors.analytics`, `src/theme/colors.ts`)
+
+| Token | Value | Contrast |
+|---|---|---|
+| `banner` | gray-900 ground, white figures | 17.7:1 |
+| `bannerCaption` | gray-300 on gray-900 | 12.1:1 |
+| `bar` / `barTrack` | blue-600 on gray-100 (on the white card: 5.2:1) | 4.7:1 (non-text, ≥ 3:1) |
+| `mutedAvatar` | gray-600 initials on gray-100 | 6.9:1 |

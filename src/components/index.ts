@@ -1,6 +1,7 @@
 export { AnnouncementBanner, AnnouncementCard, AnnouncementTypeChip } from './AnnouncementCard';
 export { ApprovalStatusChip } from './ApprovalStatusChip';
 export { AttachmentPicker } from './AttachmentPicker';
+export { AuditActionPill, AuditEntryCard } from './AuditEntryCard';
 export { OfflineBanner, QueryBanner } from './Banners';
 export { BrandLogo } from './BrandLogo';
 export { BulkProgressModal } from './BulkProgressModal';

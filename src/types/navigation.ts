@@ -10,6 +10,7 @@ import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigat
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { TicketNamedFilter } from '@/utils/ticket-filters';
+import type { AnalyticsUserRow } from './analytics';
 import type { UUID } from './api';
 import type { TicketStatus } from './enums';
 
@@ -90,6 +91,22 @@ export type CatalogStackParamList = {
   ServiceRequestDetail: { requestId: UUID };
 };
 
+/**
+ * Analytics (2026-11-26), ADMIN only: the whole stack is registered for ADMIN alone (drawerRoutes), so none of its three
+ * screens exists for any other role. Contract: docs/ANALYTICS-BACKEND.md (NOT YET DEPLOYED).
+ */
+export type AnalyticsStackParamList = {
+  /** Screen one: the app, people, where, what they did (ANL-1, ANL-4). */
+  AnalyticsOverview: undefined;
+  /** Screen two: who is using Setu (ANL-2). */
+  AnalyticsUsers: undefined;
+  /**
+   * Screen three: one person (ANL-3). `person` is the ANL-2 row that was tapped: ANL-3's shape is not specified, so the
+   * header (name, role, country, the three counts) comes from that row, not from an invented field.
+   */
+  AnalyticsPerson: { userId: UUID; person?: AnalyticsUserRow };
+};
+
 export type AppDrawerParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Approvals: NavigatorScreenParams<ApprovalsStackParamList>;
@@ -100,6 +117,8 @@ export type AppDrawerParamList = {
   Announcements: undefined;
   /** M20 Audit log (G8), ADMIN only: registered for ADMIN alone (drawerRoutes). */
   AuditLog: undefined;
+  /** Analytics (2026-11-26), ADMIN only: registered for ADMIN alone (drawerRoutes). */
+  Analytics: NavigatorScreenParams<AnalyticsStackParamList>;
   /** M10 — opened from the drawer's account card and the "Settings" item. */
   Profile: undefined;
 };
@@ -159,6 +178,11 @@ export type KnowledgeStackScreenProps<T extends keyof KnowledgeStackParamList> =
 
 export type CatalogStackScreenProps<T extends keyof CatalogStackParamList> = CompositeScreenProps<
   NativeStackScreenProps<CatalogStackParamList, T>,
+  AppDrawerScreenProps<keyof AppDrawerParamList>
+>;
+
+export type AnalyticsStackScreenProps<T extends keyof AnalyticsStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<AnalyticsStackParamList, T>,
   AppDrawerScreenProps<keyof AppDrawerParamList>
 >;
 

@@ -1,6 +1,9 @@
 // Drawer modules that need their own stack (08 §3.2).
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AnalyticsPersonScreen } from '@/screens/analytics/AnalyticsPersonScreen';
+import { AnalyticsScreen } from '@/screens/analytics/AnalyticsScreen';
+import { AnalyticsUsersScreen } from '@/screens/analytics/AnalyticsUsersScreen';
 import { ApprovalDetailScreen } from '@/screens/approvals/ApprovalDetailScreen';
 import { ApprovalsInboxScreen } from '@/screens/approvals/ApprovalsInboxScreen';
 import { ServiceCatalogScreen } from '@/screens/catalog/ServiceCatalogScreen';
@@ -11,7 +14,9 @@ import { KnowledgeBaseScreen } from '@/screens/knowledge/KnowledgeBaseScreen';
 import { TaskDetailScreen } from '@/screens/tasks/TaskDetailScreen';
 import { TaskEditorScreen } from '@/screens/tasks/TaskEditorScreen';
 import { TaskListScreen } from '@/screens/tasks/TaskListScreen';
-import type { ApprovalsStackParamList, CatalogStackParamList, KnowledgeStackParamList, TasksStackParamList } from '@/types';
+import type {
+  AnalyticsStackParamList, ApprovalsStackParamList, CatalogStackParamList, KnowledgeStackParamList, TasksStackParamList,
+} from '@/types';
 
 // freezeOnBlur (Phase P2): a screen that is not on show stops re-rendering until it is shown again.
 const SCREEN_OPTIONS = { headerShown: false, freezeOnBlur: true } as const;
@@ -74,5 +79,22 @@ export function CatalogStack() {
       <Catalog.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} getId={({ params }) => params.itemId} />
       <Catalog.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} getId={({ params }) => params.requestId} />
     </Catalog.Navigator>
+  );
+}
+
+const Analytics = createNativeStackNavigator<AnalyticsStackParamList>();
+
+/**
+ * Analytics (2026-11-26), ADMIN only: overview → who is using Setu → one person. The whole stack is one drawer route,
+ * registered for ADMIN alone (drawerRoutes), so for anyone else none of the three screens exists.
+ */
+export function AnalyticsStack() {
+  return (
+    <Analytics.Navigator initialRouteName="AnalyticsOverview" screenOptions={SCREEN_OPTIONS}>
+      <Analytics.Screen name="AnalyticsOverview" component={AnalyticsScreen} />
+      <Analytics.Screen name="AnalyticsUsers" component={AnalyticsUsersScreen} />
+      {/* One screen per person (getId, docs/PERFORMANCE.md §9.7): another person never reuses this one's screen. */}
+      <Analytics.Screen name="AnalyticsPerson" component={AnalyticsPersonScreen} getId={({ params }) => params.userId} />
+    </Analytics.Navigator>
   );
 }

@@ -29,6 +29,11 @@ export { useTaskFeed } from './useTasks';
 export { useMyServiceRequests, useServiceCategories, useServiceItem, useServiceItems, useServiceRequest } from './useServiceCatalog';
 // Phase G8 reads
 export { AUDIT_LOG_CAP, useAuditLog } from './useAuditLog';
+// Analytics reads (2026-11-26; ADMIN only, NOT YET DEPLOYED)
+export {
+  ANALYTICS_LIST_CAP, ANALYTICS_STALE_TIME_MS, useAnalyticsInstalls, useAnalyticsOverview, useAnalyticsUserActivity,
+  useAnalyticsUsers,
+} from './useAnalytics';
 
 // Writes
 export { useCreateTicket, validateNewTicket, type CreateTicketVariables } from './useCreateTicket';

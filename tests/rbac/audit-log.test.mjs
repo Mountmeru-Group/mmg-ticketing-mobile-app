@@ -50,10 +50,12 @@ describe('Audit log: the drawer row (ADMIN only)', () => {
   forEachPersona('canViewAuditLog', ONLY_ADMIN, (p) => canViewAuditLog(p.role));
   forEachPersona('drawer row shown', ONLY_ADMIN, (p) => drawerItems(p.role).includes('auditLog'));
 
-  test('ADMIN: after Announcements, before Settings', () => {
+  test('ADMIN: after Announcements, before Analytics and Settings', () => {
     const rows = drawerItems('ADMIN');
     assert.equal(rows.indexOf('auditLog'), rows.indexOf('announcements') + 1);
-    assert.equal(rows.indexOf('settings'), rows.indexOf('auditLog') + 1);
+    // 2026-11-26: Analytics sits directly below it (tests/rbac/analytics.test.mjs), then Settings.
+    assert.equal(rows.indexOf('analytics'), rows.indexOf('auditLog') + 1);
+    assert.equal(rows.indexOf('settings'), rows.indexOf('analytics') + 1);
   });
 
   test('a role the app does not know gets neither the row nor the route', () => {

@@ -34,11 +34,15 @@
 //   ['service-catalog', 'request', id]                SCR-6   one request (G4)
 //   ['audit-log', 'list', query]                      AUD-1   infinite, 50 per page, capped at 500 (G8; ADMIN only)
 //   ['audit-log', 'ticket', number]                   TKT-1   ticket number → id for the audit log's ticket filter
+//   ['analytics', 'overview', range]                  ANL-1   screen one (ADMIN only; NOT YET DEPLOYED, 2026-11-26)
+//   ['analytics', 'installs', range]                  ANL-4   screen one, Google Play figures
+//   ['analytics', 'users', range, sortBy]             ANL-2   infinite, 50 per page, capped at 500
+//   ['analytics', 'user', userId, range]              ANL-3   infinite, 50 per page, capped at 500
 //
 // Keys nest by prefix: invalidating ['tickets', 'detail', id] also hits that ticket's comments, attachments
 // and history. Writes invalidate the narrowest key that changed; the whole cache is cleared ONLY on sign-out (02 §5.5).
 // ['tickets', 'list'] holds infinite data only (cache.ts maps its `pages`): one-page lists live under other keys.
-import type { TicketListQuery } from '@/types';
+import type { AnalyticsRange, AnalyticsUserSort, TicketListQuery } from '@/types';
 import type { AuditLogKeyParams } from '@/utils/audit-log';
 
 export type TicketListKeyParams = Omit<TicketListQuery, 'page' | 'limit'>;
@@ -115,5 +119,13 @@ export const queryKeys = {
   auditLog: {
     all: () => ['audit-log'] as const,
     list: (params: AuditLogKeyParams) => ['audit-log', 'list', params] as const,
+  },
+
+  analytics: {
+    all: () => ['analytics'] as const,
+    overview: (range: AnalyticsRange) => ['analytics', 'overview', range] as const,
+    installs: (range: AnalyticsRange) => ['analytics', 'installs', range] as const,
+    users: (range: AnalyticsRange, sortBy: AnalyticsUserSort) => ['analytics', 'users', range, sortBy] as const,
+    user: (userId: string, range: AnalyticsRange) => ['analytics', 'user', userId, range] as const,
   },
 } as const;

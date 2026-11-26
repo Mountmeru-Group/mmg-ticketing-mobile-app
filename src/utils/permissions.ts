@@ -19,7 +19,8 @@ export type Viewer = Pick<AuthUser, 'id' | 'role' | 'countryId'>;
 
 // ── Navigation (08 §3) ───────────────────────────────────────
 
-export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'auditLog' | 'settings';
+export type DrawerItem =
+  | 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'announcements' | 'auditLog' | 'analytics' | 'settings';
 
 /**
  * Drawer rows, top to bottom (08 §3.2). Sign out and the account card are on every drawer and are not listed.
@@ -30,6 +31,7 @@ export type DrawerItem = 'approvals' | 'tasks' | 'knowledge' | 'catalog' | 'anno
  * Knowledge base and Announcements: ADMIN only (2026-10-29, canUseKnowledgeBase, canReadAnnouncements).
  * Catalog (Phase G4): "Service Request", every role, after Knowledge base as in the web sidebar (AppLayout.tsx:21, :30).
  * Audit log (G8): ADMIN only (canViewAuditLog), after Announcements below a divider (DrawerContent.tsx), before Settings.
+ * Analytics (2026-11-26): ADMIN only (canViewAnalytics), directly below Audit log, before Settings.
  */
 export function drawerItems(role: UserRole): DrawerItem[] {
   const items: DrawerItem[] = ['approvals'];
@@ -38,6 +40,7 @@ export function drawerItems(role: UserRole): DrawerItem[] {
   if (canUseServiceCatalog(role)) items.push('catalog');
   if (canReadAnnouncements(role)) items.push('announcements');
   if (canViewAuditLog(role)) items.push('auditLog');
+  if (canViewAnalytics(role)) items.push('analytics');
   items.push('settings');
   return items;
 }
@@ -47,9 +50,9 @@ export type DrawerRoute = keyof AppDrawerParamList;
 /**
  * The routes the App drawer REGISTERS for this role, in order (AppDrawer.tsx renders exactly these). A route left out
  * does not exist for that person: a navigate() to it is handled by no navigator, so no row, banner, link, back history
- * or stale call can open it. Knowledge (M14, M15), Announcements (M16) and the Audit log (M20, G8) are ADMIN only;
- * every other route is registered for every role, as before (their rows and shortcuts are gated by drawerItems and
- * showApprovalsShortcut).
+ * or stale call can open it. Knowledge (M14, M15), Announcements (M16), the Audit log (M20, G8) and Analytics (its stack
+ * of three screens, 2026-11-26) are ADMIN only; every other route is registered for every role, as before (their rows
+ * and shortcuts are gated by drawerItems and showApprovalsShortcut).
  */
 export function drawerRoutes(role: UserRole): DrawerRoute[] {
   const routes: DrawerRoute[] = ['MainTabs', 'Approvals', 'Tasks'];
@@ -57,6 +60,7 @@ export function drawerRoutes(role: UserRole): DrawerRoute[] {
   routes.push('Catalog');
   if (canReadAnnouncements(role)) routes.push('Announcements');
   if (canViewAuditLog(role)) routes.push('AuditLog');
+  if (canViewAnalytics(role)) routes.push('Analytics');
   routes.push('Profile');
   return routes;
 }
@@ -82,6 +86,16 @@ export function canSwitchEnvironment(role: UserRole | null | undefined): boolean
 
 /** M20 Audit log: the drawer row, the AuditLog route and the AUD-1 request itself. */
 export function canViewAuditLog(role: UserRole): boolean {
+  return role === 'ADMIN';
+}
+
+// ── Analytics: ADMIN only (2026-11-26, Ronit's brief; docs/ANALYTICS-BACKEND.md) ──
+// The spec asks the server to enforce ADMIN on all four endpoints (18 §4, §8 item 5); none is deployed yet. The app gates
+// the row, the route (the whole Analytics stack: overview, people, one person) AND the queries (hooks/useAnalytics.ts),
+// so no ANL request is ever sent for another role.
+
+/** Analytics: the drawer row, the Analytics route with its three screens, and the ANL-1..4 requests. */
+export function canViewAnalytics(role: UserRole): boolean {
   return role === 'ADMIN';
 }
 

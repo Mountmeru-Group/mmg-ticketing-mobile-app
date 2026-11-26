@@ -311,6 +311,23 @@ export const colors = {
     UAT: tone(palette.amber[400], palette.amber[950]),
   },
 
+  /**
+   * Analytics (2026-11-26, UI-STANDARDS.md §19), ADMIN only. App-only: the web portal has no analytics page. WCAG 2.x on
+   * these exact values:
+   *   banner         gray-900 ground for the Google Play banner: white figures 17.7:1, gray-300 words 12.1:1
+   *   bar            blue-600, one series: 5.2:1 on the white card, 4.7:1 on its gray-100 track (non-text needs 3:1).
+   *                  Every bar has its name and its count in words beside it, so the colour carries nothing alone (1.4.1)
+   *   mutedAvatar    a person with nothing in the period: gray-600 initials on gray-100, 6.9:1; their words are gray-500
+   *                  (4.8:1 on white)
+   */
+  analytics: {
+    banner: tone(palette.gray[900], palette.white),
+    bannerCaption: palette.gray[300],
+    bar: palette.blue[600],
+    barTrack: palette.gray[100],
+    mutedAvatar: tone(palette.gray[100], palette.gray[600]),
+  },
+
   /** Microsoft's four-square logo, in Microsoft's own colours (the sign-in button only). */
   microsoft: { red: '#f25022', green: '#7fba00', blue: '#00a4ef', yellow: '#ffb900' },
 
