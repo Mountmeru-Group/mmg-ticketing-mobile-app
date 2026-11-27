@@ -21,18 +21,24 @@ Google Play. Not built.
 Updated 2026-11-18, still versionCode 7 (never uploaded): every ticket filter is a multi-select, sent as comma lists in
 the live portal's format; the environment switch is **ADMIN only, with no password** (the gate is removed); the drawer's
 account card and the switch sheet are redesigned (§5f). Not built.
+Updated 2026-11-26 for the next production build: **versionCode 9** (versionCode 8 is on Google Play). An ADMIN-only
+Analytics section, three screens, built against a contract the backend has **not deployed**: on today's servers it shows
+"Analytics isn't available yet" (§5g). Not built.
+Updated 2026-11-27, still versionCode 9 (not yet uploaded): Analytics screen two gets a search field, "Name or email",
+that filters on the phone over every page loaded first, capped at 10 pages, and says when it cannot cover everyone
+(§5g, addendum). Not built.
 
 **Where things stand**
 
 | Item | State |
 |---|---|
-| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`7`** (`app.json`, set 2026-11-17, second brief). versionCode `6` is the latest AAB on Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
+| App identity | `Setu` (renamed 2026-10-23; `Mount Meru Service Desk` from Phase B, 2026-10-20, and `MMG Service Desk` before that), package `com.mountmeru.servicedesk`, version **`1.0.0`**, versionCode **`9`** (`app.json`, set 2026-11-26). versionCode `8` is the latest AAB on Google Play, and `2` (set 2026-10-29) was the first; every build before them was `0.1.0` / `1` |
 | Android SDK | targetSdk **36**, compileSdk 36, minSdk 24 (re-checked 2026-10-29, 2026-11-03 and 2026-11-06). Not set in this repo: the Expo SDK 57 template reads them from React Native 0.86's version catalog (`node_modules/react-native/gradle/libs.versions.toml`) through the `expo-root-project` Gradle plugin (`ExpoRootProjectPlugin.kt`, which falls back to **35** if the catalog has no `targetSdk`). Re-check after any Expo or React Native upgrade |
 | Icons | Built from the official Meru logo (`assets/brand/meru-logo.png`, the web portal's own file) and wired in `app.json` (see §7). Re-audited in Phase C: no placeholder file remains. The blue "MMG" ticket icon seen on a phone is an APK built before Phase B (commit `8ffe265`); uninstall it before installing the next build, because some launchers keep the old icon. Source is only 689 × 478, so get a vector or ≥ 2048 px master before a store release |
 | Splash | **Wired (Phase C, 2026-10-20).** `expo-splash-screen` ~57.0.10 is installed and configured in `app.json`. It shows the Meru logo with "Setu" on white (image regenerated 2026-10-23, §7), and stays up until the first screen is ready (`src/navigation/splash.ts`), so no blank frame shows between the splash and the app. Takes effect from the next build |
 | `preview` APK | Ready to build with your Expo account (§2). Since 2026-11-17 it starts on **Production**, like every release build. Since 2026-11-18 only an **ADMIN** can switch, from the drawer's Environment row (no password); any role may then sign in on UAT and stays there (§5f) |
 | Signing in | **Microsoft sign-in and email and password sign-in, on every build (UAT and PROD)** since 2026-11-06: the backend confirmed the email endpoint on PRODUCTION (⚠ contract still assumed, 02-AUTH §8). The `__DEV__` developer-token screen was **deleted on 2026-10-29** (§5). AUTH-P2 is live on UAT (02-AUTH §7); production is still unconfirmed (§5) |
-| `production` AAB | **versionCode 7: ready to build, not built** (§5f; kept at 7 on 2026-11-18, as it was never uploaded). versionCode 6 is already on Google Play. It starts on **PRODUCTION**; an ADMIN can switch to UAT from the drawer (§5f). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
+| `production` AAB | **versionCode 9: ready to build, not built** (§5g). versionCode 8 is already on Google Play. (Earlier: versionCode 7, §5f.) It starts on **PRODUCTION**; an ADMIN can switch to UAT from the drawer (§5f). Email sign-in and, with `GOOGLE_SERVICES_JSON` set in the production EAS environment (Ronit, 2026-11-06), push. Open items outside this repo are in §5 |
 
 ---
 
@@ -882,6 +888,112 @@ uploaded, so there is no reason to skip a number. `version` stays `1.0.0`.
 - On UAT: save a web view with two categories and look at its `filters.categoryId` (16 §7a): a string means the web and
   the app agree; an array means the app's reader needs a change.
 - Technicians: the sheet searches (2+ letters). A full list like the web's needs `GET /users` added to 01 first.
+
+**Build command (Ronit runs it, from the repo root, after review and commit):**
+```
+npm run verify:release-bundle
+eas build --platform android --profile production
+```
+
+## 5g. versionCode 9 (2026-11-26): Analytics, ADMIN only, against a contract not yet deployed
+
+Not built. Ronit's written brief of 2026-11-26. R4 and R5 relaxed for this repo; R1, R2, R3 and R6 not. No EAS build was
+run, nothing was committed, the live UAT and PROD APIs were not called, and the web clone was not written to.
+
+**versionCode: 9.** versionCode 8 is on Google Play (`tests/release/production-readiness.test.mjs` now pins "above 8").
+`version` stays `1.0.0`.
+
+**The contract.** `docs/ANALYTICS-BACKEND.md` ("18 — Analytics Dashboard: Backend Specification", 2026-11-19). The brief
+named it `docs/web-system/18-ANALYTICS-BACKEND.md`; it is at `docs/ANALYTICS-BACKEND.md`. **Nothing in it is deployed.**
+Added to `01-API-CONTRACT.md` §10.7 as ANL-1..4, marked ⛔ NOT YET DEPLOYED, and its shapes to `03-DATA-MODEL.md` §C
+(rule 2: types come from 03), every field optional.
+
+**What a tester sees on today's servers (nothing deployed)**
+- An ADMIN: the drawer's "Analytics" row, below "Audit log". It opens the header, the four period chips and one grey
+  line: *"Analytics isn't available yet. The Service Desk hasn't switched it on."* No error box, no Retry, no repeated
+  requests: two GETs per period, cached five minutes.
+- Any other role: no row, no route, no request.
+
+**Done in this repo**
+- [x] **The drawer row and the gate**: `canViewAnalytics` (`permissions.ts`), ADMIN only. The row sits directly below
+  Audit log; the route, a stack of all three screens, is registered for ADMIN only (`drawerRoutes`). Each query is gated
+  in its hook: `enabled: allowed`, and `queryFn` is TanStack's `skipToken` when not allowed, so not even Retry or
+  pull-to-refresh can send one. Each screen also refuses to render for anyone else.
+- [x] **Screen one, Analytics** (ANL-1, ANL-4): The app (Google Play, always under "Google Play · as at <day>"), People
+  (with the adoption line), Where, What they did, the row to screen two, the Play footnote (UI-STANDARDS §19.3).
+- [x] **Screen two, Who is using Setu** (ANL-2): server-side sort chips, muted rows for nothing in the period, infinite
+  scroll capped at 500 (UI-STANDARDS §19.4).
+- [x] **Screen three, one person** (ANL-3): header and counts from the tapped row; the timeline drawn by **the audit
+  log's own card**, extracted from the audit-log screen to `src/components/AuditEntryCard.tsx` and used by both
+  (UI-STANDARDS §19.5).
+- [x] **Undeployed routes** read as "not available yet" (`src/api/analytics.api.ts`, `{ deployed: false }`); JSON errors
+  as errors; every field read tolerantly, drift logged in `__DEV__`.
+- [x] **Cost:** staleTime 5 minutes; no polling, timers or refetch on focus, reconnect or mount; pull-to-refresh only;
+  the period in memory only (`ui.store`).
+- [x] Pagination shape (e) in the one adapter (`normaliseLoosePage`, `src/api/pagination.ts`).
+- [x] No library added. The bars are Views.
+
+**Tests** (1506, was 1407)
+- New: `tests/rbac/analytics.test.mjs` (99):
+  - the row for ADMIN and none of the other four;
+  - React Navigation's drawer router refusing every way into any of the three screens, nested and stale state included;
+  - the hooks' own options run through TanStack's observers, so no request for the other four (not even on refetch),
+    one for ADMIN;
+  - an HTML 404 and an index.html 200 on each endpoint give "not deployed", while JSON errors throw;
+  - tolerant reading: missing sections, wrong types, zeros;
+  - tiles left out vs zeros; the adoption percentage; the Play heading with every Play figure;
+  - the audit log's labels; the reused renderer; versionCode 9.
+- Updated: the ADMIN drawer pins in `tests/rbac/audit-log.test.mjs`, `kb-announcements.test.mjs` and
+  `role-gating.test.mjs`; the Play floor in `tests/release/production-readiness.test.mjs`.
+
+**Checks (2026-11-26)**
+- `npx tsc --noEmit`: clean.
+- `npm test`: **1506 pass, 0 fail**.
+- `npm run verify:release-bundle`: **PASS** (local Metro and Hermes only; no EAS build).
+
+**For Ronit to decide**
+- ~~**Search on screen two.**~~ Decided 2026-11-27: ANL-2 will not gain `search`; the search runs on the phone over
+  every page loaded first. Built (addendum below).
+- **ANL-3's shape.** The spec does not give one; the app reads AUD-1's (the spec's own suggestion). Confirm it with the
+  backend team, or update 01 §10.7 and 03 with what they choose.
+- **"Changed status on #10482".** The brief's example wording differs from the audit log's label for the same enum
+  ("Status Changed"). The brief also says to use the audit log's labels, so the app says "Status Changed on #10482".
+- **The contract's location.** `docs/ANALYTICS-BACKEND.md` is untracked and outside `docs/web-system/`. Move it, or
+  keep the references as they are.
+- **Employee monitoring** (18 §7): screens two and three show what each named person did and when. The spec suggests
+  a word with HR before release.
+
+**Addendum, 2026-11-27 (still versionCode 9, not yet uploaded): search on screen two, on the phone**
+
+Ronit's written decision: ANL-2 has no `search` parameter and will not gain one. Contract note: 01 §10.7 (ANL-2);
+look: UI-STANDARDS §19.4.
+- [x] **Everyone loaded first.** On opening, `useAnalyticsUsers` asks for pages 1, 2, 3 … **one at a time**
+  (`loadNextPageIfDue`; across sorts and refreshes too, no two ANL-2 requests ever overlap) until the rows reach
+  `total`, the last page, or the cap: **`ANALYTICS_MAX_PAGES` = 10** (500 people at 50). Rows show as they arrive.
+- [x] **Never silent about a gap** (`peopleCoverage`): "More people are coming …" while loading; "Search covers the
+  first 500 of 1,631 people." at the cap; "The list is incomplete: … Search covers only those." after a failed page
+  (kept rows, stopped, Retry); the same when offline mid-load. A list known to be whole has no line.
+- [x] **One search rule.** `utils/option-search.ts` gained `filterByText` (several texts per item);
+  `filterOptionsByLabel` is now that rule on one text, its behaviour unchanged. Screen two's `filterPeople` uses it:
+  name (as shown and as sent) or email, anywhere, any case, trimmed.
+- [x] **Cost.** Typing sends nothing (the search is in no key). The pages are one infinite query per period and sort,
+  staleTime 5 min: reopening asks for nothing; an interrupted load carries on from its page. Pull-to-refresh: page 1,
+  then the rest in order. No refetch on focus; the one focus effect clears the field.
+- [x] Field: "Name or email", TalkBack label "Search people by name or email", the match count read out once typing
+  pauses; no match is a plain line; clears on leaving the screen.
+
+**Tests (1529, was 1506):** `tests/rbac/analytics.test.mjs` 122 (was 99). New: the load through TanStack's own
+observer and the hook's own step (pages 1–10 in order, never two in flight, also across a sort chip and a refresh);
+someone on page 7 found by name and by email; the cap line at 1,631 and none at 500, 120, 37; no `total` sent; a failed
+page keeping 150 rows and saying so, then Retry; typing, reopening and an interrupted load asking for nothing extra;
+`filterByText`. Two old pins changed: "no search field" is now the search's own checks, and "no focus listener" allows
+the one effect that clears the field. Mutation-checked: removing the one-at-a-time queue, or the stop on failure, fails
+the tests.
+
+**For Ronit to decide (new)**
+- **Who ANL-2 lists.** 18 §4b's example `total` is 212 (the month's active people): under the cap, search covers
+  everyone. If it lists all 1,631 with access, the cap line shows on every load and search covers the first 500 in the
+  chosen sort (by default the 500 most recently seen). Each sort chip loads its own pages (up to 10 more requests).
 
 **Build command (Ronit runs it, from the repo root, after review and commit):**
 ```

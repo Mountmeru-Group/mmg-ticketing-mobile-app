@@ -16,6 +16,8 @@
 
 **Updated 2026-10-27: the technician, inline on M4.** The Technician row in Properties now has a "Change technician" link and an inline editor, like impact/urgency, category and country. **Placement, not a new capability:** it saves through the existing assignment path (`useAssignTicket` → TKT-5), for exactly the roles and states that already had Assign in More options. Rows T6 and A1, §3, §6 and §7 are updated; §15 has the web's picker (with sources), what was built and the duplication check. No row was added and no total changed.
 
+**Updated 2026-11-26: Analytics, ADMIN only.** N10 (new): the "Analytics" drawer row, directly below Audit log, and its route (three screens) exist for ADMIN only; no ANL request is sent for anyone else. The endpoints are the app's own spec, not deployed, so there is no server guard to compare yet.
+
 **Updated for Phase G8, 2026-11-02: the audit log (M20), ADMIN only.**
 - N9 (new): the "Audit log" drawer row and its route exist for ADMIN only. For the other four personas the route is not registered, so React Navigation's router refuses every way to open it.
 - The server agrees: AUD-1 is `requireAuth, adminOnly` (`BE:modules/auditLog/auditLog.router.ts:8`), a 403 for every other role. **This is a server guard, not only a hidden link**, so there is no §C finding.
@@ -252,6 +254,7 @@ It builds on `src/utils/ticket-rules.ts`, `activity.ts` and `ticket-filters.ts`.
 | N7 | Locked-country chip | country AGENT | country AGENT (lock icon) | MATCH | `DrawerContent.tsx:59` |
 | N8 | Tabs Home · Tickets · Alerts | all, same three | all, five tabs | MATCH. KB and the catalogue (the web's "Requests" tab, SC1) are in the drawer | `src/navigation/MainTabs.tsx:46` → perm `mainTabs` |
 | N9 | Drawer · Audit log (M20, G8) | ADMIN (row and route) | ADMIN: the server's AUD-1 guard (`BE:modules/auditLog/auditLog.router.ts:8`). The page is not in the clone, so its sidebar visibility could not be read | **MATCH** with the server. The route is registered for ADMIN only, below a divider after Announcements. Its action and date filters are not built: the clone's endpoint has none (`docs/G8-WEB-AUDIT.md` §6) | perm `drawerItems`, `drawerRoutes`, `canViewAuditLog`; `src/navigation/AppDrawer.tsx`, `DrawerContent.tsx`; `src/hooks/useAuditLog.ts` |
+| N10 | Drawer · Analytics (2026-11-26) | ADMIN (row, route: a stack of three screens, and every request) | – (no web page; the backend's ANL-1..4 are asked for as ADMIN-only and **not deployed**, `docs/ANALYTICS-BACKEND.md`) | N/A (mobile module). Unreachable for the other four: the route is not registered, and each query is gated in its hook (`skipToken`), so nothing is sent for them | perm `drawerItems`, `drawerRoutes`, `canViewAnalytics`; `src/navigation/ModuleStacks.tsx` AnalyticsStack; `src/hooks/useAnalytics.ts`; tests `tests/rbac/analytics.test.mjs` |
 
 ### 2.2 Home (M2) vs Dashboard
 | # | Element | Mobile shows to | Web shows to | Verdict | Mobile source |

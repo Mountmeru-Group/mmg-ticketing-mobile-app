@@ -8,6 +8,8 @@
 > - File references are relative to `backend/src/` unless prefixed.
 > - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
 > - **2026-11-17 (Ronit's written brief):** SVW-1..4, the saved views, added from the source at `7df97c8` (§10.6; full contract with sources: `16-SAVED-VIEWS.md`). TKT-1's Status filter (several values) added to the mobile filters.
+> - **2026-11-26 (Ronit's written brief):** ANL-1..4, the Analytics endpoints, added as **⛔ NOT YET DEPLOYED** from `docs/ANALYTICS-BACKEND.md` ("18", the spec the app sent the backend team), not from source: none exists yet (§10.7).
+> - **2026-11-27 (Ronit's written decision):** ANL-2 has no `search` parameter and **will not gain one**. Analytics screen two searches **on the phone**, over every page it loads first (§10.7, ANL-2). No parameter was added; none is sent.
 > - **2026-11-18 (Ronit's written brief):** TKT-1's `priority`, `categoryId`, `assignedToId` and `teamId` take several values as ONE comma-separated parameter. **Read from a live URL, not from source:** Ronit copied it from the UAT portal. The clone's controller (`7df97c8`, and all 16 refs) still reads each as one value, so the deployed server differs from the source, as with AUD-1 (§10.5) and NTF-5/6.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
@@ -62,6 +64,7 @@ Every error body is JSON `{ "error": string }`, with these exceptions noted belo
 | **(b) Hand-rolled** | `?page=&limit=`, **limit uncapped** | `{ data: T[], total, page, limit }` | APR (list), SCR-4 |
 | **(c) Ticket activity** | `?page=&pageSize=` (default 50, max 100) | `{ items, auditTotal, page, pageSize, auditPages }` | TKT-7 |
 | **(d) Plain array** | none | `T[]` | comments, attachments, tasks, categories, teams, users/search, … |
+| **(e) Analytics** (⛔ not deployed, §10.7) | `?page=&limit=` (cap 100) | ANL-2 `{ page, limit, total, rows }`; ANL-3 read as (a). Every key optional: missing counters fall back to what was asked, a missing `total` to "a full page means maybe more" (`normaliseLoosePage`) | ANL-2, ANL-3 |
 
 **Rules**
 - `page=abc` or `limit=abc` gives `NaN`, which crashes Prisma and returns **500**. Always send integers.
@@ -1277,6 +1280,91 @@ Out of scope until 2026-11-17 (Appendix A). Since then the app's "Saved filters"
 - **200:** `{ "message": "View deleted" }`. 404 and 403 as SVW-3 (`:65-71`).
 - **Mobile:** after a confirmation. A 404 counts as already deleted: the view leaves the list.
 
+### 10.7 Analytics (`/api/v1/analytics`): ⛔ NOT YET DEPLOYED (2026-11-26)
+
+> **NOT YET DEPLOYED. Not in the web source either.** Source: **`docs/ANALYTICS-BACKEND.md`**, titled "18 — Analytics
+> Dashboard: Backend Specification" (Ronit to the backend team, 2026-11-19). Ronit's brief of 2026-11-26 named it
+> `docs/web-system/18-ANALYTICS-BACKEND.md`; the file is at `docs/ANALYTICS-BACKEND.md`. These are the shapes the app
+> ASKED for; the backend has not answered the spec's five questions (its §3) or shipped anything. Re-verify every line
+> here against the backend's answer, and the source once it exists, before relying on it.
+
+- **Auth:** the spec asks for **ADMIN, enforced server-side**, on all four (18 §4, §8 item 5). Unverified until deployed.
+  The app gates the drawer row, the route (a stack of three screens) and every request on `canViewAnalytics` (ADMIN).
+- **Every field is optional** (18 §4a: "the app renders what arrives and skips what doesn't"). Types: `03` §C
+  "Analytics (ANL-1..4)".
+- **Not deployed:** a GET to a route the server does not have answers HTML (§0.5). `src/api/analytics.api.ts` returns
+  `{ deployed: false }` for it (`isNoSuchGetRoute`: Express's HTML 404, or `index.html` with 200), never an error, and
+  the screen shows one plain line. A JSON error (401, 403, 404, 500) or a 429 is the route's own answer: an error state.
+- **Reading:** the body must be a JSON object (a `shape` error otherwise, as everywhere). Inside it, each field is kept
+  only if it has the documented type; anything else is left out and logged once as `[API drift] ANL-n <path>`
+  (`__DEV__`, type names only). One bad field never rejects the response.
+- **Cost (18 §5):** heavy aggregations on hardware UAT shares with Production. staleTime 5 minutes; no polling, no
+  timers, no refetch on focus, reconnect or mount; pull-to-refresh only. Lists page by 50, capped at 10 pages (500
+  rows; `ANALYTICS_MAX_PAGES`). Screen two loads its pages on opening, **one request at a time** (ANL-2 below).
+- **Params:** an allow-list (`src/api/analytics.api.ts`). `range` is one of `today | last7 | last30 | last90` (anything
+  else is sent as `last30`); `page`, `limit` positive integers, `limit` ≤ 100; `sortBy` one of three or not sent;
+  `countryId` documented on ANL-1, -2, -4 but **not sent** by any screen yet. **There is no search parameter**, and
+  none is sent: screen two's search runs on the phone (ANL-2 below).
+
+#### ANL-1 `GET /api/v1/analytics/overview` — ⛔ NOT YET DEPLOYED (18 §4a)
+- **Query:** `range` (default in the app `last30`), optional `countryId`.
+- **200:** `AnalyticsOverview` (`03` §C): `range`, `from`, `to`; `users { activeToday, activeThisMonth, totalWithAccess,
+  newThisPeriod }`; `devices { registered, activeThisMonth, byCountry[{ countryId, country, devices }] }`;
+  `logins { mobile, web }`; `actions { total, byType[{ action, count }] }`. `action` is an `AuditAction`.
+- **`logins.mobile`** depends on the spec's question 3a (a `platform` column on sessions); it may never arrive.
+- **Mobile:** Analytics screen one, sections People, Where and What they did, the adoption line, and the count on the
+  row to screen two (`totalWithAccess`).
+
+#### ANL-2 `GET /api/v1/analytics/users` — ⛔ NOT YET DEPLOYED (18 §4b)
+- **Query:** `range`, `page`, `limit` (cap 100), `sortBy` (`lastSeen | actions | name`), optional `countryId`.
+  **No search parameter, and there will not be one** (Ronit, 2026-11-27).
+- **Search is CLIENT-SIDE (2026-11-27), and why.** Ronit decided the backend will not add `search`, so screen two's
+  "Name or email" field filters on the phone. Filtering only the page or pages loaded so far would pass a partial
+  answer off as the whole one, so:
+  - **Everything is loaded before anyone types.** On opening, the app asks for page 1, 2, 3 … **sequentially** (the
+    next request only after the last answer; never two ANL-2 requests at once, across sorts and refreshes too) until
+    the rows reach `total`, the server says it was the last page, or the **cap of 10 pages** (500 people at
+    `limit=50`). Rows show as they arrive, under a line saying more are coming.
+  - **Cap reached with more on the server:** a plain line above the results, "Search covers the first 500 of 1,631
+    people." Never hidden.
+  - **A page fails mid-load:** what arrived is kept, loading stops, and the line says "The list is incomplete: 150 of
+    1,631 people loaded. Search covers only those." with Retry.
+  - **Typing sends nothing.** The search is in no query key and no request; it matches anywhere in the name or the
+    email, any case, trimmed (the app's one rule, `src/utils/option-search.ts` `filterByText`).
+  - **Cost:** the pages are one infinite query, cached together per period and sort (staleTime 5 min): reopening
+    within that asks for nothing, and loading happens once per period and sort, never per keystroke. Each sort chip is
+    its own server-sorted list, so a chip not yet visited loads its own pages. Pull-to-refresh asks for page 1 again,
+    then the rest in order.
+  - **What the cap means in practice depends on who ANL-2 lists**, which 18 §4b does not say: its example `total` is
+    212 (the month's active people: under the cap, so the search covers everyone). If it lists all 1,631 people with
+    access, the cap is reached on every load: the line always shows, and the search covers the first 500 **in the
+    chosen sort** (the 500 most recently seen, by default). A server-side `search` or a higher cap would remove that;
+    Ronit's call.
+- **200:** pagination shape **(e)** (§0.3): `{ page, limit, total, rows: AnalyticsUserRow[] }`. Each row: `userId`,
+  `name`, `email`, `role`, `country` (a NAME), `lastSeenAt`, `lastAction { type, ticketNumber, at }`, `actionsInPeriod`,
+  `loginsInPeriod`, `daysActiveInPeriod`, `hasMobileApp`.
+- **Sorting is the server's.** The app never re-sorts the rows it holds. Rows are de-duplicated by `userId` across pages.
+- **Mobile:** Analytics screen two ("Who is using Setu"); the tapped row is also screen three's header.
+
+#### ANL-3 `GET /api/v1/analytics/users/:id` — ⛔ NOT YET DEPLOYED (18 §4c)
+- **Query:** `range`, `page`, `limit`. `:id` is sent as one encoded path segment.
+- **200: NOT SPECIFIED.** The spec says only "the audit log filtered to that user. If reusing the audit log's existing
+  response shape is easier, do that and tell us." **The app reads AUD-1's shape** (§10.5, `Paginated<AuditLogEntry>`),
+  the only documented one: `data[]` of audit entries, newest first. An entry needs a string `id` and `action`; other
+  fields fall back to "not there". A body with no `data` array: the timeline is left out. Anything else the backend
+  chooses means changing this section and `03` first.
+- **Mobile:** Analytics screen three, its timeline, drawn by the audit log's own card (`AuditEntryCard`).
+
+#### ANL-4 `GET /api/v1/analytics/installs` — ⛔ NOT YET DEPLOYED (18 §6d)
+- **Query:** `range`, optional `countryId`.
+- **200:** `AnalyticsInstalls` (`03` §C): `range`, `from`, `to`, **`dataThrough`** (`YYYY-MM-DD`, the last day Google's
+  figures cover), `totals { installs, uninstalls, netGrowth, growthRatePercent, currentInstalls, activeDevices,
+  audienceSize }`, `crashRatePercent`, `byCountry[]`, `daily[]`.
+- Needs a Google Cloud project, a service account with Play Console read access, a daily job and a table (18 §6b, §6c).
+  The last of the four in the spec's priority list.
+- **Mobile:** Analytics screen one, section "The app". Every Play figure shows under "Google Play · as at
+  <dataThrough>" ("Google Play" alone when `dataThrough` is missing). Not deployed: the whole section is absent.
+
 ---
 
 ## Appendix A — Out of scope for mobile (names only)
@@ -1329,6 +1417,8 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 **64 documented endpoints:** 33 MVP and 31 Phase 2 (APR-4 added in G3, AUD-1 in G8, SVW-1..4 on 2026-11-17). Also:
 - AUTH-P1, P2, P3 and P5 (§1.4), PENDING backend asks;
 - NTF-5 and NTF-6 (§9), confirmed in writing by the backend team on 2026-11-05 and in the source at `7df97c8`. They replace AUTH-P4.
+- ANL-1..4 (§10.7), **⛔ NOT YET DEPLOYED**: built against the app's own spec (`docs/ANALYTICS-BACKEND.md`), not counted
+  in the 64 until the backend ships and confirms them.
 
 3 more are reference-only, do-not-call (§1.5). SCR-1..SCR-6 are used by the app since G4; their label stays P2, as for LKP-7 and APR-4.
 
@@ -1400,3 +1490,7 @@ These routes exist but the mobile app **must not call them**. Adding any of them
 | SVW-2 | POST | `/saved-views` `{ name, entityType, filters }` | any | 2026-11-17 |
 | SVW-3 | PUT | `/saved-views/:id` `{ name }` | owner | 2026-11-17 |
 | SVW-4 | DELETE | `/saved-views/:id` | owner | 2026-11-17 |
+| ANL-1 | GET | `/analytics/overview?range=` | ADMIN (asked for) | ⛔ NOT YET DEPLOYED (2026-11-26) |
+| ANL-2 | GET | `/analytics/users?range=&page=&limit=&sortBy=` | ADMIN (asked for) | ⛔ NOT YET DEPLOYED (2026-11-26) |
+| ANL-3 | GET | `/analytics/users/:id?range=&page=&limit=` | ADMIN (asked for) | ⛔ NOT YET DEPLOYED (2026-11-26) |
+| ANL-4 | GET | `/analytics/installs?range=` | ADMIN (asked for) | ⛔ NOT YET DEPLOYED (2026-11-26) |

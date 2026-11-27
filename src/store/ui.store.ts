@@ -6,8 +6,12 @@
 // dashboard (FE:DashboardPage.tsx:61); the app keeps it a little longer, across tabs, but writes nothing to disk.
 // Saved filters are the Service Desk's saved views (2026-11-17, src/hooks/useSavedViews.ts); applying one only sets the
 // fields below. reset() also runs on the environment switch (src/api/environmentSwitch.ts).
+// The Analytics period (2026-11-26) lives here too, like the Home period: memory only, back to "Last 30 days" after a
+// restart, a sign-out or an environment switch.
 import { create } from 'zustand';
 
+import type { AnalyticsRange } from '@/types';
+import { DEFAULT_ANALYTICS_RANGE } from '@/utils/analytics';
 import {
   DEFAULT_DASHBOARD_PERIOD, NO_CUSTOM_RANGE, type CustomDayRange, type DashboardPeriod,
 } from '@/utils/dashboard-period';
@@ -37,6 +41,8 @@ interface UiState {
   homePeriod: DashboardPeriod;
   /** The Custom period's From and To. Kept when another period is picked, so going back to Custom restores them. */
   homeCustomRange: CustomDayRange;
+  /** Analytics (ADMIN): the window all three screens ask for. Set on screen one only. */
+  analyticsRange: AnalyticsRange;
 
   setTicketFilter: (filter: TicketNamedFilter) => void;
   setTicketSort: (sort: TicketSortOption) => void;
@@ -63,6 +69,7 @@ interface UiState {
   restoreAnnouncement: (id: string) => void;
   setHomePeriod: (period: DashboardPeriod) => void;
   setHomeCustomRange: (patch: Partial<CustomDayRange>) => void;
+  setAnalyticsRange: (range: AnalyticsRange) => void;
   reset: () => void;
 }
 
@@ -81,10 +88,11 @@ const INITIAL = {
   dismissedAnnouncementIds: [],
   homePeriod: DEFAULT_DASHBOARD_PERIOD,
   homeCustomRange: NO_CUSTOM_RANGE,
+  analyticsRange: DEFAULT_ANALYTICS_RANGE,
 } as const satisfies Pick<
   UiState,
   | 'ticketFilter' | 'ticketSort' | 'ticketAdvanced' | 'ticketSearchText' | 'ticketSearch' | 'ticketCountryId' | 'dismissedAnnouncementIds'
-  | 'homePeriod' | 'homeCustomRange' | 'ticketPeriod'
+  | 'homePeriod' | 'homeCustomRange' | 'ticketPeriod' | 'analyticsRange'
 >;
 
 export const useUiStore = create<UiState>()((set) => ({
@@ -122,5 +130,6 @@ export const useUiStore = create<UiState>()((set) => ({
   restoreAnnouncement: (id) => set((s) => ({ dismissedAnnouncementIds: s.dismissedAnnouncementIds.filter((d) => d !== id) })),
   setHomePeriod: (homePeriod) => set({ homePeriod }),
   setHomeCustomRange: (patch) => set((s) => ({ homeCustomRange: { ...s.homeCustomRange, ...patch } })),
+  setAnalyticsRange: (analyticsRange) => set({ analyticsRange }),
   reset: () => set({ ...INITIAL }),
 }));

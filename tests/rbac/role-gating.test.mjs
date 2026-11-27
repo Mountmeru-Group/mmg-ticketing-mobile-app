@@ -43,8 +43,9 @@ describe('drawer and tab bar', () => {
   // 2026-10-29: Knowledge base and Announcements are ADMIN only (a product decision; tests/rbac/kb-announcements.test.mjs).
   // G7 (Ronit, 2026-11-02): Approvals for every role, always. Before: END_USER and L2_MANAGER only while APR-1 had one.
   // G8: the Audit log, ADMIN only, after Announcements (tests/rbac/audit-log.test.mjs).
+  // 2026-11-26: Analytics, ADMIN only, directly below the Audit log (tests/rbac/analytics.test.mjs).
   const ROWS = ['approvals', 'tasks', 'catalog', 'settings'];
-  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'settings'];
+  const ADMIN_ROWS = ['approvals', 'tasks', 'knowledge', 'catalog', 'announcements', 'auditLog', 'analytics', 'settings'];
 
   forEachPersona(
     'drawer rows (whatever is pending)',

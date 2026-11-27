@@ -11,6 +11,8 @@
 // - Service Request (Phase G4): every role, the service catalogue and My Requests (docs/G4-WEB-CATALOGUE.md).
 // - Audit log (G8): ADMIN only, after Announcements below a divider, before Settings. Its route is registered for ADMIN
 //   only (AppDrawer.tsx), and the server answers 403 to anyone else (docs/G8-WEB-AUDIT.md).
+// - Analytics (2026-11-26): ADMIN only (canViewAnalytics), directly below Audit log. Its route, the stack of all three
+//   Analytics screens, is registered for ADMIN only (AppDrawer.tsx); docs/ANALYTICS-BACKEND.md.
 // - Sign out: confirmation, AUTH-3, then the local wipe (hooks/useProfile.ts useSignOut).
 // - Environment (2026-11-18, Ronit's decision): ADMIN only (permissions.ts canSwitchEnvironment), release builds only
 //   (CAN_SWITCH_ENVIRONMENT), no password. For every other role the row is ABSENT, not disabled, and the sheet
@@ -69,6 +71,8 @@ const DRAWER_ROWS: Record<
   announcements: { label: 'Announcements', icon: 'megaphone-outline', route: 'Announcements' },
   // G8: an administrator's tool, below a divider so it does not read as one of the modules everyone has.
   auditLog: { label: 'Audit log', icon: 'document-text-outline', route: 'AuditLog', dividerBefore: true },
+  // Directly below Audit log, in the same administrators' group (no second divider).
+  analytics: { label: 'Analytics', icon: 'bar-chart-outline', route: 'Analytics' },
   settings: { label: 'Settings', icon: 'settings-outline', route: 'Profile' },
 };
 
@@ -103,6 +107,9 @@ export function DrawerContent({ navigation, state }: DrawerContentComponentProps
         break;
       case 'Catalog':
         navigation.navigate('Catalog', { screen: 'ServiceCatalog', pop: true });
+        break;
+      case 'Analytics':
+        navigation.navigate('Analytics', { screen: 'AnalyticsOverview', pop: true });
         break;
       case 'MainTabs':
         navigation.navigate('MainTabs', { screen: 'HomeTab' });
