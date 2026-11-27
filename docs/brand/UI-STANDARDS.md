@@ -1421,8 +1421,23 @@ on a server without the routes and once with them.
 ### 19.4 Screen two: Who is using Setu
 - Under the header: the period and the count ("Last 30 days · 1,631 people"), then three sort chips: **Last seen**
   (default), **Most actions**, **Name**. The server sorts (`sortBy`); the app never re-sorts loaded rows.
-- **No search field.** The brief asked for one (name or email), but ANL-2 has no search parameter, and filtering only
-  the loaded pages would read as the whole answer. Waiting on Ronit: add `search` to 18 §4b, then build it.
+- **Search, on the phone (2026-11-27).** ANL-2 has no search parameter and will not gain one (Ronit), so:
+  - a search field **pinned under the period line, above the sort chips and the list** (the standard `SearchField`,
+    44 dp): placeholder **"Name or email"**, TalkBack label "Search people by name or email", a clear button;
+  - it matches anywhere in the name or the email, any case, trimmed (the app's one rule, `utils/option-search.ts`);
+    the sort chip still orders what it finds; clearing it brings the whole list back; it clears itself when the screen
+    loses focus;
+  - no match: one plain line, **"Nothing matches “…”."** (14 dp gray-500, centred), not an empty screen;
+  - TalkBack reads the number of matches once typing pauses ("3 matches"), then any gap in the list (below).
+- **Everyone is loaded before the search counts.** On opening, every page is asked for, one at a time, up to 10 pages
+  (500 people). Rows show as they arrive. A line under the chips, above the results (12 dp, an icon at its left), says
+  whenever the list is not everyone, and is never hidden:
+  - loading: a small spinner, **"More people are coming: 150 of 1,631 loaded so far."** (gray-500);
+  - the cap reached: **"Search covers the first 500 of 1,631 people."** (gray-700, info icon);
+  - a page failed: **"The list is incomplete: 150 of 1,631 people loaded. Search covers only those. Tap to retry"**
+    (red-700, the whole line a 44 dp button);
+  - offline mid-load: "The list is incomplete: … The rest load when you're back online.";
+  - a list known to be whole: no line.
 - A row per person (the standard card, press feedback): initials (40 dp, the requester avatar's red-on-pale), the name
   (16 dp semibold), a 14 dp **phone icon** when they have the app; then what they last did and when, **"Status Changed
   on #10482 · 2h ago"** (14 dp gray-700; the action label alone without a ticket; "Last seen 2h ago" without an action);
@@ -1430,7 +1445,8 @@ on a server without the routes and once with them.
 - **Nothing in the period** (zero days active, or zero actions and zero logins): the row is muted: gray initials on
   gray-100, the name gray-500, **"Nothing in this period"**, then **"Last seen 12 Oct 2026"** as a date. Still listed.
   A person with none of the counts is not called inactive: a missing number is not a zero.
-- Infinite scroll, 50 a page, capped at 500, with the audit log's footer ("Showing the first 500 of 1,631").
+- 50 a page, capped at 500 (10 pages). Since 2026-11-27 the pages load on opening, not on scroll; the line above
+  replaces the old footer ("Showing the first 500 of 1,631").
 
 ### 19.5 Screen three: one person
 - The header card: 56 dp initials, the name (18 dp semibold), role and country ("Technician · Zambia"), chips **"Has the

@@ -24,6 +24,9 @@ account card and the switch sheet are redesigned (§5f). Not built.
 Updated 2026-11-26 for the next production build: **versionCode 9** (versionCode 8 is on Google Play). An ADMIN-only
 Analytics section, three screens, built against a contract the backend has **not deployed**: on today's servers it shows
 "Analytics isn't available yet" (§5g). Not built.
+Updated 2026-11-27, still versionCode 9 (not yet uploaded): Analytics screen two gets a search field, "Name or email",
+that filters on the phone over every page loaded first, capped at 10 pages, and says when it cannot cover everyone
+(§5g, addendum). Not built.
 
 **Where things stand**
 
@@ -949,9 +952,8 @@ Added to `01-API-CONTRACT.md` §10.7 as ANL-1..4, marked ⛔ NOT YET DEPLOYED, a
 - `npm run verify:release-bundle`: **PASS** (local Metro and Hermes only; no EAS build).
 
 **For Ronit to decide**
-- **Search on screen two.** The brief asked for a search field (name or email); ANL-2 has no search parameter, and
-  filtering only the loaded pages would pass a partial answer off as the whole one. Not built. Add `search` to 18 §4b if
-  wanted.
+- ~~**Search on screen two.**~~ Decided 2026-11-27: ANL-2 will not gain `search`; the search runs on the phone over
+  every page loaded first. Built (addendum below).
 - **ANL-3's shape.** The spec does not give one; the app reads AUD-1's (the spec's own suggestion). Confirm it with the
   backend team, or update 01 §10.7 and 03 with what they choose.
 - **"Changed status on #10482".** The brief's example wording differs from the audit log's label for the same enum
@@ -960,6 +962,38 @@ Added to `01-API-CONTRACT.md` §10.7 as ANL-1..4, marked ⛔ NOT YET DEPLOYED, a
   keep the references as they are.
 - **Employee monitoring** (18 §7): screens two and three show what each named person did and when. The spec suggests
   a word with HR before release.
+
+**Addendum, 2026-11-27 (still versionCode 9, not yet uploaded): search on screen two, on the phone**
+
+Ronit's written decision: ANL-2 has no `search` parameter and will not gain one. Contract note: 01 §10.7 (ANL-2);
+look: UI-STANDARDS §19.4.
+- [x] **Everyone loaded first.** On opening, `useAnalyticsUsers` asks for pages 1, 2, 3 … **one at a time**
+  (`loadNextPageIfDue`; across sorts and refreshes too, no two ANL-2 requests ever overlap) until the rows reach
+  `total`, the last page, or the cap: **`ANALYTICS_MAX_PAGES` = 10** (500 people at 50). Rows show as they arrive.
+- [x] **Never silent about a gap** (`peopleCoverage`): "More people are coming …" while loading; "Search covers the
+  first 500 of 1,631 people." at the cap; "The list is incomplete: … Search covers only those." after a failed page
+  (kept rows, stopped, Retry); the same when offline mid-load. A list known to be whole has no line.
+- [x] **One search rule.** `utils/option-search.ts` gained `filterByText` (several texts per item);
+  `filterOptionsByLabel` is now that rule on one text, its behaviour unchanged. Screen two's `filterPeople` uses it:
+  name (as shown and as sent) or email, anywhere, any case, trimmed.
+- [x] **Cost.** Typing sends nothing (the search is in no key). The pages are one infinite query per period and sort,
+  staleTime 5 min: reopening asks for nothing; an interrupted load carries on from its page. Pull-to-refresh: page 1,
+  then the rest in order. No refetch on focus; the one focus effect clears the field.
+- [x] Field: "Name or email", TalkBack label "Search people by name or email", the match count read out once typing
+  pauses; no match is a plain line; clears on leaving the screen.
+
+**Tests (1529, was 1506):** `tests/rbac/analytics.test.mjs` 122 (was 99). New: the load through TanStack's own
+observer and the hook's own step (pages 1–10 in order, never two in flight, also across a sort chip and a refresh);
+someone on page 7 found by name and by email; the cap line at 1,631 and none at 500, 120, 37; no `total` sent; a failed
+page keeping 150 rows and saying so, then Retry; typing, reopening and an interrupted load asking for nothing extra;
+`filterByText`. Two old pins changed: "no search field" is now the search's own checks, and "no focus listener" allows
+the one effect that clears the field. Mutation-checked: removing the one-at-a-time queue, or the stop on failure, fails
+the tests.
+
+**For Ronit to decide (new)**
+- **Who ANL-2 lists.** 18 §4b's example `total` is 212 (the month's active people): under the cap, search covers
+  everyone. If it lists all 1,631 with access, the cap line shows on every load and search covers the first 500 in the
+  chosen sort (by default the 500 most recently seen). Each sort chip loads its own pages (up to 10 more requests).
 
 **Build command (Ronit runs it, from the repo root, after review and commit):**
 ```

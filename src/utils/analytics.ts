@@ -11,6 +11,7 @@ import type { AnalyticsInstalls, AnalyticsOverview, AnalyticsRange, AnalyticsUse
 import { auditActionLabel } from './audit-log';
 import { DASHBOARD_PERIODS } from './dashboard-period';
 import { formatDate, formatDisplayName, formatRelativeShort } from './format';
+import { filterByText, optionSearchAnnouncement } from './option-search';
 import { ROLE_LABELS } from './roles';
 
 // ── The period and the sort ──────────────────────────────────
@@ -294,4 +295,76 @@ export function personChips(row: AnalyticsUserRow | undefined, now: number = Dat
     ...(row.hasMobileApp === true ? [{ key: 'app', label: 'Has the app' }] : []),
     ...(row.lastSeenAt ? [{ key: 'seen', label: `Active ${formatRelativeShort(row.lastSeenAt, now)}` }] : []),
   ];
+}
+
+// ── Screen two: search on the phone, and how much of the list it covers (2026-11-27) ──
+// Ronit's decision: ANL-2 has no `search` parameter and will not gain one, so the search runs on the phone. It is only
+// honest over the WHOLE list, so the screen loads every page first (hooks/useAnalytics.ts, capped at
+// ANALYTICS_MAX_PAGES), and whenever what it holds is not everyone, a line above the results says so (peopleCoverage).
+
+/** The texts a person is found by: the name as shown, the name as sent, the email. */
+const personSearchTexts = (row: AnalyticsUserRow) => [formatDisplayName(row.name), row.name, row.email];
+
+/**
+ * Screen two's search: anywhere in the name OR the email, any case, the query trimmed. It IS option-search.ts's rule
+ * (filterByText), not a second matcher. The rows keep their order: the server's, for the sort chip chosen.
+ */
+export function filterPeople(rows: readonly AnalyticsUserRow[], query: string): readonly AnalyticsUserRow[] {
+  return filterByText(rows, query, personSearchTexts);
+}
+
+/** Where loading the list stands (useAnalyticsUsers, read by screen two). */
+export interface PeopleLoadState {
+  /** People held, once each. */
+  loaded: number;
+  /** ANL-2's `total`, when it sent one. */
+  total: number | null;
+  /** Another page is due (under the cap). */
+  more: boolean;
+  /** That page waits for the network. */
+  waiting: boolean;
+  /** A request failed: loading stopped, and what arrived is kept. */
+  failed: boolean;
+  /** The cap stopped loading, and the server has more. */
+  capped: boolean;
+}
+
+export type PeopleCoverageKind = 'complete' | 'failed' | 'waiting' | 'loading' | 'capped' | 'short';
+
+export interface PeopleCoverage {
+  kind: PeopleCoverageKind;
+  /** The plain line above the results; null only when the list is everyone. */
+  text: string | null;
+  /** Said after the number of matches; null only when the list is everyone. */
+  note: string | null;
+}
+
+/**
+ * Whether the search covers everyone, and the line that says so when it does not. NEVER silent about a gap: a list
+ * that is still loading, stopped by a failure or the network, cut by the cap, or short of the server's total gets its
+ * line. Only a list known to be whole has none.
+ */
+export function peopleCoverage(s: PeopleLoadState): PeopleCoverage {
+  const n = formatCount(s.loaded);
+  const of = s.total !== null ? ` of ${formatCount(s.total)}` : '';
+  const people = (s.total ?? s.loaded) === 1 ? 'person' : 'people';
+  const incomplete = `The list is incomplete: ${n}${of} ${people} loaded.`;
+  const line = (kind: PeopleCoverageKind, text: string, note: string = text): PeopleCoverage => ({ kind, text, note });
+
+  if (s.failed) return line('failed', `${incomplete} Search covers only those.`);
+  if (s.more && s.waiting) return line('waiting', `${incomplete} The rest load when you're back online.`);
+  if (s.more) return line('loading', `More people are coming: ${n}${of} loaded so far.`, 'More people are still loading.');
+  if (s.capped) {
+    return line('capped', s.total !== null && s.total > s.loaded
+      ? `Search covers the first ${n} of ${formatCount(s.total)} people.`
+      : `Search covers the first ${n} people. There may be more.`);
+  }
+  if (s.total !== null && s.loaded < s.total) return line('short', `${incomplete} Search covers only those.`);
+  return { kind: 'complete', text: null, note: null };
+}
+
+/** What TalkBack says once typing pauses: the number of matches (option-search's words), then any gap in the list. */
+export function peopleSearchAnnouncement(matches: number, note: string | null): string {
+  const count = optionSearchAnnouncement(matches);
+  return note ? `${count}. ${note}` : count;
 }

@@ -9,6 +9,7 @@
 > - **2026-11-05:** the backend team sent Ronit a written contract for AUD-1, DSH-1 and NTF-5/NTF-6. Each section below says where it agrees with the source (re-read at `7df97c8`, the clone of 2026-11-05 09:56) and where it does not, and what the app does.
 > - **2026-11-17 (Ronit's written brief):** SVW-1..4, the saved views, added from the source at `7df97c8` (§10.6; full contract with sources: `16-SAVED-VIEWS.md`). TKT-1's Status filter (several values) added to the mobile filters.
 > - **2026-11-26 (Ronit's written brief):** ANL-1..4, the Analytics endpoints, added as **⛔ NOT YET DEPLOYED** from `docs/ANALYTICS-BACKEND.md` ("18", the spec the app sent the backend team), not from source: none exists yet (§10.7).
+> - **2026-11-27 (Ronit's written decision):** ANL-2 has no `search` parameter and **will not gain one**. Analytics screen two searches **on the phone**, over every page it loads first (§10.7, ANL-2). No parameter was added; none is sent.
 > - **2026-11-18 (Ronit's written brief):** TKT-1's `priority`, `categoryId`, `assignedToId` and `teamId` take several values as ONE comma-separated parameter. **Read from a live URL, not from source:** Ronit copied it from the UAT portal. The clone's controller (`7df97c8`, and all 16 refs) still reads each as one value, so the deployed server differs from the source, as with AUD-1 (§10.5) and NTF-5/6.
 >
 > **Auth status:** every endpoint below except §1's public ones needs `Authorization: Bearer <token>`. **No way to obtain a token exists yet** (`02-AUTH.md`).
@@ -1298,10 +1299,12 @@ Out of scope until 2026-11-17 (Appendix A). Since then the app's "Saved filters"
   only if it has the documented type; anything else is left out and logged once as `[API drift] ANL-n <path>`
   (`__DEV__`, type names only). One bad field never rejects the response.
 - **Cost (18 §5):** heavy aggregations on hardware UAT shares with Production. staleTime 5 minutes; no polling, no
-  timers, no refetch on focus, reconnect or mount; pull-to-refresh only. Lists page by 50, capped at 500 rows.
+  timers, no refetch on focus, reconnect or mount; pull-to-refresh only. Lists page by 50, capped at 10 pages (500
+  rows; `ANALYTICS_MAX_PAGES`). Screen two loads its pages on opening, **one request at a time** (ANL-2 below).
 - **Params:** an allow-list (`src/api/analytics.api.ts`). `range` is one of `today | last7 | last30 | last90` (anything
   else is sent as `last30`); `page`, `limit` positive integers, `limit` ≤ 100; `sortBy` one of three or not sent;
-  `countryId` documented on ANL-1, -2, -4 but **not sent** by any screen yet. **There is no search parameter.**
+  `countryId` documented on ANL-1, -2, -4 but **not sent** by any screen yet. **There is no search parameter**, and
+  none is sent: screen two's search runs on the phone (ANL-2 below).
 
 #### ANL-1 `GET /api/v1/analytics/overview` — ⛔ NOT YET DEPLOYED (18 §4a)
 - **Query:** `range` (default in the app `last30`), optional `countryId`.
@@ -1314,8 +1317,29 @@ Out of scope until 2026-11-17 (Appendix A). Since then the app's "Saved filters"
 
 #### ANL-2 `GET /api/v1/analytics/users` — ⛔ NOT YET DEPLOYED (18 §4b)
 - **Query:** `range`, `page`, `limit` (cap 100), `sortBy` (`lastSeen | actions | name`), optional `countryId`.
-  **No search parameter**, so the screen has no search field (filtering the loaded pages on the phone would pass a
-  partial answer off as the whole one). Adding `search` to 18 §4b is Ronit's call (`RELEASE.md` §5g).
+  **No search parameter, and there will not be one** (Ronit, 2026-11-27).
+- **Search is CLIENT-SIDE (2026-11-27), and why.** Ronit decided the backend will not add `search`, so screen two's
+  "Name or email" field filters on the phone. Filtering only the page or pages loaded so far would pass a partial
+  answer off as the whole one, so:
+  - **Everything is loaded before anyone types.** On opening, the app asks for page 1, 2, 3 … **sequentially** (the
+    next request only after the last answer; never two ANL-2 requests at once, across sorts and refreshes too) until
+    the rows reach `total`, the server says it was the last page, or the **cap of 10 pages** (500 people at
+    `limit=50`). Rows show as they arrive, under a line saying more are coming.
+  - **Cap reached with more on the server:** a plain line above the results, "Search covers the first 500 of 1,631
+    people." Never hidden.
+  - **A page fails mid-load:** what arrived is kept, loading stops, and the line says "The list is incomplete: 150 of
+    1,631 people loaded. Search covers only those." with Retry.
+  - **Typing sends nothing.** The search is in no query key and no request; it matches anywhere in the name or the
+    email, any case, trimmed (the app's one rule, `src/utils/option-search.ts` `filterByText`).
+  - **Cost:** the pages are one infinite query, cached together per period and sort (staleTime 5 min): reopening
+    within that asks for nothing, and loading happens once per period and sort, never per keystroke. Each sort chip is
+    its own server-sorted list, so a chip not yet visited loads its own pages. Pull-to-refresh asks for page 1 again,
+    then the rest in order.
+  - **What the cap means in practice depends on who ANL-2 lists**, which 18 §4b does not say: its example `total` is
+    212 (the month's active people: under the cap, so the search covers everyone). If it lists all 1,631 people with
+    access, the cap is reached on every load: the line always shows, and the search covers the first 500 **in the
+    chosen sort** (the 500 most recently seen, by default). A server-side `search` or a higher cap would remove that;
+    Ronit's call.
 - **200:** pagination shape **(e)** (§0.3): `{ page, limit, total, rows: AnalyticsUserRow[] }`. Each row: `userId`,
   `name`, `email`, `role`, `country` (a NAME), `lastSeenAt`, `lastAction { type, ticketNumber, at }`, `actionsInPeriod`,
   `loginsInPeriod`, `daysActiveInPeriod`, `hasMobileApp`.
